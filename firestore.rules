@@ -1,0 +1,85 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Users: read/write own doc
+    match /users/{userId} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+
+    // Products: anyone can read, only admin writes
+    match /products/{productId} {
+      allow read: if true;
+      allow write: if request.auth != null && request.auth.token.email == 'admin@neemuchblink.in';
+    }
+
+    // Categories: public read
+    match /categories/{categoryId} {
+      allow read: if true;
+      allow write: if request.auth != null && request.auth.token.email == 'admin@neemuchblink.in';
+    }
+
+    // Orders: user can read/write own orders
+    match /orders/{orderId} {
+      allow read, write: if request.auth != null && resource.data.userId == request.auth.uid;
+      allow write: if request.auth != null;
+    }
+
+    // Cart: own cart only
+    match /cart/{userId} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+
+    // Wishlist: own wishlist only
+    match /wishlist/{userId} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+
+    // Coupons: public read
+    match /coupons/{couponId} {
+      allow read: if true;
+      allow write: if request.auth != null && request.auth.token.email == 'admin@neemuchblink.in';
+    }
+
+    // Banners: public read
+    match /banners/{bannerId} {
+      allow read: if true;
+      allow write: if request.auth != null && request.auth.token.email == 'admin@neemuchblink.in';
+    }
+
+    // Addresses: own addresses
+    match /addresses/{userId}/list/{addressId} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+
+    // Notifications: own only
+    match /notifications/{userId} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+
+    // Vendors: contains commission rates & sales figures — admin only.
+    // Vendors themselves should authenticate through a separate
+    // vendor-portal flow (not covered by this consumer-facing app).
+    match /vendors/{vendorId} {
+      allow read, write: if request.auth != null && request.auth.token.email == 'admin@neemuchblink.in';
+    }
+
+    // Ad slots / sponsored placements: public read so the storefront can
+    // render sponsored products & banners; only admin manages pricing & status.
+    match /adSlots/{adSlotId} {
+      allow read: if true;
+      allow write: if request.auth != null && request.auth.token.email == 'admin@neemuchblink.in';
+    }
+
+    // Referrals: a user can create their own referral record and read
+    // records where they are either the referrer or the referee.
+    // Reward crediting itself should happen server-side via a Cloud
+    // Function trigger — never trust the client to set reward amounts.
+    match /referrals/{referralId} {
+      allow create: if request.auth != null && request.resource.data.referrerUid == request.auth.uid;
+      allow read: if request.auth != null &&
+        (resource.data.referrerUid == request.auth.uid || resource.data.refereeUid == request.auth.uid);
+      allow update, delete: if request.auth != null && request.auth.token.email == 'admin@neemuchblink.in';
+    }
+  }
+}

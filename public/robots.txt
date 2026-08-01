@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://neemuchblink.in/sitemap.xml
