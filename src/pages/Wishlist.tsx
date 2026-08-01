@@ -1,44 +1,36 @@
-import React from 'react'
-import { motion } from 'framer-motion'
-import { Heart } from 'lucide-react'
-import { useNavigate } from 'react-router-dom'
-import ProductCard from '../components/ProductCard'
-import { useWishlist } from '../context/WishlistContext'
+import React, { useEffect, useState } from 'react';
+import { SEO } from '../components/SEO';
+import { ProductCard } from '../components/ProductCard';
+import { useWishlist } from '../context/WishlistContext';
+import { productRepository } from '../repositories/productRepository';
+import { Product } from '../types';
 
-const Wishlist: React.FC = () => {
-  const { items } = useWishlist()
-  const navigate = useNavigate()
+export const Wishlist: React.FC = () => {
+  const { wishlistIds } = useWishlist();
+  const [products, setProducts] = useState<Product[]>([]);
+
+  useEffect(() => {
+    productRepository.getAllProducts().then(all => {
+      setProducts(all.filter(p => wishlistIds.includes(p.id)));
+    });
+  }, [wishlistIds]);
 
   return (
-    <div className="max-w-7xl mx-auto px-4 py-8">
-      <div className="flex items-center gap-2 mb-6">
-        <Heart size={20} className="text-red-500 fill-red-500" />
-        <h1 className="text-2xl font-black text-gray-900 dark:text-white">Wishlist</h1>
-        <span className="bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 text-sm font-bold px-2.5 py-0.5 rounded-full">{items.length}</span>
-      </div>
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
+      <SEO title="Saved Wishlist - StyleDash" />
+      <h1 className="text-2xl sm:text-3xl font-black text-neutral-900 dark:text-white">Saved Wishlist ({products.length})</h1>
 
-      {items.length === 0 ? (
-        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-center py-20">
-          <Heart size={56} className="text-gray-200 dark:text-gray-700 mx-auto mb-3" />
-          <p className="text-gray-400 font-medium mb-4">Your wishlist is empty</p>
-          <button
-            onClick={() => navigate('/products')}
-            className="bg-brand-yellow text-brand-dark font-bold px-5 py-2.5 rounded-xl hover:bg-yellow-400 transition-colors"
-          >
-            Discover Products
-          </button>
-        </motion.div>
+      {products.length === 0 ? (
+        <div className="p-12 text-center bg-white dark:bg-neutral-900 rounded-3xl border border-neutral-200 dark:border-neutral-800 space-y-3">
+          <p className="text-xs text-neutral-500">You haven't saved any fashion items to your wishlist yet.</p>
+        </div>
       ) : (
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
-          {items.map((p, i) => (
-            <motion.div key={p.id} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.05 }}>
-              <ProductCard product={p} />
-            </motion.div>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+          {products.map(p => (
+            <ProductCard key={p.id} product={p} />
           ))}
         </div>
       )}
     </div>
-  )
-}
-
-export default Wishlist
+  );
+};
