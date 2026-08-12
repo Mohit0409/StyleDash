@@ -11,7 +11,7 @@ export const trackEvent = (eventName: string, eventParams?: Record<string, any>)
   } else {
     // In demo/local mode, log to console in dev
     if (import.meta.env.DEV) {
-      console.log('[analytics]', eventName, eventParams);
+      console.log('[Analytics Demo] ' + eventName + ':', eventParams);
     }
   }
 };

@@ -1,0 +1,34 @@
+#!/data/data/com.termux/files/usr/bin/bash
+# Temporary rollback path retained until ngrok reboot recovery is confirmed.
+set -u
+
+RUN_DIR="$HOME/run"
+LOG_DIR="$HOME/logs"
+PID_FILE="$RUN_DIR/styledash-cloudflare.pid"
+URL_FILE="$RUN_DIR/styledash-cloudflare-url"
+LOG_FILE="$LOG_DIR/styledash-tunnel.log"
+
+mkdir -p "$RUN_DIR" "$LOG_DIR"
+curl -fsS --max-time 5 http://127.0.0.1:8080/ >/dev/null || "$HOME/bin/start-styledash" || exit 1
+
+if [ -s "$PID_FILE" ]; then
+  pid="$(cat "$PID_FILE")"
+  if kill -0 "$pid" 2>/dev/null && tr '\0' ' ' < "/proc/$pid/cmdline" 2>/dev/null | grep -Fq 'cloudflared tunnel'; then
+    exit 0
+  fi
+fi
+
+nohup cloudflared tunnel --no-autoupdate --url http://127.0.0.1:8080 >> "$LOG_FILE" 2>&1 &
+pid="$!"
+printf '%s\n' "$pid" > "$PID_FILE"
+
+for _ in $(seq 1 30); do
+  url="$(grep -Eo 'https://[-a-z0-9]+\.trycloudflare\.com' "$LOG_FILE" 2>/dev/null | tail -n 1 || true)"
+  if [ -n "$url" ]; then
+    printf '%s\n' "$url" > "$URL_FILE"
+    exit 0
+  fi
+  kill -0 "$pid" 2>/dev/null || break
+  sleep 1
+done
+exit 1

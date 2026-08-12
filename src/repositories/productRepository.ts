@@ -3,13 +3,26 @@ import { PRODUCTS } from '../data/products';
 import { db, isFirebaseConfigured } from '../firebase/config';
 import { collection, getDocs, doc, getDoc, setDoc, query, where } from 'firebase/firestore';
 
+const launchStore = {
+  vendorId: 'v-urban-style',
+  storeName: 'Urban Style Boutique (Main Store)',
+  storeSlug: 'urban-style-store',
+};
+
+const normalizeStoreMetadata = (product: Product): Product => ({
+  ...product,
+  vendorId: product.vendorId || launchStore.vendorId,
+  storeName: product.storeName || launchStore.storeName,
+  storeSlug: product.storeSlug || launchStore.storeSlug,
+});
+
 export const productRepository = {
   async getAllProducts(): Promise<Product[]> {
     if (isFirebaseConfigured && db) {
       try {
         const snap = await getDocs(collection(db, 'products'));
         if (!snap.empty) {
-          return snap.docs.map(d => ({ id: d.id, ...d.data() } as Product));
+          return snap.docs.map(d => normalizeStoreMetadata({ id: d.id, ...d.data() } as Product));
         }
       } catch (e) {
         console.warn('Firestore fetch failed, using local products fallback', e);
@@ -17,9 +30,9 @@ export const productRepository = {
     }
     const local = localStorage.getItem('sd_products');
     if (local) {
-      try { return JSON.parse(local); } catch { /* Ignore malformed local product data. */ }
+      try { return (JSON.parse(local) as Product[]).map(normalizeStoreMetadata); } catch { /* Ignore malformed local product data. */ }
     }
-    return PRODUCTS;
+    return PRODUCTS.map(normalizeStoreMetadata);
   },
 
   async getProductBySlug(slug: string): Promise<Product | null> {
@@ -28,6 +41,7 @@ export const productRepository = {
   },
 
   async saveProduct(product: Product): Promise<void> {
+    product = normalizeStoreMetadata(product);
     const products = await this.getAllProducts();
     const idx = products.findIndex(p => p.id === product.id);
     if (idx >= 0) {

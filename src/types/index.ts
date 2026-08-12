@@ -64,13 +64,40 @@ export interface Product {
   returnWindowDays: number;
   exchangeAvailable: boolean;
 
-  vendorId?: string;
+  // Multi-Store & Vendor Fields
+  vendorId: string;
+  storeName?: string;
+  storeSlug?: string;
   commissionPercent?: number;
   sponsored?: boolean;
 
   active: boolean;
   createdAt?: string;
   updatedAt?: string;
+}
+
+export interface VendorStore {
+  id: string;
+  slug: string;
+  storeName: string;
+  ownerName: string;
+  email: string;
+  phone: string;
+  category: 'Clothing & Fashion' | 'Footwear' | 'Electronics' | 'Home & Living' | 'General Store';
+  address: string;
+  pincode: string;
+  city: string;
+  rating: number;
+  reviewCount: number;
+  deliveryMinutes: number;
+  commissionPercent: number;
+  bannerImage: string;
+  logoImage: string;
+  description: string;
+  totalSales: number;
+  active: boolean;
+  approved: boolean;
+  createdAt: string;
 }
 
 export interface CartItem {
@@ -137,19 +164,6 @@ export interface Order {
   updatedAt: string;
 }
 
-export interface Vendor {
-  id: string;
-  name: string;
-  email: string;
-  phone: string;
-  storeName: string;
-  address: string;
-  commissionPercent: number;
-  totalSales: number;
-  totalCommissionEarned: number;
-  active: boolean;
-}
-
 export interface AdSlot {
   id: string;
   title: string;
@@ -193,15 +207,4 @@ export interface ServiceArea {
   serviceable: boolean;
   expressAvailable: boolean;
   estimatedDeliveryMinutes: number;
-}
-
-export interface RevenueSummary {
-  grossOrderValue: number;
-  deliveryFeeRevenue: number;
-  vendorCommissionRevenue: number;
-  adRevenue: number;
-  totalRevenue: number;
-  totalOrders: number;
-  activeProducts: number;
-  lowStockSkus: number;
 }

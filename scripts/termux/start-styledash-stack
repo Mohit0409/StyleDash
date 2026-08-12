@@ -1,0 +1,20 @@
+#!/data/data/com.termux/files/usr/bin/bash
+set -eu
+
+mkdir -p "$HOME/logs" "$HOME/run"
+"$HOME/bin/start-styledash"
+
+for _ in $(seq 1 30); do
+  curl -fsS --max-time 3 http://127.0.0.1:8080/ >/dev/null && break
+  sleep 2
+done
+
+if ! curl -fsS --max-time 3 http://127.0.0.1:8080/ >/dev/null; then
+  echo "$(date -Iseconds) StyleDash failed to become healthy; ngrok was not started" >> "$HOME/logs/styledash-health.log"
+  exit 1
+fi
+
+"$HOME/bin/start-styledash-ngrok" || echo "$(date -Iseconds) ngrok is not established yet; watchdog will retry" >> "$HOME/logs/styledash-health.log"
+if [ ! -s "$HOME/run/styledash-health.pid" ] || ! kill -0 "$(cat "$HOME/run/styledash-health.pid")" 2>/dev/null; then
+  nohup "$HOME/bin/styledash-health" >> "$HOME/logs/styledash-health.log" 2>&1 &
+fi

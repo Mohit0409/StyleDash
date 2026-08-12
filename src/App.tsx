@@ -12,6 +12,9 @@ const Home = lazy(() => import('./pages/Home').then(m => ({ default: m.Home })))
 const Products = lazy(() => import('./pages/Products').then(m => ({ default: m.Products })));
 const ProductDetail = lazy(() => import('./pages/ProductDetail').then(m => ({ default: m.ProductDetail })));
 const Categories = lazy(() => import('./pages/Categories').then(m => ({ default: m.Categories })));
+const Stores = lazy(() => import('./pages/Stores').then(m => ({ default: m.Stores })));
+const StoreDetail = lazy(() => import('./pages/StoreDetail').then(m => ({ default: m.StoreDetail })));
+const VendorOnboarding = lazy(() => import('./pages/VendorOnboarding').then(m => ({ default: m.VendorOnboarding })));
 const Wishlist = lazy(() => import('./pages/Wishlist').then(m => ({ default: m.Wishlist })));
 const Checkout = lazy(() => import('./pages/Checkout').then(m => ({ default: m.Checkout })));
 const OrderSuccess = lazy(() => import('./pages/OrderSuccess').then(m => ({ default: m.OrderSuccess })));
@@ -45,6 +48,9 @@ export const App: React.FC = () => {
                         <Route path="products" element={<Products />} />
                         <Route path="product/:slug" element={<ProductDetail />} />
                         <Route path="categories" element={<Categories />} />
+                        <Route path="stores" element={<Stores />} />
+                        <Route path="store/:slug" element={<StoreDetail />} />
+                        <Route path="partner" element={<VendorOnboarding />} />
                         <Route path="wishlist" element={<Wishlist />} />
                         <Route path="checkout" element={<Checkout />} />
                         <Route path="order-success/:orderId" element={<OrderSuccess />} />

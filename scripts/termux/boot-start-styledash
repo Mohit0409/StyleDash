@@ -1,0 +1,26 @@
+#!/data/data/com.termux/files/usr/bin/bash
+# Run by the Termux:Boot Android companion application after phone startup.
+set -u
+
+LOG_DIR="$HOME/logs"
+LOG_FILE="$LOG_DIR/styledash-boot.log"
+mkdir -p "$LOG_DIR"
+[ -f "$LOG_FILE" ] && [ "$(wc -l < "$LOG_FILE")" -gt 2000 ] && tail -n 1500 "$LOG_FILE" > "$LOG_FILE.trim" && mv "$LOG_FILE.trim" "$LOG_FILE"
+exec >> "$LOG_FILE" 2>&1
+echo "$(date -Iseconds) boot startup requested"
+
+termux-wake-lock || true
+source "$PREFIX/etc/profile.d/start-services.sh"
+sv up sshd || true
+
+for _ in $(seq 1 30); do
+  curl -fsS --max-time 3 http://127.0.0.1:8080/ >/dev/null && break
+  "$HOME/bin/start-styledash" || true
+  sleep 1
+done
+
+"$HOME/bin/start-styledash-stack" || echo "$(date -Iseconds) stack start failed"
+
+# Temporary rollback endpoint during migration. Remove after ngrok survives reboot.
+"$HOME/bin/start-styledash-cloudflare-rollback" || echo "$(date -Iseconds) Cloudflare rollback tunnel did not start"
+echo "$(date -Iseconds) boot startup finished"
