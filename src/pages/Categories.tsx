@@ -1,20 +1,33 @@
-import React from 'react'
-import { motion } from 'framer-motion'
-import CategoryCard from '../components/CategoryCard'
-import { categories } from '../data/categories'
+import React from 'react';
+import { Link } from 'react-router-dom';
+import { SEO } from '../components/SEO';
+import { CATEGORIES } from '../data/categories';
 
-const Categories: React.FC = () => (
-  <div className="max-w-7xl mx-auto px-4 py-8">
-    <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
-      <h1 className="text-2xl font-black text-gray-900 dark:text-white mb-1">All Categories</h1>
-      <p className="text-sm text-gray-400 mb-6">Browse all product categories available in Neemuch</p>
-      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
-        {categories.map((cat, i) => (
-          <CategoryCard key={cat.id} category={cat} index={i} />
+export const Categories: React.FC = () => {
+  return (
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
+      <SEO title="Fashion Categories - StyleDash" />
+      <h1 className="text-2xl sm:text-3xl font-black text-neutral-900 dark:text-white">All Fashion Categories</h1>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+        {CATEGORIES.map(cat => (
+          <div key={cat.id} className="p-6 bg-white dark:bg-neutral-900 rounded-3xl border border-neutral-200 dark:border-neutral-800 space-y-3 shadow-sm">
+            <span className="text-[10px] font-black uppercase tracking-widest text-lime-600 dark:text-lime-400">{cat.department}</span>
+            <h3 className="font-extrabold text-lg text-neutral-900 dark:text-white">{cat.name}</h3>
+            <div className="flex flex-wrap gap-2 pt-2">
+              {cat.subcategories.map(sub => (
+                <Link
+                  key={sub}
+                  to={`/products?dept=${cat.department}`}
+                  className="px-2.5 py-1 rounded-lg bg-neutral-100 dark:bg-neutral-800 text-neutral-700 dark:text-neutral-300 text-xs font-bold hover:bg-lime-400 hover:text-neutral-950 transition-colors"
+                >
+                  {sub}
+                </Link>
+              ))}
+            </div>
+          </div>
         ))}
       </div>
-    </motion.div>
-  </div>
-)
-
-export default Categories
+    </div>
+  );
+};

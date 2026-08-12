@@ -1,146 +1,210 @@
-export interface Product {
-  id: string
-  name: string
-  category: string
-  subcategory?: string
-  price: number
-  originalPrice: number
-  discount: number
-  weight: string
-  unit: string
-  image: string
-  rating: number
-  reviewCount: number
-  description: string
-  inStock: boolean
-  badge?: string
-  nutrition?: Record<string, string>
-  tags?: string[]
-  // --- Monetization fields ---
-  vendorId?: string          // which local shop/brand supplies this product
-  commissionPercent?: number // % platform earns per sale of this item
-  sponsored?: boolean        // true if vendor paid to feature this product
+export type Department = 'men' | 'women' | 'kids' | 'unisex' | 'footwear' | 'accessories';
+
+export interface ProductVariant {
+  id: string;
+  sku: string;
+  size: string;
+  colourName: string;
+  colourHex?: string;
+  stock: number;
+  price?: number;
+  originalPrice?: number;
+  images?: string[];
 }
 
-export interface Category {
-  id: string
-  name: string
-  icon: string
-  image: string
-  color: string
-  productCount: number
-  slug: string
+export interface Review {
+  id: string;
+  userName: string;
+  rating: number;
+  title?: string;
+  comment: string;
+  createdAt: string;
+  verifiedPurchase: boolean;
+}
+
+export interface Product {
+  id: string;
+  slug: string;
+  name: string;
+  brand: string;
+  department: Department;
+  category: string;
+  subcategory?: string;
+  collection?: string;
+
+  shortDescription: string;
+  description: string;
+  material: string;
+  fit?: string;
+  pattern?: string;
+  occasion?: string[];
+  careInstructions: string[];
+
+  price: number;
+  originalPrice: number;
+  discount: number;
+
+  images: string[];
+  thumbnail: string;
+
+  rating: number;
+  reviewCount: number;
+  reviews?: Review[];
+
+  variants: ProductVariant[];
+
+  tags: string[];
+  badge?: string;
+  newArrival?: boolean;
+  trending?: boolean;
+  featured?: boolean;
+  expressDelivery?: boolean;
+
+  estimatedDeliveryMinutes?: number;
+  returnWindowDays: number;
+  exchangeAvailable: boolean;
+
+  // Multi-Store & Vendor Fields
+  vendorId: string;
+  storeName?: string;
+  storeSlug?: string;
+  commissionPercent?: number;
+  sponsored?: boolean;
+
+  active: boolean;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface VendorStore {
+  id: string;
+  slug: string;
+  storeName: string;
+  ownerName: string;
+  email: string;
+  phone: string;
+  category: 'Clothing & Fashion' | 'Footwear' | 'Electronics' | 'Home & Living' | 'General Store';
+  address: string;
+  pincode: string;
+  city: string;
+  rating: number;
+  reviewCount: number;
+  deliveryMinutes: number;
+  commissionPercent: number;
+  bannerImage: string;
+  logoImage: string;
+  description: string;
+  totalSales: number;
+  active: boolean;
+  approved: boolean;
+  createdAt: string;
 }
 
 export interface CartItem {
-  product: Product
-  quantity: number
+  lineId: string;
+  productId: string;
+  product: Product;
+  variantId: string;
+  selectedSize: string;
+  selectedColour: string;
+  sku: string;
+  quantity: number;
+  unitPrice: number;
 }
 
 export interface Address {
-  id: string
-  label: string
-  fullAddress: string
-  city: string
-  pincode: string
-  isDefault: boolean
+  id: string;
+  name: string;
+  phone: string;
+  street: string;
+  city: string;
+  state: string;
+  pincode: string;
+  isDefault?: boolean;
+  type?: 'home' | 'work' | 'other';
+}
+
+export type OrderStatus =
+  | 'placed'
+  | 'confirmed'
+  | 'packed'
+  | 'ready_for_pickup'
+  | 'out_for_delivery'
+  | 'delivered'
+  | 'cancelled'
+  | 'return_requested'
+  | 'returned'
+  | 'exchange_requested'
+  | 'exchanged';
+
+export interface OrderStatusHistory {
+  status: OrderStatus;
+  timestamp: string;
+  note?: string;
 }
 
 export interface Order {
-  id: string
-  items: CartItem[]
-  total: number
-  status: 'placed' | 'packed' | 'out_for_delivery' | 'delivered' | 'cancelled'
-  address: Address
-  paymentMethod: string
-  createdAt: Date
-  estimatedDelivery?: string
+  id: string;
+  userId: string;
+  items: CartItem[];
+  address: Address;
+  paymentMethod: 'upi' | 'cod' | 'card' | 'wallet';
+  paymentStatus: 'pending' | 'paid' | 'failed' | 'refunded';
+  subtotal: number;
+  discount: number;
+  walletAmount: number;
+  deliveryFee: number;
+  taxes: number;
+  grandTotal: number;
+  deliveryMethod: 'express' | 'standard';
+  estimatedDelivery: string;
+  status: OrderStatus;
+  statusHistory: OrderStatusHistory[];
+  createdAt: string;
+  updatedAt: string;
 }
 
-export interface User {
-  uid: string
-  name: string
-  email: string
-  phone?: string
-  photoURL?: string
-  addresses?: Address[]
+export interface AdSlot {
+  id: string;
+  title: string;
+  type: 'banner' | 'featured_product' | 'category_top';
+  imageUrl: string;
+  targetUrl: string;
+  vendorId?: string;
+  impressions: number;
+  clicks: number;
+  active: boolean;
+  startDate: string;
+  endDate: string;
 }
 
 export interface Coupon {
-  id: string
-  code: string
-  discount: number
-  type: 'flat' | 'percent'
-  minOrder: number
-  maxDiscount?: number
-  description: string
-  validTill: string
+  code: string;
+  discountType: 'percentage' | 'fixed';
+  value: number;
+  minOrderValue: number;
+  maxDiscount?: number;
+  active: boolean;
+  expiryDate: string;
 }
 
-export interface Banner {
-  id: string
-  image: string
-  title: string
-  subtitle: string
-  link: string
-  bgColor: string
-  // --- Monetization fields ---
-  sponsoredBy?: string   // vendor/brand name paying for this banner slot
-  pricePaid?: number     // how much the vendor paid for this placement (admin-only view)
-  expiresAt?: string     // ISO date — when the paid placement ends
+export interface UserProfile {
+  uid: string;
+  name: string;
+  email: string;
+  phone?: string;
+  role: 'customer' | 'admin' | 'vendor';
+  addresses: Address[];
+  referralCode: string;
+  walletBalance: number;
+  createdAt: string;
 }
 
-// A local shop, brand, or seller onboarded onto the platform.
-// Each sale of their product earns the platform `commissionPercent`.
-export interface Vendor {
-  id: string
-  name: string
-  contactPhone: string
-  city: string
-  commissionPercent: number
-  totalSales: number
-  totalCommissionEarned: number
-  joinedAt: string
-  active: boolean
-}
-
-// Paid placement: a vendor pays to have a product/banner shown prominently.
-export interface AdSlot {
-  id: string
-  type: 'banner' | 'featured_product' | 'category_top'
-  vendorId: string
-  vendorName: string
-  refId: string        // bannerId or productId being promoted
-  price: number         // amount paid for this slot
-  startDate: string
-  endDate: string
-  impressions: number
-  clicks: number
-  status: 'active' | 'scheduled' | 'expired'
-}
-
-// Referral program — "Give ₹50, Get ₹50" style growth + retention lever
-export interface Referral {
-  code: string
-  referrerUid: string
-  refereeUid?: string
-  rewardForReferrer: number
-  rewardForReferee: number
-  status: 'pending' | 'completed'
-  createdAt: string
-}
-
-// Aggregated revenue figures shown on the admin dashboard
-export interface RevenueSummary {
-  grossOrderValue: number
-  deliveryFeeRevenue: number
-  vendorCommissionRevenue: number
-  adRevenue: number
-  totalRevenue: number
-}
-
-export interface Toast {
-  id: string
-  message: string
-  type: 'success' | 'error' | 'info' | 'warning'
+export interface ServiceArea {
+  pincode: string;
+  city: string;
+  state: string;
+  serviceable: boolean;
+  expressAvailable: boolean;
+  estimatedDeliveryMinutes: number;
 }

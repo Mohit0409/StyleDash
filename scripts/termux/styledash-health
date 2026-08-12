@@ -1,0 +1,80 @@
+#!/data/data/com.termux/files/usr/bin/bash
+# Low-frequency watchdog for the local SPA server and authenticated ngrok agent.
+set -u
+
+LOG_DIR="$HOME/logs"
+PID_FILE="$HOME/run/styledash-health.pid"
+LOG_FILE="$LOG_DIR/styledash-health.log"
+NGROK_PID_FILE="$HOME/run/styledash-ngrok.pid"
+URL_FILE="$HOME/run/styledash-public-url"
+EXPECTED_CMD='ngrok http http://127.0.0.1:8080'
+mkdir -p "$HOME/run" "$LOG_DIR"
+
+if [ -s "$PID_FILE" ] && kill -0 "$(cat "$PID_FILE")" 2>/dev/null; then
+  exit 0
+fi
+printf '%s\n' "$$" > "$PID_FILE"
+trap 'rm -f "$PID_FILE"' EXIT INT TERM
+
+agent_url() {
+  curl -fsS --max-time 3 http://127.0.0.1:4040/api/tunnels 2>/dev/null |
+    python3 -c 'import json,sys; d=json.load(sys.stdin); print(next((t.get("public_url", "") for t in d.get("tunnels", []) if t.get("public_url", "").startswith("https://")), ""))' 2>/dev/null
+}
+
+ngrok_process_ok() {
+  [ -s "$NGROK_PID_FILE" ] || return 1
+  pid="$(cat "$NGROK_PID_FILE")"
+  kill -0 "$pid" 2>/dev/null || return 1
+  tr '\0' ' ' < "/proc/$pid/cmdline" 2>/dev/null | grep -Fq "$EXPECTED_CMD"
+}
+
+ngrok_failures=0
+public_failures=0
+public_counter=0
+
+while true; do
+  if ! curl -fsS --max-time 5 http://127.0.0.1:8080/ >/dev/null; then
+    echo "$(date -Iseconds) local site unhealthy; restarting" >> "$LOG_FILE"
+    "$HOME/bin/start-styledash" || true
+  fi
+
+  url=''
+  if ngrok_process_ok; then
+    url="$(agent_url || true)"
+  fi
+
+  if printf '%s' "$url" | grep -Eq '^https://[-a-z0-9]+\.ngrok-free\.(app|dev)$'; then
+    printf '%s\n' "$url" > "$URL_FILE"
+    ngrok_failures=0
+  else
+    ngrok_failures=$((ngrok_failures + 1))
+    echo "$(date -Iseconds) ngrok local health failure $ngrok_failures/2" >> "$LOG_FILE"
+    if [ "$ngrok_failures" -ge 2 ]; then
+      "$HOME/bin/stop-styledash-ngrok" || true
+      sleep 5
+      "$HOME/bin/start-styledash-ngrok" || true
+      ngrok_failures=0
+    fi
+  fi
+
+  public_counter=$((public_counter + 1))
+  if [ "$public_counter" -ge 30 ] && [ -s "$URL_FILE" ]; then
+    public_counter=0
+    url="$(cat "$URL_FILE")"
+    if curl -fsS --max-time 12 -H 'ngrok-skip-browser-warning: styledash-health' "$url/" >/dev/null; then
+      public_failures=0
+    else
+      public_failures=$((public_failures + 1))
+      echo "$(date -Iseconds) ngrok public health failure $public_failures/2" >> "$LOG_FILE"
+      if [ "$public_failures" -ge 2 ]; then
+        "$HOME/bin/stop-styledash-ngrok" || true
+        sleep 5
+        "$HOME/bin/start-styledash-ngrok" || true
+        public_failures=0
+      fi
+    fi
+  fi
+
+  [ -f "$LOG_FILE" ] && [ "$(wc -l < "$LOG_FILE")" -gt 2000 ] && tail -n 1500 "$LOG_FILE" > "$LOG_FILE.trim" && mv "$LOG_FILE.trim" "$LOG_FILE"
+  sleep 60
+done

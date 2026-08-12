@@ -1,0 +1,3 @@
+#!/data/data/com.termux/files/usr/bin/bash
+# Compatibility name retained for existing operator habits.
+exec "$HOME/bin/start-styledash-ngrok" "$@"

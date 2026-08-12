@@ -1,66 +1,203 @@
-import React, { createContext, useContext, useState, useEffect } from 'react'
-import type { CartItem, Product } from '../types'
+import React, { createContext, useContext, useState, useEffect } from 'react';
+import { Product, CartItem, Coupon } from '../types';
+import { trackEvent } from '../firebase/analytics';
+import { CONFIG } from '../config';
 
 interface CartContextType {
-  items: CartItem[]
-  addItem: (product: Product) => void
-  removeItem: (productId: string) => void
-  updateQty: (productId: string, qty: number) => void
-  clearCart: () => void
-  total: number
-  itemCount: number
-  isOpen: boolean
-  setIsOpen: (open: boolean) => void
+  items: CartItem[];
+  addItem: (product: Product, variantId: string, quantity?: number) => boolean;
+  removeItem: (lineId: string) => void;
+  updateQuantity: (lineId: string, quantity: number) => void;
+  clearCart: () => void;
+  appliedCoupon: Coupon | null;
+  applyCoupon: (coupon: Coupon) => void;
+  removeCoupon: () => void;
+  walletDiscount: number;
+  applyWalletCredit: (amount: number) => void;
+  subtotal: number;
+  discountTotal: number;
+  couponDiscount: number;
+  deliveryFee: number;
+  taxes: number;
+  grandTotal: number;
+  totalItemsCount: number;
+  deliveryMethod: 'express' | 'standard';
+  setDeliveryMethod: (method: 'express' | 'standard') => void;
 }
 
-const CartContext = createContext<CartContextType | null>(null)
+const CartContext = createContext<CartContextType | undefined>(undefined);
 
-export const useCart = () => {
-  const ctx = useContext(CartContext)
-  if (!ctx) throw new Error('useCart must be used within CartProvider')
-  return ctx
-}
+const LOCAL_CART_KEY = 'sd_cart_v2';
 
 export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [items, setItems] = useState<CartItem[]>(() => {
-    try {
-      const saved = localStorage.getItem('nb-cart')
-      return saved ? JSON.parse(saved) : []
-    } catch { return [] }
-  })
-  const [isOpen, setIsOpen] = useState(false)
+    const saved = localStorage.getItem(LOCAL_CART_KEY);
+    if (saved) {
+      try { return JSON.parse(saved); } catch { /* Ignore malformed local cart data. */ }
+    }
+    return [];
+  });
+
+  const [appliedCoupon, setAppliedCoupon] = useState<Coupon | null>(null);
+  const [walletDiscount, setWalletDiscount] = useState<number>(0);
+  const [deliveryMethod, setDeliveryMethod] = useState<'express' | 'standard'>('express');
 
   useEffect(() => {
-    localStorage.setItem('nb-cart', JSON.stringify(items))
-  }, [items])
+    localStorage.setItem(LOCAL_CART_KEY, JSON.stringify(items));
+  }, [items]);
 
-  const addItem = (product: Product) => {
+  const addItem = (product: Product, variantId: string, quantity = 1): boolean => {
+    const variant = product.variants.find(v => v.id === variantId);
+    if (!variant) return false;
+
+    if (variant.stock <= 0) {
+      return false;
+    }
+
+    const lineId = `${product.id}:${variantId}`;
+
     setItems(prev => {
-      const existing = prev.find(i => i.product.id === product.id)
-      if (existing) {
-        return prev.map(i => i.product.id === product.id ? { ...i, quantity: i.quantity + 1 } : i)
+      const existingIdx = prev.findIndex(item => item.lineId === lineId);
+      if (existingIdx >= 0) {
+        const existing = prev[existingIdx];
+        const newQty = Math.min(existing.quantity + quantity, variant.stock);
+        const updated = [...prev];
+        updated[existingIdx] = { ...existing, quantity: newQty };
+        return updated;
+      } else {
+        const unitPrice = variant.price ?? product.price;
+        const newItem: CartItem = {
+          lineId,
+          productId: product.id,
+          product,
+          variantId: variant.id,
+          selectedSize: variant.size,
+          selectedColour: variant.colourName,
+          sku: variant.sku,
+          quantity: Math.min(quantity, variant.stock),
+          unitPrice
+        };
+        return [...prev, newItem];
       }
-      return [...prev, { product, quantity: 1 }]
-    })
+    });
+
+    trackEvent('add_to_cart', {
+      item_id: product.id,
+      item_name: product.name,
+      item_category: product.category,
+      variant_id: variantId,
+      size: variant.size,
+      colour: variant.colourName,
+      price: variant.price ?? product.price,
+      quantity
+    });
+
+    return true;
+  };
+
+  const removeItem = (lineId: string) => {
+    setItems(prev => {
+      const item = prev.find(i => i.lineId === lineId);
+      if (item) {
+        trackEvent('remove_from_cart', {
+          item_id: item.productId,
+          line_id: lineId,
+          quantity: item.quantity
+        });
+      }
+      return prev.filter(i => i.lineId !== lineId);
+    });
+  };
+
+  const updateQuantity = (lineId: string, quantity: number) => {
+    if (quantity <= 0) {
+      removeItem(lineId);
+      return;
+    }
+    setItems(prev => {
+      return prev.map(item => {
+        if (item.lineId === lineId) {
+          const variant = item.product.variants.find(v => v.id === item.variantId);
+          const maxStock = variant ? variant.stock : item.quantity;
+          return { ...item, quantity: Math.min(quantity, maxStock) };
+        }
+        return item;
+      });
+    });
+  };
+
+  const clearCart = () => {
+    setItems([]);
+    setAppliedCoupon(null);
+    setWalletDiscount(0);
+    localStorage.removeItem(LOCAL_CART_KEY);
+  };
+
+  const applyCoupon = (coupon: Coupon) => {
+    setAppliedCoupon(coupon);
+    trackEvent('select_promotion', { promotion_id: coupon.code });
+  };
+
+  const removeCoupon = () => {
+    setAppliedCoupon(null);
+  };
+
+  const applyWalletCredit = (amount: number) => {
+    setWalletDiscount(amount);
+  };
+
+  const subtotal = items.reduce((acc, item) => acc + item.unitPrice * item.quantity, 0);
+  const totalItemsCount = items.reduce((acc, item) => acc + item.quantity, 0);
+
+  let couponDiscount = 0;
+  if (appliedCoupon && subtotal >= appliedCoupon.minOrderValue) {
+    if (appliedCoupon.discountType === 'fixed') {
+      couponDiscount = appliedCoupon.value;
+    } else {
+      couponDiscount = (subtotal * appliedCoupon.value) / 100;
+      if (appliedCoupon.maxDiscount) {
+        couponDiscount = Math.min(couponDiscount, appliedCoupon.maxDiscount);
+      }
+    }
   }
 
-  const removeItem = (productId: string) => {
-    setItems(prev => prev.filter(i => i.product.id !== productId))
-  }
+  const isFreeDelivery = subtotal >= CONFIG.FREE_DELIVERY_THRESHOLD;
+  const baseDeliveryFee = deliveryMethod === 'express' ? CONFIG.EXPRESS_DELIVERY_FEE : CONFIG.STANDARD_DELIVERY_FEE;
+  const deliveryFee = isFreeDelivery ? 0 : baseDeliveryFee;
 
-  const updateQty = (productId: string, qty: number) => {
-    if (qty <= 0) { removeItem(productId); return }
-    setItems(prev => prev.map(i => i.product.id === productId ? { ...i, quantity: qty } : i))
-  }
-
-  const clearCart = () => setItems([])
-
-  const total = items.reduce((sum, i) => sum + i.product.price * i.quantity, 0)
-  const itemCount = items.reduce((sum, i) => sum + i.quantity, 0)
+  const taxes = Math.round((subtotal - couponDiscount) * CONFIG.TAX_RATE);
+  const discountTotal = couponDiscount + walletDiscount;
+  const grandTotal = Math.max(0, subtotal - discountTotal + deliveryFee + taxes);
 
   return (
-    <CartContext.Provider value={{ items, addItem, removeItem, updateQty, clearCart, total, itemCount, isOpen, setIsOpen }}>
+    <CartContext.Provider value={{
+      items,
+      addItem,
+      removeItem,
+      updateQuantity,
+      clearCart,
+      appliedCoupon,
+      applyCoupon,
+      removeCoupon,
+      walletDiscount,
+      applyWalletCredit,
+      subtotal,
+      discountTotal,
+      couponDiscount,
+      deliveryFee,
+      taxes,
+      grandTotal,
+      totalItemsCount,
+      deliveryMethod,
+      setDeliveryMethod
+    }}>
       {children}
     </CartContext.Provider>
-  )
-}
+  );
+};
+
+export const useCart = () => {
+  const context = useContext(CartContext);
+  if (!context) throw new Error('useCart must be used within CartProvider');
+  return context;
+};

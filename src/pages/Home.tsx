@@ -1,201 +1,218 @@
-import React from 'react'
-import { motion } from 'framer-motion'
-import { useNavigate } from 'react-router-dom'
-import { Zap, Clock, ShieldCheck, ChevronRight, Star } from 'lucide-react'
-import Banner from '../components/Banner'
-import CategoryCard from '../components/CategoryCard'
-import ProductCard from '../components/ProductCard'
-import { categories } from '../data/categories'
-import { products, getFeaturedProducts } from '../data/products'
+import React, { useEffect, useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
+import { ArrowRight, Zap, Flame, Sparkles, Tag, ShieldCheck, RefreshCcw, Star, ChevronRight } from 'lucide-react';
+import { SEO } from '../components/SEO';
+import { ProductCard } from '../components/ProductCard';
+import { Product } from '../types';
+import { productRepository } from '../repositories/productRepository';
+import { BANNERS } from '../data/banners';
+import { CONFIG } from '../config';
 
-const fadeUp = {
-  initial: { opacity: 0, y: 30 },
-  whileInView: { opacity: 1, y: 0 },
-  viewport: { once: true },
-  transition: { duration: 0.5 }
-}
+export const Home: React.FC = () => {
+  const navigate = useNavigate();
+  const [products, setProducts] = useState<Product[]>([]);
+  const [loading, setLoading] = useState(true);
 
-const Home: React.FC = () => {
-  const navigate = useNavigate()
-  const featured = getFeaturedProducts()
-  const trending = products.slice(0, 10)
-  const veggies = products.filter(p => p.category === 'vegetables').slice(0, 6)
+  useEffect(() => {
+    productRepository.getAllProducts().then(data => {
+      setProducts(data);
+      setLoading(false);
+    });
+  }, []);
+
+  const newDrops = products.filter(p => p.newArrival).slice(0, 8);
+  const trending = products.filter(p => p.trending).slice(0, 8);
+  const expressPicks = products.filter(p => p.expressDelivery).slice(0, 8);
+  const under499 = products.filter(p => p.price <= 499).slice(0, 8);
 
   return (
-    <div className="max-w-7xl mx-auto px-4 py-6 space-y-10">
+    <div className="space-y-12 pb-16">
+      <SEO title="StyleDash - Your look, delivered fast" />
 
-      {/* Hero */}
-      <motion.section
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        className="relative rounded-3xl overflow-hidden bg-gradient-to-br from-brand-yellow via-yellow-300 to-brand-green p-8 md:p-12"
-      >
-        <div className="relative z-10 max-w-lg">
-          <motion.div
-            initial={{ opacity: 0, x: -30 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ delay: 0.1 }}
-            className="inline-flex items-center gap-2 bg-white/30 backdrop-blur-sm text-brand-dark text-xs font-bold px-3 py-1.5 rounded-full mb-4"
-          >
-            <Zap size={12} className="fill-brand-dark" /> 10–20 Min Delivery
-          </motion.div>
-          <motion.h1
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.2 }}
-            className="text-3xl md:text-5xl font-black text-brand-dark leading-tight"
-          >
-            Neemuch's Fastest<br />
-            <span className="text-white drop-shadow">Grocery Delivery</span>
-          </motion.h1>
-          <motion.p
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.3 }}
-            className="mt-3 text-brand-dark/80 text-sm md:text-base leading-relaxed"
-          >
-            Fresh groceries, vegetables, fruits, dairy, snacks and daily essentials delivered in minutes.
-          </motion.p>
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.4 }}
-            className="flex gap-3 mt-6"
-          >
-            <button
-              onClick={() => navigate('/products')}
-              className="bg-brand-dark text-white font-bold px-5 py-3 rounded-xl hover:bg-gray-800 transition-colors shadow-lg"
-            >
-              Order Now
-            </button>
-            <button
-              onClick={() => navigate('/categories')}
-              className="bg-white/40 backdrop-blur-sm text-brand-dark font-bold px-5 py-3 rounded-xl hover:bg-white/60 transition-colors"
-            >
-              Browse Categories
-            </button>
-          </motion.div>
-        </div>
+      {/* Hero Section */}
+      <section className="relative overflow-hidden bg-neutral-950 text-white py-16 lg:py-24 px-4 sm:px-6 lg:px-8">
+        <div className="max-w-7xl mx-auto grid lg:grid-cols-2 gap-12 items-center">
+          <div className="space-y-6 z-10">
+            <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-lime-400 text-neutral-950 text-xs font-black uppercase tracking-wider">
+              <Zap className="w-3.5 h-3.5 fill-neutral-950" /> 60-Minute Fashion Delivery in {CONFIG.SERVICE_CITY}
+            </div>
 
-        {/* Decorative scooter */}
-        <div className="absolute right-6 bottom-0 text-8xl md:text-9xl opacity-30 select-none pointer-events-none">🛵</div>
-        <div className="absolute top-4 right-24 text-4xl opacity-20 animate-bounce select-none pointer-events-none">🥦</div>
-        <div className="absolute top-12 right-10 text-3xl opacity-20 animate-spin-slow select-none pointer-events-none">🍎</div>
-      </motion.section>
+            <h1 className="text-4xl sm:text-6xl font-black tracking-tight leading-none">
+              Your look, <br />
+              <span className="text-lime-400">delivered fast.</span>
+            </h1>
 
-      {/* Trust badges */}
-      <div className="grid grid-cols-3 gap-3">
-        {[
-          { icon: <Zap size={20} className="text-brand-yellow" />, label: '10–20 Min', sub: 'Delivery' },
-          { icon: <ShieldCheck size={20} className="text-brand-green" />, label: '100% Fresh', sub: 'Guarantee' },
-          { icon: <Clock size={20} className="text-blue-500" />, label: '7 AM – 10 PM', sub: 'Open Daily' },
-        ].map((b, i) => (
-          <motion.div
-            key={i}
-            {...fadeUp}
-            transition={{ delay: i * 0.1 }}
-            className="flex flex-col items-center text-center bg-white dark:bg-gray-800 rounded-2xl p-4 shadow-sm border border-gray-100 dark:border-gray-700"
-          >
-            {b.icon}
-            <p className="font-bold text-sm text-gray-900 dark:text-white mt-1.5">{b.label}</p>
-            <p className="text-xs text-gray-400">{b.sub}</p>
-          </motion.div>
-        ))}
-      </div>
+            <p className="text-neutral-400 text-sm sm:text-base max-w-lg leading-relaxed">
+              Trending streetwear, ethnic wear, footwear and last-minute party outfits dispatched from verified local fashion boutiques straight to your doorstep.
+            </p>
 
-      {/* Banner */}
-      <motion.section {...fadeUp}>
-        <Banner />
-      </motion.section>
+            <div className="flex flex-wrap gap-4 pt-2">
+              <Link
+                to="/products?dept=women"
+                className="px-8 py-3.5 bg-lime-400 text-neutral-950 font-black rounded-xl text-sm shadow-xl hover:bg-lime-300 transition-all transform hover:-translate-y-0.5"
+              >
+                Shop Women
+              </Link>
+              <Link
+                to="/products?dept=men"
+                className="px-8 py-3.5 bg-neutral-800 text-white font-black rounded-xl text-sm border border-neutral-700 hover:bg-neutral-700 transition-all"
+              >
+                Shop Men
+              </Link>
+              <Link
+                to="/products?filter=express"
+                className="px-6 py-3.5 bg-rose-500 text-white font-black rounded-xl text-sm hover:bg-rose-600 transition-all flex items-center gap-1.5"
+              >
+                <Zap className="w-4 h-4 fill-white" /> Express Picks
+              </Link>
+            </div>
 
-      {/* Categories */}
-      <motion.section {...fadeUp}>
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-xl font-black text-gray-900 dark:text-white">Shop by Category</h2>
-          <button onClick={() => navigate('/categories')} className="flex items-center gap-1 text-sm font-semibold text-brand-green hover:underline">
-            See all <ChevronRight size={14} />
-          </button>
-        </div>
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3">
-          {categories.slice(0, 10).map((cat, i) => (
-            <CategoryCard key={cat.id} category={cat} index={i} />
-          ))}
-        </div>
-      </motion.section>
-
-      {/* Flash Sale */}
-      <motion.section {...fadeUp} className="bg-gradient-to-r from-red-500 to-orange-400 rounded-3xl p-5">
-        <div className="flex items-center gap-2 mb-4">
-          <span className="text-2xl">🔥</span>
-          <h2 className="text-xl font-black text-white">Flash Sale</h2>
-          <span className="bg-white/20 text-white text-xs font-bold px-2 py-0.5 rounded-full ml-auto">Limited Time</span>
-        </div>
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
-          {products.filter(p => p.discount >= 20).slice(0, 4).map(p => (
-            <ProductCard key={p.id} product={p} />
-          ))}
-        </div>
-      </motion.section>
-
-      {/* Best Sellers */}
-      <motion.section {...fadeUp}>
-        <div className="flex items-center justify-between mb-4">
-          <div className="flex items-center gap-2">
-            <Star size={18} className="fill-amber-400 text-amber-400" />
-            <h2 className="text-xl font-black text-gray-900 dark:text-white">Best Sellers</h2>
+            {/* Quick Specs */}
+            <div className="pt-6 border-t border-neutral-800 grid grid-cols-3 gap-4 text-xs text-neutral-400">
+              <div><strong className="text-white block text-sm">60 Mins</strong> Hyperlocal Delivery</div>
+              <div><strong className="text-white block text-sm">100% Original</strong> Local Stores</div>
+              <div><strong className="text-white block text-sm">7 Days</strong> Easy Size Exchange</div>
+            </div>
           </div>
-          <button onClick={() => navigate('/products')} className="flex items-center gap-1 text-sm font-semibold text-brand-green hover:underline">
-            View all <ChevronRight size={14} />
-          </button>
-        </div>
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
-          {featured.slice(0, 10).map(p => <ProductCard key={p.id} product={p} />)}
-        </div>
-      </motion.section>
 
-      {/* Fresh Vegetables */}
-      <motion.section {...fadeUp}>
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-xl font-black text-gray-900 dark:text-white">🥦 Fresh Vegetables</h2>
-          <button onClick={() => navigate('/products?category=vegetables')} className="flex items-center gap-1 text-sm font-semibold text-brand-green hover:underline">
-            See all <ChevronRight size={14} />
-          </button>
+          {/* Banner Gallery */}
+          <div className="relative group">
+            <div className="absolute -inset-1 bg-gradient-to-r from-lime-400 to-emerald-400 rounded-3xl blur opacity-30 group-hover:opacity-50 transition duration-1000"></div>
+            <div className="relative rounded-3xl overflow-hidden aspect-[4/3] shadow-2xl border border-neutral-800">
+              <img
+                src={BANNERS[0].imageUrl}
+                alt={BANNERS[0].title}
+                className="w-full h-full object-cover object-center"
+              />
+              <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent flex flex-col justify-end p-6">
+                <span className="text-xs font-bold text-lime-400 uppercase tracking-widest">Featured Collection</span>
+                <h3 className="text-xl font-black text-white">{BANNERS[0].title}</h3>
+              </div>
+            </div>
+          </div>
         </div>
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
-          {veggies.map(p => <ProductCard key={p.id} product={p} />)}
-        </div>
-      </motion.section>
+      </section>
 
-      {/* Trending */}
-      <motion.section {...fadeUp}>
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-xl font-black text-gray-900 dark:text-white">🔥 Trending Now</h2>
-        </div>
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
-          {trending.map(p => <ProductCard key={p.id} product={p} />)}
-        </div>
-      </motion.section>
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-16">
 
-      {/* App CTA */}
-      <motion.section
-        {...fadeUp}
-        className="bg-brand-dark rounded-3xl p-8 text-center text-white"
-      >
-        <p className="text-3xl mb-2">📱</p>
-        <h2 className="text-2xl font-black mb-2">Get the App</h2>
-        <p className="text-gray-400 text-sm mb-5">Order faster, track live, get exclusive app deals.</p>
-        <div className="flex gap-3 justify-center flex-wrap">
-          <button className="flex items-center gap-2 bg-white text-brand-dark font-bold px-4 py-2.5 rounded-xl text-sm hover:bg-gray-100 transition-colors">
-            🍎 App Store
-          </button>
-          <button className="flex items-center gap-2 bg-brand-yellow text-brand-dark font-bold px-4 py-2.5 rounded-xl text-sm hover:bg-yellow-400 transition-colors">
-            ▶ Play Store
-          </button>
-        </div>
-      </motion.section>
+        {/* Shop by Department */}
+        <section className="space-y-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-2xl font-black text-neutral-900 dark:text-white">Shop by Department</h2>
+              <p className="text-xs text-neutral-500">Explore curated collections across all categories</p>
+            </div>
+          </div>
 
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+            {[
+              { name: "Men's Fashion", dept: 'men', img: 'https://images.unsplash.com/photo-1516826957135-700dedea698c?auto=format&fit=crop&w=500&q=80' },
+              { name: "Women's Fashion", dept: 'women', img: 'https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?auto=format&fit=crop&w=500&q=80' },
+              { name: 'Kids Wear', dept: 'kids', img: 'https://images.unsplash.com/photo-1519238263530-99afd11df2ea?auto=format&fit=crop&w=500&q=80' },
+              { name: 'Footwear', dept: 'footwear', img: 'https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&w=500&q=80' },
+              { name: 'Accessories', dept: 'accessories', img: 'https://images.unsplash.com/photo-1523293182086-7651a899d37f?auto=format&fit=crop&w=500&q=80' }
+            ].map(item => (
+              <Link
+                key={item.dept}
+                to={`/products?dept=${item.dept}`}
+                className="group relative rounded-2xl overflow-hidden aspect-[3/4] shadow-md hover:shadow-xl transition-all duration-300 border border-neutral-200 dark:border-neutral-800"
+              >
+                <img src={item.img} alt={item.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+                <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent flex flex-col justify-end p-4">
+                  <h3 className="text-white font-extrabold text-sm">{item.name}</h3>
+                  <span className="text-[10px] text-lime-400 font-bold flex items-center gap-1 group-hover:translate-x-1 transition-transform">
+                    Explore <ChevronRight className="w-3 h-3" />
+                  </span>
+                </div>
+              </Link>
+            ))}
+          </div>
+        </section>
+
+        {/* Express Delivery Picks */}
+        <section className="space-y-6">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <div className="p-2 bg-amber-400 text-neutral-950 rounded-xl">
+                <Zap className="w-5 h-5 fill-neutral-950" />
+              </div>
+              <div>
+                <h2 className="text-2xl font-black text-neutral-900 dark:text-white">60-Min Express Picks</h2>
+                <p className="text-xs text-neutral-500">In stock nearby and ready for immediate dispatch in Neemuch</p>
+              </div>
+            </div>
+            <Link to="/products?filter=express" className="text-xs font-bold text-lime-600 dark:text-lime-400 hover:underline flex items-center gap-1">
+              View All <ArrowRight className="w-3.5 h-3.5" />
+            </Link>
+          </div>
+
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 sm:gap-6">
+            {expressPicks.map(p => (
+              <ProductCard key={p.id} product={p} />
+            ))}
+          </div>
+        </section>
+
+        {/* Styles Under 499 */}
+        <section className="space-y-6 bg-lime-50 dark:bg-lime-950/20 p-6 sm:p-8 rounded-3xl border border-lime-200 dark:border-lime-900">
+          <div className="flex items-center justify-between">
+            <div>
+              <span className="text-xs font-black uppercase text-lime-700 dark:text-lime-400 tracking-wider">Budget Deals</span>
+              <h2 className="text-2xl font-black text-neutral-900 dark:text-white">Styles Under ₹499</h2>
+            </div>
+            <Link to="/products?maxPrice=499" className="text-xs font-bold text-neutral-900 dark:text-white hover:underline flex items-center gap-1">
+              Shop All Deals <ArrowRight className="w-3.5 h-3.5" />
+            </Link>
+          </div>
+
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 sm:gap-6">
+            {under499.map(p => (
+              <ProductCard key={p.id} product={p} />
+            ))}
+          </div>
+        </section>
+
+        {/* New Drops */}
+        <section className="space-y-6">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <div className="p-2 bg-emerald-500 text-white rounded-xl">
+                <Sparkles className="w-5 h-5" />
+              </div>
+              <div>
+                <h2 className="text-2xl font-black text-neutral-900 dark:text-white">New Drops & Arrivals</h2>
+                <p className="text-xs text-neutral-500">Fresh streetwear and seasonal styles added this week</p>
+              </div>
+            </div>
+            <Link to="/products?filter=new" className="text-xs font-bold text-lime-600 dark:text-lime-400 hover:underline flex items-center gap-1">
+              View All <ArrowRight className="w-3.5 h-3.5" />
+            </Link>
+          </div>
+
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 sm:gap-6">
+            {newDrops.map(p => (
+              <ProductCard key={p.id} product={p} />
+            ))}
+          </div>
+        </section>
+
+        {/* Referral Invite Banner */}
+        <section className="bg-neutral-950 text-white rounded-3xl p-8 lg:p-12 relative overflow-hidden flex flex-col md:flex-row items-center justify-between gap-6 shadow-2xl">
+          <div className="space-y-3 z-10 max-w-xl">
+            <span className="text-xs font-black text-lime-400 uppercase tracking-widest">Referral Reward</span>
+            <h3 className="text-2xl sm:text-3xl font-black">Give ₹100, Get ₹100 Off</h3>
+            <p className="text-xs sm:text-sm text-neutral-400">
+              Invite your friends in Neemuch to StyleDash. When they place their first fashion order, both of you get ₹100 credit in your StyleWallet!
+            </p>
+          </div>
+          <Link
+            to="/referrals"
+            className="z-10 px-8 py-3.5 bg-lime-400 text-neutral-950 font-black text-xs uppercase tracking-wider rounded-xl hover:bg-lime-300 transition-colors whitespace-nowrap"
+          >
+            Invite Friends Now
+          </Link>
+        </section>
+      </div>
     </div>
-  )
-}
-
-export default Home
+  );
+};

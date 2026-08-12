@@ -1,117 +1,21429 @@
-import type { Product } from '../types'
+import { Product } from "../types";
 
-export const products: Product[] = [
-  // Vegetables
-  { id: 'v1', name: 'Fresh Tomatoes', category: 'vegetables', price: 35, originalPrice: 45, discount: 22, weight: '500', unit: 'g', image: 'https://images.unsplash.com/photo-1518977676601-b53f82aba655?w=400&q=80', rating: 4.5, reviewCount: 128, description: 'Farm-fresh tomatoes, perfect for curries and salads.', inStock: true, badge: 'Fresh', tags: ['organic', 'seasonal'] },
-  { id: 'v2', name: 'Spinach (Palak)', category: 'vegetables', price: 25, originalPrice: 30, discount: 17, weight: '250', unit: 'g', image: 'https://images.unsplash.com/photo-1576045057995-568f588f82fb?w=400&q=80', rating: 4.3, reviewCount: 85, description: 'Tender green spinach leaves, rich in iron.', inStock: true, badge: 'Organic' },
-  { id: 'v3', name: 'Onions', category: 'vegetables', price: 40, originalPrice: 55, discount: 27, weight: '1', unit: 'kg', image: 'https://images.unsplash.com/photo-1508747703725-719777637510?w=400&q=80', rating: 4.4, reviewCount: 210, description: 'Premium quality red onions.', inStock: true },
-  { id: 'v4', name: 'Potatoes (Aloo)', category: 'vegetables', price: 35, originalPrice: 40, discount: 12, weight: '1', unit: 'kg', image: 'https://images.unsplash.com/photo-1518977676601-b53f82aba655?w=400&q=80', rating: 4.2, reviewCount: 195, description: 'Fresh potatoes for every dish.', inStock: true },
-  { id: 'v5', name: 'Green Chillies', category: 'vegetables', price: 15, originalPrice: 20, discount: 25, weight: '100', unit: 'g', image: 'https://images.unsplash.com/photo-1583119022894-919a68a3d0e3?w=400&q=80', rating: 4.1, reviewCount: 67, description: 'Hot and spicy green chillies.', inStock: true },
-  { id: 'v6', name: 'Brinjal (Baingan)', category: 'vegetables', price: 30, originalPrice: 38, discount: 21, weight: '500', unit: 'g', image: 'https://images.unsplash.com/photo-1615484477778-ca3b77940c25?w=400&q=80', rating: 4.0, reviewCount: 52, description: 'Fresh purple brinjals.', inStock: true },
-  { id: 'v7', name: 'Cauliflower', category: 'vegetables', price: 45, originalPrice: 60, discount: 25, weight: '1', unit: 'pc', image: 'https://images.unsplash.com/photo-1568584711075-3d021a7c3ca3?w=400&q=80', rating: 4.3, reviewCount: 89, description: 'Tender white cauliflower head.', inStock: true, badge: 'Fresh' },
-  { id: 'v8', name: 'Capsicum (Shimla Mirch)', category: 'vegetables', price: 40, originalPrice: 55, discount: 27, weight: '250', unit: 'g', image: 'https://images.unsplash.com/photo-1563565375-f3fdfdbefa83?w=400&q=80', rating: 4.2, reviewCount: 73, description: 'Mixed colour capsicums.', inStock: true },
-  { id: 'v9', name: 'Cucumber (Kheera)', category: 'vegetables', price: 25, originalPrice: 30, discount: 17, weight: '500', unit: 'g', image: 'https://images.unsplash.com/photo-1449300079323-02e209d9d3a6?w=400&q=80', rating: 4.1, reviewCount: 61, description: 'Crisp and refreshing cucumbers.', inStock: true },
-  { id: 'v10', name: 'Bottle Gourd (Lauki)', category: 'vegetables', price: 20, originalPrice: 25, discount: 20, weight: '1', unit: 'pc', image: 'https://images.unsplash.com/photo-1518977676601-b53f82aba655?w=400&q=80', rating: 3.9, reviewCount: 44, description: 'Fresh bottle gourd.', inStock: true },
-  { id: 'v11', name: 'Carrot (Gajar)', category: 'vegetables', price: 35, originalPrice: 45, discount: 22, weight: '500', unit: 'g', image: 'https://images.unsplash.com/photo-1447175008436-054170c2e979?w=400&q=80', rating: 4.4, reviewCount: 118, description: 'Crisp orange carrots.', inStock: true },
-  { id: 'v12', name: 'Peas (Matar)', category: 'vegetables', price: 50, originalPrice: 65, discount: 23, weight: '500', unit: 'g', image: 'https://images.unsplash.com/photo-1587005379940-0e849b4d6b28?w=400&q=80', rating: 4.5, reviewCount: 96, description: 'Sweet green peas.', inStock: true, badge: 'Seasonal' },
-  { id: 'v13', name: 'Ginger (Adrak)', category: 'vegetables', price: 20, originalPrice: 25, discount: 20, weight: '100', unit: 'g', image: 'https://images.unsplash.com/photo-1615485500834-bc10199bc727?w=400&q=80', rating: 4.3, reviewCount: 77, description: 'Aromatic fresh ginger root.', inStock: true },
-  { id: 'v14', name: 'Garlic (Lehsun)', category: 'vegetables', price: 30, originalPrice: 40, discount: 25, weight: '100', unit: 'g', image: 'https://images.unsplash.com/photo-1615484477778-ca3b77940c25?w=400&q=80', rating: 4.4, reviewCount: 132, description: 'Fresh garlic bulbs.', inStock: true },
-  { id: 'v15', name: 'Drumstick (Sehjan)', category: 'vegetables', price: 30, originalPrice: 38, discount: 21, weight: '250', unit: 'g', image: 'https://images.unsplash.com/photo-1518977676601-b53f82aba655?w=400&q=80', rating: 4.0, reviewCount: 35, description: 'Fresh drumsticks, great for sambar.', inStock: true },
-  { id: 'v16', name: 'Lady Finger (Bhindi)', category: 'vegetables', price: 35, originalPrice: 45, discount: 22, weight: '250', unit: 'g', image: 'https://images.unsplash.com/photo-1503454537195-1dcabb73ffb9?w=400&q=80', rating: 4.2, reviewCount: 88, description: 'Tender green okra.', inStock: true },
-  { id: 'v17', name: 'Radish (Mooli)', category: 'vegetables', price: 15, originalPrice: 20, discount: 25, weight: '250', unit: 'g', image: 'https://images.unsplash.com/photo-1518977676601-b53f82aba655?w=400&q=80', rating: 3.8, reviewCount: 29, description: 'Fresh white radishes.', inStock: true },
-  { id: 'v18', name: 'Beetroot', category: 'vegetables', price: 30, originalPrice: 38, discount: 21, weight: '500', unit: 'g', image: 'https://images.unsplash.com/photo-1610832958506-aa56368176cf?w=400&q=80', rating: 4.1, reviewCount: 54, description: 'Sweet and earthy beetroots.', inStock: true },
-  { id: 'v19', name: 'Methi (Fenugreek Leaves)', category: 'vegetables', price: 20, originalPrice: 25, discount: 20, weight: '200', unit: 'g', image: 'https://images.unsplash.com/photo-1576045057995-568f588f82fb?w=400&q=80', rating: 4.3, reviewCount: 63, description: 'Fresh aromatic fenugreek leaves.', inStock: true },
-  { id: 'v20', name: 'Green Beans (Faras)', category: 'vegetables', price: 40, originalPrice: 50, discount: 20, weight: '250', unit: 'g', image: 'https://images.unsplash.com/photo-1567375698348-5d9d5ae99de0?w=400&q=80', rating: 4.0, reviewCount: 41, description: 'Tender green French beans.', inStock: true },
-
-  // Fruits
-  { id: 'f1', name: 'Bananas (Kela)', category: 'fruits', price: 45, originalPrice: 55, discount: 18, weight: '1', unit: 'dozen', image: 'https://images.unsplash.com/photo-1571771894821-ce9b6c11b08e?w=400&q=80', rating: 4.6, reviewCount: 245, description: 'Ripe yellow bananas, sweet and nutritious.', inStock: true, badge: 'Best Seller' },
-  { id: 'f2', name: 'Apples (Seb)', category: 'fruits', price: 120, originalPrice: 150, discount: 20, weight: '1', unit: 'kg', image: 'https://images.unsplash.com/photo-1568702846914-96b305d2aaeb?w=400&q=80', rating: 4.5, reviewCount: 189, description: 'Crisp Shimla apples, perfect for snacking.', inStock: true, badge: 'Premium' },
-  { id: 'f3', name: 'Mangoes (Aam)', category: 'fruits', price: 150, originalPrice: 180, discount: 17, weight: '1', unit: 'kg', image: 'https://images.unsplash.com/photo-1601493700631-2b16ec4b4716?w=400&q=80', rating: 4.8, reviewCount: 312, description: 'Sweet Alphonso mangoes.', inStock: true, badge: 'Seasonal' },
-  { id: 'f4', name: 'Grapes (Angoor)', category: 'fruits', price: 80, originalPrice: 100, discount: 20, weight: '500', unit: 'g', image: 'https://images.unsplash.com/photo-1537640538966-79f369143f8f?w=400&q=80', rating: 4.4, reviewCount: 134, description: 'Sweet seedless black grapes.', inStock: true },
-  { id: 'f5', name: 'Watermelon (Tarbooz)', category: 'fruits', price: 60, originalPrice: 75, discount: 20, weight: '2-3', unit: 'kg', image: 'https://images.unsplash.com/photo-1589984662646-e7b2e4962f18?w=400&q=80', rating: 4.5, reviewCount: 178, description: 'Juicy red watermelon, summer special.', inStock: true, badge: 'Seasonal' },
-  { id: 'f6', name: 'Papaya (Papita)', category: 'fruits', price: 55, originalPrice: 70, discount: 21, weight: '1', unit: 'pc', image: 'https://images.unsplash.com/photo-1517282009859-f000ec3b26fe?w=400&q=80', rating: 4.2, reviewCount: 91, description: 'Ripe and sweet papaya.', inStock: true },
-  { id: 'f7', name: 'Pineapple (Ananas)', category: 'fruits', price: 80, originalPrice: 100, discount: 20, weight: '1', unit: 'pc', image: 'https://images.unsplash.com/photo-1550258987-190a2d41a8ba?w=400&q=80', rating: 4.3, reviewCount: 76, description: 'Tangy sweet pineapple.', inStock: true },
-  { id: 'f8', name: 'Pomegranate (Anar)', category: 'fruits', price: 120, originalPrice: 150, discount: 20, weight: '2', unit: 'pcs', image: 'https://images.unsplash.com/photo-1541344999736-83eca272f6fc?w=400&q=80', rating: 4.6, reviewCount: 143, description: 'Ruby red pomegranates, loaded with antioxidants.', inStock: true },
-  { id: 'f9', name: 'Guava (Amrud)', category: 'fruits', price: 40, originalPrice: 50, discount: 20, weight: '500', unit: 'g', image: 'https://images.unsplash.com/photo-1536511132770-e5058c7e8c46?w=400&q=80', rating: 4.1, reviewCount: 58, description: 'Fresh green guavas.', inStock: true },
-  { id: 'f10', name: 'Coconut (Nariyal)', category: 'fruits', price: 45, originalPrice: 55, discount: 18, weight: '1', unit: 'pc', image: 'https://images.unsplash.com/photo-1530826628767-f990a2c4abb0?w=400&q=80', rating: 4.4, reviewCount: 88, description: 'Fresh whole coconut.', inStock: true },
-  { id: 'f11', name: 'Lemon (Nimbu)', category: 'fruits', price: 30, originalPrice: 40, discount: 25, weight: '6', unit: 'pcs', image: 'https://images.unsplash.com/photo-1587486913049-53fc88980cfc?w=400&q=80', rating: 4.3, reviewCount: 102, description: 'Sour and fresh lemons.', inStock: true },
-  { id: 'f12', name: 'Orange (Santra)', category: 'fruits', price: 80, originalPrice: 100, discount: 20, weight: '1', unit: 'kg', image: 'https://images.unsplash.com/photo-1547514701-42782101795e?w=400&q=80', rating: 4.4, reviewCount: 167, description: 'Juicy Nagpur oranges.', inStock: true, badge: 'Premium' },
-  { id: 'f13', name: 'Strawberries', category: 'fruits', price: 120, originalPrice: 150, discount: 20, weight: '250', unit: 'g', image: 'https://images.unsplash.com/photo-1518635017498-87f514b751ba?w=400&q=80', rating: 4.7, reviewCount: 221, description: 'Fresh red strawberries.', inStock: true, badge: 'Premium' },
-  { id: 'f14', name: 'Chickoo (Sapota)', category: 'fruits', price: 50, originalPrice: 65, discount: 23, weight: '500', unit: 'g', image: 'https://images.unsplash.com/photo-1601493700631-2b16ec4b4716?w=400&q=80', rating: 4.0, reviewCount: 48, description: 'Sweet and soft chickoo.', inStock: true },
-  { id: 'f15', name: 'Kiwi', category: 'fruits', price: 150, originalPrice: 180, discount: 17, weight: '4', unit: 'pcs', image: 'https://images.unsplash.com/photo-1585059895524-72359e06133a?w=400&q=80', rating: 4.5, reviewCount: 112, description: 'Tangy green kiwi fruits.', inStock: true },
-  { id: 'f16', name: 'Pear (Nashpati)', category: 'fruits', price: 90, originalPrice: 110, discount: 18, weight: '500', unit: 'g', image: 'https://images.unsplash.com/photo-1518977676601-b53f82aba655?w=400&q=80', rating: 4.2, reviewCount: 67, description: 'Juicy sweet pears.', inStock: true },
-  { id: 'f17', name: 'Plums (Aloo Bukhara)', category: 'fruits', price: 100, originalPrice: 130, discount: 23, weight: '500', unit: 'g', image: 'https://images.unsplash.com/photo-1582769923195-3f2aad2d4c10?w=400&q=80', rating: 4.1, reviewCount: 41, description: 'Seasonal sweet-sour plums.', inStock: true, badge: 'Seasonal' },
-  { id: 'f18', name: 'Sweet Lime (Mausambi)', category: 'fruits', price: 60, originalPrice: 80, discount: 25, weight: '1', unit: 'kg', image: 'https://images.unsplash.com/photo-1547514701-42782101795e?w=400&q=80', rating: 4.3, reviewCount: 95, description: 'Fresh sweet lime.', inStock: true },
-  { id: 'f19', name: 'Litchi', category: 'fruits', price: 100, originalPrice: 130, discount: 23, weight: '250', unit: 'g', image: 'https://images.unsplash.com/photo-1601493700631-2b16ec4b4716?w=400&q=80', rating: 4.6, reviewCount: 137, description: 'Sweet summer litchi.', inStock: true, badge: 'Seasonal' },
-  { id: 'f20', name: 'Dragon Fruit', category: 'fruits', price: 200, originalPrice: 250, discount: 20, weight: '1', unit: 'pc', image: 'https://images.unsplash.com/photo-1527325678964-54921661f888?w=400&q=80', rating: 4.4, reviewCount: 58, description: 'Exotic pink dragon fruit.', inStock: true, badge: 'Premium' },
-
-  // Dairy
-  { id: 'd1', name: 'Amul Full Cream Milk', category: 'dairy', price: 32, originalPrice: 32, discount: 0, weight: '500', unit: 'ml', image: 'https://images.unsplash.com/photo-1563636619-e9143da7973b?w=400&q=80', rating: 4.6, reviewCount: 342, description: 'Fresh pasteurised full cream milk.', inStock: true },
-  { id: 'd2', name: 'Amul Butter', category: 'dairy', price: 55, originalPrice: 60, discount: 8, weight: '100', unit: 'g', image: 'https://images.unsplash.com/photo-1589985270826-4b7bb135bc9d?w=400&q=80', rating: 4.7, reviewCount: 278, description: 'Creamy Amul table butter.', inStock: true, badge: 'Best Seller' },
-  { id: 'd3', name: 'Paneer', category: 'dairy', price: 85, originalPrice: 100, discount: 15, weight: '200', unit: 'g', image: 'https://images.unsplash.com/photo-1631452180519-c014fe946bc7?w=400&q=80', rating: 4.4, reviewCount: 165, description: 'Fresh soft paneer.', inStock: true },
-  { id: 'd4', name: 'Curd (Dahi)', category: 'dairy', price: 38, originalPrice: 42, discount: 10, weight: '400', unit: 'g', image: 'https://images.unsplash.com/photo-1579370653779-43b640afbeae?w=400&q=80', rating: 4.5, reviewCount: 198, description: 'Thick creamy curd.', inStock: true },
-  { id: 'd5', name: 'Amul Cheese Slices', category: 'dairy', price: 120, originalPrice: 135, discount: 11, weight: '200', unit: 'g', image: 'https://images.unsplash.com/photo-1486297678162-eb2a19b0a32d?w=400&q=80', rating: 4.3, reviewCount: 132, description: 'Processed cheese slices, perfect for sandwiches.', inStock: true },
-  { id: 'd6', name: 'Ghee', category: 'dairy', price: 275, originalPrice: 320, discount: 14, weight: '500', unit: 'ml', image: 'https://images.unsplash.com/photo-1631452180519-c014fe946bc7?w=400&q=80', rating: 4.8, reviewCount: 287, description: 'Pure cow ghee.', inStock: true, badge: 'Premium' },
-  { id: 'd7', name: 'Lassi (Sweet)', category: 'dairy', price: 35, originalPrice: 40, discount: 12, weight: '200', unit: 'ml', image: 'https://images.unsplash.com/photo-1570197571499-166b36435e9f?w=400&q=80', rating: 4.4, reviewCount: 89, description: 'Traditional sweet lassi.', inStock: true },
-  { id: 'd8', name: 'Condensed Milk', category: 'dairy', price: 75, originalPrice: 85, discount: 12, weight: '400', unit: 'g', image: 'https://images.unsplash.com/photo-1563636619-e9143da7973b?w=400&q=80', rating: 4.3, reviewCount: 74, description: 'Sweet condensed milk for desserts.', inStock: true },
-  { id: 'd9', name: 'Buttermilk (Chaas)', category: 'dairy', price: 25, originalPrice: 28, discount: 11, weight: '500', unit: 'ml', image: 'https://images.unsplash.com/photo-1579370653779-43b640afbeae?w=400&q=80', rating: 4.2, reviewCount: 61, description: 'Refreshing spiced buttermilk.', inStock: true },
-  { id: 'd10', name: 'Khoya (Mawa)', category: 'dairy', price: 180, originalPrice: 210, discount: 14, weight: '250', unit: 'g', image: 'https://images.unsplash.com/photo-1631452180519-c014fe946bc7?w=400&q=80', rating: 4.5, reviewCount: 112, description: 'Fresh khoya for mithai.', inStock: true },
-
-  // Snacks
-  { id: 's1', name: 'Lays Classic Salted', category: 'snacks', price: 20, originalPrice: 20, discount: 0, weight: '78', unit: 'g', image: 'https://images.unsplash.com/photo-1566478989037-eec170784d0b?w=400&q=80', rating: 4.5, reviewCount: 412, description: 'Classic salted potato chips.', inStock: true, badge: 'Popular', vendorId: 'vd-pepsico', commissionPercent: 8, sponsored: true },
-  { id: 's2', name: 'Maggi Noodles 2-Min', category: 'snacks', price: 14, originalPrice: 14, discount: 0, weight: '70', unit: 'g', image: 'https://images.unsplash.com/photo-1569718212165-3a8278d5f624?w=400&q=80', rating: 4.7, reviewCount: 867, description: 'Iconic Maggi masala noodles.', inStock: true, badge: 'Best Seller' },
-  { id: 's3', name: 'Kurkure Masala Munch', category: 'snacks', price: 20, originalPrice: 20, discount: 0, weight: '90', unit: 'g', image: 'https://images.unsplash.com/photo-1566478989037-eec170784d0b?w=400&q=80', rating: 4.4, reviewCount: 321, description: 'Spicy and crunchy corn puffs.', inStock: true },
-  { id: 's4', name: 'Biscuits (Parle-G)', category: 'snacks', price: 10, originalPrice: 10, discount: 0, weight: '100', unit: 'g', image: 'https://images.unsplash.com/photo-1558961363-fa8fdf82db35?w=400&q=80', rating: 4.6, reviewCount: 543, description: 'India\'s favourite glucose biscuits.', inStock: true, badge: 'Iconic' },
-  { id: 's5', name: 'Haldiram\'s Bhujia', category: 'snacks', price: 60, originalPrice: 65, discount: 8, weight: '200', unit: 'g', image: 'https://images.unsplash.com/photo-1504674900247-0877df9cc836?w=400&q=80', rating: 4.5, reviewCount: 234, description: 'Crunchy spicy bhujia sev.', inStock: true },
-  { id: 's6', name: 'Dark Fantasy Choco Fills', category: 'snacks', price: 50, originalPrice: 55, discount: 9, weight: '75', unit: 'g', image: 'https://images.unsplash.com/photo-1558961363-fa8fdf82db35?w=400&q=80', rating: 4.6, reviewCount: 189, description: 'Premium chocolate filled biscuits.', inStock: true },
-  { id: 's7', name: 'Popcorn (Butter)', category: 'snacks', price: 30, originalPrice: 35, discount: 14, weight: '60', unit: 'g', image: 'https://images.unsplash.com/photo-1585647347384-2593bc35786b?w=400&q=80', rating: 4.2, reviewCount: 96, description: 'Buttery microwave popcorn.', inStock: true },
-  { id: 's8', name: 'Oreo Cookies', category: 'snacks', price: 30, originalPrice: 35, discount: 14, weight: '120', unit: 'g', image: 'https://images.unsplash.com/photo-1558961363-fa8fdf82db35?w=400&q=80', rating: 4.7, reviewCount: 378, description: 'Classic cream-filled chocolate cookies.', inStock: true, badge: 'Popular' },
-  { id: 's9', name: 'Roasted Peanuts (Moongfali)', category: 'snacks', price: 40, originalPrice: 50, discount: 20, weight: '200', unit: 'g', image: 'https://images.unsplash.com/photo-1504674900247-0877df9cc836?w=400&q=80', rating: 4.3, reviewCount: 147, description: 'Salted crunchy roasted peanuts.', inStock: true },
-  { id: 's10', name: 'Nachos with Salsa', category: 'snacks', price: 55, originalPrice: 65, discount: 15, weight: '150', unit: 'g', image: 'https://images.unsplash.com/photo-1566478989037-eec170784d0b?w=400&q=80', rating: 4.1, reviewCount: 82, description: 'Crispy nachos with tangy salsa dip.', inStock: true },
-  { id: 's11', name: 'Almonds (Badam)', category: 'snacks', price: 250, originalPrice: 300, discount: 17, weight: '250', unit: 'g', image: 'https://images.unsplash.com/photo-1619566636858-adf3ef46400b?w=400&q=80', rating: 4.7, reviewCount: 267, description: 'Premium California almonds.', inStock: true, badge: 'Premium' },
-  { id: 's12', name: 'Cashews (Kaju)', category: 'snacks', price: 350, originalPrice: 420, discount: 17, weight: '250', unit: 'g', image: 'https://images.unsplash.com/photo-1574184864703-3487b13f0edd?w=400&q=80', rating: 4.8, reviewCount: 198, description: 'Whole premium cashew nuts.', inStock: true, badge: 'Premium' },
-  { id: 's13', name: 'Hide & Seek Biscuits', category: 'snacks', price: 35, originalPrice: 40, discount: 12, weight: '120', unit: 'g', image: 'https://images.unsplash.com/photo-1558961363-fa8fdf82db35?w=400&q=80', rating: 4.3, reviewCount: 124, description: 'Choco chip hide and seek biscuits.', inStock: true },
-  { id: 's14', name: 'Wai Wai Noodles', category: 'snacks', price: 15, originalPrice: 15, discount: 0, weight: '75', unit: 'g', image: 'https://images.unsplash.com/photo-1569718212165-3a8278d5f624?w=400&q=80', rating: 4.2, reviewCount: 91, description: 'Spicy instant noodles.', inStock: true },
-  { id: 's15', name: 'Digestive Marie Biscuit', category: 'snacks', price: 30, originalPrice: 35, discount: 14, weight: '200', unit: 'g', image: 'https://images.unsplash.com/photo-1558961363-fa8fdf82db35?w=400&q=80', rating: 4.1, reviewCount: 73, description: 'Healthy digestive biscuits.', inStock: true },
-  { id: 's16', name: 'Choco Pie', category: 'snacks', price: 50, originalPrice: 55, discount: 9, weight: '6', unit: 'pcs', image: 'https://images.unsplash.com/photo-1578985545062-69928b1d9587?w=400&q=80', rating: 4.5, reviewCount: 156, description: 'Soft chocolate-coated marshmallow pies.', inStock: true },
-  { id: 's17', name: 'Lay\'s Magic Masala', category: 'snacks', price: 20, originalPrice: 20, discount: 0, weight: '78', unit: 'g', image: 'https://images.unsplash.com/photo-1566478989037-eec170784d0b?w=400&q=80', rating: 4.4, reviewCount: 287, description: 'India\'s favourite masala flavour chips.', inStock: true },
-  { id: 's18', name: 'Corn Flakes', category: 'snacks', price: 110, originalPrice: 130, discount: 15, weight: '250', unit: 'g', image: 'https://images.unsplash.com/photo-1504674900247-0877df9cc836?w=400&q=80', rating: 4.2, reviewCount: 88, description: 'Crispy golden corn flakes.', inStock: true },
-  { id: 's19', name: 'Raisins (Kishmish)', category: 'snacks', price: 80, originalPrice: 95, discount: 16, weight: '200', unit: 'g', image: 'https://images.unsplash.com/photo-1619566636858-adf3ef46400b?w=400&q=80', rating: 4.3, reviewCount: 112, description: 'Juicy sweet raisins.', inStock: true },
-  { id: 's20', name: 'Chakki Atta (Wheat Flour)', category: 'snacks', price: 55, originalPrice: 65, discount: 15, weight: '1', unit: 'kg', image: 'https://images.unsplash.com/photo-1504674900247-0877df9cc836?w=400&q=80', rating: 4.4, reviewCount: 201, description: 'Fresh stone-ground whole wheat flour.', inStock: true },
-
-  // Beverages
-  { id: 'b1', name: 'Coca-Cola', category: 'beverages', price: 40, originalPrice: 40, discount: 0, weight: '500', unit: 'ml', image: 'https://images.unsplash.com/photo-1554866585-cd94860890b7?w=400&q=80', rating: 4.6, reviewCount: 412, description: 'Classic ice-cold Coca-Cola.', inStock: true, badge: 'Popular', vendorId: 'vd-coke', commissionPercent: 6, sponsored: true },
-  { id: 'b2', name: 'Minute Maid Orange Juice', category: 'beverages', price: 85, originalPrice: 95, discount: 11, weight: '1', unit: 'L', image: 'https://images.unsplash.com/photo-1498557850523-fd3d118b962e?w=400&q=80', rating: 4.3, reviewCount: 178, description: 'Fresh squeezed orange juice.', inStock: true },
-  { id: 'b3', name: 'Tropicana Mixed Fruit', category: 'beverages', price: 90, originalPrice: 105, discount: 14, weight: '1', unit: 'L', image: 'https://images.unsplash.com/photo-1589733955941-5eeaf752f6dd?w=400&q=80', rating: 4.4, reviewCount: 134, description: 'Refreshing mixed fruit juice.', inStock: true },
-  { id: 'b4', name: 'Red Bull Energy Drink', category: 'beverages', price: 115, originalPrice: 125, discount: 8, weight: '250', unit: 'ml', image: 'https://images.unsplash.com/photo-1527960471264-932f39eb5846?w=400&q=80', rating: 4.5, reviewCount: 221, description: 'Energy boost in a can.', inStock: true, badge: 'Popular' },
-  { id: 'b5', name: 'Bisleri Mineral Water', category: 'beverages', price: 20, originalPrice: 20, discount: 0, weight: '1', unit: 'L', image: 'https://images.unsplash.com/photo-1548839140-29a749e1cf4d?w=400&q=80', rating: 4.4, reviewCount: 543, description: 'Pure mineral water.', inStock: true },
-  { id: 'b6', name: 'Lipton Green Tea', category: 'beverages', price: 150, originalPrice: 175, discount: 14, weight: '100', unit: 'g', image: 'https://images.unsplash.com/photo-1556679343-c7306c1976bc?w=400&q=80', rating: 4.3, reviewCount: 167, description: 'Refreshing green tea bags.', inStock: true },
-  { id: 'b7', name: 'Nescafé Classic Coffee', category: 'beverages', price: 250, originalPrice: 285, discount: 12, weight: '100', unit: 'g', image: 'https://images.unsplash.com/photo-1509042239860-f550ce710b93?w=400&q=80', rating: 4.6, reviewCount: 289, description: 'Rich and aromatic instant coffee.', inStock: true, badge: 'Premium' },
-  { id: 'b8', name: 'Sprite', category: 'beverages', price: 40, originalPrice: 40, discount: 0, weight: '500', unit: 'ml', image: 'https://images.unsplash.com/photo-1554866585-cd94860890b7?w=400&q=80', rating: 4.4, reviewCount: 298, description: 'Crisp lemon-lime soda.', inStock: true },
-  { id: 'b9', name: 'Frooti Mango Drink', category: 'beverages', price: 15, originalPrice: 15, discount: 0, weight: '200', unit: 'ml', image: 'https://images.unsplash.com/photo-1498557850523-fd3d118b962e?w=400&q=80', rating: 4.2, reviewCount: 334, description: 'India\'s favourite mango drink.', inStock: true },
-  { id: 'b10', name: 'Horlicks Health Drink', category: 'beverages', price: 175, originalPrice: 200, discount: 12, weight: '200', unit: 'g', image: 'https://images.unsplash.com/photo-1563636619-e9143da7973b?w=400&q=80', rating: 4.3, reviewCount: 142, description: 'Nutritious malt health drink.', inStock: true },
-]
-
-export const getProductsByCategory = (category: string) =>
-  products.filter(p => p.category === category)
-
-export const getFeaturedProducts = () =>
-  products.filter(p => p.badge === 'Best Seller' || p.badge === 'Popular')
-
-export const getProductById = (id: string) =>
-  products.find(p => p.id === id)
-
-export const getSponsoredProducts = () =>
-  products.filter(p => p.sponsored)
-
-/**
- * Every product earns the platform a commission on sale — whether it's an
- * explicit brand deal (set on the product, e.g. Lay's, Coca-Cola above) or
- * the platform's standard cut from local Neemuch grocers (default below).
- * This default keeps the revenue dashboard meaningful even for products
- * that don't have a named vendor deal yet.
- */
-const DEFAULT_COMMISSION_PERCENT = 12
-
-export const getCommissionPercent = (product: Product) =>
-  product.commissionPercent ?? DEFAULT_COMMISSION_PERCENT
+export const PRODUCTS: Product[] = [
+  {
+    "id": "sd-prod-001",
+    "slug": "pure-cotton-oversized-graphic-tee-sd-prod-001",
+    "name": "Pure Cotton Oversized Graphic Tee",
+    "brand": "StyleDash Studio",
+    "department": "men",
+    "category": "T-Shirts",
+    "subcategory": "Oversized",
+    "collection": "Summer Essentials 2026",
+    "shortDescription": "Premium quality pure cotton oversized graphic tee crafted for comfort and style.",
+    "description": "Elevate your daily fashion with this Pure Cotton Oversized Graphic Tee. Features premium fabric construction, tailored fit, and durable craftsmanship ideal for everyday wear.",
+    "material": "100% Premium Combed Cotton",
+    "fit": "Regular Fit",
+    "pattern": "Solid / Textured",
+    "occasion": [
+      "Casual",
+      "Everyday",
+      "Party"
+    ],
+    "careInstructions": [
+      "Machine wash cold",
+      "Do not bleach",
+      "Tumble dry low",
+      "Warm iron if needed"
+    ],
+    "price": 473,
+    "originalPrice": 662,
+    "discount": 28,
+    "images": [
+      "https://images.unsplash.com/photo-1576995853123-5a10305d93c0?auto=format&fit=crop&w=800&q=80",
+      "https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?auto=format&fit=crop&w=800&q=80"
+    ],
+    "thumbnail": "https://images.unsplash.com/photo-1576995853123-5a10305d93c0?auto=format&fit=crop&w=800&q=80",
+    "rating": 4.0,
+    "reviewCount": 38,
+    "reviews": [
+      {
+        "id": "rev-sd-prod-001-1",
+        "userName": "Aman Sharma",
+        "rating": 5,
+        "title": "Great quality and fast delivery!",
+        "comment": "Delivered in Neemuch within 45 minutes! Quality is top notch.",
+        "createdAt": "2026-07-28",
+        "verifiedPurchase": true
+      },
+      {
+        "id": "rev-sd-prod-001-2",
+        "userName": "Priya Verma",
+        "rating": 4,
+        "title": "Nice fit and comfortable material",
+        "comment": "The fabric is very soft. True to size.",
+        "createdAt": "2026-07-29",
+        "verifiedPurchase": true
+      }
+    ],
+    "variants": [
+      {
+        "id": "sd-prod-001-var-1",
+        "sku": "SD-SD-PROD-001-NAV-S",
+        "size": "S",
+        "colourName": "Navy Blue",
+        "colourHex": "#000080",
+        "stock": 15,
+        "price": 473,
+        "originalPrice": 662
+      },
+      {
+        "id": "sd-prod-001-var-2",
+        "sku": "SD-SD-PROD-001-NAV-M",
+        "size": "M",
+        "colourName": "Navy Blue",
+        "colourHex": "#000080",
+        "stock": 15,
+        "price": 473,
+        "originalPrice": 662
+      },
+      {
+        "id": "sd-prod-001-var-3",
+        "sku": "SD-SD-PROD-001-NAV-L",
+        "size": "L",
+        "colourName": "Navy Blue",
+        "colourHex": "#000080",
+        "stock": 15,
+        "price": 473,
+        "originalPrice": 662
+      },
+      {
+        "id": "sd-prod-001-var-4",
+        "sku": "SD-SD-PROD-001-NAV-XL",
+        "size": "XL",
+        "colourName": "Navy Blue",
+        "colourHex": "#000080",
+        "stock": 15,
+        "price": 473,
+        "originalPrice": 662
+      },
+      {
+        "id": "sd-prod-001-var-5",
+        "sku": "SD-SD-PROD-001-NAV-XXL",
+        "size": "XXL",
+        "colourName": "Navy Blue",
+        "colourHex": "#000080",
+        "stock": 15,
+        "price": 473,
+        "originalPrice": 662
+      },
+      {
+        "id": "sd-prod-001-var-6",
+        "sku": "SD-SD-PROD-001-OLI-S",
+        "size": "S",
+        "colourName": "Olive Green",
+        "colourHex": "#556B2F",
+        "stock": 15,
+        "price": 473,
+        "originalPrice": 662
+      },
+      {
+        "id": "sd-prod-001-var-7",
+        "sku": "SD-SD-PROD-001-OLI-M",
+        "size": "M",
+        "colourName": "Olive Green",
+        "colourHex": "#556B2F",
+        "stock": 0,
+        "price": 473,
+        "originalPrice": 662
+      },
+      {
+        "id": "sd-prod-001-var-8",
+        "sku": "SD-SD-PROD-001-OLI-L",
+        "size": "L",
+        "colourName": "Olive Green",
+        "colourHex": "#556B2F",
+        "stock": 15,
+        "price": 473,
+        "originalPrice": 662
+      },
+      {
+        "id": "sd-prod-001-var-9",
+        "sku": "SD-SD-PROD-001-OLI-XL",
+        "size": "XL",
+        "colourName": "Olive Green",
+        "colourHex": "#556B2F",
+        "stock": 15,
+        "price": 473,
+        "originalPrice": 662
+      },
+      {
+        "id": "sd-prod-001-var-10",
+        "sku": "SD-SD-PROD-001-OLI-XXL",
+        "size": "XXL",
+        "colourName": "Olive Green",
+        "colourHex": "#556B2F",
+        "stock": 15,
+        "price": 473,
+        "originalPrice": 662
+      }
+    ],
+    "tags": [
+      "pure cotton oversized graphic tee",
+      "men",
+      "t-shirts",
+      "oversized",
+      "styledash studio",
+      "fashion",
+      "trending"
+    ],
+    "badge": "Express",
+    "newArrival": false,
+    "trending": true,
+    "featured": false,
+    "expressDelivery": true,
+    "estimatedDeliveryMinutes": 60,
+    "returnWindowDays": 7,
+    "exchangeAvailable": true,
+    "vendorId": "v-urban-style",
+    "commissionPercent": 12,
+    "sponsored": false,
+    "active": true,
+    "createdAt": "2026-07-01T00:00:00Z",
+    "updatedAt": "2026-08-01T00:00:00Z"
+  },
+  {
+    "id": "sd-prod-002",
+    "slug": "solid-heavyweight-crew-neck-t-shirt-sd-prod-002",
+    "name": "Solid Heavyweight Crew Neck T-Shirt",
+    "brand": "Anouk",
+    "department": "men",
+    "category": "T-Shirts",
+    "subcategory": "Oversized",
+    "collection": "Summer Essentials 2026",
+    "shortDescription": "Premium quality solid heavyweight crew neck t-shirt crafted for comfort and style.",
+    "description": "Elevate your daily fashion with this Solid Heavyweight Crew Neck T-Shirt. Features premium fabric construction, tailored fit, and durable craftsmanship ideal for everyday wear.",
+    "material": "100% Premium Combed Cotton",
+    "fit": "Regular Fit",
+    "pattern": "Solid / Textured",
+    "occasion": [
+      "Casual",
+      "Everyday",
+      "Party"
+    ],
+    "careInstructions": [
+      "Machine wash cold",
+      "Do not bleach",
+      "Tumble dry low",
+      "Warm iron if needed"
+    ],
+    "price": 510,
+    "originalPrice": 714,
+    "discount": 28,
+    "images": [
+      "https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?auto=format&fit=crop&w=800&q=80",
+      "https://images.unsplash.com/photo-1529374255404-311a2a4f1fd9?auto=format&fit=crop&w=800&q=80"
+    ],
+    "thumbnail": "https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?auto=format&fit=crop&w=800&q=80",
+    "rating": 4.1,
+    "reviewCount": 51,
+    "reviews": [
+      {
+        "id": "rev-sd-prod-002-1",
+        "userName": "Aman Sharma",
+        "rating": 5,
+        "title": "Great quality and fast delivery!",
+        "comment": "Delivered in Neemuch within 45 minutes! Quality is top notch.",
+        "createdAt": "2026-07-28",
+        "verifiedPurchase": true
+      },
+      {
+        "id": "rev-sd-prod-002-2",
+        "userName": "Priya Verma",
+        "rating": 4,
+        "title": "Nice fit and comfortable material",
+        "comment": "The fabric is very soft. True to size.",
+        "createdAt": "2026-07-29",
+        "verifiedPurchase": true
+      }
+    ],
+    "variants": [
+      {
+        "id": "sd-prod-002-var-1",
+        "sku": "SD-SD-PROD-002-OLI-S",
+        "size": "S",
+        "colourName": "Olive Green",
+        "colourHex": "#556B2F",
+        "stock": 15,
+        "price": 510,
+        "originalPrice": 714
+      },
+      {
+        "id": "sd-prod-002-var-2",
+        "sku": "SD-SD-PROD-002-OLI-M",
+        "size": "M",
+        "colourName": "Olive Green",
+        "colourHex": "#556B2F",
+        "stock": 15,
+        "price": 510,
+        "originalPrice": 714
+      },
+      {
+        "id": "sd-prod-002-var-3",
+        "sku": "SD-SD-PROD-002-OLI-L",
+        "size": "L",
+        "colourName": "Olive Green",
+        "colourHex": "#556B2F",
+        "stock": 15,
+        "price": 510,
+        "originalPrice": 714
+      },
+      {
+        "id": "sd-prod-002-var-4",
+        "sku": "SD-SD-PROD-002-OLI-XL",
+        "size": "XL",
+        "colourName": "Olive Green",
+        "colourHex": "#556B2F",
+        "stock": 15,
+        "price": 510,
+        "originalPrice": 714
+      },
+      {
+        "id": "sd-prod-002-var-5",
+        "sku": "SD-SD-PROD-002-OLI-XXL",
+        "size": "XXL",
+        "colourName": "Olive Green",
+        "colourHex": "#556B2F",
+        "stock": 15,
+        "price": 510,
+        "originalPrice": 714
+      },
+      {
+        "id": "sd-prod-002-var-6",
+        "sku": "SD-SD-PROD-002-CRI-S",
+        "size": "S",
+        "colourName": "Crimson Red",
+        "colourHex": "#DC143C",
+        "stock": 15,
+        "price": 510,
+        "originalPrice": 714
+      },
+      {
+        "id": "sd-prod-002-var-7",
+        "sku": "SD-SD-PROD-002-CRI-M",
+        "size": "M",
+        "colourName": "Crimson Red",
+        "colourHex": "#DC143C",
+        "stock": 0,
+        "price": 510,
+        "originalPrice": 714
+      },
+      {
+        "id": "sd-prod-002-var-8",
+        "sku": "SD-SD-PROD-002-CRI-L",
+        "size": "L",
+        "colourName": "Crimson Red",
+        "colourHex": "#DC143C",
+        "stock": 15,
+        "price": 510,
+        "originalPrice": 714
+      },
+      {
+        "id": "sd-prod-002-var-9",
+        "sku": "SD-SD-PROD-002-CRI-XL",
+        "size": "XL",
+        "colourName": "Crimson Red",
+        "colourHex": "#DC143C",
+        "stock": 15,
+        "price": 510,
+        "originalPrice": 714
+      },
+      {
+        "id": "sd-prod-002-var-10",
+        "sku": "SD-SD-PROD-002-CRI-XXL",
+        "size": "XXL",
+        "colourName": "Crimson Red",
+        "colourHex": "#DC143C",
+        "stock": 15,
+        "price": 510,
+        "originalPrice": 714
+      }
+    ],
+    "tags": [
+      "solid heavyweight crew neck t-shirt",
+      "men",
+      "t-shirts",
+      "oversized",
+      "anouk",
+      "fashion",
+      "trending"
+    ],
+    "badge": "Trending",
+    "newArrival": true,
+    "trending": false,
+    "featured": false,
+    "expressDelivery": true,
+    "estimatedDeliveryMinutes": 60,
+    "returnWindowDays": 7,
+    "exchangeAvailable": true,
+    "vendorId": "v-ethnic-vibe",
+    "commissionPercent": 12,
+    "sponsored": false,
+    "active": true,
+    "createdAt": "2026-07-01T00:00:00Z",
+    "updatedAt": "2026-08-01T00:00:00Z"
+  },
+  {
+    "id": "sd-prod-003",
+    "slug": "vintage-wash-acid-tee-sd-prod-003",
+    "name": "Vintage Wash Acid Tee",
+    "brand": "Mast & Harbour",
+    "department": "men",
+    "category": "T-Shirts",
+    "subcategory": "Oversized",
+    "collection": "Summer Essentials 2026",
+    "shortDescription": "Premium quality vintage wash acid tee crafted for comfort and style.",
+    "description": "Elevate your daily fashion with this Vintage Wash Acid Tee. Features premium fabric construction, tailored fit, and durable craftsmanship ideal for everyday wear.",
+    "material": "100% Premium Combed Cotton",
+    "fit": "Regular Fit",
+    "pattern": "Solid / Textured",
+    "occasion": [
+      "Casual",
+      "Everyday",
+      "Party"
+    ],
+    "careInstructions": [
+      "Machine wash cold",
+      "Do not bleach",
+      "Tumble dry low",
+      "Warm iron if needed"
+    ],
+    "price": 547,
+    "originalPrice": 765,
+    "discount": 28,
+    "images": [
+      "https://images.unsplash.com/photo-1529374255404-311a2a4f1fd9?auto=format&fit=crop&w=800&q=80",
+      "https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&w=800&q=80"
+    ],
+    "thumbnail": "https://images.unsplash.com/photo-1529374255404-311a2a4f1fd9?auto=format&fit=crop&w=800&q=80",
+    "rating": 4.2,
+    "reviewCount": 64,
+    "reviews": [
+      {
+        "id": "rev-sd-prod-003-1",
+        "userName": "Aman Sharma",
+        "rating": 5,
+        "title": "Great quality and fast delivery!",
+        "comment": "Delivered in Neemuch within 45 minutes! Quality is top notch.",
+        "createdAt": "2026-07-28",
+        "verifiedPurchase": true
+      },
+      {
+        "id": "rev-sd-prod-003-2",
+        "userName": "Priya Verma",
+        "rating": 4,
+        "title": "Nice fit and comfortable material",
+        "comment": "The fabric is very soft. True to size.",
+        "createdAt": "2026-07-29",
+        "verifiedPurchase": true
+      }
+    ],
+    "variants": [
+      {
+        "id": "sd-prod-003-var-1",
+        "sku": "SD-SD-PROD-003-CRI-S",
+        "size": "S",
+        "colourName": "Crimson Red",
+        "colourHex": "#DC143C",
+        "stock": 15,
+        "price": 547,
+        "originalPrice": 765
+      },
+      {
+        "id": "sd-prod-003-var-2",
+        "sku": "SD-SD-PROD-003-CRI-M",
+        "size": "M",
+        "colourName": "Crimson Red",
+        "colourHex": "#DC143C",
+        "stock": 15,
+        "price": 547,
+        "originalPrice": 765
+      },
+      {
+        "id": "sd-prod-003-var-3",
+        "sku": "SD-SD-PROD-003-CRI-L",
+        "size": "L",
+        "colourName": "Crimson Red",
+        "colourHex": "#DC143C",
+        "stock": 15,
+        "price": 547,
+        "originalPrice": 765
+      },
+      {
+        "id": "sd-prod-003-var-4",
+        "sku": "SD-SD-PROD-003-CRI-XL",
+        "size": "XL",
+        "colourName": "Crimson Red",
+        "colourHex": "#DC143C",
+        "stock": 15,
+        "price": 547,
+        "originalPrice": 765
+      },
+      {
+        "id": "sd-prod-003-var-5",
+        "sku": "SD-SD-PROD-003-CRI-XXL",
+        "size": "XXL",
+        "colourName": "Crimson Red",
+        "colourHex": "#DC143C",
+        "stock": 15,
+        "price": 547,
+        "originalPrice": 765
+      },
+      {
+        "id": "sd-prod-003-var-6",
+        "sku": "SD-SD-PROD-003-BEI-S",
+        "size": "S",
+        "colourName": "Beige",
+        "colourHex": "#F5F5DC",
+        "stock": 15,
+        "price": 547,
+        "originalPrice": 765
+      },
+      {
+        "id": "sd-prod-003-var-7",
+        "sku": "SD-SD-PROD-003-BEI-M",
+        "size": "M",
+        "colourName": "Beige",
+        "colourHex": "#F5F5DC",
+        "stock": 0,
+        "price": 547,
+        "originalPrice": 765
+      },
+      {
+        "id": "sd-prod-003-var-8",
+        "sku": "SD-SD-PROD-003-BEI-L",
+        "size": "L",
+        "colourName": "Beige",
+        "colourHex": "#F5F5DC",
+        "stock": 15,
+        "price": 547,
+        "originalPrice": 765
+      },
+      {
+        "id": "sd-prod-003-var-9",
+        "sku": "SD-SD-PROD-003-BEI-XL",
+        "size": "XL",
+        "colourName": "Beige",
+        "colourHex": "#F5F5DC",
+        "stock": 15,
+        "price": 547,
+        "originalPrice": 765
+      },
+      {
+        "id": "sd-prod-003-var-10",
+        "sku": "SD-SD-PROD-003-BEI-XXL",
+        "size": "XXL",
+        "colourName": "Beige",
+        "colourHex": "#F5F5DC",
+        "stock": 15,
+        "price": 547,
+        "originalPrice": 765
+      }
+    ],
+    "tags": [
+      "vintage wash acid tee",
+      "men",
+      "t-shirts",
+      "oversized",
+      "mast & harbour",
+      "fashion",
+      "trending"
+    ],
+    "badge": "Express",
+    "newArrival": false,
+    "trending": true,
+    "featured": true,
+    "expressDelivery": true,
+    "estimatedDeliveryMinutes": 60,
+    "returnWindowDays": 7,
+    "exchangeAvailable": true,
+    "vendorId": "v-urban-style",
+    "commissionPercent": 12,
+    "sponsored": false,
+    "active": true,
+    "createdAt": "2026-07-01T00:00:00Z",
+    "updatedAt": "2026-08-01T00:00:00Z"
+  },
+  {
+    "id": "sd-prod-004",
+    "slug": "polo-collar-slim-fit-t-shirt-sd-prod-004",
+    "name": "Polo Collar Slim Fit T-Shirt",
+    "brand": "Highlander",
+    "department": "men",
+    "category": "T-Shirts",
+    "subcategory": "Oversized",
+    "collection": "Summer Essentials 2026",
+    "shortDescription": "Premium quality polo collar slim fit t-shirt crafted for comfort and style.",
+    "description": "Elevate your daily fashion with this Polo Collar Slim Fit T-Shirt. Features premium fabric construction, tailored fit, and durable craftsmanship ideal for everyday wear.",
+    "material": "100% Premium Combed Cotton",
+    "fit": "Regular Fit",
+    "pattern": "Solid / Textured",
+    "occasion": [
+      "Casual",
+      "Everyday",
+      "Party"
+    ],
+    "careInstructions": [
+      "Machine wash cold",
+      "Do not bleach",
+      "Tumble dry low",
+      "Warm iron if needed"
+    ],
+    "price": 584,
+    "originalPrice": 817,
+    "discount": 28,
+    "images": [
+      "https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&w=800&q=80",
+      "https://images.unsplash.com/photo-1521572267360-ee0c2909d518?auto=format&fit=crop&w=800&q=80"
+    ],
+    "thumbnail": "https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&w=800&q=80",
+    "rating": 4.3,
+    "reviewCount": 77,
+    "reviews": [
+      {
+        "id": "rev-sd-prod-004-1",
+        "userName": "Aman Sharma",
+        "rating": 5,
+        "title": "Great quality and fast delivery!",
+        "comment": "Delivered in Neemuch within 45 minutes! Quality is top notch.",
+        "createdAt": "2026-07-28",
+        "verifiedPurchase": true
+      },
+      {
+        "id": "rev-sd-prod-004-2",
+        "userName": "Priya Verma",
+        "rating": 4,
+        "title": "Nice fit and comfortable material",
+        "comment": "The fabric is very soft. True to size.",
+        "createdAt": "2026-07-29",
+        "verifiedPurchase": true
+      }
+    ],
+    "variants": [
+      {
+        "id": "sd-prod-004-var-1",
+        "sku": "SD-SD-PROD-004-BEI-S",
+        "size": "S",
+        "colourName": "Beige",
+        "colourHex": "#F5F5DC",
+        "stock": 15,
+        "price": 584,
+        "originalPrice": 817
+      },
+      {
+        "id": "sd-prod-004-var-2",
+        "sku": "SD-SD-PROD-004-BEI-M",
+        "size": "M",
+        "colourName": "Beige",
+        "colourHex": "#F5F5DC",
+        "stock": 15,
+        "price": 584,
+        "originalPrice": 817
+      },
+      {
+        "id": "sd-prod-004-var-3",
+        "sku": "SD-SD-PROD-004-BEI-L",
+        "size": "L",
+        "colourName": "Beige",
+        "colourHex": "#F5F5DC",
+        "stock": 15,
+        "price": 584,
+        "originalPrice": 817
+      },
+      {
+        "id": "sd-prod-004-var-4",
+        "sku": "SD-SD-PROD-004-BEI-XL",
+        "size": "XL",
+        "colourName": "Beige",
+        "colourHex": "#F5F5DC",
+        "stock": 15,
+        "price": 584,
+        "originalPrice": 817
+      },
+      {
+        "id": "sd-prod-004-var-5",
+        "sku": "SD-SD-PROD-004-BEI-XXL",
+        "size": "XXL",
+        "colourName": "Beige",
+        "colourHex": "#F5F5DC",
+        "stock": 15,
+        "price": 584,
+        "originalPrice": 817
+      },
+      {
+        "id": "sd-prod-004-var-6",
+        "sku": "SD-SD-PROD-004-CHA-S",
+        "size": "S",
+        "colourName": "Charcoal Gray",
+        "colourHex": "#36454F",
+        "stock": 15,
+        "price": 584,
+        "originalPrice": 817
+      },
+      {
+        "id": "sd-prod-004-var-7",
+        "sku": "SD-SD-PROD-004-CHA-M",
+        "size": "M",
+        "colourName": "Charcoal Gray",
+        "colourHex": "#36454F",
+        "stock": 0,
+        "price": 584,
+        "originalPrice": 817
+      },
+      {
+        "id": "sd-prod-004-var-8",
+        "sku": "SD-SD-PROD-004-CHA-L",
+        "size": "L",
+        "colourName": "Charcoal Gray",
+        "colourHex": "#36454F",
+        "stock": 15,
+        "price": 584,
+        "originalPrice": 817
+      },
+      {
+        "id": "sd-prod-004-var-9",
+        "sku": "SD-SD-PROD-004-CHA-XL",
+        "size": "XL",
+        "colourName": "Charcoal Gray",
+        "colourHex": "#36454F",
+        "stock": 15,
+        "price": 584,
+        "originalPrice": 817
+      },
+      {
+        "id": "sd-prod-004-var-10",
+        "sku": "SD-SD-PROD-004-CHA-XXL",
+        "size": "XXL",
+        "colourName": "Charcoal Gray",
+        "colourHex": "#36454F",
+        "stock": 15,
+        "price": 584,
+        "originalPrice": 817
+      }
+    ],
+    "tags": [
+      "polo collar slim fit t-shirt",
+      "men",
+      "t-shirts",
+      "oversized",
+      "highlander",
+      "fashion",
+      "trending"
+    ],
+    "badge": "New",
+    "newArrival": false,
+    "trending": false,
+    "featured": false,
+    "expressDelivery": true,
+    "estimatedDeliveryMinutes": 60,
+    "returnWindowDays": 7,
+    "exchangeAvailable": true,
+    "vendorId": "v-ethnic-vibe",
+    "commissionPercent": 12,
+    "sponsored": false,
+    "active": true,
+    "createdAt": "2026-07-01T00:00:00Z",
+    "updatedAt": "2026-08-01T00:00:00Z"
+  },
+  {
+    "id": "sd-prod-005",
+    "slug": "minimalist-stripe-cotton-tee-sd-prod-005",
+    "name": "Minimalist Stripe Cotton Tee",
+    "brand": "Bawree",
+    "department": "men",
+    "category": "T-Shirts",
+    "subcategory": "Oversized",
+    "collection": "Summer Essentials 2026",
+    "shortDescription": "Premium quality minimalist stripe cotton tee crafted for comfort and style.",
+    "description": "Elevate your daily fashion with this Minimalist Stripe Cotton Tee. Features premium fabric construction, tailored fit, and durable craftsmanship ideal for everyday wear.",
+    "material": "100% Premium Combed Cotton",
+    "fit": "Regular Fit",
+    "pattern": "Solid / Textured",
+    "occasion": [
+      "Casual",
+      "Everyday",
+      "Party"
+    ],
+    "careInstructions": [
+      "Machine wash cold",
+      "Do not bleach",
+      "Tumble dry low",
+      "Warm iron if needed"
+    ],
+    "price": 621,
+    "originalPrice": 869,
+    "discount": 28,
+    "images": [
+      "https://images.unsplash.com/photo-1521572267360-ee0c2909d518?auto=format&fit=crop&w=800&q=80",
+      "https://images.unsplash.com/photo-1503342217505-b0a15ec3261c?auto=format&fit=crop&w=800&q=80"
+    ],
+    "thumbnail": "https://images.unsplash.com/photo-1521572267360-ee0c2909d518?auto=format&fit=crop&w=800&q=80",
+    "rating": 4.4,
+    "reviewCount": 90,
+    "reviews": [
+      {
+        "id": "rev-sd-prod-005-1",
+        "userName": "Aman Sharma",
+        "rating": 5,
+        "title": "Great quality and fast delivery!",
+        "comment": "Delivered in Neemuch within 45 minutes! Quality is top notch.",
+        "createdAt": "2026-07-28",
+        "verifiedPurchase": true
+      },
+      {
+        "id": "rev-sd-prod-005-2",
+        "userName": "Priya Verma",
+        "rating": 4,
+        "title": "Nice fit and comfortable material",
+        "comment": "The fabric is very soft. True to size.",
+        "createdAt": "2026-07-29",
+        "verifiedPurchase": true
+      }
+    ],
+    "variants": [
+      {
+        "id": "sd-prod-005-var-1",
+        "sku": "SD-SD-PROD-005-CHA-S",
+        "size": "S",
+        "colourName": "Charcoal Gray",
+        "colourHex": "#36454F",
+        "stock": 15,
+        "price": 621,
+        "originalPrice": 869
+      },
+      {
+        "id": "sd-prod-005-var-2",
+        "sku": "SD-SD-PROD-005-CHA-M",
+        "size": "M",
+        "colourName": "Charcoal Gray",
+        "colourHex": "#36454F",
+        "stock": 15,
+        "price": 621,
+        "originalPrice": 869
+      },
+      {
+        "id": "sd-prod-005-var-3",
+        "sku": "SD-SD-PROD-005-CHA-L",
+        "size": "L",
+        "colourName": "Charcoal Gray",
+        "colourHex": "#36454F",
+        "stock": 15,
+        "price": 621,
+        "originalPrice": 869
+      },
+      {
+        "id": "sd-prod-005-var-4",
+        "sku": "SD-SD-PROD-005-CHA-XL",
+        "size": "XL",
+        "colourName": "Charcoal Gray",
+        "colourHex": "#36454F",
+        "stock": 15,
+        "price": 621,
+        "originalPrice": 869
+      },
+      {
+        "id": "sd-prod-005-var-5",
+        "sku": "SD-SD-PROD-005-CHA-XXL",
+        "size": "XXL",
+        "colourName": "Charcoal Gray",
+        "colourHex": "#36454F",
+        "stock": 15,
+        "price": 621,
+        "originalPrice": 869
+      },
+      {
+        "id": "sd-prod-005-var-6",
+        "sku": "SD-SD-PROD-005-MUS-S",
+        "size": "S",
+        "colourName": "Mustard Yellow",
+        "colourHex": "#FFDB58",
+        "stock": 15,
+        "price": 621,
+        "originalPrice": 869
+      },
+      {
+        "id": "sd-prod-005-var-7",
+        "sku": "SD-SD-PROD-005-MUS-M",
+        "size": "M",
+        "colourName": "Mustard Yellow",
+        "colourHex": "#FFDB58",
+        "stock": 0,
+        "price": 621,
+        "originalPrice": 869
+      },
+      {
+        "id": "sd-prod-005-var-8",
+        "sku": "SD-SD-PROD-005-MUS-L",
+        "size": "L",
+        "colourName": "Mustard Yellow",
+        "colourHex": "#FFDB58",
+        "stock": 15,
+        "price": 621,
+        "originalPrice": 869
+      },
+      {
+        "id": "sd-prod-005-var-9",
+        "sku": "SD-SD-PROD-005-MUS-XL",
+        "size": "XL",
+        "colourName": "Mustard Yellow",
+        "colourHex": "#FFDB58",
+        "stock": 15,
+        "price": 621,
+        "originalPrice": 869
+      },
+      {
+        "id": "sd-prod-005-var-10",
+        "sku": "SD-SD-PROD-005-MUS-XXL",
+        "size": "XXL",
+        "colourName": "Mustard Yellow",
+        "colourHex": "#FFDB58",
+        "stock": 15,
+        "price": 621,
+        "originalPrice": 869
+      }
+    ],
+    "tags": [
+      "minimalist stripe cotton tee",
+      "men",
+      "t-shirts",
+      "oversized",
+      "bawree",
+      "fashion",
+      "trending"
+    ],
+    "badge": "Trending",
+    "newArrival": true,
+    "trending": true,
+    "featured": false,
+    "expressDelivery": true,
+    "estimatedDeliveryMinutes": 60,
+    "returnWindowDays": 7,
+    "exchangeAvailable": true,
+    "vendorId": "v-urban-style",
+    "commissionPercent": 12,
+    "sponsored": false,
+    "active": true,
+    "createdAt": "2026-07-01T00:00:00Z",
+    "updatedAt": "2026-08-01T00:00:00Z"
+  },
+  {
+    "id": "sd-prod-006",
+    "slug": "textured-linen-spread-collar-shirt-sd-prod-006",
+    "name": "Textured Linen Spread Collar Shirt",
+    "brand": "Snitch",
+    "department": "men",
+    "category": "Shirts",
+    "subcategory": "Casual",
+    "collection": "Summer Essentials 2026",
+    "shortDescription": "Premium quality textured linen spread collar shirt crafted for comfort and style.",
+    "description": "Elevate your daily fashion with this Textured Linen Spread Collar Shirt. Features premium fabric construction, tailored fit, and durable craftsmanship ideal for everyday wear.",
+    "material": "100% Premium Combed Cotton",
+    "fit": "Regular Fit",
+    "pattern": "Solid / Textured",
+    "occasion": [
+      "Casual",
+      "Everyday",
+      "Party"
+    ],
+    "careInstructions": [
+      "Machine wash cold",
+      "Do not bleach",
+      "Tumble dry low",
+      "Warm iron if needed"
+    ],
+    "price": 658,
+    "originalPrice": 921,
+    "discount": 28,
+    "images": [
+      "https://images.unsplash.com/photo-1503342217505-b0a15ec3261c?auto=format&fit=crop&w=800&q=80",
+      "https://images.unsplash.com/photo-1576995853123-5a10305d93c0?auto=format&fit=crop&w=800&q=80"
+    ],
+    "thumbnail": "https://images.unsplash.com/photo-1503342217505-b0a15ec3261c?auto=format&fit=crop&w=800&q=80",
+    "rating": 4.5,
+    "reviewCount": 103,
+    "reviews": [
+      {
+        "id": "rev-sd-prod-006-1",
+        "userName": "Aman Sharma",
+        "rating": 5,
+        "title": "Great quality and fast delivery!",
+        "comment": "Delivered in Neemuch within 45 minutes! Quality is top notch.",
+        "createdAt": "2026-07-28",
+        "verifiedPurchase": true
+      },
+      {
+        "id": "rev-sd-prod-006-2",
+        "userName": "Priya Verma",
+        "rating": 4,
+        "title": "Nice fit and comfortable material",
+        "comment": "The fabric is very soft. True to size.",
+        "createdAt": "2026-07-29",
+        "verifiedPurchase": true
+      }
+    ],
+    "variants": [
+      {
+        "id": "sd-prod-006-var-1",
+        "sku": "SD-SD-PROD-006-MUS-S",
+        "size": "S",
+        "colourName": "Mustard Yellow",
+        "colourHex": "#FFDB58",
+        "stock": 15,
+        "price": 658,
+        "originalPrice": 921
+      },
+      {
+        "id": "sd-prod-006-var-2",
+        "sku": "SD-SD-PROD-006-MUS-M",
+        "size": "M",
+        "colourName": "Mustard Yellow",
+        "colourHex": "#FFDB58",
+        "stock": 15,
+        "price": 658,
+        "originalPrice": 921
+      },
+      {
+        "id": "sd-prod-006-var-3",
+        "sku": "SD-SD-PROD-006-MUS-L",
+        "size": "L",
+        "colourName": "Mustard Yellow",
+        "colourHex": "#FFDB58",
+        "stock": 15,
+        "price": 658,
+        "originalPrice": 921
+      },
+      {
+        "id": "sd-prod-006-var-4",
+        "sku": "SD-SD-PROD-006-MUS-XL",
+        "size": "XL",
+        "colourName": "Mustard Yellow",
+        "colourHex": "#FFDB58",
+        "stock": 15,
+        "price": 658,
+        "originalPrice": 921
+      },
+      {
+        "id": "sd-prod-006-var-5",
+        "sku": "SD-SD-PROD-006-MUS-XXL",
+        "size": "XXL",
+        "colourName": "Mustard Yellow",
+        "colourHex": "#FFDB58",
+        "stock": 15,
+        "price": 658,
+        "originalPrice": 921
+      },
+      {
+        "id": "sd-prod-006-var-6",
+        "sku": "SD-SD-PROD-006-BLA-S",
+        "size": "S",
+        "colourName": "Black",
+        "colourHex": "#000000",
+        "stock": 15,
+        "price": 658,
+        "originalPrice": 921
+      },
+      {
+        "id": "sd-prod-006-var-7",
+        "sku": "SD-SD-PROD-006-BLA-M",
+        "size": "M",
+        "colourName": "Black",
+        "colourHex": "#000000",
+        "stock": 0,
+        "price": 658,
+        "originalPrice": 921
+      },
+      {
+        "id": "sd-prod-006-var-8",
+        "sku": "SD-SD-PROD-006-BLA-L",
+        "size": "L",
+        "colourName": "Black",
+        "colourHex": "#000000",
+        "stock": 15,
+        "price": 658,
+        "originalPrice": 921
+      },
+      {
+        "id": "sd-prod-006-var-9",
+        "sku": "SD-SD-PROD-006-BLA-XL",
+        "size": "XL",
+        "colourName": "Black",
+        "colourHex": "#000000",
+        "stock": 15,
+        "price": 658,
+        "originalPrice": 921
+      },
+      {
+        "id": "sd-prod-006-var-10",
+        "sku": "SD-SD-PROD-006-BLA-XXL",
+        "size": "XXL",
+        "colourName": "Black",
+        "colourHex": "#000000",
+        "stock": 15,
+        "price": 658,
+        "originalPrice": 921
+      }
+    ],
+    "tags": [
+      "textured linen spread collar shirt",
+      "men",
+      "shirts",
+      "casual",
+      "snitch",
+      "fashion",
+      "trending"
+    ],
+    "badge": "New",
+    "newArrival": false,
+    "trending": false,
+    "featured": false,
+    "expressDelivery": true,
+    "estimatedDeliveryMinutes": 60,
+    "returnWindowDays": 7,
+    "exchangeAvailable": true,
+    "vendorId": "v-ethnic-vibe",
+    "commissionPercent": 12,
+    "sponsored": true,
+    "active": true,
+    "createdAt": "2026-07-01T00:00:00Z",
+    "updatedAt": "2026-08-01T00:00:00Z"
+  },
+  {
+    "id": "sd-prod-007",
+    "slug": "classic-chambray-denim-shirt-sd-prod-007",
+    "name": "Classic Chambray Denim Shirt",
+    "brand": "Wrong",
+    "department": "men",
+    "category": "Shirts",
+    "subcategory": "Casual",
+    "collection": "Summer Essentials 2026",
+    "shortDescription": "Premium quality classic chambray denim shirt crafted for comfort and style.",
+    "description": "Elevate your daily fashion with this Classic Chambray Denim Shirt. Features premium fabric construction, tailored fit, and durable craftsmanship ideal for everyday wear.",
+    "material": "100% Premium Combed Cotton",
+    "fit": "Regular Fit",
+    "pattern": "Solid / Textured",
+    "occasion": [
+      "Casual",
+      "Everyday",
+      "Party"
+    ],
+    "careInstructions": [
+      "Machine wash cold",
+      "Do not bleach",
+      "Tumble dry low",
+      "Warm iron if needed"
+    ],
+    "price": 695,
+    "originalPrice": 972,
+    "discount": 28,
+    "images": [
+      "https://images.unsplash.com/photo-1576995853123-5a10305d93c0?auto=format&fit=crop&w=800&q=80",
+      "https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?auto=format&fit=crop&w=800&q=80"
+    ],
+    "thumbnail": "https://images.unsplash.com/photo-1576995853123-5a10305d93c0?auto=format&fit=crop&w=800&q=80",
+    "rating": 4.6,
+    "reviewCount": 116,
+    "reviews": [
+      {
+        "id": "rev-sd-prod-007-1",
+        "userName": "Aman Sharma",
+        "rating": 5,
+        "title": "Great quality and fast delivery!",
+        "comment": "Delivered in Neemuch within 45 minutes! Quality is top notch.",
+        "createdAt": "2026-07-28",
+        "verifiedPurchase": true
+      },
+      {
+        "id": "rev-sd-prod-007-2",
+        "userName": "Priya Verma",
+        "rating": 4,
+        "title": "Nice fit and comfortable material",
+        "comment": "The fabric is very soft. True to size.",
+        "createdAt": "2026-07-29",
+        "verifiedPurchase": true
+      }
+    ],
+    "variants": [
+      {
+        "id": "sd-prod-007-var-1",
+        "sku": "SD-SD-PROD-007-BLA-S",
+        "size": "S",
+        "colourName": "Black",
+        "colourHex": "#000000",
+        "stock": 15,
+        "price": 695,
+        "originalPrice": 972
+      },
+      {
+        "id": "sd-prod-007-var-2",
+        "sku": "SD-SD-PROD-007-BLA-M",
+        "size": "M",
+        "colourName": "Black",
+        "colourHex": "#000000",
+        "stock": 15,
+        "price": 695,
+        "originalPrice": 972
+      },
+      {
+        "id": "sd-prod-007-var-3",
+        "sku": "SD-SD-PROD-007-BLA-L",
+        "size": "L",
+        "colourName": "Black",
+        "colourHex": "#000000",
+        "stock": 15,
+        "price": 695,
+        "originalPrice": 972
+      },
+      {
+        "id": "sd-prod-007-var-4",
+        "sku": "SD-SD-PROD-007-BLA-XL",
+        "size": "XL",
+        "colourName": "Black",
+        "colourHex": "#000000",
+        "stock": 15,
+        "price": 695,
+        "originalPrice": 972
+      },
+      {
+        "id": "sd-prod-007-var-5",
+        "sku": "SD-SD-PROD-007-BLA-XXL",
+        "size": "XXL",
+        "colourName": "Black",
+        "colourHex": "#000000",
+        "stock": 15,
+        "price": 695,
+        "originalPrice": 972
+      },
+      {
+        "id": "sd-prod-007-var-6",
+        "sku": "SD-SD-PROD-007-WHI-S",
+        "size": "S",
+        "colourName": "White",
+        "colourHex": "#FFFFFF",
+        "stock": 15,
+        "price": 695,
+        "originalPrice": 972
+      },
+      {
+        "id": "sd-prod-007-var-7",
+        "sku": "SD-SD-PROD-007-WHI-M",
+        "size": "M",
+        "colourName": "White",
+        "colourHex": "#FFFFFF",
+        "stock": 0,
+        "price": 695,
+        "originalPrice": 972
+      },
+      {
+        "id": "sd-prod-007-var-8",
+        "sku": "SD-SD-PROD-007-WHI-L",
+        "size": "L",
+        "colourName": "White",
+        "colourHex": "#FFFFFF",
+        "stock": 15,
+        "price": 695,
+        "originalPrice": 972
+      },
+      {
+        "id": "sd-prod-007-var-9",
+        "sku": "SD-SD-PROD-007-WHI-XL",
+        "size": "XL",
+        "colourName": "White",
+        "colourHex": "#FFFFFF",
+        "stock": 15,
+        "price": 695,
+        "originalPrice": 972
+      },
+      {
+        "id": "sd-prod-007-var-10",
+        "sku": "SD-SD-PROD-007-WHI-XXL",
+        "size": "XXL",
+        "colourName": "White",
+        "colourHex": "#FFFFFF",
+        "stock": 15,
+        "price": 695,
+        "originalPrice": 972
+      }
+    ],
+    "tags": [
+      "classic chambray denim shirt",
+      "men",
+      "shirts",
+      "casual",
+      "wrong",
+      "fashion",
+      "trending"
+    ],
+    "badge": "Express",
+    "newArrival": false,
+    "trending": true,
+    "featured": true,
+    "expressDelivery": true,
+    "estimatedDeliveryMinutes": 60,
+    "returnWindowDays": 7,
+    "exchangeAvailable": true,
+    "vendorId": "v-urban-style",
+    "commissionPercent": 12,
+    "sponsored": false,
+    "active": true,
+    "createdAt": "2026-07-01T00:00:00Z",
+    "updatedAt": "2026-08-01T00:00:00Z"
+  },
+  {
+    "id": "sd-prod-008",
+    "slug": "cuban-collar-printed-resort-shirt-sd-prod-008",
+    "name": "Cuban Collar Printed Resort Shirt",
+    "brand": "Roadster",
+    "department": "men",
+    "category": "Shirts",
+    "subcategory": "Casual",
+    "collection": "Summer Essentials 2026",
+    "shortDescription": "Premium quality cuban collar printed resort shirt crafted for comfort and style.",
+    "description": "Elevate your daily fashion with this Cuban Collar Printed Resort Shirt. Features premium fabric construction, tailored fit, and durable craftsmanship ideal for everyday wear.",
+    "material": "100% Premium Combed Cotton",
+    "fit": "Regular Fit",
+    "pattern": "Solid / Textured",
+    "occasion": [
+      "Casual",
+      "Everyday",
+      "Party"
+    ],
+    "careInstructions": [
+      "Machine wash cold",
+      "Do not bleach",
+      "Tumble dry low",
+      "Warm iron if needed"
+    ],
+    "price": 732,
+    "originalPrice": 1024,
+    "discount": 28,
+    "images": [
+      "https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?auto=format&fit=crop&w=800&q=80",
+      "https://images.unsplash.com/photo-1529374255404-311a2a4f1fd9?auto=format&fit=crop&w=800&q=80"
+    ],
+    "thumbnail": "https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?auto=format&fit=crop&w=800&q=80",
+    "rating": 4.7,
+    "reviewCount": 129,
+    "reviews": [
+      {
+        "id": "rev-sd-prod-008-1",
+        "userName": "Aman Sharma",
+        "rating": 5,
+        "title": "Great quality and fast delivery!",
+        "comment": "Delivered in Neemuch within 45 minutes! Quality is top notch.",
+        "createdAt": "2026-07-28",
+        "verifiedPurchase": true
+      },
+      {
+        "id": "rev-sd-prod-008-2",
+        "userName": "Priya Verma",
+        "rating": 4,
+        "title": "Nice fit and comfortable material",
+        "comment": "The fabric is very soft. True to size.",
+        "createdAt": "2026-07-29",
+        "verifiedPurchase": true
+      }
+    ],
+    "variants": [
+      {
+        "id": "sd-prod-008-var-1",
+        "sku": "SD-SD-PROD-008-WHI-S",
+        "size": "S",
+        "colourName": "White",
+        "colourHex": "#FFFFFF",
+        "stock": 15,
+        "price": 732,
+        "originalPrice": 1024
+      },
+      {
+        "id": "sd-prod-008-var-2",
+        "sku": "SD-SD-PROD-008-WHI-M",
+        "size": "M",
+        "colourName": "White",
+        "colourHex": "#FFFFFF",
+        "stock": 15,
+        "price": 732,
+        "originalPrice": 1024
+      },
+      {
+        "id": "sd-prod-008-var-3",
+        "sku": "SD-SD-PROD-008-WHI-L",
+        "size": "L",
+        "colourName": "White",
+        "colourHex": "#FFFFFF",
+        "stock": 15,
+        "price": 732,
+        "originalPrice": 1024
+      },
+      {
+        "id": "sd-prod-008-var-4",
+        "sku": "SD-SD-PROD-008-WHI-XL",
+        "size": "XL",
+        "colourName": "White",
+        "colourHex": "#FFFFFF",
+        "stock": 15,
+        "price": 732,
+        "originalPrice": 1024
+      },
+      {
+        "id": "sd-prod-008-var-5",
+        "sku": "SD-SD-PROD-008-WHI-XXL",
+        "size": "XXL",
+        "colourName": "White",
+        "colourHex": "#FFFFFF",
+        "stock": 15,
+        "price": 732,
+        "originalPrice": 1024
+      },
+      {
+        "id": "sd-prod-008-var-6",
+        "sku": "SD-SD-PROD-008-NAV-S",
+        "size": "S",
+        "colourName": "Navy Blue",
+        "colourHex": "#000080",
+        "stock": 15,
+        "price": 732,
+        "originalPrice": 1024
+      },
+      {
+        "id": "sd-prod-008-var-7",
+        "sku": "SD-SD-PROD-008-NAV-M",
+        "size": "M",
+        "colourName": "Navy Blue",
+        "colourHex": "#000080",
+        "stock": 0,
+        "price": 732,
+        "originalPrice": 1024
+      },
+      {
+        "id": "sd-prod-008-var-8",
+        "sku": "SD-SD-PROD-008-NAV-L",
+        "size": "L",
+        "colourName": "Navy Blue",
+        "colourHex": "#000080",
+        "stock": 15,
+        "price": 732,
+        "originalPrice": 1024
+      },
+      {
+        "id": "sd-prod-008-var-9",
+        "sku": "SD-SD-PROD-008-NAV-XL",
+        "size": "XL",
+        "colourName": "Navy Blue",
+        "colourHex": "#000080",
+        "stock": 15,
+        "price": 732,
+        "originalPrice": 1024
+      },
+      {
+        "id": "sd-prod-008-var-10",
+        "sku": "SD-SD-PROD-008-NAV-XXL",
+        "size": "XXL",
+        "colourName": "Navy Blue",
+        "colourHex": "#000080",
+        "stock": 15,
+        "price": 732,
+        "originalPrice": 1024
+      }
+    ],
+    "tags": [
+      "cuban collar printed resort shirt",
+      "men",
+      "shirts",
+      "casual",
+      "roadster",
+      "fashion",
+      "trending"
+    ],
+    "badge": "Trending",
+    "newArrival": true,
+    "trending": false,
+    "featured": false,
+    "expressDelivery": true,
+    "estimatedDeliveryMinutes": 60,
+    "returnWindowDays": 7,
+    "exchangeAvailable": true,
+    "vendorId": "v-ethnic-vibe",
+    "commissionPercent": 12,
+    "sponsored": false,
+    "active": true,
+    "createdAt": "2026-07-01T00:00:00Z",
+    "updatedAt": "2026-08-01T00:00:00Z"
+  },
+  {
+    "id": "sd-prod-009",
+    "slug": "oxford-cotton-formal-shirt-sd-prod-009",
+    "name": "Oxford Cotton Formal Shirt",
+    "brand": "HRX",
+    "department": "men",
+    "category": "Shirts",
+    "subcategory": "Casual",
+    "collection": "Summer Essentials 2026",
+    "shortDescription": "Premium quality oxford cotton formal shirt crafted for comfort and style.",
+    "description": "Elevate your daily fashion with this Oxford Cotton Formal Shirt. Features premium fabric construction, tailored fit, and durable craftsmanship ideal for everyday wear.",
+    "material": "100% Premium Combed Cotton",
+    "fit": "Regular Fit",
+    "pattern": "Solid / Textured",
+    "occasion": [
+      "Casual",
+      "Everyday",
+      "Party"
+    ],
+    "careInstructions": [
+      "Machine wash cold",
+      "Do not bleach",
+      "Tumble dry low",
+      "Warm iron if needed"
+    ],
+    "price": 769,
+    "originalPrice": 1076,
+    "discount": 28,
+    "images": [
+      "https://images.unsplash.com/photo-1529374255404-311a2a4f1fd9?auto=format&fit=crop&w=800&q=80",
+      "https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&w=800&q=80"
+    ],
+    "thumbnail": "https://images.unsplash.com/photo-1529374255404-311a2a4f1fd9?auto=format&fit=crop&w=800&q=80",
+    "rating": 4.8,
+    "reviewCount": 142,
+    "reviews": [
+      {
+        "id": "rev-sd-prod-009-1",
+        "userName": "Aman Sharma",
+        "rating": 5,
+        "title": "Great quality and fast delivery!",
+        "comment": "Delivered in Neemuch within 45 minutes! Quality is top notch.",
+        "createdAt": "2026-07-28",
+        "verifiedPurchase": true
+      },
+      {
+        "id": "rev-sd-prod-009-2",
+        "userName": "Priya Verma",
+        "rating": 4,
+        "title": "Nice fit and comfortable material",
+        "comment": "The fabric is very soft. True to size.",
+        "createdAt": "2026-07-29",
+        "verifiedPurchase": true
+      }
+    ],
+    "variants": [
+      {
+        "id": "sd-prod-009-var-1",
+        "sku": "SD-SD-PROD-009-NAV-S",
+        "size": "S",
+        "colourName": "Navy Blue",
+        "colourHex": "#000080",
+        "stock": 15,
+        "price": 769,
+        "originalPrice": 1076
+      },
+      {
+        "id": "sd-prod-009-var-2",
+        "sku": "SD-SD-PROD-009-NAV-M",
+        "size": "M",
+        "colourName": "Navy Blue",
+        "colourHex": "#000080",
+        "stock": 15,
+        "price": 769,
+        "originalPrice": 1076
+      },
+      {
+        "id": "sd-prod-009-var-3",
+        "sku": "SD-SD-PROD-009-NAV-L",
+        "size": "L",
+        "colourName": "Navy Blue",
+        "colourHex": "#000080",
+        "stock": 15,
+        "price": 769,
+        "originalPrice": 1076
+      },
+      {
+        "id": "sd-prod-009-var-4",
+        "sku": "SD-SD-PROD-009-NAV-XL",
+        "size": "XL",
+        "colourName": "Navy Blue",
+        "colourHex": "#000080",
+        "stock": 15,
+        "price": 769,
+        "originalPrice": 1076
+      },
+      {
+        "id": "sd-prod-009-var-5",
+        "sku": "SD-SD-PROD-009-NAV-XXL",
+        "size": "XXL",
+        "colourName": "Navy Blue",
+        "colourHex": "#000080",
+        "stock": 15,
+        "price": 769,
+        "originalPrice": 1076
+      },
+      {
+        "id": "sd-prod-009-var-6",
+        "sku": "SD-SD-PROD-009-OLI-S",
+        "size": "S",
+        "colourName": "Olive Green",
+        "colourHex": "#556B2F",
+        "stock": 15,
+        "price": 769,
+        "originalPrice": 1076
+      },
+      {
+        "id": "sd-prod-009-var-7",
+        "sku": "SD-SD-PROD-009-OLI-M",
+        "size": "M",
+        "colourName": "Olive Green",
+        "colourHex": "#556B2F",
+        "stock": 0,
+        "price": 769,
+        "originalPrice": 1076
+      },
+      {
+        "id": "sd-prod-009-var-8",
+        "sku": "SD-SD-PROD-009-OLI-L",
+        "size": "L",
+        "colourName": "Olive Green",
+        "colourHex": "#556B2F",
+        "stock": 15,
+        "price": 769,
+        "originalPrice": 1076
+      },
+      {
+        "id": "sd-prod-009-var-9",
+        "sku": "SD-SD-PROD-009-OLI-XL",
+        "size": "XL",
+        "colourName": "Olive Green",
+        "colourHex": "#556B2F",
+        "stock": 15,
+        "price": 769,
+        "originalPrice": 1076
+      },
+      {
+        "id": "sd-prod-009-var-10",
+        "sku": "SD-SD-PROD-009-OLI-XXL",
+        "size": "XXL",
+        "colourName": "Olive Green",
+        "colourHex": "#556B2F",
+        "stock": 15,
+        "price": 769,
+        "originalPrice": 1076
+      }
+    ],
+    "tags": [
+      "oxford cotton formal shirt",
+      "men",
+      "shirts",
+      "casual",
+      "hrx",
+      "fashion",
+      "trending"
+    ],
+    "badge": "Express",
+    "newArrival": false,
+    "trending": true,
+    "featured": false,
+    "expressDelivery": true,
+    "estimatedDeliveryMinutes": 60,
+    "returnWindowDays": 7,
+    "exchangeAvailable": true,
+    "vendorId": "v-urban-style",
+    "commissionPercent": 12,
+    "sponsored": false,
+    "active": true,
+    "createdAt": "2026-07-01T00:00:00Z",
+    "updatedAt": "2026-08-01T00:00:00Z"
+  },
+  {
+    "id": "sd-prod-010",
+    "slug": "checked-flannel-casual-shirt-sd-prod-010",
+    "name": "Checked Flannel Casual Shirt",
+    "brand": "StyleDash Studio",
+    "department": "men",
+    "category": "Shirts",
+    "subcategory": "Casual",
+    "collection": "Summer Essentials 2026",
+    "shortDescription": "Premium quality checked flannel casual shirt crafted for comfort and style.",
+    "description": "Elevate your daily fashion with this Checked Flannel Casual Shirt. Features premium fabric construction, tailored fit, and durable craftsmanship ideal for everyday wear.",
+    "material": "100% Premium Combed Cotton",
+    "fit": "Regular Fit",
+    "pattern": "Solid / Textured",
+    "occasion": [
+      "Casual",
+      "Everyday",
+      "Party"
+    ],
+    "careInstructions": [
+      "Machine wash cold",
+      "Do not bleach",
+      "Tumble dry low",
+      "Warm iron if needed"
+    ],
+    "price": 806,
+    "originalPrice": 1128,
+    "discount": 28,
+    "images": [
+      "https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&w=800&q=80",
+      "https://images.unsplash.com/photo-1521572267360-ee0c2909d518?auto=format&fit=crop&w=800&q=80"
+    ],
+    "thumbnail": "https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&w=800&q=80",
+    "rating": 4.9,
+    "reviewCount": 155,
+    "reviews": [
+      {
+        "id": "rev-sd-prod-010-1",
+        "userName": "Aman Sharma",
+        "rating": 5,
+        "title": "Great quality and fast delivery!",
+        "comment": "Delivered in Neemuch within 45 minutes! Quality is top notch.",
+        "createdAt": "2026-07-28",
+        "verifiedPurchase": true
+      },
+      {
+        "id": "rev-sd-prod-010-2",
+        "userName": "Priya Verma",
+        "rating": 4,
+        "title": "Nice fit and comfortable material",
+        "comment": "The fabric is very soft. True to size.",
+        "createdAt": "2026-07-29",
+        "verifiedPurchase": true
+      }
+    ],
+    "variants": [
+      {
+        "id": "sd-prod-010-var-1",
+        "sku": "SD-SD-PROD-010-OLI-S",
+        "size": "S",
+        "colourName": "Olive Green",
+        "colourHex": "#556B2F",
+        "stock": 15,
+        "price": 806,
+        "originalPrice": 1128
+      },
+      {
+        "id": "sd-prod-010-var-2",
+        "sku": "SD-SD-PROD-010-OLI-M",
+        "size": "M",
+        "colourName": "Olive Green",
+        "colourHex": "#556B2F",
+        "stock": 15,
+        "price": 806,
+        "originalPrice": 1128
+      },
+      {
+        "id": "sd-prod-010-var-3",
+        "sku": "SD-SD-PROD-010-OLI-L",
+        "size": "L",
+        "colourName": "Olive Green",
+        "colourHex": "#556B2F",
+        "stock": 15,
+        "price": 806,
+        "originalPrice": 1128
+      },
+      {
+        "id": "sd-prod-010-var-4",
+        "sku": "SD-SD-PROD-010-OLI-XL",
+        "size": "XL",
+        "colourName": "Olive Green",
+        "colourHex": "#556B2F",
+        "stock": 15,
+        "price": 806,
+        "originalPrice": 1128
+      },
+      {
+        "id": "sd-prod-010-var-5",
+        "sku": "SD-SD-PROD-010-OLI-XXL",
+        "size": "XXL",
+        "colourName": "Olive Green",
+        "colourHex": "#556B2F",
+        "stock": 15,
+        "price": 806,
+        "originalPrice": 1128
+      },
+      {
+        "id": "sd-prod-010-var-6",
+        "sku": "SD-SD-PROD-010-CRI-S",
+        "size": "S",
+        "colourName": "Crimson Red",
+        "colourHex": "#DC143C",
+        "stock": 15,
+        "price": 806,
+        "originalPrice": 1128
+      },
+      {
+        "id": "sd-prod-010-var-7",
+        "sku": "SD-SD-PROD-010-CRI-M",
+        "size": "M",
+        "colourName": "Crimson Red",
+        "colourHex": "#DC143C",
+        "stock": 0,
+        "price": 806,
+        "originalPrice": 1128
+      },
+      {
+        "id": "sd-prod-010-var-8",
+        "sku": "SD-SD-PROD-010-CRI-L",
+        "size": "L",
+        "colourName": "Crimson Red",
+        "colourHex": "#DC143C",
+        "stock": 15,
+        "price": 806,
+        "originalPrice": 1128
+      },
+      {
+        "id": "sd-prod-010-var-9",
+        "sku": "SD-SD-PROD-010-CRI-XL",
+        "size": "XL",
+        "colourName": "Crimson Red",
+        "colourHex": "#DC143C",
+        "stock": 15,
+        "price": 806,
+        "originalPrice": 1128
+      },
+      {
+        "id": "sd-prod-010-var-10",
+        "sku": "SD-SD-PROD-010-CRI-XXL",
+        "size": "XXL",
+        "colourName": "Crimson Red",
+        "colourHex": "#DC143C",
+        "stock": 15,
+        "price": 806,
+        "originalPrice": 1128
+      }
+    ],
+    "tags": [
+      "checked flannel casual shirt",
+      "men",
+      "shirts",
+      "casual",
+      "styledash studio",
+      "fashion",
+      "trending"
+    ],
+    "badge": "New",
+    "newArrival": false,
+    "trending": false,
+    "featured": false,
+    "expressDelivery": true,
+    "estimatedDeliveryMinutes": 60,
+    "returnWindowDays": 7,
+    "exchangeAvailable": true,
+    "vendorId": "v-ethnic-vibe",
+    "commissionPercent": 12,
+    "sponsored": false,
+    "active": true,
+    "createdAt": "2026-07-01T00:00:00Z",
+    "updatedAt": "2026-08-01T00:00:00Z"
+  },
+  {
+    "id": "sd-prod-011",
+    "slug": "dark-indigo-slim-fit-stretch-jeans-sd-prod-011",
+    "name": "Dark Indigo Slim Fit Stretch Jeans",
+    "brand": "Anouk",
+    "department": "men",
+    "category": "Jeans",
+    "subcategory": "Slim Fit",
+    "collection": "Summer Essentials 2026",
+    "shortDescription": "Premium quality dark indigo slim fit stretch jeans crafted for comfort and style.",
+    "description": "Elevate your daily fashion with this Dark Indigo Slim Fit Stretch Jeans. Features premium fabric construction, tailored fit, and durable craftsmanship ideal for everyday wear.",
+    "material": "100% Premium Combed Cotton",
+    "fit": "Regular Fit",
+    "pattern": "Solid / Textured",
+    "occasion": [
+      "Casual",
+      "Everyday",
+      "Party"
+    ],
+    "careInstructions": [
+      "Machine wash cold",
+      "Do not bleach",
+      "Tumble dry low",
+      "Warm iron if needed"
+    ],
+    "price": 843,
+    "originalPrice": 1180,
+    "discount": 28,
+    "images": [
+      "https://images.unsplash.com/photo-1521572267360-ee0c2909d518?auto=format&fit=crop&w=800&q=80",
+      "https://images.unsplash.com/photo-1503342217505-b0a15ec3261c?auto=format&fit=crop&w=800&q=80"
+    ],
+    "thumbnail": "https://images.unsplash.com/photo-1521572267360-ee0c2909d518?auto=format&fit=crop&w=800&q=80",
+    "rating": 3.8,
+    "reviewCount": 168,
+    "reviews": [
+      {
+        "id": "rev-sd-prod-011-1",
+        "userName": "Aman Sharma",
+        "rating": 5,
+        "title": "Great quality and fast delivery!",
+        "comment": "Delivered in Neemuch within 45 minutes! Quality is top notch.",
+        "createdAt": "2026-07-28",
+        "verifiedPurchase": true
+      },
+      {
+        "id": "rev-sd-prod-011-2",
+        "userName": "Priya Verma",
+        "rating": 4,
+        "title": "Nice fit and comfortable material",
+        "comment": "The fabric is very soft. True to size.",
+        "createdAt": "2026-07-29",
+        "verifiedPurchase": true
+      }
+    ],
+    "variants": [
+      {
+        "id": "sd-prod-011-var-1",
+        "sku": "SD-SD-PROD-011-CRI-S",
+        "size": "S",
+        "colourName": "Crimson Red",
+        "colourHex": "#DC143C",
+        "stock": 15,
+        "price": 843,
+        "originalPrice": 1180
+      },
+      {
+        "id": "sd-prod-011-var-2",
+        "sku": "SD-SD-PROD-011-CRI-M",
+        "size": "M",
+        "colourName": "Crimson Red",
+        "colourHex": "#DC143C",
+        "stock": 15,
+        "price": 843,
+        "originalPrice": 1180
+      },
+      {
+        "id": "sd-prod-011-var-3",
+        "sku": "SD-SD-PROD-011-CRI-L",
+        "size": "L",
+        "colourName": "Crimson Red",
+        "colourHex": "#DC143C",
+        "stock": 15,
+        "price": 843,
+        "originalPrice": 1180
+      },
+      {
+        "id": "sd-prod-011-var-4",
+        "sku": "SD-SD-PROD-011-CRI-XL",
+        "size": "XL",
+        "colourName": "Crimson Red",
+        "colourHex": "#DC143C",
+        "stock": 15,
+        "price": 843,
+        "originalPrice": 1180
+      },
+      {
+        "id": "sd-prod-011-var-5",
+        "sku": "SD-SD-PROD-011-CRI-XXL",
+        "size": "XXL",
+        "colourName": "Crimson Red",
+        "colourHex": "#DC143C",
+        "stock": 15,
+        "price": 843,
+        "originalPrice": 1180
+      },
+      {
+        "id": "sd-prod-011-var-6",
+        "sku": "SD-SD-PROD-011-BEI-S",
+        "size": "S",
+        "colourName": "Beige",
+        "colourHex": "#F5F5DC",
+        "stock": 15,
+        "price": 843,
+        "originalPrice": 1180
+      },
+      {
+        "id": "sd-prod-011-var-7",
+        "sku": "SD-SD-PROD-011-BEI-M",
+        "size": "M",
+        "colourName": "Beige",
+        "colourHex": "#F5F5DC",
+        "stock": 0,
+        "price": 843,
+        "originalPrice": 1180
+      },
+      {
+        "id": "sd-prod-011-var-8",
+        "sku": "SD-SD-PROD-011-BEI-L",
+        "size": "L",
+        "colourName": "Beige",
+        "colourHex": "#F5F5DC",
+        "stock": 15,
+        "price": 843,
+        "originalPrice": 1180
+      },
+      {
+        "id": "sd-prod-011-var-9",
+        "sku": "SD-SD-PROD-011-BEI-XL",
+        "size": "XL",
+        "colourName": "Beige",
+        "colourHex": "#F5F5DC",
+        "stock": 15,
+        "price": 843,
+        "originalPrice": 1180
+      },
+      {
+        "id": "sd-prod-011-var-10",
+        "sku": "SD-SD-PROD-011-BEI-XXL",
+        "size": "XXL",
+        "colourName": "Beige",
+        "colourHex": "#F5F5DC",
+        "stock": 15,
+        "price": 843,
+        "originalPrice": 1180
+      }
+    ],
+    "tags": [
+      "dark indigo slim fit stretch jeans",
+      "men",
+      "jeans",
+      "slim fit",
+      "anouk",
+      "fashion",
+      "trending"
+    ],
+    "badge": "Trending",
+    "newArrival": true,
+    "trending": true,
+    "featured": true,
+    "expressDelivery": true,
+    "estimatedDeliveryMinutes": 60,
+    "returnWindowDays": 7,
+    "exchangeAvailable": true,
+    "vendorId": "v-urban-style",
+    "commissionPercent": 12,
+    "sponsored": false,
+    "active": true,
+    "createdAt": "2026-07-01T00:00:00Z",
+    "updatedAt": "2026-08-01T00:00:00Z"
+  },
+  {
+    "id": "sd-prod-012",
+    "slug": "distressed-light-blue-denim-sd-prod-012",
+    "name": "Distressed Light Blue Denim",
+    "brand": "Mast & Harbour",
+    "department": "men",
+    "category": "Jeans",
+    "subcategory": "Slim Fit",
+    "collection": "Summer Essentials 2026",
+    "shortDescription": "Premium quality distressed light blue denim crafted for comfort and style.",
+    "description": "Elevate your daily fashion with this Distressed Light Blue Denim. Features premium fabric construction, tailored fit, and durable craftsmanship ideal for everyday wear.",
+    "material": "100% Premium Combed Cotton",
+    "fit": "Regular Fit",
+    "pattern": "Solid / Textured",
+    "occasion": [
+      "Casual",
+      "Everyday",
+      "Party"
+    ],
+    "careInstructions": [
+      "Machine wash cold",
+      "Do not bleach",
+      "Tumble dry low",
+      "Warm iron if needed"
+    ],
+    "price": 880,
+    "originalPrice": 1232,
+    "discount": 28,
+    "images": [
+      "https://images.unsplash.com/photo-1503342217505-b0a15ec3261c?auto=format&fit=crop&w=800&q=80",
+      "https://images.unsplash.com/photo-1576995853123-5a10305d93c0?auto=format&fit=crop&w=800&q=80"
+    ],
+    "thumbnail": "https://images.unsplash.com/photo-1503342217505-b0a15ec3261c?auto=format&fit=crop&w=800&q=80",
+    "rating": 3.9,
+    "reviewCount": 181,
+    "reviews": [
+      {
+        "id": "rev-sd-prod-012-1",
+        "userName": "Aman Sharma",
+        "rating": 5,
+        "title": "Great quality and fast delivery!",
+        "comment": "Delivered in Neemuch within 45 minutes! Quality is top notch.",
+        "createdAt": "2026-07-28",
+        "verifiedPurchase": true
+      },
+      {
+        "id": "rev-sd-prod-012-2",
+        "userName": "Priya Verma",
+        "rating": 4,
+        "title": "Nice fit and comfortable material",
+        "comment": "The fabric is very soft. True to size.",
+        "createdAt": "2026-07-29",
+        "verifiedPurchase": true
+      }
+    ],
+    "variants": [
+      {
+        "id": "sd-prod-012-var-1",
+        "sku": "SD-SD-PROD-012-BEI-S",
+        "size": "S",
+        "colourName": "Beige",
+        "colourHex": "#F5F5DC",
+        "stock": 15,
+        "price": 880,
+        "originalPrice": 1232
+      },
+      {
+        "id": "sd-prod-012-var-2",
+        "sku": "SD-SD-PROD-012-BEI-M",
+        "size": "M",
+        "colourName": "Beige",
+        "colourHex": "#F5F5DC",
+        "stock": 15,
+        "price": 880,
+        "originalPrice": 1232
+      },
+      {
+        "id": "sd-prod-012-var-3",
+        "sku": "SD-SD-PROD-012-BEI-L",
+        "size": "L",
+        "colourName": "Beige",
+        "colourHex": "#F5F5DC",
+        "stock": 15,
+        "price": 880,
+        "originalPrice": 1232
+      },
+      {
+        "id": "sd-prod-012-var-4",
+        "sku": "SD-SD-PROD-012-BEI-XL",
+        "size": "XL",
+        "colourName": "Beige",
+        "colourHex": "#F5F5DC",
+        "stock": 15,
+        "price": 880,
+        "originalPrice": 1232
+      },
+      {
+        "id": "sd-prod-012-var-5",
+        "sku": "SD-SD-PROD-012-BEI-XXL",
+        "size": "XXL",
+        "colourName": "Beige",
+        "colourHex": "#F5F5DC",
+        "stock": 15,
+        "price": 880,
+        "originalPrice": 1232
+      },
+      {
+        "id": "sd-prod-012-var-6",
+        "sku": "SD-SD-PROD-012-CHA-S",
+        "size": "S",
+        "colourName": "Charcoal Gray",
+        "colourHex": "#36454F",
+        "stock": 15,
+        "price": 880,
+        "originalPrice": 1232
+      },
+      {
+        "id": "sd-prod-012-var-7",
+        "sku": "SD-SD-PROD-012-CHA-M",
+        "size": "M",
+        "colourName": "Charcoal Gray",
+        "colourHex": "#36454F",
+        "stock": 0,
+        "price": 880,
+        "originalPrice": 1232
+      },
+      {
+        "id": "sd-prod-012-var-8",
+        "sku": "SD-SD-PROD-012-CHA-L",
+        "size": "L",
+        "colourName": "Charcoal Gray",
+        "colourHex": "#36454F",
+        "stock": 15,
+        "price": 880,
+        "originalPrice": 1232
+      },
+      {
+        "id": "sd-prod-012-var-9",
+        "sku": "SD-SD-PROD-012-CHA-XL",
+        "size": "XL",
+        "colourName": "Charcoal Gray",
+        "colourHex": "#36454F",
+        "stock": 15,
+        "price": 880,
+        "originalPrice": 1232
+      },
+      {
+        "id": "sd-prod-012-var-10",
+        "sku": "SD-SD-PROD-012-CHA-XXL",
+        "size": "XXL",
+        "colourName": "Charcoal Gray",
+        "colourHex": "#36454F",
+        "stock": 15,
+        "price": 880,
+        "originalPrice": 1232
+      }
+    ],
+    "tags": [
+      "distressed light blue denim",
+      "men",
+      "jeans",
+      "slim fit",
+      "mast & harbour",
+      "fashion",
+      "trending"
+    ],
+    "badge": "New",
+    "newArrival": false,
+    "trending": false,
+    "featured": false,
+    "expressDelivery": true,
+    "estimatedDeliveryMinutes": 60,
+    "returnWindowDays": 7,
+    "exchangeAvailable": true,
+    "vendorId": "v-ethnic-vibe",
+    "commissionPercent": 12,
+    "sponsored": false,
+    "active": true,
+    "createdAt": "2026-07-01T00:00:00Z",
+    "updatedAt": "2026-08-01T00:00:00Z"
+  },
+  {
+    "id": "sd-prod-013",
+    "slug": "raw-selvedge-straight-jeans-sd-prod-013",
+    "name": "Raw Selvedge Straight Jeans",
+    "brand": "Highlander",
+    "department": "men",
+    "category": "Jeans",
+    "subcategory": "Slim Fit",
+    "collection": "Summer Essentials 2026",
+    "shortDescription": "Premium quality raw selvedge straight jeans crafted for comfort and style.",
+    "description": "Elevate your daily fashion with this Raw Selvedge Straight Jeans. Features premium fabric construction, tailored fit, and durable craftsmanship ideal for everyday wear.",
+    "material": "100% Premium Combed Cotton",
+    "fit": "Regular Fit",
+    "pattern": "Solid / Textured",
+    "occasion": [
+      "Casual",
+      "Everyday",
+      "Party"
+    ],
+    "careInstructions": [
+      "Machine wash cold",
+      "Do not bleach",
+      "Tumble dry low",
+      "Warm iron if needed"
+    ],
+    "price": 917,
+    "originalPrice": 1283,
+    "discount": 28,
+    "images": [
+      "https://images.unsplash.com/photo-1576995853123-5a10305d93c0?auto=format&fit=crop&w=800&q=80",
+      "https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?auto=format&fit=crop&w=800&q=80"
+    ],
+    "thumbnail": "https://images.unsplash.com/photo-1576995853123-5a10305d93c0?auto=format&fit=crop&w=800&q=80",
+    "rating": 4.0,
+    "reviewCount": 14,
+    "reviews": [
+      {
+        "id": "rev-sd-prod-013-1",
+        "userName": "Aman Sharma",
+        "rating": 5,
+        "title": "Great quality and fast delivery!",
+        "comment": "Delivered in Neemuch within 45 minutes! Quality is top notch.",
+        "createdAt": "2026-07-28",
+        "verifiedPurchase": true
+      },
+      {
+        "id": "rev-sd-prod-013-2",
+        "userName": "Priya Verma",
+        "rating": 4,
+        "title": "Nice fit and comfortable material",
+        "comment": "The fabric is very soft. True to size.",
+        "createdAt": "2026-07-29",
+        "verifiedPurchase": true
+      }
+    ],
+    "variants": [
+      {
+        "id": "sd-prod-013-var-1",
+        "sku": "SD-SD-PROD-013-CHA-S",
+        "size": "S",
+        "colourName": "Charcoal Gray",
+        "colourHex": "#36454F",
+        "stock": 15,
+        "price": 917,
+        "originalPrice": 1283
+      },
+      {
+        "id": "sd-prod-013-var-2",
+        "sku": "SD-SD-PROD-013-CHA-M",
+        "size": "M",
+        "colourName": "Charcoal Gray",
+        "colourHex": "#36454F",
+        "stock": 15,
+        "price": 917,
+        "originalPrice": 1283
+      },
+      {
+        "id": "sd-prod-013-var-3",
+        "sku": "SD-SD-PROD-013-CHA-L",
+        "size": "L",
+        "colourName": "Charcoal Gray",
+        "colourHex": "#36454F",
+        "stock": 15,
+        "price": 917,
+        "originalPrice": 1283
+      },
+      {
+        "id": "sd-prod-013-var-4",
+        "sku": "SD-SD-PROD-013-CHA-XL",
+        "size": "XL",
+        "colourName": "Charcoal Gray",
+        "colourHex": "#36454F",
+        "stock": 15,
+        "price": 917,
+        "originalPrice": 1283
+      },
+      {
+        "id": "sd-prod-013-var-5",
+        "sku": "SD-SD-PROD-013-CHA-XXL",
+        "size": "XXL",
+        "colourName": "Charcoal Gray",
+        "colourHex": "#36454F",
+        "stock": 15,
+        "price": 917,
+        "originalPrice": 1283
+      },
+      {
+        "id": "sd-prod-013-var-6",
+        "sku": "SD-SD-PROD-013-MUS-S",
+        "size": "S",
+        "colourName": "Mustard Yellow",
+        "colourHex": "#FFDB58",
+        "stock": 15,
+        "price": 917,
+        "originalPrice": 1283
+      },
+      {
+        "id": "sd-prod-013-var-7",
+        "sku": "SD-SD-PROD-013-MUS-M",
+        "size": "M",
+        "colourName": "Mustard Yellow",
+        "colourHex": "#FFDB58",
+        "stock": 0,
+        "price": 917,
+        "originalPrice": 1283
+      },
+      {
+        "id": "sd-prod-013-var-8",
+        "sku": "SD-SD-PROD-013-MUS-L",
+        "size": "L",
+        "colourName": "Mustard Yellow",
+        "colourHex": "#FFDB58",
+        "stock": 15,
+        "price": 917,
+        "originalPrice": 1283
+      },
+      {
+        "id": "sd-prod-013-var-9",
+        "sku": "SD-SD-PROD-013-MUS-XL",
+        "size": "XL",
+        "colourName": "Mustard Yellow",
+        "colourHex": "#FFDB58",
+        "stock": 15,
+        "price": 917,
+        "originalPrice": 1283
+      },
+      {
+        "id": "sd-prod-013-var-10",
+        "sku": "SD-SD-PROD-013-MUS-XXL",
+        "size": "XXL",
+        "colourName": "Mustard Yellow",
+        "colourHex": "#FFDB58",
+        "stock": 15,
+        "price": 917,
+        "originalPrice": 1283
+      }
+    ],
+    "tags": [
+      "raw selvedge straight jeans",
+      "men",
+      "jeans",
+      "slim fit",
+      "highlander",
+      "fashion",
+      "trending"
+    ],
+    "badge": "Express",
+    "newArrival": false,
+    "trending": true,
+    "featured": false,
+    "expressDelivery": true,
+    "estimatedDeliveryMinutes": 60,
+    "returnWindowDays": 7,
+    "exchangeAvailable": true,
+    "vendorId": "v-urban-style",
+    "commissionPercent": 12,
+    "sponsored": true,
+    "active": true,
+    "createdAt": "2026-07-01T00:00:00Z",
+    "updatedAt": "2026-08-01T00:00:00Z"
+  },
+  {
+    "id": "sd-prod-014",
+    "slug": "black-tapered-fit-denim-sd-prod-014",
+    "name": "Black Tapered Fit Denim",
+    "brand": "Bawree",
+    "department": "men",
+    "category": "Jeans",
+    "subcategory": "Slim Fit",
+    "collection": "Summer Essentials 2026",
+    "shortDescription": "Premium quality black tapered fit denim crafted for comfort and style.",
+    "description": "Elevate your daily fashion with this Black Tapered Fit Denim. Features premium fabric construction, tailored fit, and durable craftsmanship ideal for everyday wear.",
+    "material": "100% Premium Combed Cotton",
+    "fit": "Regular Fit",
+    "pattern": "Solid / Textured",
+    "occasion": [
+      "Casual",
+      "Everyday",
+      "Party"
+    ],
+    "careInstructions": [
+      "Machine wash cold",
+      "Do not bleach",
+      "Tumble dry low",
+      "Warm iron if needed"
+    ],
+    "price": 954,
+    "originalPrice": 1335,
+    "discount": 28,
+    "images": [
+      "https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?auto=format&fit=crop&w=800&q=80",
+      "https://images.unsplash.com/photo-1529374255404-311a2a4f1fd9?auto=format&fit=crop&w=800&q=80"
+    ],
+    "thumbnail": "https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?auto=format&fit=crop&w=800&q=80",
+    "rating": 4.1,
+    "reviewCount": 27,
+    "reviews": [
+      {
+        "id": "rev-sd-prod-014-1",
+        "userName": "Aman Sharma",
+        "rating": 5,
+        "title": "Great quality and fast delivery!",
+        "comment": "Delivered in Neemuch within 45 minutes! Quality is top notch.",
+        "createdAt": "2026-07-28",
+        "verifiedPurchase": true
+      },
+      {
+        "id": "rev-sd-prod-014-2",
+        "userName": "Priya Verma",
+        "rating": 4,
+        "title": "Nice fit and comfortable material",
+        "comment": "The fabric is very soft. True to size.",
+        "createdAt": "2026-07-29",
+        "verifiedPurchase": true
+      }
+    ],
+    "variants": [
+      {
+        "id": "sd-prod-014-var-1",
+        "sku": "SD-SD-PROD-014-MUS-S",
+        "size": "S",
+        "colourName": "Mustard Yellow",
+        "colourHex": "#FFDB58",
+        "stock": 15,
+        "price": 954,
+        "originalPrice": 1335
+      },
+      {
+        "id": "sd-prod-014-var-2",
+        "sku": "SD-SD-PROD-014-MUS-M",
+        "size": "M",
+        "colourName": "Mustard Yellow",
+        "colourHex": "#FFDB58",
+        "stock": 15,
+        "price": 954,
+        "originalPrice": 1335
+      },
+      {
+        "id": "sd-prod-014-var-3",
+        "sku": "SD-SD-PROD-014-MUS-L",
+        "size": "L",
+        "colourName": "Mustard Yellow",
+        "colourHex": "#FFDB58",
+        "stock": 15,
+        "price": 954,
+        "originalPrice": 1335
+      },
+      {
+        "id": "sd-prod-014-var-4",
+        "sku": "SD-SD-PROD-014-MUS-XL",
+        "size": "XL",
+        "colourName": "Mustard Yellow",
+        "colourHex": "#FFDB58",
+        "stock": 15,
+        "price": 954,
+        "originalPrice": 1335
+      },
+      {
+        "id": "sd-prod-014-var-5",
+        "sku": "SD-SD-PROD-014-MUS-XXL",
+        "size": "XXL",
+        "colourName": "Mustard Yellow",
+        "colourHex": "#FFDB58",
+        "stock": 15,
+        "price": 954,
+        "originalPrice": 1335
+      },
+      {
+        "id": "sd-prod-014-var-6",
+        "sku": "SD-SD-PROD-014-BLA-S",
+        "size": "S",
+        "colourName": "Black",
+        "colourHex": "#000000",
+        "stock": 15,
+        "price": 954,
+        "originalPrice": 1335
+      },
+      {
+        "id": "sd-prod-014-var-7",
+        "sku": "SD-SD-PROD-014-BLA-M",
+        "size": "M",
+        "colourName": "Black",
+        "colourHex": "#000000",
+        "stock": 0,
+        "price": 954,
+        "originalPrice": 1335
+      },
+      {
+        "id": "sd-prod-014-var-8",
+        "sku": "SD-SD-PROD-014-BLA-L",
+        "size": "L",
+        "colourName": "Black",
+        "colourHex": "#000000",
+        "stock": 15,
+        "price": 954,
+        "originalPrice": 1335
+      },
+      {
+        "id": "sd-prod-014-var-9",
+        "sku": "SD-SD-PROD-014-BLA-XL",
+        "size": "XL",
+        "colourName": "Black",
+        "colourHex": "#000000",
+        "stock": 15,
+        "price": 954,
+        "originalPrice": 1335
+      },
+      {
+        "id": "sd-prod-014-var-10",
+        "sku": "SD-SD-PROD-014-BLA-XXL",
+        "size": "XXL",
+        "colourName": "Black",
+        "colourHex": "#000000",
+        "stock": 15,
+        "price": 954,
+        "originalPrice": 1335
+      }
+    ],
+    "tags": [
+      "black tapered fit denim",
+      "men",
+      "jeans",
+      "slim fit",
+      "bawree",
+      "fashion",
+      "trending"
+    ],
+    "badge": "Trending",
+    "newArrival": true,
+    "trending": false,
+    "featured": false,
+    "expressDelivery": true,
+    "estimatedDeliveryMinutes": 60,
+    "returnWindowDays": 7,
+    "exchangeAvailable": true,
+    "vendorId": "v-ethnic-vibe",
+    "commissionPercent": 12,
+    "sponsored": false,
+    "active": true,
+    "createdAt": "2026-07-01T00:00:00Z",
+    "updatedAt": "2026-08-01T00:00:00Z"
+  },
+  {
+    "id": "sd-prod-015",
+    "slug": "vintage-grey-washed-jeans-sd-prod-015",
+    "name": "Vintage Grey Washed Jeans",
+    "brand": "Snitch",
+    "department": "men",
+    "category": "Jeans",
+    "subcategory": "Slim Fit",
+    "collection": "Summer Essentials 2026",
+    "shortDescription": "Premium quality vintage grey washed jeans crafted for comfort and style.",
+    "description": "Elevate your daily fashion with this Vintage Grey Washed Jeans. Features premium fabric construction, tailored fit, and durable craftsmanship ideal for everyday wear.",
+    "material": "100% Premium Combed Cotton",
+    "fit": "Regular Fit",
+    "pattern": "Solid / Textured",
+    "occasion": [
+      "Casual",
+      "Everyday",
+      "Party"
+    ],
+    "careInstructions": [
+      "Machine wash cold",
+      "Do not bleach",
+      "Tumble dry low",
+      "Warm iron if needed"
+    ],
+    "price": 991,
+    "originalPrice": 1387,
+    "discount": 28,
+    "images": [
+      "https://images.unsplash.com/photo-1529374255404-311a2a4f1fd9?auto=format&fit=crop&w=800&q=80",
+      "https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&w=800&q=80"
+    ],
+    "thumbnail": "https://images.unsplash.com/photo-1529374255404-311a2a4f1fd9?auto=format&fit=crop&w=800&q=80",
+    "rating": 4.2,
+    "reviewCount": 40,
+    "reviews": [
+      {
+        "id": "rev-sd-prod-015-1",
+        "userName": "Aman Sharma",
+        "rating": 5,
+        "title": "Great quality and fast delivery!",
+        "comment": "Delivered in Neemuch within 45 minutes! Quality is top notch.",
+        "createdAt": "2026-07-28",
+        "verifiedPurchase": true
+      },
+      {
+        "id": "rev-sd-prod-015-2",
+        "userName": "Priya Verma",
+        "rating": 4,
+        "title": "Nice fit and comfortable material",
+        "comment": "The fabric is very soft. True to size.",
+        "createdAt": "2026-07-29",
+        "verifiedPurchase": true
+      }
+    ],
+    "variants": [
+      {
+        "id": "sd-prod-015-var-1",
+        "sku": "SD-SD-PROD-015-BLA-S",
+        "size": "S",
+        "colourName": "Black",
+        "colourHex": "#000000",
+        "stock": 15,
+        "price": 991,
+        "originalPrice": 1387
+      },
+      {
+        "id": "sd-prod-015-var-2",
+        "sku": "SD-SD-PROD-015-BLA-M",
+        "size": "M",
+        "colourName": "Black",
+        "colourHex": "#000000",
+        "stock": 15,
+        "price": 991,
+        "originalPrice": 1387
+      },
+      {
+        "id": "sd-prod-015-var-3",
+        "sku": "SD-SD-PROD-015-BLA-L",
+        "size": "L",
+        "colourName": "Black",
+        "colourHex": "#000000",
+        "stock": 15,
+        "price": 991,
+        "originalPrice": 1387
+      },
+      {
+        "id": "sd-prod-015-var-4",
+        "sku": "SD-SD-PROD-015-BLA-XL",
+        "size": "XL",
+        "colourName": "Black",
+        "colourHex": "#000000",
+        "stock": 15,
+        "price": 991,
+        "originalPrice": 1387
+      },
+      {
+        "id": "sd-prod-015-var-5",
+        "sku": "SD-SD-PROD-015-BLA-XXL",
+        "size": "XXL",
+        "colourName": "Black",
+        "colourHex": "#000000",
+        "stock": 15,
+        "price": 991,
+        "originalPrice": 1387
+      },
+      {
+        "id": "sd-prod-015-var-6",
+        "sku": "SD-SD-PROD-015-WHI-S",
+        "size": "S",
+        "colourName": "White",
+        "colourHex": "#FFFFFF",
+        "stock": 15,
+        "price": 991,
+        "originalPrice": 1387
+      },
+      {
+        "id": "sd-prod-015-var-7",
+        "sku": "SD-SD-PROD-015-WHI-M",
+        "size": "M",
+        "colourName": "White",
+        "colourHex": "#FFFFFF",
+        "stock": 0,
+        "price": 991,
+        "originalPrice": 1387
+      },
+      {
+        "id": "sd-prod-015-var-8",
+        "sku": "SD-SD-PROD-015-WHI-L",
+        "size": "L",
+        "colourName": "White",
+        "colourHex": "#FFFFFF",
+        "stock": 15,
+        "price": 991,
+        "originalPrice": 1387
+      },
+      {
+        "id": "sd-prod-015-var-9",
+        "sku": "SD-SD-PROD-015-WHI-XL",
+        "size": "XL",
+        "colourName": "White",
+        "colourHex": "#FFFFFF",
+        "stock": 15,
+        "price": 991,
+        "originalPrice": 1387
+      },
+      {
+        "id": "sd-prod-015-var-10",
+        "sku": "SD-SD-PROD-015-WHI-XXL",
+        "size": "XXL",
+        "colourName": "White",
+        "colourHex": "#FFFFFF",
+        "stock": 15,
+        "price": 991,
+        "originalPrice": 1387
+      }
+    ],
+    "tags": [
+      "vintage grey washed jeans",
+      "men",
+      "jeans",
+      "slim fit",
+      "snitch",
+      "fashion",
+      "trending"
+    ],
+    "badge": "Express",
+    "newArrival": false,
+    "trending": true,
+    "featured": true,
+    "expressDelivery": true,
+    "estimatedDeliveryMinutes": 60,
+    "returnWindowDays": 7,
+    "exchangeAvailable": true,
+    "vendorId": "v-urban-style",
+    "commissionPercent": 12,
+    "sponsored": false,
+    "active": true,
+    "createdAt": "2026-07-01T00:00:00Z",
+    "updatedAt": "2026-08-01T00:00:00Z"
+  },
+  {
+    "id": "sd-prod-016",
+    "slug": "classic-cotton-stretch-chinos-sd-prod-016",
+    "name": "Classic Cotton Stretch Chinos",
+    "brand": "Wrong",
+    "department": "men",
+    "category": "Trousers",
+    "subcategory": "Chinos",
+    "collection": "Summer Essentials 2026",
+    "shortDescription": "Premium quality classic cotton stretch chinos crafted for comfort and style.",
+    "description": "Elevate your daily fashion with this Classic Cotton Stretch Chinos. Features premium fabric construction, tailored fit, and durable craftsmanship ideal for everyday wear.",
+    "material": "100% Premium Combed Cotton",
+    "fit": "Regular Fit",
+    "pattern": "Solid / Textured",
+    "occasion": [
+      "Casual",
+      "Everyday",
+      "Party"
+    ],
+    "careInstructions": [
+      "Machine wash cold",
+      "Do not bleach",
+      "Tumble dry low",
+      "Warm iron if needed"
+    ],
+    "price": 1028,
+    "originalPrice": 1439,
+    "discount": 28,
+    "images": [
+      "https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&w=800&q=80",
+      "https://images.unsplash.com/photo-1521572267360-ee0c2909d518?auto=format&fit=crop&w=800&q=80"
+    ],
+    "thumbnail": "https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&w=800&q=80",
+    "rating": 4.3,
+    "reviewCount": 53,
+    "reviews": [
+      {
+        "id": "rev-sd-prod-016-1",
+        "userName": "Aman Sharma",
+        "rating": 5,
+        "title": "Great quality and fast delivery!",
+        "comment": "Delivered in Neemuch within 45 minutes! Quality is top notch.",
+        "createdAt": "2026-07-28",
+        "verifiedPurchase": true
+      },
+      {
+        "id": "rev-sd-prod-016-2",
+        "userName": "Priya Verma",
+        "rating": 4,
+        "title": "Nice fit and comfortable material",
+        "comment": "The fabric is very soft. True to size.",
+        "createdAt": "2026-07-29",
+        "verifiedPurchase": true
+      }
+    ],
+    "variants": [
+      {
+        "id": "sd-prod-016-var-1",
+        "sku": "SD-SD-PROD-016-WHI-S",
+        "size": "S",
+        "colourName": "White",
+        "colourHex": "#FFFFFF",
+        "stock": 15,
+        "price": 1028,
+        "originalPrice": 1439
+      },
+      {
+        "id": "sd-prod-016-var-2",
+        "sku": "SD-SD-PROD-016-WHI-M",
+        "size": "M",
+        "colourName": "White",
+        "colourHex": "#FFFFFF",
+        "stock": 15,
+        "price": 1028,
+        "originalPrice": 1439
+      },
+      {
+        "id": "sd-prod-016-var-3",
+        "sku": "SD-SD-PROD-016-WHI-L",
+        "size": "L",
+        "colourName": "White",
+        "colourHex": "#FFFFFF",
+        "stock": 15,
+        "price": 1028,
+        "originalPrice": 1439
+      },
+      {
+        "id": "sd-prod-016-var-4",
+        "sku": "SD-SD-PROD-016-WHI-XL",
+        "size": "XL",
+        "colourName": "White",
+        "colourHex": "#FFFFFF",
+        "stock": 15,
+        "price": 1028,
+        "originalPrice": 1439
+      },
+      {
+        "id": "sd-prod-016-var-5",
+        "sku": "SD-SD-PROD-016-WHI-XXL",
+        "size": "XXL",
+        "colourName": "White",
+        "colourHex": "#FFFFFF",
+        "stock": 15,
+        "price": 1028,
+        "originalPrice": 1439
+      },
+      {
+        "id": "sd-prod-016-var-6",
+        "sku": "SD-SD-PROD-016-NAV-S",
+        "size": "S",
+        "colourName": "Navy Blue",
+        "colourHex": "#000080",
+        "stock": 15,
+        "price": 1028,
+        "originalPrice": 1439
+      },
+      {
+        "id": "sd-prod-016-var-7",
+        "sku": "SD-SD-PROD-016-NAV-M",
+        "size": "M",
+        "colourName": "Navy Blue",
+        "colourHex": "#000080",
+        "stock": 0,
+        "price": 1028,
+        "originalPrice": 1439
+      },
+      {
+        "id": "sd-prod-016-var-8",
+        "sku": "SD-SD-PROD-016-NAV-L",
+        "size": "L",
+        "colourName": "Navy Blue",
+        "colourHex": "#000080",
+        "stock": 15,
+        "price": 1028,
+        "originalPrice": 1439
+      },
+      {
+        "id": "sd-prod-016-var-9",
+        "sku": "SD-SD-PROD-016-NAV-XL",
+        "size": "XL",
+        "colourName": "Navy Blue",
+        "colourHex": "#000080",
+        "stock": 15,
+        "price": 1028,
+        "originalPrice": 1439
+      },
+      {
+        "id": "sd-prod-016-var-10",
+        "sku": "SD-SD-PROD-016-NAV-XXL",
+        "size": "XXL",
+        "colourName": "Navy Blue",
+        "colourHex": "#000080",
+        "stock": 15,
+        "price": 1028,
+        "originalPrice": 1439
+      }
+    ],
+    "tags": [
+      "classic cotton stretch chinos",
+      "men",
+      "trousers",
+      "chinos",
+      "wrong",
+      "fashion",
+      "trending"
+    ],
+    "badge": "New",
+    "newArrival": false,
+    "trending": false,
+    "featured": false,
+    "expressDelivery": true,
+    "estimatedDeliveryMinutes": 60,
+    "returnWindowDays": 7,
+    "exchangeAvailable": true,
+    "vendorId": "v-ethnic-vibe",
+    "commissionPercent": 12,
+    "sponsored": false,
+    "active": true,
+    "createdAt": "2026-07-01T00:00:00Z",
+    "updatedAt": "2026-08-01T00:00:00Z"
+  },
+  {
+    "id": "sd-prod-017",
+    "slug": "pleated-formal-trousers-sd-prod-017",
+    "name": "Pleated Formal Trousers",
+    "brand": "Roadster",
+    "department": "men",
+    "category": "Trousers",
+    "subcategory": "Chinos",
+    "collection": "Summer Essentials 2026",
+    "shortDescription": "Premium quality pleated formal trousers crafted for comfort and style.",
+    "description": "Elevate your daily fashion with this Pleated Formal Trousers. Features premium fabric construction, tailored fit, and durable craftsmanship ideal for everyday wear.",
+    "material": "100% Premium Combed Cotton",
+    "fit": "Regular Fit",
+    "pattern": "Solid / Textured",
+    "occasion": [
+      "Casual",
+      "Everyday",
+      "Party"
+    ],
+    "careInstructions": [
+      "Machine wash cold",
+      "Do not bleach",
+      "Tumble dry low",
+      "Warm iron if needed"
+    ],
+    "price": 1065,
+    "originalPrice": 1491,
+    "discount": 28,
+    "images": [
+      "https://images.unsplash.com/photo-1521572267360-ee0c2909d518?auto=format&fit=crop&w=800&q=80",
+      "https://images.unsplash.com/photo-1503342217505-b0a15ec3261c?auto=format&fit=crop&w=800&q=80"
+    ],
+    "thumbnail": "https://images.unsplash.com/photo-1521572267360-ee0c2909d518?auto=format&fit=crop&w=800&q=80",
+    "rating": 4.4,
+    "reviewCount": 66,
+    "reviews": [
+      {
+        "id": "rev-sd-prod-017-1",
+        "userName": "Aman Sharma",
+        "rating": 5,
+        "title": "Great quality and fast delivery!",
+        "comment": "Delivered in Neemuch within 45 minutes! Quality is top notch.",
+        "createdAt": "2026-07-28",
+        "verifiedPurchase": true
+      },
+      {
+        "id": "rev-sd-prod-017-2",
+        "userName": "Priya Verma",
+        "rating": 4,
+        "title": "Nice fit and comfortable material",
+        "comment": "The fabric is very soft. True to size.",
+        "createdAt": "2026-07-29",
+        "verifiedPurchase": true
+      }
+    ],
+    "variants": [
+      {
+        "id": "sd-prod-017-var-1",
+        "sku": "SD-SD-PROD-017-NAV-S",
+        "size": "S",
+        "colourName": "Navy Blue",
+        "colourHex": "#000080",
+        "stock": 15,
+        "price": 1065,
+        "originalPrice": 1491
+      },
+      {
+        "id": "sd-prod-017-var-2",
+        "sku": "SD-SD-PROD-017-NAV-M",
+        "size": "M",
+        "colourName": "Navy Blue",
+        "colourHex": "#000080",
+        "stock": 15,
+        "price": 1065,
+        "originalPrice": 1491
+      },
+      {
+        "id": "sd-prod-017-var-3",
+        "sku": "SD-SD-PROD-017-NAV-L",
+        "size": "L",
+        "colourName": "Navy Blue",
+        "colourHex": "#000080",
+        "stock": 15,
+        "price": 1065,
+        "originalPrice": 1491
+      },
+      {
+        "id": "sd-prod-017-var-4",
+        "sku": "SD-SD-PROD-017-NAV-XL",
+        "size": "XL",
+        "colourName": "Navy Blue",
+        "colourHex": "#000080",
+        "stock": 15,
+        "price": 1065,
+        "originalPrice": 1491
+      },
+      {
+        "id": "sd-prod-017-var-5",
+        "sku": "SD-SD-PROD-017-NAV-XXL",
+        "size": "XXL",
+        "colourName": "Navy Blue",
+        "colourHex": "#000080",
+        "stock": 15,
+        "price": 1065,
+        "originalPrice": 1491
+      },
+      {
+        "id": "sd-prod-017-var-6",
+        "sku": "SD-SD-PROD-017-OLI-S",
+        "size": "S",
+        "colourName": "Olive Green",
+        "colourHex": "#556B2F",
+        "stock": 15,
+        "price": 1065,
+        "originalPrice": 1491
+      },
+      {
+        "id": "sd-prod-017-var-7",
+        "sku": "SD-SD-PROD-017-OLI-M",
+        "size": "M",
+        "colourName": "Olive Green",
+        "colourHex": "#556B2F",
+        "stock": 0,
+        "price": 1065,
+        "originalPrice": 1491
+      },
+      {
+        "id": "sd-prod-017-var-8",
+        "sku": "SD-SD-PROD-017-OLI-L",
+        "size": "L",
+        "colourName": "Olive Green",
+        "colourHex": "#556B2F",
+        "stock": 15,
+        "price": 1065,
+        "originalPrice": 1491
+      },
+      {
+        "id": "sd-prod-017-var-9",
+        "sku": "SD-SD-PROD-017-OLI-XL",
+        "size": "XL",
+        "colourName": "Olive Green",
+        "colourHex": "#556B2F",
+        "stock": 15,
+        "price": 1065,
+        "originalPrice": 1491
+      },
+      {
+        "id": "sd-prod-017-var-10",
+        "sku": "SD-SD-PROD-017-OLI-XXL",
+        "size": "XXL",
+        "colourName": "Olive Green",
+        "colourHex": "#556B2F",
+        "stock": 15,
+        "price": 1065,
+        "originalPrice": 1491
+      }
+    ],
+    "tags": [
+      "pleated formal trousers",
+      "men",
+      "trousers",
+      "chinos",
+      "roadster",
+      "fashion",
+      "trending"
+    ],
+    "badge": "Trending",
+    "newArrival": true,
+    "trending": true,
+    "featured": false,
+    "expressDelivery": true,
+    "estimatedDeliveryMinutes": 60,
+    "returnWindowDays": 7,
+    "exchangeAvailable": true,
+    "vendorId": "v-urban-style",
+    "commissionPercent": 12,
+    "sponsored": false,
+    "active": true,
+    "createdAt": "2026-07-01T00:00:00Z",
+    "updatedAt": "2026-08-01T00:00:00Z"
+  },
+  {
+    "id": "sd-prod-018",
+    "slug": "utility-cargo-track-pants-sd-prod-018",
+    "name": "Utility Cargo Track Pants",
+    "brand": "HRX",
+    "department": "men",
+    "category": "Trousers",
+    "subcategory": "Chinos",
+    "collection": "Summer Essentials 2026",
+    "shortDescription": "Premium quality utility cargo track pants crafted for comfort and style.",
+    "description": "Elevate your daily fashion with this Utility Cargo Track Pants. Features premium fabric construction, tailored fit, and durable craftsmanship ideal for everyday wear.",
+    "material": "100% Premium Combed Cotton",
+    "fit": "Regular Fit",
+    "pattern": "Solid / Textured",
+    "occasion": [
+      "Casual",
+      "Everyday",
+      "Party"
+    ],
+    "careInstructions": [
+      "Machine wash cold",
+      "Do not bleach",
+      "Tumble dry low",
+      "Warm iron if needed"
+    ],
+    "price": 1102,
+    "originalPrice": 1542,
+    "discount": 28,
+    "images": [
+      "https://images.unsplash.com/photo-1503342217505-b0a15ec3261c?auto=format&fit=crop&w=800&q=80",
+      "https://images.unsplash.com/photo-1576995853123-5a10305d93c0?auto=format&fit=crop&w=800&q=80"
+    ],
+    "thumbnail": "https://images.unsplash.com/photo-1503342217505-b0a15ec3261c?auto=format&fit=crop&w=800&q=80",
+    "rating": 4.5,
+    "reviewCount": 79,
+    "reviews": [
+      {
+        "id": "rev-sd-prod-018-1",
+        "userName": "Aman Sharma",
+        "rating": 5,
+        "title": "Great quality and fast delivery!",
+        "comment": "Delivered in Neemuch within 45 minutes! Quality is top notch.",
+        "createdAt": "2026-07-28",
+        "verifiedPurchase": true
+      },
+      {
+        "id": "rev-sd-prod-018-2",
+        "userName": "Priya Verma",
+        "rating": 4,
+        "title": "Nice fit and comfortable material",
+        "comment": "The fabric is very soft. True to size.",
+        "createdAt": "2026-07-29",
+        "verifiedPurchase": true
+      }
+    ],
+    "variants": [
+      {
+        "id": "sd-prod-018-var-1",
+        "sku": "SD-SD-PROD-018-OLI-S",
+        "size": "S",
+        "colourName": "Olive Green",
+        "colourHex": "#556B2F",
+        "stock": 15,
+        "price": 1102,
+        "originalPrice": 1542
+      },
+      {
+        "id": "sd-prod-018-var-2",
+        "sku": "SD-SD-PROD-018-OLI-M",
+        "size": "M",
+        "colourName": "Olive Green",
+        "colourHex": "#556B2F",
+        "stock": 15,
+        "price": 1102,
+        "originalPrice": 1542
+      },
+      {
+        "id": "sd-prod-018-var-3",
+        "sku": "SD-SD-PROD-018-OLI-L",
+        "size": "L",
+        "colourName": "Olive Green",
+        "colourHex": "#556B2F",
+        "stock": 15,
+        "price": 1102,
+        "originalPrice": 1542
+      },
+      {
+        "id": "sd-prod-018-var-4",
+        "sku": "SD-SD-PROD-018-OLI-XL",
+        "size": "XL",
+        "colourName": "Olive Green",
+        "colourHex": "#556B2F",
+        "stock": 15,
+        "price": 1102,
+        "originalPrice": 1542
+      },
+      {
+        "id": "sd-prod-018-var-5",
+        "sku": "SD-SD-PROD-018-OLI-XXL",
+        "size": "XXL",
+        "colourName": "Olive Green",
+        "colourHex": "#556B2F",
+        "stock": 15,
+        "price": 1102,
+        "originalPrice": 1542
+      },
+      {
+        "id": "sd-prod-018-var-6",
+        "sku": "SD-SD-PROD-018-CRI-S",
+        "size": "S",
+        "colourName": "Crimson Red",
+        "colourHex": "#DC143C",
+        "stock": 15,
+        "price": 1102,
+        "originalPrice": 1542
+      },
+      {
+        "id": "sd-prod-018-var-7",
+        "sku": "SD-SD-PROD-018-CRI-M",
+        "size": "M",
+        "colourName": "Crimson Red",
+        "colourHex": "#DC143C",
+        "stock": 0,
+        "price": 1102,
+        "originalPrice": 1542
+      },
+      {
+        "id": "sd-prod-018-var-8",
+        "sku": "SD-SD-PROD-018-CRI-L",
+        "size": "L",
+        "colourName": "Crimson Red",
+        "colourHex": "#DC143C",
+        "stock": 15,
+        "price": 1102,
+        "originalPrice": 1542
+      },
+      {
+        "id": "sd-prod-018-var-9",
+        "sku": "SD-SD-PROD-018-CRI-XL",
+        "size": "XL",
+        "colourName": "Crimson Red",
+        "colourHex": "#DC143C",
+        "stock": 15,
+        "price": 1102,
+        "originalPrice": 1542
+      },
+      {
+        "id": "sd-prod-018-var-10",
+        "sku": "SD-SD-PROD-018-CRI-XXL",
+        "size": "XXL",
+        "colourName": "Crimson Red",
+        "colourHex": "#DC143C",
+        "stock": 15,
+        "price": 1102,
+        "originalPrice": 1542
+      }
+    ],
+    "tags": [
+      "utility cargo track pants",
+      "men",
+      "trousers",
+      "chinos",
+      "hrx",
+      "fashion",
+      "trending"
+    ],
+    "badge": "New",
+    "newArrival": false,
+    "trending": false,
+    "featured": false,
+    "expressDelivery": true,
+    "estimatedDeliveryMinutes": 60,
+    "returnWindowDays": 7,
+    "exchangeAvailable": true,
+    "vendorId": "v-ethnic-vibe",
+    "commissionPercent": 12,
+    "sponsored": false,
+    "active": true,
+    "createdAt": "2026-07-01T00:00:00Z",
+    "updatedAt": "2026-08-01T00:00:00Z"
+  },
+  {
+    "id": "sd-prod-019",
+    "slug": "tailored-ankle-length-pants-sd-prod-019",
+    "name": "Tailored Ankle-Length Pants",
+    "brand": "StyleDash Studio",
+    "department": "men",
+    "category": "Trousers",
+    "subcategory": "Chinos",
+    "collection": "Summer Essentials 2026",
+    "shortDescription": "Premium quality tailored ankle-length pants crafted for comfort and style.",
+    "description": "Elevate your daily fashion with this Tailored Ankle-Length Pants. Features premium fabric construction, tailored fit, and durable craftsmanship ideal for everyday wear.",
+    "material": "100% Premium Combed Cotton",
+    "fit": "Regular Fit",
+    "pattern": "Solid / Textured",
+    "occasion": [
+      "Casual",
+      "Everyday",
+      "Party"
+    ],
+    "careInstructions": [
+      "Machine wash cold",
+      "Do not bleach",
+      "Tumble dry low",
+      "Warm iron if needed"
+    ],
+    "price": 1139,
+    "originalPrice": 1594,
+    "discount": 28,
+    "images": [
+      "https://images.unsplash.com/photo-1576995853123-5a10305d93c0?auto=format&fit=crop&w=800&q=80",
+      "https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?auto=format&fit=crop&w=800&q=80"
+    ],
+    "thumbnail": "https://images.unsplash.com/photo-1576995853123-5a10305d93c0?auto=format&fit=crop&w=800&q=80",
+    "rating": 4.6,
+    "reviewCount": 92,
+    "reviews": [
+      {
+        "id": "rev-sd-prod-019-1",
+        "userName": "Aman Sharma",
+        "rating": 5,
+        "title": "Great quality and fast delivery!",
+        "comment": "Delivered in Neemuch within 45 minutes! Quality is top notch.",
+        "createdAt": "2026-07-28",
+        "verifiedPurchase": true
+      },
+      {
+        "id": "rev-sd-prod-019-2",
+        "userName": "Priya Verma",
+        "rating": 4,
+        "title": "Nice fit and comfortable material",
+        "comment": "The fabric is very soft. True to size.",
+        "createdAt": "2026-07-29",
+        "verifiedPurchase": true
+      }
+    ],
+    "variants": [
+      {
+        "id": "sd-prod-019-var-1",
+        "sku": "SD-SD-PROD-019-CRI-S",
+        "size": "S",
+        "colourName": "Crimson Red",
+        "colourHex": "#DC143C",
+        "stock": 15,
+        "price": 1139,
+        "originalPrice": 1594
+      },
+      {
+        "id": "sd-prod-019-var-2",
+        "sku": "SD-SD-PROD-019-CRI-M",
+        "size": "M",
+        "colourName": "Crimson Red",
+        "colourHex": "#DC143C",
+        "stock": 15,
+        "price": 1139,
+        "originalPrice": 1594
+      },
+      {
+        "id": "sd-prod-019-var-3",
+        "sku": "SD-SD-PROD-019-CRI-L",
+        "size": "L",
+        "colourName": "Crimson Red",
+        "colourHex": "#DC143C",
+        "stock": 15,
+        "price": 1139,
+        "originalPrice": 1594
+      },
+      {
+        "id": "sd-prod-019-var-4",
+        "sku": "SD-SD-PROD-019-CRI-XL",
+        "size": "XL",
+        "colourName": "Crimson Red",
+        "colourHex": "#DC143C",
+        "stock": 15,
+        "price": 1139,
+        "originalPrice": 1594
+      },
+      {
+        "id": "sd-prod-019-var-5",
+        "sku": "SD-SD-PROD-019-CRI-XXL",
+        "size": "XXL",
+        "colourName": "Crimson Red",
+        "colourHex": "#DC143C",
+        "stock": 15,
+        "price": 1139,
+        "originalPrice": 1594
+      },
+      {
+        "id": "sd-prod-019-var-6",
+        "sku": "SD-SD-PROD-019-BEI-S",
+        "size": "S",
+        "colourName": "Beige",
+        "colourHex": "#F5F5DC",
+        "stock": 15,
+        "price": 1139,
+        "originalPrice": 1594
+      },
+      {
+        "id": "sd-prod-019-var-7",
+        "sku": "SD-SD-PROD-019-BEI-M",
+        "size": "M",
+        "colourName": "Beige",
+        "colourHex": "#F5F5DC",
+        "stock": 0,
+        "price": 1139,
+        "originalPrice": 1594
+      },
+      {
+        "id": "sd-prod-019-var-8",
+        "sku": "SD-SD-PROD-019-BEI-L",
+        "size": "L",
+        "colourName": "Beige",
+        "colourHex": "#F5F5DC",
+        "stock": 15,
+        "price": 1139,
+        "originalPrice": 1594
+      },
+      {
+        "id": "sd-prod-019-var-9",
+        "sku": "SD-SD-PROD-019-BEI-XL",
+        "size": "XL",
+        "colourName": "Beige",
+        "colourHex": "#F5F5DC",
+        "stock": 15,
+        "price": 1139,
+        "originalPrice": 1594
+      },
+      {
+        "id": "sd-prod-019-var-10",
+        "sku": "SD-SD-PROD-019-BEI-XXL",
+        "size": "XXL",
+        "colourName": "Beige",
+        "colourHex": "#F5F5DC",
+        "stock": 15,
+        "price": 1139,
+        "originalPrice": 1594
+      }
+    ],
+    "tags": [
+      "tailored ankle-length pants",
+      "men",
+      "trousers",
+      "chinos",
+      "styledash studio",
+      "fashion",
+      "trending"
+    ],
+    "badge": "Express",
+    "newArrival": false,
+    "trending": true,
+    "featured": true,
+    "expressDelivery": true,
+    "estimatedDeliveryMinutes": 60,
+    "returnWindowDays": 7,
+    "exchangeAvailable": true,
+    "vendorId": "v-urban-style",
+    "commissionPercent": 12,
+    "sponsored": false,
+    "active": true,
+    "createdAt": "2026-07-01T00:00:00Z",
+    "updatedAt": "2026-08-01T00:00:00Z"
+  },
+  {
+    "id": "sd-prod-020",
+    "slug": "relaxed-linen-trousers-sd-prod-020",
+    "name": "Relaxed Linen Trousers",
+    "brand": "Anouk",
+    "department": "men",
+    "category": "Trousers",
+    "subcategory": "Chinos",
+    "collection": "Summer Essentials 2026",
+    "shortDescription": "Premium quality relaxed linen trousers crafted for comfort and style.",
+    "description": "Elevate your daily fashion with this Relaxed Linen Trousers. Features premium fabric construction, tailored fit, and durable craftsmanship ideal for everyday wear.",
+    "material": "100% Premium Combed Cotton",
+    "fit": "Regular Fit",
+    "pattern": "Solid / Textured",
+    "occasion": [
+      "Casual",
+      "Everyday",
+      "Party"
+    ],
+    "careInstructions": [
+      "Machine wash cold",
+      "Do not bleach",
+      "Tumble dry low",
+      "Warm iron if needed"
+    ],
+    "price": 1176,
+    "originalPrice": 1646,
+    "discount": 28,
+    "images": [
+      "https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?auto=format&fit=crop&w=800&q=80",
+      "https://images.unsplash.com/photo-1529374255404-311a2a4f1fd9?auto=format&fit=crop&w=800&q=80"
+    ],
+    "thumbnail": "https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?auto=format&fit=crop&w=800&q=80",
+    "rating": 4.7,
+    "reviewCount": 105,
+    "reviews": [
+      {
+        "id": "rev-sd-prod-020-1",
+        "userName": "Aman Sharma",
+        "rating": 5,
+        "title": "Great quality and fast delivery!",
+        "comment": "Delivered in Neemuch within 45 minutes! Quality is top notch.",
+        "createdAt": "2026-07-28",
+        "verifiedPurchase": true
+      },
+      {
+        "id": "rev-sd-prod-020-2",
+        "userName": "Priya Verma",
+        "rating": 4,
+        "title": "Nice fit and comfortable material",
+        "comment": "The fabric is very soft. True to size.",
+        "createdAt": "2026-07-29",
+        "verifiedPurchase": true
+      }
+    ],
+    "variants": [
+      {
+        "id": "sd-prod-020-var-1",
+        "sku": "SD-SD-PROD-020-BEI-S",
+        "size": "S",
+        "colourName": "Beige",
+        "colourHex": "#F5F5DC",
+        "stock": 15,
+        "price": 1176,
+        "originalPrice": 1646
+      },
+      {
+        "id": "sd-prod-020-var-2",
+        "sku": "SD-SD-PROD-020-BEI-M",
+        "size": "M",
+        "colourName": "Beige",
+        "colourHex": "#F5F5DC",
+        "stock": 15,
+        "price": 1176,
+        "originalPrice": 1646
+      },
+      {
+        "id": "sd-prod-020-var-3",
+        "sku": "SD-SD-PROD-020-BEI-L",
+        "size": "L",
+        "colourName": "Beige",
+        "colourHex": "#F5F5DC",
+        "stock": 15,
+        "price": 1176,
+        "originalPrice": 1646
+      },
+      {
+        "id": "sd-prod-020-var-4",
+        "sku": "SD-SD-PROD-020-BEI-XL",
+        "size": "XL",
+        "colourName": "Beige",
+        "colourHex": "#F5F5DC",
+        "stock": 15,
+        "price": 1176,
+        "originalPrice": 1646
+      },
+      {
+        "id": "sd-prod-020-var-5",
+        "sku": "SD-SD-PROD-020-BEI-XXL",
+        "size": "XXL",
+        "colourName": "Beige",
+        "colourHex": "#F5F5DC",
+        "stock": 15,
+        "price": 1176,
+        "originalPrice": 1646
+      },
+      {
+        "id": "sd-prod-020-var-6",
+        "sku": "SD-SD-PROD-020-CHA-S",
+        "size": "S",
+        "colourName": "Charcoal Gray",
+        "colourHex": "#36454F",
+        "stock": 15,
+        "price": 1176,
+        "originalPrice": 1646
+      },
+      {
+        "id": "sd-prod-020-var-7",
+        "sku": "SD-SD-PROD-020-CHA-M",
+        "size": "M",
+        "colourName": "Charcoal Gray",
+        "colourHex": "#36454F",
+        "stock": 0,
+        "price": 1176,
+        "originalPrice": 1646
+      },
+      {
+        "id": "sd-prod-020-var-8",
+        "sku": "SD-SD-PROD-020-CHA-L",
+        "size": "L",
+        "colourName": "Charcoal Gray",
+        "colourHex": "#36454F",
+        "stock": 15,
+        "price": 1176,
+        "originalPrice": 1646
+      },
+      {
+        "id": "sd-prod-020-var-9",
+        "sku": "SD-SD-PROD-020-CHA-XL",
+        "size": "XL",
+        "colourName": "Charcoal Gray",
+        "colourHex": "#36454F",
+        "stock": 15,
+        "price": 1176,
+        "originalPrice": 1646
+      },
+      {
+        "id": "sd-prod-020-var-10",
+        "sku": "SD-SD-PROD-020-CHA-XXL",
+        "size": "XXL",
+        "colourName": "Charcoal Gray",
+        "colourHex": "#36454F",
+        "stock": 15,
+        "price": 1176,
+        "originalPrice": 1646
+      }
+    ],
+    "tags": [
+      "relaxed linen trousers",
+      "men",
+      "trousers",
+      "chinos",
+      "anouk",
+      "fashion",
+      "trending"
+    ],
+    "badge": "Trending",
+    "newArrival": true,
+    "trending": false,
+    "featured": false,
+    "expressDelivery": true,
+    "estimatedDeliveryMinutes": 60,
+    "returnWindowDays": 7,
+    "exchangeAvailable": true,
+    "vendorId": "v-ethnic-vibe",
+    "commissionPercent": 12,
+    "sponsored": true,
+    "active": true,
+    "createdAt": "2026-07-01T00:00:00Z",
+    "updatedAt": "2026-08-01T00:00:00Z"
+  },
+  {
+    "id": "sd-prod-021",
+    "slug": "fleece-lined-pullover-hoodie-sd-prod-021",
+    "name": "Fleece Lined Pullover Hoodie",
+    "brand": "Mast & Harbour",
+    "department": "men",
+    "category": "Hoodies & Jackets",
+    "subcategory": "Hoodies",
+    "collection": "Summer Essentials 2026",
+    "shortDescription": "Premium quality fleece lined pullover hoodie crafted for comfort and style.",
+    "description": "Elevate your daily fashion with this Fleece Lined Pullover Hoodie. Features premium fabric construction, tailored fit, and durable craftsmanship ideal for everyday wear.",
+    "material": "100% Premium Combed Cotton",
+    "fit": "Regular Fit",
+    "pattern": "Solid / Textured",
+    "occasion": [
+      "Casual",
+      "Everyday",
+      "Party"
+    ],
+    "careInstructions": [
+      "Machine wash cold",
+      "Do not bleach",
+      "Tumble dry low",
+      "Warm iron if needed"
+    ],
+    "price": 1213,
+    "originalPrice": 1698,
+    "discount": 28,
+    "images": [
+      "https://images.unsplash.com/photo-1529374255404-311a2a4f1fd9?auto=format&fit=crop&w=800&q=80",
+      "https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&w=800&q=80"
+    ],
+    "thumbnail": "https://images.unsplash.com/photo-1529374255404-311a2a4f1fd9?auto=format&fit=crop&w=800&q=80",
+    "rating": 4.8,
+    "reviewCount": 118,
+    "reviews": [
+      {
+        "id": "rev-sd-prod-021-1",
+        "userName": "Aman Sharma",
+        "rating": 5,
+        "title": "Great quality and fast delivery!",
+        "comment": "Delivered in Neemuch within 45 minutes! Quality is top notch.",
+        "createdAt": "2026-07-28",
+        "verifiedPurchase": true
+      },
+      {
+        "id": "rev-sd-prod-021-2",
+        "userName": "Priya Verma",
+        "rating": 4,
+        "title": "Nice fit and comfortable material",
+        "comment": "The fabric is very soft. True to size.",
+        "createdAt": "2026-07-29",
+        "verifiedPurchase": true
+      }
+    ],
+    "variants": [
+      {
+        "id": "sd-prod-021-var-1",
+        "sku": "SD-SD-PROD-021-CHA-S",
+        "size": "S",
+        "colourName": "Charcoal Gray",
+        "colourHex": "#36454F",
+        "stock": 15,
+        "price": 1213,
+        "originalPrice": 1698
+      },
+      {
+        "id": "sd-prod-021-var-2",
+        "sku": "SD-SD-PROD-021-CHA-M",
+        "size": "M",
+        "colourName": "Charcoal Gray",
+        "colourHex": "#36454F",
+        "stock": 15,
+        "price": 1213,
+        "originalPrice": 1698
+      },
+      {
+        "id": "sd-prod-021-var-3",
+        "sku": "SD-SD-PROD-021-CHA-L",
+        "size": "L",
+        "colourName": "Charcoal Gray",
+        "colourHex": "#36454F",
+        "stock": 15,
+        "price": 1213,
+        "originalPrice": 1698
+      },
+      {
+        "id": "sd-prod-021-var-4",
+        "sku": "SD-SD-PROD-021-CHA-XL",
+        "size": "XL",
+        "colourName": "Charcoal Gray",
+        "colourHex": "#36454F",
+        "stock": 15,
+        "price": 1213,
+        "originalPrice": 1698
+      },
+      {
+        "id": "sd-prod-021-var-5",
+        "sku": "SD-SD-PROD-021-CHA-XXL",
+        "size": "XXL",
+        "colourName": "Charcoal Gray",
+        "colourHex": "#36454F",
+        "stock": 15,
+        "price": 1213,
+        "originalPrice": 1698
+      },
+      {
+        "id": "sd-prod-021-var-6",
+        "sku": "SD-SD-PROD-021-MUS-S",
+        "size": "S",
+        "colourName": "Mustard Yellow",
+        "colourHex": "#FFDB58",
+        "stock": 15,
+        "price": 1213,
+        "originalPrice": 1698
+      },
+      {
+        "id": "sd-prod-021-var-7",
+        "sku": "SD-SD-PROD-021-MUS-M",
+        "size": "M",
+        "colourName": "Mustard Yellow",
+        "colourHex": "#FFDB58",
+        "stock": 0,
+        "price": 1213,
+        "originalPrice": 1698
+      },
+      {
+        "id": "sd-prod-021-var-8",
+        "sku": "SD-SD-PROD-021-MUS-L",
+        "size": "L",
+        "colourName": "Mustard Yellow",
+        "colourHex": "#FFDB58",
+        "stock": 15,
+        "price": 1213,
+        "originalPrice": 1698
+      },
+      {
+        "id": "sd-prod-021-var-9",
+        "sku": "SD-SD-PROD-021-MUS-XL",
+        "size": "XL",
+        "colourName": "Mustard Yellow",
+        "colourHex": "#FFDB58",
+        "stock": 15,
+        "price": 1213,
+        "originalPrice": 1698
+      },
+      {
+        "id": "sd-prod-021-var-10",
+        "sku": "SD-SD-PROD-021-MUS-XXL",
+        "size": "XXL",
+        "colourName": "Mustard Yellow",
+        "colourHex": "#FFDB58",
+        "stock": 15,
+        "price": 1213,
+        "originalPrice": 1698
+      }
+    ],
+    "tags": [
+      "fleece lined pullover hoodie",
+      "men",
+      "hoodies & jackets",
+      "hoodies",
+      "mast & harbour",
+      "fashion",
+      "trending"
+    ],
+    "badge": "Express",
+    "newArrival": false,
+    "trending": true,
+    "featured": false,
+    "expressDelivery": true,
+    "estimatedDeliveryMinutes": 60,
+    "returnWindowDays": 7,
+    "exchangeAvailable": true,
+    "vendorId": "v-urban-style",
+    "commissionPercent": 12,
+    "sponsored": false,
+    "active": true,
+    "createdAt": "2026-07-01T00:00:00Z",
+    "updatedAt": "2026-08-01T00:00:00Z"
+  },
+  {
+    "id": "sd-prod-022",
+    "slug": "classic-trucker-denim-jacket-sd-prod-022",
+    "name": "Classic Trucker Denim Jacket",
+    "brand": "Highlander",
+    "department": "men",
+    "category": "Hoodies & Jackets",
+    "subcategory": "Hoodies",
+    "collection": "Summer Essentials 2026",
+    "shortDescription": "Premium quality classic trucker denim jacket crafted for comfort and style.",
+    "description": "Elevate your daily fashion with this Classic Trucker Denim Jacket. Features premium fabric construction, tailored fit, and durable craftsmanship ideal for everyday wear.",
+    "material": "100% Premium Combed Cotton",
+    "fit": "Regular Fit",
+    "pattern": "Solid / Textured",
+    "occasion": [
+      "Casual",
+      "Everyday",
+      "Party"
+    ],
+    "careInstructions": [
+      "Machine wash cold",
+      "Do not bleach",
+      "Tumble dry low",
+      "Warm iron if needed"
+    ],
+    "price": 1250,
+    "originalPrice": 1750,
+    "discount": 28,
+    "images": [
+      "https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&w=800&q=80",
+      "https://images.unsplash.com/photo-1521572267360-ee0c2909d518?auto=format&fit=crop&w=800&q=80"
+    ],
+    "thumbnail": "https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&w=800&q=80",
+    "rating": 4.9,
+    "reviewCount": 131,
+    "reviews": [
+      {
+        "id": "rev-sd-prod-022-1",
+        "userName": "Aman Sharma",
+        "rating": 5,
+        "title": "Great quality and fast delivery!",
+        "comment": "Delivered in Neemuch within 45 minutes! Quality is top notch.",
+        "createdAt": "2026-07-28",
+        "verifiedPurchase": true
+      },
+      {
+        "id": "rev-sd-prod-022-2",
+        "userName": "Priya Verma",
+        "rating": 4,
+        "title": "Nice fit and comfortable material",
+        "comment": "The fabric is very soft. True to size.",
+        "createdAt": "2026-07-29",
+        "verifiedPurchase": true
+      }
+    ],
+    "variants": [
+      {
+        "id": "sd-prod-022-var-1",
+        "sku": "SD-SD-PROD-022-MUS-S",
+        "size": "S",
+        "colourName": "Mustard Yellow",
+        "colourHex": "#FFDB58",
+        "stock": 15,
+        "price": 1250,
+        "originalPrice": 1750
+      },
+      {
+        "id": "sd-prod-022-var-2",
+        "sku": "SD-SD-PROD-022-MUS-M",
+        "size": "M",
+        "colourName": "Mustard Yellow",
+        "colourHex": "#FFDB58",
+        "stock": 15,
+        "price": 1250,
+        "originalPrice": 1750
+      },
+      {
+        "id": "sd-prod-022-var-3",
+        "sku": "SD-SD-PROD-022-MUS-L",
+        "size": "L",
+        "colourName": "Mustard Yellow",
+        "colourHex": "#FFDB58",
+        "stock": 15,
+        "price": 1250,
+        "originalPrice": 1750
+      },
+      {
+        "id": "sd-prod-022-var-4",
+        "sku": "SD-SD-PROD-022-MUS-XL",
+        "size": "XL",
+        "colourName": "Mustard Yellow",
+        "colourHex": "#FFDB58",
+        "stock": 15,
+        "price": 1250,
+        "originalPrice": 1750
+      },
+      {
+        "id": "sd-prod-022-var-5",
+        "sku": "SD-SD-PROD-022-MUS-XXL",
+        "size": "XXL",
+        "colourName": "Mustard Yellow",
+        "colourHex": "#FFDB58",
+        "stock": 15,
+        "price": 1250,
+        "originalPrice": 1750
+      },
+      {
+        "id": "sd-prod-022-var-6",
+        "sku": "SD-SD-PROD-022-BLA-S",
+        "size": "S",
+        "colourName": "Black",
+        "colourHex": "#000000",
+        "stock": 15,
+        "price": 1250,
+        "originalPrice": 1750
+      },
+      {
+        "id": "sd-prod-022-var-7",
+        "sku": "SD-SD-PROD-022-BLA-M",
+        "size": "M",
+        "colourName": "Black",
+        "colourHex": "#000000",
+        "stock": 0,
+        "price": 1250,
+        "originalPrice": 1750
+      },
+      {
+        "id": "sd-prod-022-var-8",
+        "sku": "SD-SD-PROD-022-BLA-L",
+        "size": "L",
+        "colourName": "Black",
+        "colourHex": "#000000",
+        "stock": 15,
+        "price": 1250,
+        "originalPrice": 1750
+      },
+      {
+        "id": "sd-prod-022-var-9",
+        "sku": "SD-SD-PROD-022-BLA-XL",
+        "size": "XL",
+        "colourName": "Black",
+        "colourHex": "#000000",
+        "stock": 15,
+        "price": 1250,
+        "originalPrice": 1750
+      },
+      {
+        "id": "sd-prod-022-var-10",
+        "sku": "SD-SD-PROD-022-BLA-XXL",
+        "size": "XXL",
+        "colourName": "Black",
+        "colourHex": "#000000",
+        "stock": 15,
+        "price": 1250,
+        "originalPrice": 1750
+      }
+    ],
+    "tags": [
+      "classic trucker denim jacket",
+      "men",
+      "hoodies & jackets",
+      "hoodies",
+      "highlander",
+      "fashion",
+      "trending"
+    ],
+    "badge": "New",
+    "newArrival": false,
+    "trending": false,
+    "featured": false,
+    "expressDelivery": true,
+    "estimatedDeliveryMinutes": 60,
+    "returnWindowDays": 7,
+    "exchangeAvailable": true,
+    "vendorId": "v-ethnic-vibe",
+    "commissionPercent": 12,
+    "sponsored": false,
+    "active": true,
+    "createdAt": "2026-07-01T00:00:00Z",
+    "updatedAt": "2026-08-01T00:00:00Z"
+  },
+  {
+    "id": "sd-prod-023",
+    "slug": "quilted-puffer-winter-jacket-sd-prod-023",
+    "name": "Quilted Puffer Winter Jacket",
+    "brand": "Bawree",
+    "department": "men",
+    "category": "Hoodies & Jackets",
+    "subcategory": "Hoodies",
+    "collection": "Summer Essentials 2026",
+    "shortDescription": "Premium quality quilted puffer winter jacket crafted for comfort and style.",
+    "description": "Elevate your daily fashion with this Quilted Puffer Winter Jacket. Features premium fabric construction, tailored fit, and durable craftsmanship ideal for everyday wear.",
+    "material": "100% Premium Combed Cotton",
+    "fit": "Regular Fit",
+    "pattern": "Solid / Textured",
+    "occasion": [
+      "Casual",
+      "Everyday",
+      "Party"
+    ],
+    "careInstructions": [
+      "Machine wash cold",
+      "Do not bleach",
+      "Tumble dry low",
+      "Warm iron if needed"
+    ],
+    "price": 1287,
+    "originalPrice": 1801,
+    "discount": 28,
+    "images": [
+      "https://images.unsplash.com/photo-1521572267360-ee0c2909d518?auto=format&fit=crop&w=800&q=80",
+      "https://images.unsplash.com/photo-1503342217505-b0a15ec3261c?auto=format&fit=crop&w=800&q=80"
+    ],
+    "thumbnail": "https://images.unsplash.com/photo-1521572267360-ee0c2909d518?auto=format&fit=crop&w=800&q=80",
+    "rating": 3.8,
+    "reviewCount": 144,
+    "reviews": [
+      {
+        "id": "rev-sd-prod-023-1",
+        "userName": "Aman Sharma",
+        "rating": 5,
+        "title": "Great quality and fast delivery!",
+        "comment": "Delivered in Neemuch within 45 minutes! Quality is top notch.",
+        "createdAt": "2026-07-28",
+        "verifiedPurchase": true
+      },
+      {
+        "id": "rev-sd-prod-023-2",
+        "userName": "Priya Verma",
+        "rating": 4,
+        "title": "Nice fit and comfortable material",
+        "comment": "The fabric is very soft. True to size.",
+        "createdAt": "2026-07-29",
+        "verifiedPurchase": true
+      }
+    ],
+    "variants": [
+      {
+        "id": "sd-prod-023-var-1",
+        "sku": "SD-SD-PROD-023-BLA-S",
+        "size": "S",
+        "colourName": "Black",
+        "colourHex": "#000000",
+        "stock": 15,
+        "price": 1287,
+        "originalPrice": 1801
+      },
+      {
+        "id": "sd-prod-023-var-2",
+        "sku": "SD-SD-PROD-023-BLA-M",
+        "size": "M",
+        "colourName": "Black",
+        "colourHex": "#000000",
+        "stock": 15,
+        "price": 1287,
+        "originalPrice": 1801
+      },
+      {
+        "id": "sd-prod-023-var-3",
+        "sku": "SD-SD-PROD-023-BLA-L",
+        "size": "L",
+        "colourName": "Black",
+        "colourHex": "#000000",
+        "stock": 15,
+        "price": 1287,
+        "originalPrice": 1801
+      },
+      {
+        "id": "sd-prod-023-var-4",
+        "sku": "SD-SD-PROD-023-BLA-XL",
+        "size": "XL",
+        "colourName": "Black",
+        "colourHex": "#000000",
+        "stock": 15,
+        "price": 1287,
+        "originalPrice": 1801
+      },
+      {
+        "id": "sd-prod-023-var-5",
+        "sku": "SD-SD-PROD-023-BLA-XXL",
+        "size": "XXL",
+        "colourName": "Black",
+        "colourHex": "#000000",
+        "stock": 15,
+        "price": 1287,
+        "originalPrice": 1801
+      },
+      {
+        "id": "sd-prod-023-var-6",
+        "sku": "SD-SD-PROD-023-WHI-S",
+        "size": "S",
+        "colourName": "White",
+        "colourHex": "#FFFFFF",
+        "stock": 15,
+        "price": 1287,
+        "originalPrice": 1801
+      },
+      {
+        "id": "sd-prod-023-var-7",
+        "sku": "SD-SD-PROD-023-WHI-M",
+        "size": "M",
+        "colourName": "White",
+        "colourHex": "#FFFFFF",
+        "stock": 0,
+        "price": 1287,
+        "originalPrice": 1801
+      },
+      {
+        "id": "sd-prod-023-var-8",
+        "sku": "SD-SD-PROD-023-WHI-L",
+        "size": "L",
+        "colourName": "White",
+        "colourHex": "#FFFFFF",
+        "stock": 15,
+        "price": 1287,
+        "originalPrice": 1801
+      },
+      {
+        "id": "sd-prod-023-var-9",
+        "sku": "SD-SD-PROD-023-WHI-XL",
+        "size": "XL",
+        "colourName": "White",
+        "colourHex": "#FFFFFF",
+        "stock": 15,
+        "price": 1287,
+        "originalPrice": 1801
+      },
+      {
+        "id": "sd-prod-023-var-10",
+        "sku": "SD-SD-PROD-023-WHI-XXL",
+        "size": "XXL",
+        "colourName": "White",
+        "colourHex": "#FFFFFF",
+        "stock": 15,
+        "price": 1287,
+        "originalPrice": 1801
+      }
+    ],
+    "tags": [
+      "quilted puffer winter jacket",
+      "men",
+      "hoodies & jackets",
+      "hoodies",
+      "bawree",
+      "fashion",
+      "trending"
+    ],
+    "badge": "Trending",
+    "newArrival": true,
+    "trending": true,
+    "featured": true,
+    "expressDelivery": true,
+    "estimatedDeliveryMinutes": 60,
+    "returnWindowDays": 7,
+    "exchangeAvailable": true,
+    "vendorId": "v-urban-style",
+    "commissionPercent": 12,
+    "sponsored": false,
+    "active": true,
+    "createdAt": "2026-07-01T00:00:00Z",
+    "updatedAt": "2026-08-01T00:00:00Z"
+  },
+  {
+    "id": "sd-prod-024",
+    "slug": "zip-through-french-terry-sweatshirt-sd-prod-024",
+    "name": "Zip-Through French Terry Sweatshirt",
+    "brand": "Snitch",
+    "department": "men",
+    "category": "Hoodies & Jackets",
+    "subcategory": "Hoodies",
+    "collection": "Summer Essentials 2026",
+    "shortDescription": "Premium quality zip-through french terry sweatshirt crafted for comfort and style.",
+    "description": "Elevate your daily fashion with this Zip-Through French Terry Sweatshirt. Features premium fabric construction, tailored fit, and durable craftsmanship ideal for everyday wear.",
+    "material": "100% Premium Combed Cotton",
+    "fit": "Regular Fit",
+    "pattern": "Solid / Textured",
+    "occasion": [
+      "Casual",
+      "Everyday",
+      "Party"
+    ],
+    "careInstructions": [
+      "Machine wash cold",
+      "Do not bleach",
+      "Tumble dry low",
+      "Warm iron if needed"
+    ],
+    "price": 1324,
+    "originalPrice": 1853,
+    "discount": 28,
+    "images": [
+      "https://images.unsplash.com/photo-1503342217505-b0a15ec3261c?auto=format&fit=crop&w=800&q=80",
+      "https://images.unsplash.com/photo-1576995853123-5a10305d93c0?auto=format&fit=crop&w=800&q=80"
+    ],
+    "thumbnail": "https://images.unsplash.com/photo-1503342217505-b0a15ec3261c?auto=format&fit=crop&w=800&q=80",
+    "rating": 3.9,
+    "reviewCount": 157,
+    "reviews": [
+      {
+        "id": "rev-sd-prod-024-1",
+        "userName": "Aman Sharma",
+        "rating": 5,
+        "title": "Great quality and fast delivery!",
+        "comment": "Delivered in Neemuch within 45 minutes! Quality is top notch.",
+        "createdAt": "2026-07-28",
+        "verifiedPurchase": true
+      },
+      {
+        "id": "rev-sd-prod-024-2",
+        "userName": "Priya Verma",
+        "rating": 4,
+        "title": "Nice fit and comfortable material",
+        "comment": "The fabric is very soft. True to size.",
+        "createdAt": "2026-07-29",
+        "verifiedPurchase": true
+      }
+    ],
+    "variants": [
+      {
+        "id": "sd-prod-024-var-1",
+        "sku": "SD-SD-PROD-024-WHI-S",
+        "size": "S",
+        "colourName": "White",
+        "colourHex": "#FFFFFF",
+        "stock": 15,
+        "price": 1324,
+        "originalPrice": 1853
+      },
+      {
+        "id": "sd-prod-024-var-2",
+        "sku": "SD-SD-PROD-024-WHI-M",
+        "size": "M",
+        "colourName": "White",
+        "colourHex": "#FFFFFF",
+        "stock": 15,
+        "price": 1324,
+        "originalPrice": 1853
+      },
+      {
+        "id": "sd-prod-024-var-3",
+        "sku": "SD-SD-PROD-024-WHI-L",
+        "size": "L",
+        "colourName": "White",
+        "colourHex": "#FFFFFF",
+        "stock": 15,
+        "price": 1324,
+        "originalPrice": 1853
+      },
+      {
+        "id": "sd-prod-024-var-4",
+        "sku": "SD-SD-PROD-024-WHI-XL",
+        "size": "XL",
+        "colourName": "White",
+        "colourHex": "#FFFFFF",
+        "stock": 15,
+        "price": 1324,
+        "originalPrice": 1853
+      },
+      {
+        "id": "sd-prod-024-var-5",
+        "sku": "SD-SD-PROD-024-WHI-XXL",
+        "size": "XXL",
+        "colourName": "White",
+        "colourHex": "#FFFFFF",
+        "stock": 15,
+        "price": 1324,
+        "originalPrice": 1853
+      },
+      {
+        "id": "sd-prod-024-var-6",
+        "sku": "SD-SD-PROD-024-NAV-S",
+        "size": "S",
+        "colourName": "Navy Blue",
+        "colourHex": "#000080",
+        "stock": 15,
+        "price": 1324,
+        "originalPrice": 1853
+      },
+      {
+        "id": "sd-prod-024-var-7",
+        "sku": "SD-SD-PROD-024-NAV-M",
+        "size": "M",
+        "colourName": "Navy Blue",
+        "colourHex": "#000080",
+        "stock": 0,
+        "price": 1324,
+        "originalPrice": 1853
+      },
+      {
+        "id": "sd-prod-024-var-8",
+        "sku": "SD-SD-PROD-024-NAV-L",
+        "size": "L",
+        "colourName": "Navy Blue",
+        "colourHex": "#000080",
+        "stock": 15,
+        "price": 1324,
+        "originalPrice": 1853
+      },
+      {
+        "id": "sd-prod-024-var-9",
+        "sku": "SD-SD-PROD-024-NAV-XL",
+        "size": "XL",
+        "colourName": "Navy Blue",
+        "colourHex": "#000080",
+        "stock": 15,
+        "price": 1324,
+        "originalPrice": 1853
+      },
+      {
+        "id": "sd-prod-024-var-10",
+        "sku": "SD-SD-PROD-024-NAV-XXL",
+        "size": "XXL",
+        "colourName": "Navy Blue",
+        "colourHex": "#000080",
+        "stock": 15,
+        "price": 1324,
+        "originalPrice": 1853
+      }
+    ],
+    "tags": [
+      "zip-through french terry sweatshirt",
+      "men",
+      "hoodies & jackets",
+      "hoodies",
+      "snitch",
+      "fashion",
+      "trending"
+    ],
+    "badge": "New",
+    "newArrival": false,
+    "trending": false,
+    "featured": false,
+    "expressDelivery": true,
+    "estimatedDeliveryMinutes": 60,
+    "returnWindowDays": 7,
+    "exchangeAvailable": true,
+    "vendorId": "v-ethnic-vibe",
+    "commissionPercent": 12,
+    "sponsored": false,
+    "active": true,
+    "createdAt": "2026-07-01T00:00:00Z",
+    "updatedAt": "2026-08-01T00:00:00Z"
+  },
+  {
+    "id": "sd-prod-025",
+    "slug": "lightweight-windbreaker-jacket-sd-prod-025",
+    "name": "Lightweight Windbreaker Jacket",
+    "brand": "Wrong",
+    "department": "men",
+    "category": "Hoodies & Jackets",
+    "subcategory": "Hoodies",
+    "collection": "Summer Essentials 2026",
+    "shortDescription": "Premium quality lightweight windbreaker jacket crafted for comfort and style.",
+    "description": "Elevate your daily fashion with this Lightweight Windbreaker Jacket. Features premium fabric construction, tailored fit, and durable craftsmanship ideal for everyday wear.",
+    "material": "100% Premium Combed Cotton",
+    "fit": "Regular Fit",
+    "pattern": "Solid / Textured",
+    "occasion": [
+      "Casual",
+      "Everyday",
+      "Party"
+    ],
+    "careInstructions": [
+      "Machine wash cold",
+      "Do not bleach",
+      "Tumble dry low",
+      "Warm iron if needed"
+    ],
+    "price": 1361,
+    "originalPrice": 1905,
+    "discount": 28,
+    "images": [
+      "https://images.unsplash.com/photo-1576995853123-5a10305d93c0?auto=format&fit=crop&w=800&q=80",
+      "https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?auto=format&fit=crop&w=800&q=80"
+    ],
+    "thumbnail": "https://images.unsplash.com/photo-1576995853123-5a10305d93c0?auto=format&fit=crop&w=800&q=80",
+    "rating": 4.0,
+    "reviewCount": 170,
+    "reviews": [
+      {
+        "id": "rev-sd-prod-025-1",
+        "userName": "Aman Sharma",
+        "rating": 5,
+        "title": "Great quality and fast delivery!",
+        "comment": "Delivered in Neemuch within 45 minutes! Quality is top notch.",
+        "createdAt": "2026-07-28",
+        "verifiedPurchase": true
+      },
+      {
+        "id": "rev-sd-prod-025-2",
+        "userName": "Priya Verma",
+        "rating": 4,
+        "title": "Nice fit and comfortable material",
+        "comment": "The fabric is very soft. True to size.",
+        "createdAt": "2026-07-29",
+        "verifiedPurchase": true
+      }
+    ],
+    "variants": [
+      {
+        "id": "sd-prod-025-var-1",
+        "sku": "SD-SD-PROD-025-NAV-S",
+        "size": "S",
+        "colourName": "Navy Blue",
+        "colourHex": "#000080",
+        "stock": 15,
+        "price": 1361,
+        "originalPrice": 1905
+      },
+      {
+        "id": "sd-prod-025-var-2",
+        "sku": "SD-SD-PROD-025-NAV-M",
+        "size": "M",
+        "colourName": "Navy Blue",
+        "colourHex": "#000080",
+        "stock": 15,
+        "price": 1361,
+        "originalPrice": 1905
+      },
+      {
+        "id": "sd-prod-025-var-3",
+        "sku": "SD-SD-PROD-025-NAV-L",
+        "size": "L",
+        "colourName": "Navy Blue",
+        "colourHex": "#000080",
+        "stock": 15,
+        "price": 1361,
+        "originalPrice": 1905
+      },
+      {
+        "id": "sd-prod-025-var-4",
+        "sku": "SD-SD-PROD-025-NAV-XL",
+        "size": "XL",
+        "colourName": "Navy Blue",
+        "colourHex": "#000080",
+        "stock": 15,
+        "price": 1361,
+        "originalPrice": 1905
+      },
+      {
+        "id": "sd-prod-025-var-5",
+        "sku": "SD-SD-PROD-025-NAV-XXL",
+        "size": "XXL",
+        "colourName": "Navy Blue",
+        "colourHex": "#000080",
+        "stock": 15,
+        "price": 1361,
+        "originalPrice": 1905
+      },
+      {
+        "id": "sd-prod-025-var-6",
+        "sku": "SD-SD-PROD-025-OLI-S",
+        "size": "S",
+        "colourName": "Olive Green",
+        "colourHex": "#556B2F",
+        "stock": 15,
+        "price": 1361,
+        "originalPrice": 1905
+      },
+      {
+        "id": "sd-prod-025-var-7",
+        "sku": "SD-SD-PROD-025-OLI-M",
+        "size": "M",
+        "colourName": "Olive Green",
+        "colourHex": "#556B2F",
+        "stock": 0,
+        "price": 1361,
+        "originalPrice": 1905
+      },
+      {
+        "id": "sd-prod-025-var-8",
+        "sku": "SD-SD-PROD-025-OLI-L",
+        "size": "L",
+        "colourName": "Olive Green",
+        "colourHex": "#556B2F",
+        "stock": 15,
+        "price": 1361,
+        "originalPrice": 1905
+      },
+      {
+        "id": "sd-prod-025-var-9",
+        "sku": "SD-SD-PROD-025-OLI-XL",
+        "size": "XL",
+        "colourName": "Olive Green",
+        "colourHex": "#556B2F",
+        "stock": 15,
+        "price": 1361,
+        "originalPrice": 1905
+      },
+      {
+        "id": "sd-prod-025-var-10",
+        "sku": "SD-SD-PROD-025-OLI-XXL",
+        "size": "XXL",
+        "colourName": "Olive Green",
+        "colourHex": "#556B2F",
+        "stock": 15,
+        "price": 1361,
+        "originalPrice": 1905
+      }
+    ],
+    "tags": [
+      "lightweight windbreaker jacket",
+      "men",
+      "hoodies & jackets",
+      "hoodies",
+      "wrong",
+      "fashion",
+      "trending"
+    ],
+    "badge": "Express",
+    "newArrival": false,
+    "trending": true,
+    "featured": false,
+    "expressDelivery": true,
+    "estimatedDeliveryMinutes": 60,
+    "returnWindowDays": 7,
+    "exchangeAvailable": true,
+    "vendorId": "v-urban-style",
+    "commissionPercent": 12,
+    "sponsored": false,
+    "active": true,
+    "createdAt": "2026-07-01T00:00:00Z",
+    "updatedAt": "2026-08-01T00:00:00Z"
+  },
+  {
+    "id": "sd-prod-026",
+    "slug": "handloom-cotton-straight-kurta-sd-prod-026",
+    "name": "Handloom Cotton Straight Kurta",
+    "brand": "Roadster",
+    "department": "men",
+    "category": "Ethnic Wear",
+    "subcategory": "Kurtas",
+    "collection": "Summer Essentials 2026",
+    "shortDescription": "Premium quality handloom cotton straight kurta crafted for comfort and style.",
+    "description": "Elevate your daily fashion with this Handloom Cotton Straight Kurta. Features premium fabric construction, tailored fit, and durable craftsmanship ideal for everyday wear.",
+    "material": "100% Premium Combed Cotton",
+    "fit": "Regular Fit",
+    "pattern": "Solid / Textured",
+    "occasion": [
+      "Casual",
+      "Everyday",
+      "Party"
+    ],
+    "careInstructions": [
+      "Machine wash cold",
+      "Do not bleach",
+      "Tumble dry low",
+      "Warm iron if needed"
+    ],
+    "price": 1398,
+    "originalPrice": 1957,
+    "discount": 28,
+    "images": [
+      "https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?auto=format&fit=crop&w=800&q=80",
+      "https://images.unsplash.com/photo-1529374255404-311a2a4f1fd9?auto=format&fit=crop&w=800&q=80"
+    ],
+    "thumbnail": "https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?auto=format&fit=crop&w=800&q=80",
+    "rating": 4.1,
+    "reviewCount": 183,
+    "reviews": [
+      {
+        "id": "rev-sd-prod-026-1",
+        "userName": "Aman Sharma",
+        "rating": 5,
+        "title": "Great quality and fast delivery!",
+        "comment": "Delivered in Neemuch within 45 minutes! Quality is top notch.",
+        "createdAt": "2026-07-28",
+        "verifiedPurchase": true
+      },
+      {
+        "id": "rev-sd-prod-026-2",
+        "userName": "Priya Verma",
+        "rating": 4,
+        "title": "Nice fit and comfortable material",
+        "comment": "The fabric is very soft. True to size.",
+        "createdAt": "2026-07-29",
+        "verifiedPurchase": true
+      }
+    ],
+    "variants": [
+      {
+        "id": "sd-prod-026-var-1",
+        "sku": "SD-SD-PROD-026-OLI-S",
+        "size": "S",
+        "colourName": "Olive Green",
+        "colourHex": "#556B2F",
+        "stock": 15,
+        "price": 1398,
+        "originalPrice": 1957
+      },
+      {
+        "id": "sd-prod-026-var-2",
+        "sku": "SD-SD-PROD-026-OLI-M",
+        "size": "M",
+        "colourName": "Olive Green",
+        "colourHex": "#556B2F",
+        "stock": 15,
+        "price": 1398,
+        "originalPrice": 1957
+      },
+      {
+        "id": "sd-prod-026-var-3",
+        "sku": "SD-SD-PROD-026-OLI-L",
+        "size": "L",
+        "colourName": "Olive Green",
+        "colourHex": "#556B2F",
+        "stock": 15,
+        "price": 1398,
+        "originalPrice": 1957
+      },
+      {
+        "id": "sd-prod-026-var-4",
+        "sku": "SD-SD-PROD-026-OLI-XL",
+        "size": "XL",
+        "colourName": "Olive Green",
+        "colourHex": "#556B2F",
+        "stock": 15,
+        "price": 1398,
+        "originalPrice": 1957
+      },
+      {
+        "id": "sd-prod-026-var-5",
+        "sku": "SD-SD-PROD-026-OLI-XXL",
+        "size": "XXL",
+        "colourName": "Olive Green",
+        "colourHex": "#556B2F",
+        "stock": 15,
+        "price": 1398,
+        "originalPrice": 1957
+      },
+      {
+        "id": "sd-prod-026-var-6",
+        "sku": "SD-SD-PROD-026-CRI-S",
+        "size": "S",
+        "colourName": "Crimson Red",
+        "colourHex": "#DC143C",
+        "stock": 15,
+        "price": 1398,
+        "originalPrice": 1957
+      },
+      {
+        "id": "sd-prod-026-var-7",
+        "sku": "SD-SD-PROD-026-CRI-M",
+        "size": "M",
+        "colourName": "Crimson Red",
+        "colourHex": "#DC143C",
+        "stock": 0,
+        "price": 1398,
+        "originalPrice": 1957
+      },
+      {
+        "id": "sd-prod-026-var-8",
+        "sku": "SD-SD-PROD-026-CRI-L",
+        "size": "L",
+        "colourName": "Crimson Red",
+        "colourHex": "#DC143C",
+        "stock": 15,
+        "price": 1398,
+        "originalPrice": 1957
+      },
+      {
+        "id": "sd-prod-026-var-9",
+        "sku": "SD-SD-PROD-026-CRI-XL",
+        "size": "XL",
+        "colourName": "Crimson Red",
+        "colourHex": "#DC143C",
+        "stock": 15,
+        "price": 1398,
+        "originalPrice": 1957
+      },
+      {
+        "id": "sd-prod-026-var-10",
+        "sku": "SD-SD-PROD-026-CRI-XXL",
+        "size": "XXL",
+        "colourName": "Crimson Red",
+        "colourHex": "#DC143C",
+        "stock": 15,
+        "price": 1398,
+        "originalPrice": 1957
+      }
+    ],
+    "tags": [
+      "handloom cotton straight kurta",
+      "men",
+      "ethnic wear",
+      "kurtas",
+      "roadster",
+      "fashion",
+      "trending"
+    ],
+    "badge": "Trending",
+    "newArrival": true,
+    "trending": false,
+    "featured": false,
+    "expressDelivery": true,
+    "estimatedDeliveryMinutes": 60,
+    "returnWindowDays": 7,
+    "exchangeAvailable": true,
+    "vendorId": "v-ethnic-vibe",
+    "commissionPercent": 12,
+    "sponsored": false,
+    "active": true,
+    "createdAt": "2026-07-01T00:00:00Z",
+    "updatedAt": "2026-08-01T00:00:00Z"
+  },
+  {
+    "id": "sd-prod-027",
+    "slug": "embroidered-silk-blend-nehru-jacket-sd-prod-027",
+    "name": "Embroidered Silk Blend Nehru Jacket",
+    "brand": "HRX",
+    "department": "men",
+    "category": "Ethnic Wear",
+    "subcategory": "Kurtas",
+    "collection": "Summer Essentials 2026",
+    "shortDescription": "Premium quality embroidered silk blend nehru jacket crafted for comfort and style.",
+    "description": "Elevate your daily fashion with this Embroidered Silk Blend Nehru Jacket. Features premium fabric construction, tailored fit, and durable craftsmanship ideal for everyday wear.",
+    "material": "100% Premium Combed Cotton",
+    "fit": "Regular Fit",
+    "pattern": "Solid / Textured",
+    "occasion": [
+      "Casual",
+      "Everyday",
+      "Party"
+    ],
+    "careInstructions": [
+      "Machine wash cold",
+      "Do not bleach",
+      "Tumble dry low",
+      "Warm iron if needed"
+    ],
+    "price": 1435,
+    "originalPrice": 2008,
+    "discount": 28,
+    "images": [
+      "https://images.unsplash.com/photo-1529374255404-311a2a4f1fd9?auto=format&fit=crop&w=800&q=80",
+      "https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&w=800&q=80"
+    ],
+    "thumbnail": "https://images.unsplash.com/photo-1529374255404-311a2a4f1fd9?auto=format&fit=crop&w=800&q=80",
+    "rating": 4.2,
+    "reviewCount": 16,
+    "reviews": [
+      {
+        "id": "rev-sd-prod-027-1",
+        "userName": "Aman Sharma",
+        "rating": 5,
+        "title": "Great quality and fast delivery!",
+        "comment": "Delivered in Neemuch within 45 minutes! Quality is top notch.",
+        "createdAt": "2026-07-28",
+        "verifiedPurchase": true
+      },
+      {
+        "id": "rev-sd-prod-027-2",
+        "userName": "Priya Verma",
+        "rating": 4,
+        "title": "Nice fit and comfortable material",
+        "comment": "The fabric is very soft. True to size.",
+        "createdAt": "2026-07-29",
+        "verifiedPurchase": true
+      }
+    ],
+    "variants": [
+      {
+        "id": "sd-prod-027-var-1",
+        "sku": "SD-SD-PROD-027-CRI-S",
+        "size": "S",
+        "colourName": "Crimson Red",
+        "colourHex": "#DC143C",
+        "stock": 15,
+        "price": 1435,
+        "originalPrice": 2008
+      },
+      {
+        "id": "sd-prod-027-var-2",
+        "sku": "SD-SD-PROD-027-CRI-M",
+        "size": "M",
+        "colourName": "Crimson Red",
+        "colourHex": "#DC143C",
+        "stock": 15,
+        "price": 1435,
+        "originalPrice": 2008
+      },
+      {
+        "id": "sd-prod-027-var-3",
+        "sku": "SD-SD-PROD-027-CRI-L",
+        "size": "L",
+        "colourName": "Crimson Red",
+        "colourHex": "#DC143C",
+        "stock": 15,
+        "price": 1435,
+        "originalPrice": 2008
+      },
+      {
+        "id": "sd-prod-027-var-4",
+        "sku": "SD-SD-PROD-027-CRI-XL",
+        "size": "XL",
+        "colourName": "Crimson Red",
+        "colourHex": "#DC143C",
+        "stock": 15,
+        "price": 1435,
+        "originalPrice": 2008
+      },
+      {
+        "id": "sd-prod-027-var-5",
+        "sku": "SD-SD-PROD-027-CRI-XXL",
+        "size": "XXL",
+        "colourName": "Crimson Red",
+        "colourHex": "#DC143C",
+        "stock": 15,
+        "price": 1435,
+        "originalPrice": 2008
+      },
+      {
+        "id": "sd-prod-027-var-6",
+        "sku": "SD-SD-PROD-027-BEI-S",
+        "size": "S",
+        "colourName": "Beige",
+        "colourHex": "#F5F5DC",
+        "stock": 15,
+        "price": 1435,
+        "originalPrice": 2008
+      },
+      {
+        "id": "sd-prod-027-var-7",
+        "sku": "SD-SD-PROD-027-BEI-M",
+        "size": "M",
+        "colourName": "Beige",
+        "colourHex": "#F5F5DC",
+        "stock": 0,
+        "price": 1435,
+        "originalPrice": 2008
+      },
+      {
+        "id": "sd-prod-027-var-8",
+        "sku": "SD-SD-PROD-027-BEI-L",
+        "size": "L",
+        "colourName": "Beige",
+        "colourHex": "#F5F5DC",
+        "stock": 15,
+        "price": 1435,
+        "originalPrice": 2008
+      },
+      {
+        "id": "sd-prod-027-var-9",
+        "sku": "SD-SD-PROD-027-BEI-XL",
+        "size": "XL",
+        "colourName": "Beige",
+        "colourHex": "#F5F5DC",
+        "stock": 15,
+        "price": 1435,
+        "originalPrice": 2008
+      },
+      {
+        "id": "sd-prod-027-var-10",
+        "sku": "SD-SD-PROD-027-BEI-XXL",
+        "size": "XXL",
+        "colourName": "Beige",
+        "colourHex": "#F5F5DC",
+        "stock": 15,
+        "price": 1435,
+        "originalPrice": 2008
+      }
+    ],
+    "tags": [
+      "embroidered silk blend nehru jacket",
+      "men",
+      "ethnic wear",
+      "kurtas",
+      "hrx",
+      "fashion",
+      "trending"
+    ],
+    "badge": "Express",
+    "newArrival": false,
+    "trending": true,
+    "featured": true,
+    "expressDelivery": true,
+    "estimatedDeliveryMinutes": 60,
+    "returnWindowDays": 7,
+    "exchangeAvailable": true,
+    "vendorId": "v-urban-style",
+    "commissionPercent": 12,
+    "sponsored": true,
+    "active": true,
+    "createdAt": "2026-07-01T00:00:00Z",
+    "updatedAt": "2026-08-01T00:00:00Z"
+  },
+  {
+    "id": "sd-prod-028",
+    "slug": "short-festive-cotton-kurta-sd-prod-028",
+    "name": "Short Festive Cotton Kurta",
+    "brand": "StyleDash Studio",
+    "department": "men",
+    "category": "Ethnic Wear",
+    "subcategory": "Kurtas",
+    "collection": "Summer Essentials 2026",
+    "shortDescription": "Premium quality short festive cotton kurta crafted for comfort and style.",
+    "description": "Elevate your daily fashion with this Short Festive Cotton Kurta. Features premium fabric construction, tailored fit, and durable craftsmanship ideal for everyday wear.",
+    "material": "100% Premium Combed Cotton",
+    "fit": "Regular Fit",
+    "pattern": "Solid / Textured",
+    "occasion": [
+      "Casual",
+      "Everyday",
+      "Party"
+    ],
+    "careInstructions": [
+      "Machine wash cold",
+      "Do not bleach",
+      "Tumble dry low",
+      "Warm iron if needed"
+    ],
+    "price": 1472,
+    "originalPrice": 2060,
+    "discount": 28,
+    "images": [
+      "https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&w=800&q=80",
+      "https://images.unsplash.com/photo-1521572267360-ee0c2909d518?auto=format&fit=crop&w=800&q=80"
+    ],
+    "thumbnail": "https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&w=800&q=80",
+    "rating": 4.3,
+    "reviewCount": 29,
+    "reviews": [
+      {
+        "id": "rev-sd-prod-028-1",
+        "userName": "Aman Sharma",
+        "rating": 5,
+        "title": "Great quality and fast delivery!",
+        "comment": "Delivered in Neemuch within 45 minutes! Quality is top notch.",
+        "createdAt": "2026-07-28",
+        "verifiedPurchase": true
+      },
+      {
+        "id": "rev-sd-prod-028-2",
+        "userName": "Priya Verma",
+        "rating": 4,
+        "title": "Nice fit and comfortable material",
+        "comment": "The fabric is very soft. True to size.",
+        "createdAt": "2026-07-29",
+        "verifiedPurchase": true
+      }
+    ],
+    "variants": [
+      {
+        "id": "sd-prod-028-var-1",
+        "sku": "SD-SD-PROD-028-BEI-S",
+        "size": "S",
+        "colourName": "Beige",
+        "colourHex": "#F5F5DC",
+        "stock": 15,
+        "price": 1472,
+        "originalPrice": 2060
+      },
+      {
+        "id": "sd-prod-028-var-2",
+        "sku": "SD-SD-PROD-028-BEI-M",
+        "size": "M",
+        "colourName": "Beige",
+        "colourHex": "#F5F5DC",
+        "stock": 15,
+        "price": 1472,
+        "originalPrice": 2060
+      },
+      {
+        "id": "sd-prod-028-var-3",
+        "sku": "SD-SD-PROD-028-BEI-L",
+        "size": "L",
+        "colourName": "Beige",
+        "colourHex": "#F5F5DC",
+        "stock": 15,
+        "price": 1472,
+        "originalPrice": 2060
+      },
+      {
+        "id": "sd-prod-028-var-4",
+        "sku": "SD-SD-PROD-028-BEI-XL",
+        "size": "XL",
+        "colourName": "Beige",
+        "colourHex": "#F5F5DC",
+        "stock": 15,
+        "price": 1472,
+        "originalPrice": 2060
+      },
+      {
+        "id": "sd-prod-028-var-5",
+        "sku": "SD-SD-PROD-028-BEI-XXL",
+        "size": "XXL",
+        "colourName": "Beige",
+        "colourHex": "#F5F5DC",
+        "stock": 15,
+        "price": 1472,
+        "originalPrice": 2060
+      },
+      {
+        "id": "sd-prod-028-var-6",
+        "sku": "SD-SD-PROD-028-CHA-S",
+        "size": "S",
+        "colourName": "Charcoal Gray",
+        "colourHex": "#36454F",
+        "stock": 15,
+        "price": 1472,
+        "originalPrice": 2060
+      },
+      {
+        "id": "sd-prod-028-var-7",
+        "sku": "SD-SD-PROD-028-CHA-M",
+        "size": "M",
+        "colourName": "Charcoal Gray",
+        "colourHex": "#36454F",
+        "stock": 0,
+        "price": 1472,
+        "originalPrice": 2060
+      },
+      {
+        "id": "sd-prod-028-var-8",
+        "sku": "SD-SD-PROD-028-CHA-L",
+        "size": "L",
+        "colourName": "Charcoal Gray",
+        "colourHex": "#36454F",
+        "stock": 15,
+        "price": 1472,
+        "originalPrice": 2060
+      },
+      {
+        "id": "sd-prod-028-var-9",
+        "sku": "SD-SD-PROD-028-CHA-XL",
+        "size": "XL",
+        "colourName": "Charcoal Gray",
+        "colourHex": "#36454F",
+        "stock": 15,
+        "price": 1472,
+        "originalPrice": 2060
+      },
+      {
+        "id": "sd-prod-028-var-10",
+        "sku": "SD-SD-PROD-028-CHA-XXL",
+        "size": "XXL",
+        "colourName": "Charcoal Gray",
+        "colourHex": "#36454F",
+        "stock": 15,
+        "price": 1472,
+        "originalPrice": 2060
+      }
+    ],
+    "tags": [
+      "short festive cotton kurta",
+      "men",
+      "ethnic wear",
+      "kurtas",
+      "styledash studio",
+      "fashion",
+      "trending"
+    ],
+    "badge": "New",
+    "newArrival": false,
+    "trending": false,
+    "featured": false,
+    "expressDelivery": true,
+    "estimatedDeliveryMinutes": 60,
+    "returnWindowDays": 7,
+    "exchangeAvailable": true,
+    "vendorId": "v-ethnic-vibe",
+    "commissionPercent": 12,
+    "sponsored": false,
+    "active": true,
+    "createdAt": "2026-07-01T00:00:00Z",
+    "updatedAt": "2026-08-01T00:00:00Z"
+  },
+  {
+    "id": "sd-prod-029",
+    "slug": "jacquard-patterned-kurta-set-sd-prod-029",
+    "name": "Jacquard Patterned Kurta Set",
+    "brand": "Anouk",
+    "department": "men",
+    "category": "Ethnic Wear",
+    "subcategory": "Kurtas",
+    "collection": "Summer Essentials 2026",
+    "shortDescription": "Premium quality jacquard patterned kurta set crafted for comfort and style.",
+    "description": "Elevate your daily fashion with this Jacquard Patterned Kurta Set. Features premium fabric construction, tailored fit, and durable craftsmanship ideal for everyday wear.",
+    "material": "100% Premium Combed Cotton",
+    "fit": "Regular Fit",
+    "pattern": "Solid / Textured",
+    "occasion": [
+      "Casual",
+      "Everyday",
+      "Party"
+    ],
+    "careInstructions": [
+      "Machine wash cold",
+      "Do not bleach",
+      "Tumble dry low",
+      "Warm iron if needed"
+    ],
+    "price": 1509,
+    "originalPrice": 2112,
+    "discount": 28,
+    "images": [
+      "https://images.unsplash.com/photo-1521572267360-ee0c2909d518?auto=format&fit=crop&w=800&q=80",
+      "https://images.unsplash.com/photo-1503342217505-b0a15ec3261c?auto=format&fit=crop&w=800&q=80"
+    ],
+    "thumbnail": "https://images.unsplash.com/photo-1521572267360-ee0c2909d518?auto=format&fit=crop&w=800&q=80",
+    "rating": 4.4,
+    "reviewCount": 42,
+    "reviews": [
+      {
+        "id": "rev-sd-prod-029-1",
+        "userName": "Aman Sharma",
+        "rating": 5,
+        "title": "Great quality and fast delivery!",
+        "comment": "Delivered in Neemuch within 45 minutes! Quality is top notch.",
+        "createdAt": "2026-07-28",
+        "verifiedPurchase": true
+      },
+      {
+        "id": "rev-sd-prod-029-2",
+        "userName": "Priya Verma",
+        "rating": 4,
+        "title": "Nice fit and comfortable material",
+        "comment": "The fabric is very soft. True to size.",
+        "createdAt": "2026-07-29",
+        "verifiedPurchase": true
+      }
+    ],
+    "variants": [
+      {
+        "id": "sd-prod-029-var-1",
+        "sku": "SD-SD-PROD-029-CHA-S",
+        "size": "S",
+        "colourName": "Charcoal Gray",
+        "colourHex": "#36454F",
+        "stock": 15,
+        "price": 1509,
+        "originalPrice": 2112
+      },
+      {
+        "id": "sd-prod-029-var-2",
+        "sku": "SD-SD-PROD-029-CHA-M",
+        "size": "M",
+        "colourName": "Charcoal Gray",
+        "colourHex": "#36454F",
+        "stock": 15,
+        "price": 1509,
+        "originalPrice": 2112
+      },
+      {
+        "id": "sd-prod-029-var-3",
+        "sku": "SD-SD-PROD-029-CHA-L",
+        "size": "L",
+        "colourName": "Charcoal Gray",
+        "colourHex": "#36454F",
+        "stock": 15,
+        "price": 1509,
+        "originalPrice": 2112
+      },
+      {
+        "id": "sd-prod-029-var-4",
+        "sku": "SD-SD-PROD-029-CHA-XL",
+        "size": "XL",
+        "colourName": "Charcoal Gray",
+        "colourHex": "#36454F",
+        "stock": 15,
+        "price": 1509,
+        "originalPrice": 2112
+      },
+      {
+        "id": "sd-prod-029-var-5",
+        "sku": "SD-SD-PROD-029-CHA-XXL",
+        "size": "XXL",
+        "colourName": "Charcoal Gray",
+        "colourHex": "#36454F",
+        "stock": 15,
+        "price": 1509,
+        "originalPrice": 2112
+      },
+      {
+        "id": "sd-prod-029-var-6",
+        "sku": "SD-SD-PROD-029-MUS-S",
+        "size": "S",
+        "colourName": "Mustard Yellow",
+        "colourHex": "#FFDB58",
+        "stock": 15,
+        "price": 1509,
+        "originalPrice": 2112
+      },
+      {
+        "id": "sd-prod-029-var-7",
+        "sku": "SD-SD-PROD-029-MUS-M",
+        "size": "M",
+        "colourName": "Mustard Yellow",
+        "colourHex": "#FFDB58",
+        "stock": 0,
+        "price": 1509,
+        "originalPrice": 2112
+      },
+      {
+        "id": "sd-prod-029-var-8",
+        "sku": "SD-SD-PROD-029-MUS-L",
+        "size": "L",
+        "colourName": "Mustard Yellow",
+        "colourHex": "#FFDB58",
+        "stock": 15,
+        "price": 1509,
+        "originalPrice": 2112
+      },
+      {
+        "id": "sd-prod-029-var-9",
+        "sku": "SD-SD-PROD-029-MUS-XL",
+        "size": "XL",
+        "colourName": "Mustard Yellow",
+        "colourHex": "#FFDB58",
+        "stock": 15,
+        "price": 1509,
+        "originalPrice": 2112
+      },
+      {
+        "id": "sd-prod-029-var-10",
+        "sku": "SD-SD-PROD-029-MUS-XXL",
+        "size": "XXL",
+        "colourName": "Mustard Yellow",
+        "colourHex": "#FFDB58",
+        "stock": 15,
+        "price": 1509,
+        "originalPrice": 2112
+      }
+    ],
+    "tags": [
+      "jacquard patterned kurta set",
+      "men",
+      "ethnic wear",
+      "kurtas",
+      "anouk",
+      "fashion",
+      "trending"
+    ],
+    "badge": "Trending",
+    "newArrival": true,
+    "trending": true,
+    "featured": false,
+    "expressDelivery": true,
+    "estimatedDeliveryMinutes": 60,
+    "returnWindowDays": 7,
+    "exchangeAvailable": true,
+    "vendorId": "v-urban-style",
+    "commissionPercent": 12,
+    "sponsored": false,
+    "active": true,
+    "createdAt": "2026-07-01T00:00:00Z",
+    "updatedAt": "2026-08-01T00:00:00Z"
+  },
+  {
+    "id": "sd-prod-030",
+    "slug": "linen-blend-bandhgala-jacket-sd-prod-030",
+    "name": "Linen Blend Bandhgala Jacket",
+    "brand": "Mast & Harbour",
+    "department": "men",
+    "category": "Ethnic Wear",
+    "subcategory": "Kurtas",
+    "collection": "Summer Essentials 2026",
+    "shortDescription": "Premium quality linen blend bandhgala jacket crafted for comfort and style.",
+    "description": "Elevate your daily fashion with this Linen Blend Bandhgala Jacket. Features premium fabric construction, tailored fit, and durable craftsmanship ideal for everyday wear.",
+    "material": "100% Premium Combed Cotton",
+    "fit": "Regular Fit",
+    "pattern": "Solid / Textured",
+    "occasion": [
+      "Casual",
+      "Everyday",
+      "Party"
+    ],
+    "careInstructions": [
+      "Machine wash cold",
+      "Do not bleach",
+      "Tumble dry low",
+      "Warm iron if needed"
+    ],
+    "price": 1546,
+    "originalPrice": 2164,
+    "discount": 28,
+    "images": [
+      "https://images.unsplash.com/photo-1503342217505-b0a15ec3261c?auto=format&fit=crop&w=800&q=80",
+      "https://images.unsplash.com/photo-1576995853123-5a10305d93c0?auto=format&fit=crop&w=800&q=80"
+    ],
+    "thumbnail": "https://images.unsplash.com/photo-1503342217505-b0a15ec3261c?auto=format&fit=crop&w=800&q=80",
+    "rating": 4.5,
+    "reviewCount": 55,
+    "reviews": [
+      {
+        "id": "rev-sd-prod-030-1",
+        "userName": "Aman Sharma",
+        "rating": 5,
+        "title": "Great quality and fast delivery!",
+        "comment": "Delivered in Neemuch within 45 minutes! Quality is top notch.",
+        "createdAt": "2026-07-28",
+        "verifiedPurchase": true
+      },
+      {
+        "id": "rev-sd-prod-030-2",
+        "userName": "Priya Verma",
+        "rating": 4,
+        "title": "Nice fit and comfortable material",
+        "comment": "The fabric is very soft. True to size.",
+        "createdAt": "2026-07-29",
+        "verifiedPurchase": true
+      }
+    ],
+    "variants": [
+      {
+        "id": "sd-prod-030-var-1",
+        "sku": "SD-SD-PROD-030-MUS-S",
+        "size": "S",
+        "colourName": "Mustard Yellow",
+        "colourHex": "#FFDB58",
+        "stock": 15,
+        "price": 1546,
+        "originalPrice": 2164
+      },
+      {
+        "id": "sd-prod-030-var-2",
+        "sku": "SD-SD-PROD-030-MUS-M",
+        "size": "M",
+        "colourName": "Mustard Yellow",
+        "colourHex": "#FFDB58",
+        "stock": 15,
+        "price": 1546,
+        "originalPrice": 2164
+      },
+      {
+        "id": "sd-prod-030-var-3",
+        "sku": "SD-SD-PROD-030-MUS-L",
+        "size": "L",
+        "colourName": "Mustard Yellow",
+        "colourHex": "#FFDB58",
+        "stock": 15,
+        "price": 1546,
+        "originalPrice": 2164
+      },
+      {
+        "id": "sd-prod-030-var-4",
+        "sku": "SD-SD-PROD-030-MUS-XL",
+        "size": "XL",
+        "colourName": "Mustard Yellow",
+        "colourHex": "#FFDB58",
+        "stock": 15,
+        "price": 1546,
+        "originalPrice": 2164
+      },
+      {
+        "id": "sd-prod-030-var-5",
+        "sku": "SD-SD-PROD-030-MUS-XXL",
+        "size": "XXL",
+        "colourName": "Mustard Yellow",
+        "colourHex": "#FFDB58",
+        "stock": 15,
+        "price": 1546,
+        "originalPrice": 2164
+      },
+      {
+        "id": "sd-prod-030-var-6",
+        "sku": "SD-SD-PROD-030-BLA-S",
+        "size": "S",
+        "colourName": "Black",
+        "colourHex": "#000000",
+        "stock": 15,
+        "price": 1546,
+        "originalPrice": 2164
+      },
+      {
+        "id": "sd-prod-030-var-7",
+        "sku": "SD-SD-PROD-030-BLA-M",
+        "size": "M",
+        "colourName": "Black",
+        "colourHex": "#000000",
+        "stock": 0,
+        "price": 1546,
+        "originalPrice": 2164
+      },
+      {
+        "id": "sd-prod-030-var-8",
+        "sku": "SD-SD-PROD-030-BLA-L",
+        "size": "L",
+        "colourName": "Black",
+        "colourHex": "#000000",
+        "stock": 15,
+        "price": 1546,
+        "originalPrice": 2164
+      },
+      {
+        "id": "sd-prod-030-var-9",
+        "sku": "SD-SD-PROD-030-BLA-XL",
+        "size": "XL",
+        "colourName": "Black",
+        "colourHex": "#000000",
+        "stock": 15,
+        "price": 1546,
+        "originalPrice": 2164
+      },
+      {
+        "id": "sd-prod-030-var-10",
+        "sku": "SD-SD-PROD-030-BLA-XXL",
+        "size": "XXL",
+        "colourName": "Black",
+        "colourHex": "#000000",
+        "stock": 15,
+        "price": 1546,
+        "originalPrice": 2164
+      }
+    ],
+    "tags": [
+      "linen blend bandhgala jacket",
+      "men",
+      "ethnic wear",
+      "kurtas",
+      "mast & harbour",
+      "fashion",
+      "trending"
+    ],
+    "badge": "New",
+    "newArrival": false,
+    "trending": false,
+    "featured": false,
+    "expressDelivery": true,
+    "estimatedDeliveryMinutes": 60,
+    "returnWindowDays": 7,
+    "exchangeAvailable": true,
+    "vendorId": "v-ethnic-vibe",
+    "commissionPercent": 12,
+    "sponsored": false,
+    "active": true,
+    "createdAt": "2026-07-01T00:00:00Z",
+    "updatedAt": "2026-08-01T00:00:00Z"
+  },
+  {
+    "id": "sd-prod-031",
+    "slug": "quick-dry-performance-gym-tee-sd-prod-031",
+    "name": "Quick-Dry Performance Gym Tee",
+    "brand": "Highlander",
+    "department": "men",
+    "category": "Activewear",
+    "subcategory": "Gym Tees",
+    "collection": "Summer Essentials 2026",
+    "shortDescription": "Premium quality quick-dry performance gym tee crafted for comfort and style.",
+    "description": "Elevate your daily fashion with this Quick-Dry Performance Gym Tee. Features premium fabric construction, tailored fit, and durable craftsmanship ideal for everyday wear.",
+    "material": "100% Premium Combed Cotton",
+    "fit": "Regular Fit",
+    "pattern": "Solid / Textured",
+    "occasion": [
+      "Casual",
+      "Everyday",
+      "Party"
+    ],
+    "careInstructions": [
+      "Machine wash cold",
+      "Do not bleach",
+      "Tumble dry low",
+      "Warm iron if needed"
+    ],
+    "price": 1583,
+    "originalPrice": 2216,
+    "discount": 28,
+    "images": [
+      "https://images.unsplash.com/photo-1576995853123-5a10305d93c0?auto=format&fit=crop&w=800&q=80",
+      "https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?auto=format&fit=crop&w=800&q=80"
+    ],
+    "thumbnail": "https://images.unsplash.com/photo-1576995853123-5a10305d93c0?auto=format&fit=crop&w=800&q=80",
+    "rating": 4.6,
+    "reviewCount": 68,
+    "reviews": [
+      {
+        "id": "rev-sd-prod-031-1",
+        "userName": "Aman Sharma",
+        "rating": 5,
+        "title": "Great quality and fast delivery!",
+        "comment": "Delivered in Neemuch within 45 minutes! Quality is top notch.",
+        "createdAt": "2026-07-28",
+        "verifiedPurchase": true
+      },
+      {
+        "id": "rev-sd-prod-031-2",
+        "userName": "Priya Verma",
+        "rating": 4,
+        "title": "Nice fit and comfortable material",
+        "comment": "The fabric is very soft. True to size.",
+        "createdAt": "2026-07-29",
+        "verifiedPurchase": true
+      }
+    ],
+    "variants": [
+      {
+        "id": "sd-prod-031-var-1",
+        "sku": "SD-SD-PROD-031-BLA-S",
+        "size": "S",
+        "colourName": "Black",
+        "colourHex": "#000000",
+        "stock": 15,
+        "price": 1583,
+        "originalPrice": 2216
+      },
+      {
+        "id": "sd-prod-031-var-2",
+        "sku": "SD-SD-PROD-031-BLA-M",
+        "size": "M",
+        "colourName": "Black",
+        "colourHex": "#000000",
+        "stock": 15,
+        "price": 1583,
+        "originalPrice": 2216
+      },
+      {
+        "id": "sd-prod-031-var-3",
+        "sku": "SD-SD-PROD-031-BLA-L",
+        "size": "L",
+        "colourName": "Black",
+        "colourHex": "#000000",
+        "stock": 15,
+        "price": 1583,
+        "originalPrice": 2216
+      },
+      {
+        "id": "sd-prod-031-var-4",
+        "sku": "SD-SD-PROD-031-BLA-XL",
+        "size": "XL",
+        "colourName": "Black",
+        "colourHex": "#000000",
+        "stock": 15,
+        "price": 1583,
+        "originalPrice": 2216
+      },
+      {
+        "id": "sd-prod-031-var-5",
+        "sku": "SD-SD-PROD-031-BLA-XXL",
+        "size": "XXL",
+        "colourName": "Black",
+        "colourHex": "#000000",
+        "stock": 15,
+        "price": 1583,
+        "originalPrice": 2216
+      },
+      {
+        "id": "sd-prod-031-var-6",
+        "sku": "SD-SD-PROD-031-WHI-S",
+        "size": "S",
+        "colourName": "White",
+        "colourHex": "#FFFFFF",
+        "stock": 15,
+        "price": 1583,
+        "originalPrice": 2216
+      },
+      {
+        "id": "sd-prod-031-var-7",
+        "sku": "SD-SD-PROD-031-WHI-M",
+        "size": "M",
+        "colourName": "White",
+        "colourHex": "#FFFFFF",
+        "stock": 0,
+        "price": 1583,
+        "originalPrice": 2216
+      },
+      {
+        "id": "sd-prod-031-var-8",
+        "sku": "SD-SD-PROD-031-WHI-L",
+        "size": "L",
+        "colourName": "White",
+        "colourHex": "#FFFFFF",
+        "stock": 15,
+        "price": 1583,
+        "originalPrice": 2216
+      },
+      {
+        "id": "sd-prod-031-var-9",
+        "sku": "SD-SD-PROD-031-WHI-XL",
+        "size": "XL",
+        "colourName": "White",
+        "colourHex": "#FFFFFF",
+        "stock": 15,
+        "price": 1583,
+        "originalPrice": 2216
+      },
+      {
+        "id": "sd-prod-031-var-10",
+        "sku": "SD-SD-PROD-031-WHI-XXL",
+        "size": "XXL",
+        "colourName": "White",
+        "colourHex": "#FFFFFF",
+        "stock": 15,
+        "price": 1583,
+        "originalPrice": 2216
+      }
+    ],
+    "tags": [
+      "quick-dry performance gym tee",
+      "men",
+      "activewear",
+      "gym tees",
+      "highlander",
+      "fashion",
+      "trending"
+    ],
+    "badge": "Express",
+    "newArrival": false,
+    "trending": true,
+    "featured": true,
+    "expressDelivery": true,
+    "estimatedDeliveryMinutes": 60,
+    "returnWindowDays": 7,
+    "exchangeAvailable": true,
+    "vendorId": "v-urban-style",
+    "commissionPercent": 12,
+    "sponsored": false,
+    "active": true,
+    "createdAt": "2026-07-01T00:00:00Z",
+    "updatedAt": "2026-08-01T00:00:00Z"
+  },
+  {
+    "id": "sd-prod-032",
+    "slug": "breathable-training-shorts-sd-prod-032",
+    "name": "Breathable Training Shorts",
+    "brand": "Bawree",
+    "department": "men",
+    "category": "Activewear",
+    "subcategory": "Gym Tees",
+    "collection": "Summer Essentials 2026",
+    "shortDescription": "Premium quality breathable training shorts crafted for comfort and style.",
+    "description": "Elevate your daily fashion with this Breathable Training Shorts. Features premium fabric construction, tailored fit, and durable craftsmanship ideal for everyday wear.",
+    "material": "100% Premium Combed Cotton",
+    "fit": "Regular Fit",
+    "pattern": "Solid / Textured",
+    "occasion": [
+      "Casual",
+      "Everyday",
+      "Party"
+    ],
+    "careInstructions": [
+      "Machine wash cold",
+      "Do not bleach",
+      "Tumble dry low",
+      "Warm iron if needed"
+    ],
+    "price": 1620,
+    "originalPrice": 2268,
+    "discount": 28,
+    "images": [
+      "https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?auto=format&fit=crop&w=800&q=80",
+      "https://images.unsplash.com/photo-1529374255404-311a2a4f1fd9?auto=format&fit=crop&w=800&q=80"
+    ],
+    "thumbnail": "https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?auto=format&fit=crop&w=800&q=80",
+    "rating": 4.7,
+    "reviewCount": 81,
+    "reviews": [
+      {
+        "id": "rev-sd-prod-032-1",
+        "userName": "Aman Sharma",
+        "rating": 5,
+        "title": "Great quality and fast delivery!",
+        "comment": "Delivered in Neemuch within 45 minutes! Quality is top notch.",
+        "createdAt": "2026-07-28",
+        "verifiedPurchase": true
+      },
+      {
+        "id": "rev-sd-prod-032-2",
+        "userName": "Priya Verma",
+        "rating": 4,
+        "title": "Nice fit and comfortable material",
+        "comment": "The fabric is very soft. True to size.",
+        "createdAt": "2026-07-29",
+        "verifiedPurchase": true
+      }
+    ],
+    "variants": [
+      {
+        "id": "sd-prod-032-var-1",
+        "sku": "SD-SD-PROD-032-WHI-S",
+        "size": "S",
+        "colourName": "White",
+        "colourHex": "#FFFFFF",
+        "stock": 15,
+        "price": 1620,
+        "originalPrice": 2268
+      },
+      {
+        "id": "sd-prod-032-var-2",
+        "sku": "SD-SD-PROD-032-WHI-M",
+        "size": "M",
+        "colourName": "White",
+        "colourHex": "#FFFFFF",
+        "stock": 15,
+        "price": 1620,
+        "originalPrice": 2268
+      },
+      {
+        "id": "sd-prod-032-var-3",
+        "sku": "SD-SD-PROD-032-WHI-L",
+        "size": "L",
+        "colourName": "White",
+        "colourHex": "#FFFFFF",
+        "stock": 15,
+        "price": 1620,
+        "originalPrice": 2268
+      },
+      {
+        "id": "sd-prod-032-var-4",
+        "sku": "SD-SD-PROD-032-WHI-XL",
+        "size": "XL",
+        "colourName": "White",
+        "colourHex": "#FFFFFF",
+        "stock": 15,
+        "price": 1620,
+        "originalPrice": 2268
+      },
+      {
+        "id": "sd-prod-032-var-5",
+        "sku": "SD-SD-PROD-032-WHI-XXL",
+        "size": "XXL",
+        "colourName": "White",
+        "colourHex": "#FFFFFF",
+        "stock": 15,
+        "price": 1620,
+        "originalPrice": 2268
+      },
+      {
+        "id": "sd-prod-032-var-6",
+        "sku": "SD-SD-PROD-032-NAV-S",
+        "size": "S",
+        "colourName": "Navy Blue",
+        "colourHex": "#000080",
+        "stock": 15,
+        "price": 1620,
+        "originalPrice": 2268
+      },
+      {
+        "id": "sd-prod-032-var-7",
+        "sku": "SD-SD-PROD-032-NAV-M",
+        "size": "M",
+        "colourName": "Navy Blue",
+        "colourHex": "#000080",
+        "stock": 0,
+        "price": 1620,
+        "originalPrice": 2268
+      },
+      {
+        "id": "sd-prod-032-var-8",
+        "sku": "SD-SD-PROD-032-NAV-L",
+        "size": "L",
+        "colourName": "Navy Blue",
+        "colourHex": "#000080",
+        "stock": 15,
+        "price": 1620,
+        "originalPrice": 2268
+      },
+      {
+        "id": "sd-prod-032-var-9",
+        "sku": "SD-SD-PROD-032-NAV-XL",
+        "size": "XL",
+        "colourName": "Navy Blue",
+        "colourHex": "#000080",
+        "stock": 15,
+        "price": 1620,
+        "originalPrice": 2268
+      },
+      {
+        "id": "sd-prod-032-var-10",
+        "sku": "SD-SD-PROD-032-NAV-XXL",
+        "size": "XXL",
+        "colourName": "Navy Blue",
+        "colourHex": "#000080",
+        "stock": 15,
+        "price": 1620,
+        "originalPrice": 2268
+      }
+    ],
+    "tags": [
+      "breathable training shorts",
+      "men",
+      "activewear",
+      "gym tees",
+      "bawree",
+      "fashion",
+      "trending"
+    ],
+    "badge": "Trending",
+    "newArrival": true,
+    "trending": false,
+    "featured": false,
+    "expressDelivery": true,
+    "estimatedDeliveryMinutes": 60,
+    "returnWindowDays": 7,
+    "exchangeAvailable": true,
+    "vendorId": "v-ethnic-vibe",
+    "commissionPercent": 12,
+    "sponsored": false,
+    "active": true,
+    "createdAt": "2026-07-01T00:00:00Z",
+    "updatedAt": "2026-08-01T00:00:00Z"
+  },
+  {
+    "id": "sd-prod-033",
+    "slug": "compression-fit-base-layer-sd-prod-033",
+    "name": "Compression Fit Base Layer",
+    "brand": "Snitch",
+    "department": "men",
+    "category": "Activewear",
+    "subcategory": "Gym Tees",
+    "collection": "Summer Essentials 2026",
+    "shortDescription": "Premium quality compression fit base layer crafted for comfort and style.",
+    "description": "Elevate your daily fashion with this Compression Fit Base Layer. Features premium fabric construction, tailored fit, and durable craftsmanship ideal for everyday wear.",
+    "material": "100% Premium Combed Cotton",
+    "fit": "Regular Fit",
+    "pattern": "Solid / Textured",
+    "occasion": [
+      "Casual",
+      "Everyday",
+      "Party"
+    ],
+    "careInstructions": [
+      "Machine wash cold",
+      "Do not bleach",
+      "Tumble dry low",
+      "Warm iron if needed"
+    ],
+    "price": 1657,
+    "originalPrice": 2319,
+    "discount": 28,
+    "images": [
+      "https://images.unsplash.com/photo-1529374255404-311a2a4f1fd9?auto=format&fit=crop&w=800&q=80",
+      "https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&w=800&q=80"
+    ],
+    "thumbnail": "https://images.unsplash.com/photo-1529374255404-311a2a4f1fd9?auto=format&fit=crop&w=800&q=80",
+    "rating": 4.8,
+    "reviewCount": 94,
+    "reviews": [
+      {
+        "id": "rev-sd-prod-033-1",
+        "userName": "Aman Sharma",
+        "rating": 5,
+        "title": "Great quality and fast delivery!",
+        "comment": "Delivered in Neemuch within 45 minutes! Quality is top notch.",
+        "createdAt": "2026-07-28",
+        "verifiedPurchase": true
+      },
+      {
+        "id": "rev-sd-prod-033-2",
+        "userName": "Priya Verma",
+        "rating": 4,
+        "title": "Nice fit and comfortable material",
+        "comment": "The fabric is very soft. True to size.",
+        "createdAt": "2026-07-29",
+        "verifiedPurchase": true
+      }
+    ],
+    "variants": [
+      {
+        "id": "sd-prod-033-var-1",
+        "sku": "SD-SD-PROD-033-NAV-S",
+        "size": "S",
+        "colourName": "Navy Blue",
+        "colourHex": "#000080",
+        "stock": 15,
+        "price": 1657,
+        "originalPrice": 2319
+      },
+      {
+        "id": "sd-prod-033-var-2",
+        "sku": "SD-SD-PROD-033-NAV-M",
+        "size": "M",
+        "colourName": "Navy Blue",
+        "colourHex": "#000080",
+        "stock": 15,
+        "price": 1657,
+        "originalPrice": 2319
+      },
+      {
+        "id": "sd-prod-033-var-3",
+        "sku": "SD-SD-PROD-033-NAV-L",
+        "size": "L",
+        "colourName": "Navy Blue",
+        "colourHex": "#000080",
+        "stock": 15,
+        "price": 1657,
+        "originalPrice": 2319
+      },
+      {
+        "id": "sd-prod-033-var-4",
+        "sku": "SD-SD-PROD-033-NAV-XL",
+        "size": "XL",
+        "colourName": "Navy Blue",
+        "colourHex": "#000080",
+        "stock": 15,
+        "price": 1657,
+        "originalPrice": 2319
+      },
+      {
+        "id": "sd-prod-033-var-5",
+        "sku": "SD-SD-PROD-033-NAV-XXL",
+        "size": "XXL",
+        "colourName": "Navy Blue",
+        "colourHex": "#000080",
+        "stock": 15,
+        "price": 1657,
+        "originalPrice": 2319
+      },
+      {
+        "id": "sd-prod-033-var-6",
+        "sku": "SD-SD-PROD-033-OLI-S",
+        "size": "S",
+        "colourName": "Olive Green",
+        "colourHex": "#556B2F",
+        "stock": 15,
+        "price": 1657,
+        "originalPrice": 2319
+      },
+      {
+        "id": "sd-prod-033-var-7",
+        "sku": "SD-SD-PROD-033-OLI-M",
+        "size": "M",
+        "colourName": "Olive Green",
+        "colourHex": "#556B2F",
+        "stock": 0,
+        "price": 1657,
+        "originalPrice": 2319
+      },
+      {
+        "id": "sd-prod-033-var-8",
+        "sku": "SD-SD-PROD-033-OLI-L",
+        "size": "L",
+        "colourName": "Olive Green",
+        "colourHex": "#556B2F",
+        "stock": 15,
+        "price": 1657,
+        "originalPrice": 2319
+      },
+      {
+        "id": "sd-prod-033-var-9",
+        "sku": "SD-SD-PROD-033-OLI-XL",
+        "size": "XL",
+        "colourName": "Olive Green",
+        "colourHex": "#556B2F",
+        "stock": 15,
+        "price": 1657,
+        "originalPrice": 2319
+      },
+      {
+        "id": "sd-prod-033-var-10",
+        "sku": "SD-SD-PROD-033-OLI-XXL",
+        "size": "XXL",
+        "colourName": "Olive Green",
+        "colourHex": "#556B2F",
+        "stock": 15,
+        "price": 1657,
+        "originalPrice": 2319
+      }
+    ],
+    "tags": [
+      "compression fit base layer",
+      "men",
+      "activewear",
+      "gym tees",
+      "snitch",
+      "fashion",
+      "trending"
+    ],
+    "badge": "Express",
+    "newArrival": false,
+    "trending": true,
+    "featured": false,
+    "expressDelivery": true,
+    "estimatedDeliveryMinutes": 60,
+    "returnWindowDays": 7,
+    "exchangeAvailable": true,
+    "vendorId": "v-urban-style",
+    "commissionPercent": 12,
+    "sponsored": false,
+    "active": true,
+    "createdAt": "2026-07-01T00:00:00Z",
+    "updatedAt": "2026-08-01T00:00:00Z"
+  },
+  {
+    "id": "sd-prod-034",
+    "slug": "athletic-track-pants-sd-prod-034",
+    "name": "Athletic Track Pants",
+    "brand": "Wrong",
+    "department": "men",
+    "category": "Activewear",
+    "subcategory": "Gym Tees",
+    "collection": "Summer Essentials 2026",
+    "shortDescription": "Premium quality athletic track pants crafted for comfort and style.",
+    "description": "Elevate your daily fashion with this Athletic Track Pants. Features premium fabric construction, tailored fit, and durable craftsmanship ideal for everyday wear.",
+    "material": "100% Premium Combed Cotton",
+    "fit": "Regular Fit",
+    "pattern": "Solid / Textured",
+    "occasion": [
+      "Casual",
+      "Everyday",
+      "Party"
+    ],
+    "careInstructions": [
+      "Machine wash cold",
+      "Do not bleach",
+      "Tumble dry low",
+      "Warm iron if needed"
+    ],
+    "price": 1694,
+    "originalPrice": 2371,
+    "discount": 28,
+    "images": [
+      "https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&w=800&q=80",
+      "https://images.unsplash.com/photo-1521572267360-ee0c2909d518?auto=format&fit=crop&w=800&q=80"
+    ],
+    "thumbnail": "https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&w=800&q=80",
+    "rating": 4.9,
+    "reviewCount": 107,
+    "reviews": [
+      {
+        "id": "rev-sd-prod-034-1",
+        "userName": "Aman Sharma",
+        "rating": 5,
+        "title": "Great quality and fast delivery!",
+        "comment": "Delivered in Neemuch within 45 minutes! Quality is top notch.",
+        "createdAt": "2026-07-28",
+        "verifiedPurchase": true
+      },
+      {
+        "id": "rev-sd-prod-034-2",
+        "userName": "Priya Verma",
+        "rating": 4,
+        "title": "Nice fit and comfortable material",
+        "comment": "The fabric is very soft. True to size.",
+        "createdAt": "2026-07-29",
+        "verifiedPurchase": true
+      }
+    ],
+    "variants": [
+      {
+        "id": "sd-prod-034-var-1",
+        "sku": "SD-SD-PROD-034-OLI-S",
+        "size": "S",
+        "colourName": "Olive Green",
+        "colourHex": "#556B2F",
+        "stock": 15,
+        "price": 1694,
+        "originalPrice": 2371
+      },
+      {
+        "id": "sd-prod-034-var-2",
+        "sku": "SD-SD-PROD-034-OLI-M",
+        "size": "M",
+        "colourName": "Olive Green",
+        "colourHex": "#556B2F",
+        "stock": 15,
+        "price": 1694,
+        "originalPrice": 2371
+      },
+      {
+        "id": "sd-prod-034-var-3",
+        "sku": "SD-SD-PROD-034-OLI-L",
+        "size": "L",
+        "colourName": "Olive Green",
+        "colourHex": "#556B2F",
+        "stock": 15,
+        "price": 1694,
+        "originalPrice": 2371
+      },
+      {
+        "id": "sd-prod-034-var-4",
+        "sku": "SD-SD-PROD-034-OLI-XL",
+        "size": "XL",
+        "colourName": "Olive Green",
+        "colourHex": "#556B2F",
+        "stock": 15,
+        "price": 1694,
+        "originalPrice": 2371
+      },
+      {
+        "id": "sd-prod-034-var-5",
+        "sku": "SD-SD-PROD-034-OLI-XXL",
+        "size": "XXL",
+        "colourName": "Olive Green",
+        "colourHex": "#556B2F",
+        "stock": 15,
+        "price": 1694,
+        "originalPrice": 2371
+      },
+      {
+        "id": "sd-prod-034-var-6",
+        "sku": "SD-SD-PROD-034-CRI-S",
+        "size": "S",
+        "colourName": "Crimson Red",
+        "colourHex": "#DC143C",
+        "stock": 15,
+        "price": 1694,
+        "originalPrice": 2371
+      },
+      {
+        "id": "sd-prod-034-var-7",
+        "sku": "SD-SD-PROD-034-CRI-M",
+        "size": "M",
+        "colourName": "Crimson Red",
+        "colourHex": "#DC143C",
+        "stock": 0,
+        "price": 1694,
+        "originalPrice": 2371
+      },
+      {
+        "id": "sd-prod-034-var-8",
+        "sku": "SD-SD-PROD-034-CRI-L",
+        "size": "L",
+        "colourName": "Crimson Red",
+        "colourHex": "#DC143C",
+        "stock": 15,
+        "price": 1694,
+        "originalPrice": 2371
+      },
+      {
+        "id": "sd-prod-034-var-9",
+        "sku": "SD-SD-PROD-034-CRI-XL",
+        "size": "XL",
+        "colourName": "Crimson Red",
+        "colourHex": "#DC143C",
+        "stock": 15,
+        "price": 1694,
+        "originalPrice": 2371
+      },
+      {
+        "id": "sd-prod-034-var-10",
+        "sku": "SD-SD-PROD-034-CRI-XXL",
+        "size": "XXL",
+        "colourName": "Crimson Red",
+        "colourHex": "#DC143C",
+        "stock": 15,
+        "price": 1694,
+        "originalPrice": 2371
+      }
+    ],
+    "tags": [
+      "athletic track pants",
+      "men",
+      "activewear",
+      "gym tees",
+      "wrong",
+      "fashion",
+      "trending"
+    ],
+    "badge": "New",
+    "newArrival": false,
+    "trending": false,
+    "featured": false,
+    "expressDelivery": true,
+    "estimatedDeliveryMinutes": 60,
+    "returnWindowDays": 7,
+    "exchangeAvailable": true,
+    "vendorId": "v-ethnic-vibe",
+    "commissionPercent": 12,
+    "sponsored": true,
+    "active": true,
+    "createdAt": "2026-07-01T00:00:00Z",
+    "updatedAt": "2026-08-01T00:00:00Z"
+  },
+  {
+    "id": "sd-prod-035",
+    "slug": "seamless-running-t-shirt-sd-prod-035",
+    "name": "Seamless Running T-Shirt",
+    "brand": "Roadster",
+    "department": "men",
+    "category": "Activewear",
+    "subcategory": "Gym Tees",
+    "collection": "Summer Essentials 2026",
+    "shortDescription": "Premium quality seamless running t-shirt crafted for comfort and style.",
+    "description": "Elevate your daily fashion with this Seamless Running T-Shirt. Features premium fabric construction, tailored fit, and durable craftsmanship ideal for everyday wear.",
+    "material": "100% Premium Combed Cotton",
+    "fit": "Regular Fit",
+    "pattern": "Solid / Textured",
+    "occasion": [
+      "Casual",
+      "Everyday",
+      "Party"
+    ],
+    "careInstructions": [
+      "Machine wash cold",
+      "Do not bleach",
+      "Tumble dry low",
+      "Warm iron if needed"
+    ],
+    "price": 1731,
+    "originalPrice": 2423,
+    "discount": 28,
+    "images": [
+      "https://images.unsplash.com/photo-1521572267360-ee0c2909d518?auto=format&fit=crop&w=800&q=80",
+      "https://images.unsplash.com/photo-1503342217505-b0a15ec3261c?auto=format&fit=crop&w=800&q=80"
+    ],
+    "thumbnail": "https://images.unsplash.com/photo-1521572267360-ee0c2909d518?auto=format&fit=crop&w=800&q=80",
+    "rating": 3.8,
+    "reviewCount": 120,
+    "reviews": [
+      {
+        "id": "rev-sd-prod-035-1",
+        "userName": "Aman Sharma",
+        "rating": 5,
+        "title": "Great quality and fast delivery!",
+        "comment": "Delivered in Neemuch within 45 minutes! Quality is top notch.",
+        "createdAt": "2026-07-28",
+        "verifiedPurchase": true
+      },
+      {
+        "id": "rev-sd-prod-035-2",
+        "userName": "Priya Verma",
+        "rating": 4,
+        "title": "Nice fit and comfortable material",
+        "comment": "The fabric is very soft. True to size.",
+        "createdAt": "2026-07-29",
+        "verifiedPurchase": true
+      }
+    ],
+    "variants": [
+      {
+        "id": "sd-prod-035-var-1",
+        "sku": "SD-SD-PROD-035-CRI-S",
+        "size": "S",
+        "colourName": "Crimson Red",
+        "colourHex": "#DC143C",
+        "stock": 15,
+        "price": 1731,
+        "originalPrice": 2423
+      },
+      {
+        "id": "sd-prod-035-var-2",
+        "sku": "SD-SD-PROD-035-CRI-M",
+        "size": "M",
+        "colourName": "Crimson Red",
+        "colourHex": "#DC143C",
+        "stock": 15,
+        "price": 1731,
+        "originalPrice": 2423
+      },
+      {
+        "id": "sd-prod-035-var-3",
+        "sku": "SD-SD-PROD-035-CRI-L",
+        "size": "L",
+        "colourName": "Crimson Red",
+        "colourHex": "#DC143C",
+        "stock": 15,
+        "price": 1731,
+        "originalPrice": 2423
+      },
+      {
+        "id": "sd-prod-035-var-4",
+        "sku": "SD-SD-PROD-035-CRI-XL",
+        "size": "XL",
+        "colourName": "Crimson Red",
+        "colourHex": "#DC143C",
+        "stock": 15,
+        "price": 1731,
+        "originalPrice": 2423
+      },
+      {
+        "id": "sd-prod-035-var-5",
+        "sku": "SD-SD-PROD-035-CRI-XXL",
+        "size": "XXL",
+        "colourName": "Crimson Red",
+        "colourHex": "#DC143C",
+        "stock": 15,
+        "price": 1731,
+        "originalPrice": 2423
+      },
+      {
+        "id": "sd-prod-035-var-6",
+        "sku": "SD-SD-PROD-035-BEI-S",
+        "size": "S",
+        "colourName": "Beige",
+        "colourHex": "#F5F5DC",
+        "stock": 15,
+        "price": 1731,
+        "originalPrice": 2423
+      },
+      {
+        "id": "sd-prod-035-var-7",
+        "sku": "SD-SD-PROD-035-BEI-M",
+        "size": "M",
+        "colourName": "Beige",
+        "colourHex": "#F5F5DC",
+        "stock": 0,
+        "price": 1731,
+        "originalPrice": 2423
+      },
+      {
+        "id": "sd-prod-035-var-8",
+        "sku": "SD-SD-PROD-035-BEI-L",
+        "size": "L",
+        "colourName": "Beige",
+        "colourHex": "#F5F5DC",
+        "stock": 15,
+        "price": 1731,
+        "originalPrice": 2423
+      },
+      {
+        "id": "sd-prod-035-var-9",
+        "sku": "SD-SD-PROD-035-BEI-XL",
+        "size": "XL",
+        "colourName": "Beige",
+        "colourHex": "#F5F5DC",
+        "stock": 15,
+        "price": 1731,
+        "originalPrice": 2423
+      },
+      {
+        "id": "sd-prod-035-var-10",
+        "sku": "SD-SD-PROD-035-BEI-XXL",
+        "size": "XXL",
+        "colourName": "Beige",
+        "colourHex": "#F5F5DC",
+        "stock": 15,
+        "price": 1731,
+        "originalPrice": 2423
+      }
+    ],
+    "tags": [
+      "seamless running t-shirt",
+      "men",
+      "activewear",
+      "gym tees",
+      "roadster",
+      "fashion",
+      "trending"
+    ],
+    "badge": "Trending",
+    "newArrival": true,
+    "trending": true,
+    "featured": true,
+    "expressDelivery": true,
+    "estimatedDeliveryMinutes": 60,
+    "returnWindowDays": 7,
+    "exchangeAvailable": true,
+    "vendorId": "v-urban-style",
+    "commissionPercent": 12,
+    "sponsored": false,
+    "active": true,
+    "createdAt": "2026-07-01T00:00:00Z",
+    "updatedAt": "2026-08-01T00:00:00Z"
+  },
+  {
+    "id": "sd-prod-036",
+    "slug": "combed-cotton-trunk--pack-of-2-sd-prod-036",
+    "name": "Combed Cotton Trunk - Pack of 2",
+    "brand": "HRX",
+    "department": "men",
+    "category": "Innerwear & Essentials",
+    "subcategory": "Briefs",
+    "collection": "Summer Essentials 2026",
+    "shortDescription": "Premium quality combed cotton trunk - pack of 2 crafted for comfort and style.",
+    "description": "Elevate your daily fashion with this Combed Cotton Trunk - Pack of 2. Features premium fabric construction, tailored fit, and durable craftsmanship ideal for everyday wear.",
+    "material": "100% Premium Combed Cotton",
+    "fit": "Regular Fit",
+    "pattern": "Solid / Textured",
+    "occasion": [
+      "Casual",
+      "Everyday",
+      "Party"
+    ],
+    "careInstructions": [
+      "Machine wash cold",
+      "Do not bleach",
+      "Tumble dry low",
+      "Warm iron if needed"
+    ],
+    "price": 1768,
+    "originalPrice": 2475,
+    "discount": 28,
+    "images": [
+      "https://images.unsplash.com/photo-1503342217505-b0a15ec3261c?auto=format&fit=crop&w=800&q=80",
+      "https://images.unsplash.com/photo-1576995853123-5a10305d93c0?auto=format&fit=crop&w=800&q=80"
+    ],
+    "thumbnail": "https://images.unsplash.com/photo-1503342217505-b0a15ec3261c?auto=format&fit=crop&w=800&q=80",
+    "rating": 3.9,
+    "reviewCount": 133,
+    "reviews": [
+      {
+        "id": "rev-sd-prod-036-1",
+        "userName": "Aman Sharma",
+        "rating": 5,
+        "title": "Great quality and fast delivery!",
+        "comment": "Delivered in Neemuch within 45 minutes! Quality is top notch.",
+        "createdAt": "2026-07-28",
+        "verifiedPurchase": true
+      },
+      {
+        "id": "rev-sd-prod-036-2",
+        "userName": "Priya Verma",
+        "rating": 4,
+        "title": "Nice fit and comfortable material",
+        "comment": "The fabric is very soft. True to size.",
+        "createdAt": "2026-07-29",
+        "verifiedPurchase": true
+      }
+    ],
+    "variants": [
+      {
+        "id": "sd-prod-036-var-1",
+        "sku": "SD-SD-PROD-036-BEI-S",
+        "size": "S",
+        "colourName": "Beige",
+        "colourHex": "#F5F5DC",
+        "stock": 15,
+        "price": 1768,
+        "originalPrice": 2475
+      },
+      {
+        "id": "sd-prod-036-var-2",
+        "sku": "SD-SD-PROD-036-BEI-M",
+        "size": "M",
+        "colourName": "Beige",
+        "colourHex": "#F5F5DC",
+        "stock": 15,
+        "price": 1768,
+        "originalPrice": 2475
+      },
+      {
+        "id": "sd-prod-036-var-3",
+        "sku": "SD-SD-PROD-036-BEI-L",
+        "size": "L",
+        "colourName": "Beige",
+        "colourHex": "#F5F5DC",
+        "stock": 15,
+        "price": 1768,
+        "originalPrice": 2475
+      },
+      {
+        "id": "sd-prod-036-var-4",
+        "sku": "SD-SD-PROD-036-BEI-XL",
+        "size": "XL",
+        "colourName": "Beige",
+        "colourHex": "#F5F5DC",
+        "stock": 15,
+        "price": 1768,
+        "originalPrice": 2475
+      },
+      {
+        "id": "sd-prod-036-var-5",
+        "sku": "SD-SD-PROD-036-BEI-XXL",
+        "size": "XXL",
+        "colourName": "Beige",
+        "colourHex": "#F5F5DC",
+        "stock": 15,
+        "price": 1768,
+        "originalPrice": 2475
+      },
+      {
+        "id": "sd-prod-036-var-6",
+        "sku": "SD-SD-PROD-036-CHA-S",
+        "size": "S",
+        "colourName": "Charcoal Gray",
+        "colourHex": "#36454F",
+        "stock": 15,
+        "price": 1768,
+        "originalPrice": 2475
+      },
+      {
+        "id": "sd-prod-036-var-7",
+        "sku": "SD-SD-PROD-036-CHA-M",
+        "size": "M",
+        "colourName": "Charcoal Gray",
+        "colourHex": "#36454F",
+        "stock": 0,
+        "price": 1768,
+        "originalPrice": 2475
+      },
+      {
+        "id": "sd-prod-036-var-8",
+        "sku": "SD-SD-PROD-036-CHA-L",
+        "size": "L",
+        "colourName": "Charcoal Gray",
+        "colourHex": "#36454F",
+        "stock": 15,
+        "price": 1768,
+        "originalPrice": 2475
+      },
+      {
+        "id": "sd-prod-036-var-9",
+        "sku": "SD-SD-PROD-036-CHA-XL",
+        "size": "XL",
+        "colourName": "Charcoal Gray",
+        "colourHex": "#36454F",
+        "stock": 15,
+        "price": 1768,
+        "originalPrice": 2475
+      },
+      {
+        "id": "sd-prod-036-var-10",
+        "sku": "SD-SD-PROD-036-CHA-XXL",
+        "size": "XXL",
+        "colourName": "Charcoal Gray",
+        "colourHex": "#36454F",
+        "stock": 15,
+        "price": 1768,
+        "originalPrice": 2475
+      }
+    ],
+    "tags": [
+      "combed cotton trunk - pack of 2",
+      "men",
+      "innerwear & essentials",
+      "briefs",
+      "hrx",
+      "fashion",
+      "trending"
+    ],
+    "badge": "New",
+    "newArrival": false,
+    "trending": false,
+    "featured": false,
+    "expressDelivery": true,
+    "estimatedDeliveryMinutes": 60,
+    "returnWindowDays": 7,
+    "exchangeAvailable": true,
+    "vendorId": "v-ethnic-vibe",
+    "commissionPercent": 12,
+    "sponsored": false,
+    "active": true,
+    "createdAt": "2026-07-01T00:00:00Z",
+    "updatedAt": "2026-08-01T00:00:00Z"
+  },
+  {
+    "id": "sd-prod-037",
+    "slug": "micromodal-boxer-briefs-sd-prod-037",
+    "name": "MicroModal Boxer Briefs",
+    "brand": "StyleDash Studio",
+    "department": "men",
+    "category": "Innerwear & Essentials",
+    "subcategory": "Briefs",
+    "collection": "Summer Essentials 2026",
+    "shortDescription": "Premium quality micromodal boxer briefs crafted for comfort and style.",
+    "description": "Elevate your daily fashion with this MicroModal Boxer Briefs. Features premium fabric construction, tailored fit, and durable craftsmanship ideal for everyday wear.",
+    "material": "100% Premium Combed Cotton",
+    "fit": "Regular Fit",
+    "pattern": "Solid / Textured",
+    "occasion": [
+      "Casual",
+      "Everyday",
+      "Party"
+    ],
+    "careInstructions": [
+      "Machine wash cold",
+      "Do not bleach",
+      "Tumble dry low",
+      "Warm iron if needed"
+    ],
+    "price": 1805,
+    "originalPrice": 2527,
+    "discount": 28,
+    "images": [
+      "https://images.unsplash.com/photo-1576995853123-5a10305d93c0?auto=format&fit=crop&w=800&q=80",
+      "https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?auto=format&fit=crop&w=800&q=80"
+    ],
+    "thumbnail": "https://images.unsplash.com/photo-1576995853123-5a10305d93c0?auto=format&fit=crop&w=800&q=80",
+    "rating": 4.0,
+    "reviewCount": 146,
+    "reviews": [
+      {
+        "id": "rev-sd-prod-037-1",
+        "userName": "Aman Sharma",
+        "rating": 5,
+        "title": "Great quality and fast delivery!",
+        "comment": "Delivered in Neemuch within 45 minutes! Quality is top notch.",
+        "createdAt": "2026-07-28",
+        "verifiedPurchase": true
+      },
+      {
+        "id": "rev-sd-prod-037-2",
+        "userName": "Priya Verma",
+        "rating": 4,
+        "title": "Nice fit and comfortable material",
+        "comment": "The fabric is very soft. True to size.",
+        "createdAt": "2026-07-29",
+        "verifiedPurchase": true
+      }
+    ],
+    "variants": [
+      {
+        "id": "sd-prod-037-var-1",
+        "sku": "SD-SD-PROD-037-CHA-S",
+        "size": "S",
+        "colourName": "Charcoal Gray",
+        "colourHex": "#36454F",
+        "stock": 15,
+        "price": 1805,
+        "originalPrice": 2527
+      },
+      {
+        "id": "sd-prod-037-var-2",
+        "sku": "SD-SD-PROD-037-CHA-M",
+        "size": "M",
+        "colourName": "Charcoal Gray",
+        "colourHex": "#36454F",
+        "stock": 15,
+        "price": 1805,
+        "originalPrice": 2527
+      },
+      {
+        "id": "sd-prod-037-var-3",
+        "sku": "SD-SD-PROD-037-CHA-L",
+        "size": "L",
+        "colourName": "Charcoal Gray",
+        "colourHex": "#36454F",
+        "stock": 15,
+        "price": 1805,
+        "originalPrice": 2527
+      },
+      {
+        "id": "sd-prod-037-var-4",
+        "sku": "SD-SD-PROD-037-CHA-XL",
+        "size": "XL",
+        "colourName": "Charcoal Gray",
+        "colourHex": "#36454F",
+        "stock": 15,
+        "price": 1805,
+        "originalPrice": 2527
+      },
+      {
+        "id": "sd-prod-037-var-5",
+        "sku": "SD-SD-PROD-037-CHA-XXL",
+        "size": "XXL",
+        "colourName": "Charcoal Gray",
+        "colourHex": "#36454F",
+        "stock": 15,
+        "price": 1805,
+        "originalPrice": 2527
+      },
+      {
+        "id": "sd-prod-037-var-6",
+        "sku": "SD-SD-PROD-037-MUS-S",
+        "size": "S",
+        "colourName": "Mustard Yellow",
+        "colourHex": "#FFDB58",
+        "stock": 15,
+        "price": 1805,
+        "originalPrice": 2527
+      },
+      {
+        "id": "sd-prod-037-var-7",
+        "sku": "SD-SD-PROD-037-MUS-M",
+        "size": "M",
+        "colourName": "Mustard Yellow",
+        "colourHex": "#FFDB58",
+        "stock": 0,
+        "price": 1805,
+        "originalPrice": 2527
+      },
+      {
+        "id": "sd-prod-037-var-8",
+        "sku": "SD-SD-PROD-037-MUS-L",
+        "size": "L",
+        "colourName": "Mustard Yellow",
+        "colourHex": "#FFDB58",
+        "stock": 15,
+        "price": 1805,
+        "originalPrice": 2527
+      },
+      {
+        "id": "sd-prod-037-var-9",
+        "sku": "SD-SD-PROD-037-MUS-XL",
+        "size": "XL",
+        "colourName": "Mustard Yellow",
+        "colourHex": "#FFDB58",
+        "stock": 15,
+        "price": 1805,
+        "originalPrice": 2527
+      },
+      {
+        "id": "sd-prod-037-var-10",
+        "sku": "SD-SD-PROD-037-MUS-XXL",
+        "size": "XXL",
+        "colourName": "Mustard Yellow",
+        "colourHex": "#FFDB58",
+        "stock": 15,
+        "price": 1805,
+        "originalPrice": 2527
+      }
+    ],
+    "tags": [
+      "micromodal boxer briefs",
+      "men",
+      "innerwear & essentials",
+      "briefs",
+      "styledash studio",
+      "fashion",
+      "trending"
+    ],
+    "badge": "Express",
+    "newArrival": false,
+    "trending": true,
+    "featured": false,
+    "expressDelivery": true,
+    "estimatedDeliveryMinutes": 60,
+    "returnWindowDays": 7,
+    "exchangeAvailable": true,
+    "vendorId": "v-urban-style",
+    "commissionPercent": 12,
+    "sponsored": false,
+    "active": true,
+    "createdAt": "2026-07-01T00:00:00Z",
+    "updatedAt": "2026-08-01T00:00:00Z"
+  },
+  {
+    "id": "sd-prod-038",
+    "slug": "woven-cotton-lounge-boxers-sd-prod-038",
+    "name": "Woven Cotton Lounge Boxers",
+    "brand": "Anouk",
+    "department": "men",
+    "category": "Innerwear & Essentials",
+    "subcategory": "Briefs",
+    "collection": "Summer Essentials 2026",
+    "shortDescription": "Premium quality woven cotton lounge boxers crafted for comfort and style.",
+    "description": "Elevate your daily fashion with this Woven Cotton Lounge Boxers. Features premium fabric construction, tailored fit, and durable craftsmanship ideal for everyday wear.",
+    "material": "100% Premium Combed Cotton",
+    "fit": "Regular Fit",
+    "pattern": "Solid / Textured",
+    "occasion": [
+      "Casual",
+      "Everyday",
+      "Party"
+    ],
+    "careInstructions": [
+      "Machine wash cold",
+      "Do not bleach",
+      "Tumble dry low",
+      "Warm iron if needed"
+    ],
+    "price": 1842,
+    "originalPrice": 2578,
+    "discount": 28,
+    "images": [
+      "https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?auto=format&fit=crop&w=800&q=80",
+      "https://images.unsplash.com/photo-1529374255404-311a2a4f1fd9?auto=format&fit=crop&w=800&q=80"
+    ],
+    "thumbnail": "https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?auto=format&fit=crop&w=800&q=80",
+    "rating": 4.1,
+    "reviewCount": 159,
+    "reviews": [
+      {
+        "id": "rev-sd-prod-038-1",
+        "userName": "Aman Sharma",
+        "rating": 5,
+        "title": "Great quality and fast delivery!",
+        "comment": "Delivered in Neemuch within 45 minutes! Quality is top notch.",
+        "createdAt": "2026-07-28",
+        "verifiedPurchase": true
+      },
+      {
+        "id": "rev-sd-prod-038-2",
+        "userName": "Priya Verma",
+        "rating": 4,
+        "title": "Nice fit and comfortable material",
+        "comment": "The fabric is very soft. True to size.",
+        "createdAt": "2026-07-29",
+        "verifiedPurchase": true
+      }
+    ],
+    "variants": [
+      {
+        "id": "sd-prod-038-var-1",
+        "sku": "SD-SD-PROD-038-MUS-S",
+        "size": "S",
+        "colourName": "Mustard Yellow",
+        "colourHex": "#FFDB58",
+        "stock": 15,
+        "price": 1842,
+        "originalPrice": 2578
+      },
+      {
+        "id": "sd-prod-038-var-2",
+        "sku": "SD-SD-PROD-038-MUS-M",
+        "size": "M",
+        "colourName": "Mustard Yellow",
+        "colourHex": "#FFDB58",
+        "stock": 15,
+        "price": 1842,
+        "originalPrice": 2578
+      },
+      {
+        "id": "sd-prod-038-var-3",
+        "sku": "SD-SD-PROD-038-MUS-L",
+        "size": "L",
+        "colourName": "Mustard Yellow",
+        "colourHex": "#FFDB58",
+        "stock": 15,
+        "price": 1842,
+        "originalPrice": 2578
+      },
+      {
+        "id": "sd-prod-038-var-4",
+        "sku": "SD-SD-PROD-038-MUS-XL",
+        "size": "XL",
+        "colourName": "Mustard Yellow",
+        "colourHex": "#FFDB58",
+        "stock": 15,
+        "price": 1842,
+        "originalPrice": 2578
+      },
+      {
+        "id": "sd-prod-038-var-5",
+        "sku": "SD-SD-PROD-038-MUS-XXL",
+        "size": "XXL",
+        "colourName": "Mustard Yellow",
+        "colourHex": "#FFDB58",
+        "stock": 15,
+        "price": 1842,
+        "originalPrice": 2578
+      },
+      {
+        "id": "sd-prod-038-var-6",
+        "sku": "SD-SD-PROD-038-BLA-S",
+        "size": "S",
+        "colourName": "Black",
+        "colourHex": "#000000",
+        "stock": 15,
+        "price": 1842,
+        "originalPrice": 2578
+      },
+      {
+        "id": "sd-prod-038-var-7",
+        "sku": "SD-SD-PROD-038-BLA-M",
+        "size": "M",
+        "colourName": "Black",
+        "colourHex": "#000000",
+        "stock": 0,
+        "price": 1842,
+        "originalPrice": 2578
+      },
+      {
+        "id": "sd-prod-038-var-8",
+        "sku": "SD-SD-PROD-038-BLA-L",
+        "size": "L",
+        "colourName": "Black",
+        "colourHex": "#000000",
+        "stock": 15,
+        "price": 1842,
+        "originalPrice": 2578
+      },
+      {
+        "id": "sd-prod-038-var-9",
+        "sku": "SD-SD-PROD-038-BLA-XL",
+        "size": "XL",
+        "colourName": "Black",
+        "colourHex": "#000000",
+        "stock": 15,
+        "price": 1842,
+        "originalPrice": 2578
+      },
+      {
+        "id": "sd-prod-038-var-10",
+        "sku": "SD-SD-PROD-038-BLA-XXL",
+        "size": "XXL",
+        "colourName": "Black",
+        "colourHex": "#000000",
+        "stock": 15,
+        "price": 1842,
+        "originalPrice": 2578
+      }
+    ],
+    "tags": [
+      "woven cotton lounge boxers",
+      "men",
+      "innerwear & essentials",
+      "briefs",
+      "anouk",
+      "fashion",
+      "trending"
+    ],
+    "badge": "Trending",
+    "newArrival": true,
+    "trending": false,
+    "featured": false,
+    "expressDelivery": true,
+    "estimatedDeliveryMinutes": 60,
+    "returnWindowDays": 7,
+    "exchangeAvailable": true,
+    "vendorId": "v-ethnic-vibe",
+    "commissionPercent": 12,
+    "sponsored": false,
+    "active": true,
+    "createdAt": "2026-07-01T00:00:00Z",
+    "updatedAt": "2026-08-01T00:00:00Z"
+  },
+  {
+    "id": "sd-prod-039",
+    "slug": "ribbed-cotton-tank-vests-sd-prod-039",
+    "name": "Ribbed Cotton Tank Vests",
+    "brand": "Mast & Harbour",
+    "department": "men",
+    "category": "Innerwear & Essentials",
+    "subcategory": "Briefs",
+    "collection": "Summer Essentials 2026",
+    "shortDescription": "Premium quality ribbed cotton tank vests crafted for comfort and style.",
+    "description": "Elevate your daily fashion with this Ribbed Cotton Tank Vests. Features premium fabric construction, tailored fit, and durable craftsmanship ideal for everyday wear.",
+    "material": "100% Premium Combed Cotton",
+    "fit": "Regular Fit",
+    "pattern": "Solid / Textured",
+    "occasion": [
+      "Casual",
+      "Everyday",
+      "Party"
+    ],
+    "careInstructions": [
+      "Machine wash cold",
+      "Do not bleach",
+      "Tumble dry low",
+      "Warm iron if needed"
+    ],
+    "price": 1879,
+    "originalPrice": 2630,
+    "discount": 28,
+    "images": [
+      "https://images.unsplash.com/photo-1529374255404-311a2a4f1fd9?auto=format&fit=crop&w=800&q=80",
+      "https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&w=800&q=80"
+    ],
+    "thumbnail": "https://images.unsplash.com/photo-1529374255404-311a2a4f1fd9?auto=format&fit=crop&w=800&q=80",
+    "rating": 4.2,
+    "reviewCount": 172,
+    "reviews": [
+      {
+        "id": "rev-sd-prod-039-1",
+        "userName": "Aman Sharma",
+        "rating": 5,
+        "title": "Great quality and fast delivery!",
+        "comment": "Delivered in Neemuch within 45 minutes! Quality is top notch.",
+        "createdAt": "2026-07-28",
+        "verifiedPurchase": true
+      },
+      {
+        "id": "rev-sd-prod-039-2",
+        "userName": "Priya Verma",
+        "rating": 4,
+        "title": "Nice fit and comfortable material",
+        "comment": "The fabric is very soft. True to size.",
+        "createdAt": "2026-07-29",
+        "verifiedPurchase": true
+      }
+    ],
+    "variants": [
+      {
+        "id": "sd-prod-039-var-1",
+        "sku": "SD-SD-PROD-039-BLA-S",
+        "size": "S",
+        "colourName": "Black",
+        "colourHex": "#000000",
+        "stock": 15,
+        "price": 1879,
+        "originalPrice": 2630
+      },
+      {
+        "id": "sd-prod-039-var-2",
+        "sku": "SD-SD-PROD-039-BLA-M",
+        "size": "M",
+        "colourName": "Black",
+        "colourHex": "#000000",
+        "stock": 15,
+        "price": 1879,
+        "originalPrice": 2630
+      },
+      {
+        "id": "sd-prod-039-var-3",
+        "sku": "SD-SD-PROD-039-BLA-L",
+        "size": "L",
+        "colourName": "Black",
+        "colourHex": "#000000",
+        "stock": 15,
+        "price": 1879,
+        "originalPrice": 2630
+      },
+      {
+        "id": "sd-prod-039-var-4",
+        "sku": "SD-SD-PROD-039-BLA-XL",
+        "size": "XL",
+        "colourName": "Black",
+        "colourHex": "#000000",
+        "stock": 15,
+        "price": 1879,
+        "originalPrice": 2630
+      },
+      {
+        "id": "sd-prod-039-var-5",
+        "sku": "SD-SD-PROD-039-BLA-XXL",
+        "size": "XXL",
+        "colourName": "Black",
+        "colourHex": "#000000",
+        "stock": 15,
+        "price": 1879,
+        "originalPrice": 2630
+      },
+      {
+        "id": "sd-prod-039-var-6",
+        "sku": "SD-SD-PROD-039-WHI-S",
+        "size": "S",
+        "colourName": "White",
+        "colourHex": "#FFFFFF",
+        "stock": 15,
+        "price": 1879,
+        "originalPrice": 2630
+      },
+      {
+        "id": "sd-prod-039-var-7",
+        "sku": "SD-SD-PROD-039-WHI-M",
+        "size": "M",
+        "colourName": "White",
+        "colourHex": "#FFFFFF",
+        "stock": 0,
+        "price": 1879,
+        "originalPrice": 2630
+      },
+      {
+        "id": "sd-prod-039-var-8",
+        "sku": "SD-SD-PROD-039-WHI-L",
+        "size": "L",
+        "colourName": "White",
+        "colourHex": "#FFFFFF",
+        "stock": 15,
+        "price": 1879,
+        "originalPrice": 2630
+      },
+      {
+        "id": "sd-prod-039-var-9",
+        "sku": "SD-SD-PROD-039-WHI-XL",
+        "size": "XL",
+        "colourName": "White",
+        "colourHex": "#FFFFFF",
+        "stock": 15,
+        "price": 1879,
+        "originalPrice": 2630
+      },
+      {
+        "id": "sd-prod-039-var-10",
+        "sku": "SD-SD-PROD-039-WHI-XXL",
+        "size": "XXL",
+        "colourName": "White",
+        "colourHex": "#FFFFFF",
+        "stock": 15,
+        "price": 1879,
+        "originalPrice": 2630
+      }
+    ],
+    "tags": [
+      "ribbed cotton tank vests",
+      "men",
+      "innerwear & essentials",
+      "briefs",
+      "mast & harbour",
+      "fashion",
+      "trending"
+    ],
+    "badge": "Express",
+    "newArrival": false,
+    "trending": true,
+    "featured": true,
+    "expressDelivery": true,
+    "estimatedDeliveryMinutes": 60,
+    "returnWindowDays": 7,
+    "exchangeAvailable": true,
+    "vendorId": "v-urban-style",
+    "commissionPercent": 12,
+    "sponsored": false,
+    "active": true,
+    "createdAt": "2026-07-01T00:00:00Z",
+    "updatedAt": "2026-08-01T00:00:00Z"
+  },
+  {
+    "id": "sd-prod-040",
+    "slug": "ankle-length-cushion-socks--pack-of-3-sd-prod-040",
+    "name": "Ankle Length Cushion Socks - Pack of 3",
+    "brand": "Highlander",
+    "department": "men",
+    "category": "Innerwear & Essentials",
+    "subcategory": "Briefs",
+    "collection": "Summer Essentials 2026",
+    "shortDescription": "Premium quality ankle length cushion socks - pack of 3 crafted for comfort and style.",
+    "description": "Elevate your daily fashion with this Ankle Length Cushion Socks - Pack of 3. Features premium fabric construction, tailored fit, and durable craftsmanship ideal for everyday wear.",
+    "material": "100% Premium Combed Cotton",
+    "fit": "Regular Fit",
+    "pattern": "Solid / Textured",
+    "occasion": [
+      "Casual",
+      "Everyday",
+      "Party"
+    ],
+    "careInstructions": [
+      "Machine wash cold",
+      "Do not bleach",
+      "Tumble dry low",
+      "Warm iron if needed"
+    ],
+    "price": 1916,
+    "originalPrice": 2682,
+    "discount": 28,
+    "images": [
+      "https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&w=800&q=80",
+      "https://images.unsplash.com/photo-1521572267360-ee0c2909d518?auto=format&fit=crop&w=800&q=80"
+    ],
+    "thumbnail": "https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&w=800&q=80",
+    "rating": 4.3,
+    "reviewCount": 185,
+    "reviews": [
+      {
+        "id": "rev-sd-prod-040-1",
+        "userName": "Aman Sharma",
+        "rating": 5,
+        "title": "Great quality and fast delivery!",
+        "comment": "Delivered in Neemuch within 45 minutes! Quality is top notch.",
+        "createdAt": "2026-07-28",
+        "verifiedPurchase": true
+      },
+      {
+        "id": "rev-sd-prod-040-2",
+        "userName": "Priya Verma",
+        "rating": 4,
+        "title": "Nice fit and comfortable material",
+        "comment": "The fabric is very soft. True to size.",
+        "createdAt": "2026-07-29",
+        "verifiedPurchase": true
+      }
+    ],
+    "variants": [
+      {
+        "id": "sd-prod-040-var-1",
+        "sku": "SD-SD-PROD-040-WHI-S",
+        "size": "S",
+        "colourName": "White",
+        "colourHex": "#FFFFFF",
+        "stock": 15,
+        "price": 1916,
+        "originalPrice": 2682
+      },
+      {
+        "id": "sd-prod-040-var-2",
+        "sku": "SD-SD-PROD-040-WHI-M",
+        "size": "M",
+        "colourName": "White",
+        "colourHex": "#FFFFFF",
+        "stock": 15,
+        "price": 1916,
+        "originalPrice": 2682
+      },
+      {
+        "id": "sd-prod-040-var-3",
+        "sku": "SD-SD-PROD-040-WHI-L",
+        "size": "L",
+        "colourName": "White",
+        "colourHex": "#FFFFFF",
+        "stock": 15,
+        "price": 1916,
+        "originalPrice": 2682
+      },
+      {
+        "id": "sd-prod-040-var-4",
+        "sku": "SD-SD-PROD-040-WHI-XL",
+        "size": "XL",
+        "colourName": "White",
+        "colourHex": "#FFFFFF",
+        "stock": 15,
+        "price": 1916,
+        "originalPrice": 2682
+      },
+      {
+        "id": "sd-prod-040-var-5",
+        "sku": "SD-SD-PROD-040-WHI-XXL",
+        "size": "XXL",
+        "colourName": "White",
+        "colourHex": "#FFFFFF",
+        "stock": 15,
+        "price": 1916,
+        "originalPrice": 2682
+      },
+      {
+        "id": "sd-prod-040-var-6",
+        "sku": "SD-SD-PROD-040-NAV-S",
+        "size": "S",
+        "colourName": "Navy Blue",
+        "colourHex": "#000080",
+        "stock": 15,
+        "price": 1916,
+        "originalPrice": 2682
+      },
+      {
+        "id": "sd-prod-040-var-7",
+        "sku": "SD-SD-PROD-040-NAV-M",
+        "size": "M",
+        "colourName": "Navy Blue",
+        "colourHex": "#000080",
+        "stock": 0,
+        "price": 1916,
+        "originalPrice": 2682
+      },
+      {
+        "id": "sd-prod-040-var-8",
+        "sku": "SD-SD-PROD-040-NAV-L",
+        "size": "L",
+        "colourName": "Navy Blue",
+        "colourHex": "#000080",
+        "stock": 15,
+        "price": 1916,
+        "originalPrice": 2682
+      },
+      {
+        "id": "sd-prod-040-var-9",
+        "sku": "SD-SD-PROD-040-NAV-XL",
+        "size": "XL",
+        "colourName": "Navy Blue",
+        "colourHex": "#000080",
+        "stock": 15,
+        "price": 1916,
+        "originalPrice": 2682
+      },
+      {
+        "id": "sd-prod-040-var-10",
+        "sku": "SD-SD-PROD-040-NAV-XXL",
+        "size": "XXL",
+        "colourName": "Navy Blue",
+        "colourHex": "#000080",
+        "stock": 15,
+        "price": 1916,
+        "originalPrice": 2682
+      }
+    ],
+    "tags": [
+      "ankle length cushion socks - pack of 3",
+      "men",
+      "innerwear & essentials",
+      "briefs",
+      "highlander",
+      "fashion",
+      "trending"
+    ],
+    "badge": "New",
+    "newArrival": false,
+    "trending": false,
+    "featured": false,
+    "expressDelivery": true,
+    "estimatedDeliveryMinutes": 60,
+    "returnWindowDays": 7,
+    "exchangeAvailable": true,
+    "vendorId": "v-ethnic-vibe",
+    "commissionPercent": 12,
+    "sponsored": false,
+    "active": true,
+    "createdAt": "2026-07-01T00:00:00Z",
+    "updatedAt": "2026-08-01T00:00:00Z"
+  },
+  {
+    "id": "sd-prod-041",
+    "slug": "tiered-floral-print-maxi-dress-sd-prod-041",
+    "name": "Tiered Floral Print Maxi Dress",
+    "brand": "Bawree",
+    "department": "women",
+    "category": "Dresses",
+    "subcategory": "Maxi",
+    "collection": "Summer Essentials 2026",
+    "shortDescription": "Premium quality tiered floral print maxi dress crafted for comfort and style.",
+    "description": "Elevate your daily fashion with this Tiered Floral Print Maxi Dress. Features premium fabric construction, tailored fit, and durable craftsmanship ideal for everyday wear.",
+    "material": "100% Premium Combed Cotton",
+    "fit": "Regular Fit",
+    "pattern": "Solid / Textured",
+    "occasion": [
+      "Casual",
+      "Everyday",
+      "Party"
+    ],
+    "careInstructions": [
+      "Machine wash cold",
+      "Do not bleach",
+      "Tumble dry low",
+      "Warm iron if needed"
+    ],
+    "price": 1953,
+    "originalPrice": 2734,
+    "discount": 28,
+    "images": [
+      "https://images.unsplash.com/photo-1521572267360-ee0c2909d518?auto=format&fit=crop&w=800&q=80",
+      "https://images.unsplash.com/photo-1503342217505-b0a15ec3261c?auto=format&fit=crop&w=800&q=80"
+    ],
+    "thumbnail": "https://images.unsplash.com/photo-1521572267360-ee0c2909d518?auto=format&fit=crop&w=800&q=80",
+    "rating": 4.4,
+    "reviewCount": 18,
+    "reviews": [
+      {
+        "id": "rev-sd-prod-041-1",
+        "userName": "Aman Sharma",
+        "rating": 5,
+        "title": "Great quality and fast delivery!",
+        "comment": "Delivered in Neemuch within 45 minutes! Quality is top notch.",
+        "createdAt": "2026-07-28",
+        "verifiedPurchase": true
+      },
+      {
+        "id": "rev-sd-prod-041-2",
+        "userName": "Priya Verma",
+        "rating": 4,
+        "title": "Nice fit and comfortable material",
+        "comment": "The fabric is very soft. True to size.",
+        "createdAt": "2026-07-29",
+        "verifiedPurchase": true
+      }
+    ],
+    "variants": [
+      {
+        "id": "sd-prod-041-var-1",
+        "sku": "SD-SD-PROD-041-NAV-S",
+        "size": "S",
+        "colourName": "Navy Blue",
+        "colourHex": "#000080",
+        "stock": 15,
+        "price": 1953,
+        "originalPrice": 2734
+      },
+      {
+        "id": "sd-prod-041-var-2",
+        "sku": "SD-SD-PROD-041-NAV-M",
+        "size": "M",
+        "colourName": "Navy Blue",
+        "colourHex": "#000080",
+        "stock": 15,
+        "price": 1953,
+        "originalPrice": 2734
+      },
+      {
+        "id": "sd-prod-041-var-3",
+        "sku": "SD-SD-PROD-041-NAV-L",
+        "size": "L",
+        "colourName": "Navy Blue",
+        "colourHex": "#000080",
+        "stock": 15,
+        "price": 1953,
+        "originalPrice": 2734
+      },
+      {
+        "id": "sd-prod-041-var-4",
+        "sku": "SD-SD-PROD-041-NAV-XL",
+        "size": "XL",
+        "colourName": "Navy Blue",
+        "colourHex": "#000080",
+        "stock": 15,
+        "price": 1953,
+        "originalPrice": 2734
+      },
+      {
+        "id": "sd-prod-041-var-5",
+        "sku": "SD-SD-PROD-041-NAV-XXL",
+        "size": "XXL",
+        "colourName": "Navy Blue",
+        "colourHex": "#000080",
+        "stock": 15,
+        "price": 1953,
+        "originalPrice": 2734
+      },
+      {
+        "id": "sd-prod-041-var-6",
+        "sku": "SD-SD-PROD-041-OLI-S",
+        "size": "S",
+        "colourName": "Olive Green",
+        "colourHex": "#556B2F",
+        "stock": 15,
+        "price": 1953,
+        "originalPrice": 2734
+      },
+      {
+        "id": "sd-prod-041-var-7",
+        "sku": "SD-SD-PROD-041-OLI-M",
+        "size": "M",
+        "colourName": "Olive Green",
+        "colourHex": "#556B2F",
+        "stock": 0,
+        "price": 1953,
+        "originalPrice": 2734
+      },
+      {
+        "id": "sd-prod-041-var-8",
+        "sku": "SD-SD-PROD-041-OLI-L",
+        "size": "L",
+        "colourName": "Olive Green",
+        "colourHex": "#556B2F",
+        "stock": 15,
+        "price": 1953,
+        "originalPrice": 2734
+      },
+      {
+        "id": "sd-prod-041-var-9",
+        "sku": "SD-SD-PROD-041-OLI-XL",
+        "size": "XL",
+        "colourName": "Olive Green",
+        "colourHex": "#556B2F",
+        "stock": 15,
+        "price": 1953,
+        "originalPrice": 2734
+      },
+      {
+        "id": "sd-prod-041-var-10",
+        "sku": "SD-SD-PROD-041-OLI-XXL",
+        "size": "XXL",
+        "colourName": "Olive Green",
+        "colourHex": "#556B2F",
+        "stock": 15,
+        "price": 1953,
+        "originalPrice": 2734
+      }
+    ],
+    "tags": [
+      "tiered floral print maxi dress",
+      "women",
+      "dresses",
+      "maxi",
+      "bawree",
+      "fashion",
+      "trending"
+    ],
+    "badge": "Trending",
+    "newArrival": true,
+    "trending": true,
+    "featured": false,
+    "expressDelivery": true,
+    "estimatedDeliveryMinutes": 60,
+    "returnWindowDays": 7,
+    "exchangeAvailable": true,
+    "vendorId": "v-urban-style",
+    "commissionPercent": 12,
+    "sponsored": true,
+    "active": true,
+    "createdAt": "2026-07-01T00:00:00Z",
+    "updatedAt": "2026-08-01T00:00:00Z"
+  },
+  {
+    "id": "sd-prod-042",
+    "slug": "satin-slip-party-midi-dress-sd-prod-042",
+    "name": "Satin Slip Party Midi Dress",
+    "brand": "Snitch",
+    "department": "women",
+    "category": "Dresses",
+    "subcategory": "Maxi",
+    "collection": "Summer Essentials 2026",
+    "shortDescription": "Premium quality satin slip party midi dress crafted for comfort and style.",
+    "description": "Elevate your daily fashion with this Satin Slip Party Midi Dress. Features premium fabric construction, tailored fit, and durable craftsmanship ideal for everyday wear.",
+    "material": "100% Premium Combed Cotton",
+    "fit": "Regular Fit",
+    "pattern": "Solid / Textured",
+    "occasion": [
+      "Casual",
+      "Everyday",
+      "Party"
+    ],
+    "careInstructions": [
+      "Machine wash cold",
+      "Do not bleach",
+      "Tumble dry low",
+      "Warm iron if needed"
+    ],
+    "price": 1990,
+    "originalPrice": 2786,
+    "discount": 28,
+    "images": [
+      "https://images.unsplash.com/photo-1503342217505-b0a15ec3261c?auto=format&fit=crop&w=800&q=80",
+      "https://images.unsplash.com/photo-1576995853123-5a10305d93c0?auto=format&fit=crop&w=800&q=80"
+    ],
+    "thumbnail": "https://images.unsplash.com/photo-1503342217505-b0a15ec3261c?auto=format&fit=crop&w=800&q=80",
+    "rating": 4.5,
+    "reviewCount": 31,
+    "reviews": [
+      {
+        "id": "rev-sd-prod-042-1",
+        "userName": "Aman Sharma",
+        "rating": 5,
+        "title": "Great quality and fast delivery!",
+        "comment": "Delivered in Neemuch within 45 minutes! Quality is top notch.",
+        "createdAt": "2026-07-28",
+        "verifiedPurchase": true
+      },
+      {
+        "id": "rev-sd-prod-042-2",
+        "userName": "Priya Verma",
+        "rating": 4,
+        "title": "Nice fit and comfortable material",
+        "comment": "The fabric is very soft. True to size.",
+        "createdAt": "2026-07-29",
+        "verifiedPurchase": true
+      }
+    ],
+    "variants": [
+      {
+        "id": "sd-prod-042-var-1",
+        "sku": "SD-SD-PROD-042-OLI-S",
+        "size": "S",
+        "colourName": "Olive Green",
+        "colourHex": "#556B2F",
+        "stock": 15,
+        "price": 1990,
+        "originalPrice": 2786
+      },
+      {
+        "id": "sd-prod-042-var-2",
+        "sku": "SD-SD-PROD-042-OLI-M",
+        "size": "M",
+        "colourName": "Olive Green",
+        "colourHex": "#556B2F",
+        "stock": 15,
+        "price": 1990,
+        "originalPrice": 2786
+      },
+      {
+        "id": "sd-prod-042-var-3",
+        "sku": "SD-SD-PROD-042-OLI-L",
+        "size": "L",
+        "colourName": "Olive Green",
+        "colourHex": "#556B2F",
+        "stock": 15,
+        "price": 1990,
+        "originalPrice": 2786
+      },
+      {
+        "id": "sd-prod-042-var-4",
+        "sku": "SD-SD-PROD-042-OLI-XL",
+        "size": "XL",
+        "colourName": "Olive Green",
+        "colourHex": "#556B2F",
+        "stock": 15,
+        "price": 1990,
+        "originalPrice": 2786
+      },
+      {
+        "id": "sd-prod-042-var-5",
+        "sku": "SD-SD-PROD-042-OLI-XXL",
+        "size": "XXL",
+        "colourName": "Olive Green",
+        "colourHex": "#556B2F",
+        "stock": 15,
+        "price": 1990,
+        "originalPrice": 2786
+      },
+      {
+        "id": "sd-prod-042-var-6",
+        "sku": "SD-SD-PROD-042-CRI-S",
+        "size": "S",
+        "colourName": "Crimson Red",
+        "colourHex": "#DC143C",
+        "stock": 15,
+        "price": 1990,
+        "originalPrice": 2786
+      },
+      {
+        "id": "sd-prod-042-var-7",
+        "sku": "SD-SD-PROD-042-CRI-M",
+        "size": "M",
+        "colourName": "Crimson Red",
+        "colourHex": "#DC143C",
+        "stock": 0,
+        "price": 1990,
+        "originalPrice": 2786
+      },
+      {
+        "id": "sd-prod-042-var-8",
+        "sku": "SD-SD-PROD-042-CRI-L",
+        "size": "L",
+        "colourName": "Crimson Red",
+        "colourHex": "#DC143C",
+        "stock": 15,
+        "price": 1990,
+        "originalPrice": 2786
+      },
+      {
+        "id": "sd-prod-042-var-9",
+        "sku": "SD-SD-PROD-042-CRI-XL",
+        "size": "XL",
+        "colourName": "Crimson Red",
+        "colourHex": "#DC143C",
+        "stock": 15,
+        "price": 1990,
+        "originalPrice": 2786
+      },
+      {
+        "id": "sd-prod-042-var-10",
+        "sku": "SD-SD-PROD-042-CRI-XXL",
+        "size": "XXL",
+        "colourName": "Crimson Red",
+        "colourHex": "#DC143C",
+        "stock": 15,
+        "price": 1990,
+        "originalPrice": 2786
+      }
+    ],
+    "tags": [
+      "satin slip party midi dress",
+      "women",
+      "dresses",
+      "maxi",
+      "snitch",
+      "fashion",
+      "trending"
+    ],
+    "badge": "New",
+    "newArrival": false,
+    "trending": false,
+    "featured": false,
+    "expressDelivery": true,
+    "estimatedDeliveryMinutes": 60,
+    "returnWindowDays": 7,
+    "exchangeAvailable": true,
+    "vendorId": "v-ethnic-vibe",
+    "commissionPercent": 12,
+    "sponsored": false,
+    "active": true,
+    "createdAt": "2026-07-01T00:00:00Z",
+    "updatedAt": "2026-08-01T00:00:00Z"
+  },
+  {
+    "id": "sd-prod-043",
+    "slug": "cotton-a-line-summer-dress-sd-prod-043",
+    "name": "Cotton A-Line Summer Dress",
+    "brand": "Wrong",
+    "department": "women",
+    "category": "Dresses",
+    "subcategory": "Maxi",
+    "collection": "Summer Essentials 2026",
+    "shortDescription": "Premium quality cotton a-line summer dress crafted for comfort and style.",
+    "description": "Elevate your daily fashion with this Cotton A-Line Summer Dress. Features premium fabric construction, tailored fit, and durable craftsmanship ideal for everyday wear.",
+    "material": "100% Premium Combed Cotton",
+    "fit": "Regular Fit",
+    "pattern": "Solid / Textured",
+    "occasion": [
+      "Casual",
+      "Everyday",
+      "Party"
+    ],
+    "careInstructions": [
+      "Machine wash cold",
+      "Do not bleach",
+      "Tumble dry low",
+      "Warm iron if needed"
+    ],
+    "price": 2027,
+    "originalPrice": 2837,
+    "discount": 28,
+    "images": [
+      "https://images.unsplash.com/photo-1576995853123-5a10305d93c0?auto=format&fit=crop&w=800&q=80",
+      "https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?auto=format&fit=crop&w=800&q=80"
+    ],
+    "thumbnail": "https://images.unsplash.com/photo-1576995853123-5a10305d93c0?auto=format&fit=crop&w=800&q=80",
+    "rating": 4.6,
+    "reviewCount": 44,
+    "reviews": [
+      {
+        "id": "rev-sd-prod-043-1",
+        "userName": "Aman Sharma",
+        "rating": 5,
+        "title": "Great quality and fast delivery!",
+        "comment": "Delivered in Neemuch within 45 minutes! Quality is top notch.",
+        "createdAt": "2026-07-28",
+        "verifiedPurchase": true
+      },
+      {
+        "id": "rev-sd-prod-043-2",
+        "userName": "Priya Verma",
+        "rating": 4,
+        "title": "Nice fit and comfortable material",
+        "comment": "The fabric is very soft. True to size.",
+        "createdAt": "2026-07-29",
+        "verifiedPurchase": true
+      }
+    ],
+    "variants": [
+      {
+        "id": "sd-prod-043-var-1",
+        "sku": "SD-SD-PROD-043-CRI-S",
+        "size": "S",
+        "colourName": "Crimson Red",
+        "colourHex": "#DC143C",
+        "stock": 15,
+        "price": 2027,
+        "originalPrice": 2837
+      },
+      {
+        "id": "sd-prod-043-var-2",
+        "sku": "SD-SD-PROD-043-CRI-M",
+        "size": "M",
+        "colourName": "Crimson Red",
+        "colourHex": "#DC143C",
+        "stock": 15,
+        "price": 2027,
+        "originalPrice": 2837
+      },
+      {
+        "id": "sd-prod-043-var-3",
+        "sku": "SD-SD-PROD-043-CRI-L",
+        "size": "L",
+        "colourName": "Crimson Red",
+        "colourHex": "#DC143C",
+        "stock": 15,
+        "price": 2027,
+        "originalPrice": 2837
+      },
+      {
+        "id": "sd-prod-043-var-4",
+        "sku": "SD-SD-PROD-043-CRI-XL",
+        "size": "XL",
+        "colourName": "Crimson Red",
+        "colourHex": "#DC143C",
+        "stock": 15,
+        "price": 2027,
+        "originalPrice": 2837
+      },
+      {
+        "id": "sd-prod-043-var-5",
+        "sku": "SD-SD-PROD-043-CRI-XXL",
+        "size": "XXL",
+        "colourName": "Crimson Red",
+        "colourHex": "#DC143C",
+        "stock": 15,
+        "price": 2027,
+        "originalPrice": 2837
+      },
+      {
+        "id": "sd-prod-043-var-6",
+        "sku": "SD-SD-PROD-043-BEI-S",
+        "size": "S",
+        "colourName": "Beige",
+        "colourHex": "#F5F5DC",
+        "stock": 15,
+        "price": 2027,
+        "originalPrice": 2837
+      },
+      {
+        "id": "sd-prod-043-var-7",
+        "sku": "SD-SD-PROD-043-BEI-M",
+        "size": "M",
+        "colourName": "Beige",
+        "colourHex": "#F5F5DC",
+        "stock": 0,
+        "price": 2027,
+        "originalPrice": 2837
+      },
+      {
+        "id": "sd-prod-043-var-8",
+        "sku": "SD-SD-PROD-043-BEI-L",
+        "size": "L",
+        "colourName": "Beige",
+        "colourHex": "#F5F5DC",
+        "stock": 15,
+        "price": 2027,
+        "originalPrice": 2837
+      },
+      {
+        "id": "sd-prod-043-var-9",
+        "sku": "SD-SD-PROD-043-BEI-XL",
+        "size": "XL",
+        "colourName": "Beige",
+        "colourHex": "#F5F5DC",
+        "stock": 15,
+        "price": 2027,
+        "originalPrice": 2837
+      },
+      {
+        "id": "sd-prod-043-var-10",
+        "sku": "SD-SD-PROD-043-BEI-XXL",
+        "size": "XXL",
+        "colourName": "Beige",
+        "colourHex": "#F5F5DC",
+        "stock": 15,
+        "price": 2027,
+        "originalPrice": 2837
+      }
+    ],
+    "tags": [
+      "cotton a-line summer dress",
+      "women",
+      "dresses",
+      "maxi",
+      "wrong",
+      "fashion",
+      "trending"
+    ],
+    "badge": "Express",
+    "newArrival": false,
+    "trending": true,
+    "featured": true,
+    "expressDelivery": true,
+    "estimatedDeliveryMinutes": 60,
+    "returnWindowDays": 7,
+    "exchangeAvailable": true,
+    "vendorId": "v-urban-style",
+    "commissionPercent": 12,
+    "sponsored": false,
+    "active": true,
+    "createdAt": "2026-07-01T00:00:00Z",
+    "updatedAt": "2026-08-01T00:00:00Z"
+  },
+  {
+    "id": "sd-prod-044",
+    "slug": "wrap-around-front-wrap-dress-sd-prod-044",
+    "name": "Wrap-Around Front Wrap Dress",
+    "brand": "Roadster",
+    "department": "women",
+    "category": "Dresses",
+    "subcategory": "Maxi",
+    "collection": "Summer Essentials 2026",
+    "shortDescription": "Premium quality wrap-around front wrap dress crafted for comfort and style.",
+    "description": "Elevate your daily fashion with this Wrap-Around Front Wrap Dress. Features premium fabric construction, tailored fit, and durable craftsmanship ideal for everyday wear.",
+    "material": "100% Premium Combed Cotton",
+    "fit": "Regular Fit",
+    "pattern": "Solid / Textured",
+    "occasion": [
+      "Casual",
+      "Everyday",
+      "Party"
+    ],
+    "careInstructions": [
+      "Machine wash cold",
+      "Do not bleach",
+      "Tumble dry low",
+      "Warm iron if needed"
+    ],
+    "price": 2064,
+    "originalPrice": 2889,
+    "discount": 28,
+    "images": [
+      "https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?auto=format&fit=crop&w=800&q=80",
+      "https://images.unsplash.com/photo-1529374255404-311a2a4f1fd9?auto=format&fit=crop&w=800&q=80"
+    ],
+    "thumbnail": "https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?auto=format&fit=crop&w=800&q=80",
+    "rating": 4.7,
+    "reviewCount": 57,
+    "reviews": [
+      {
+        "id": "rev-sd-prod-044-1",
+        "userName": "Aman Sharma",
+        "rating": 5,
+        "title": "Great quality and fast delivery!",
+        "comment": "Delivered in Neemuch within 45 minutes! Quality is top notch.",
+        "createdAt": "2026-07-28",
+        "verifiedPurchase": true
+      },
+      {
+        "id": "rev-sd-prod-044-2",
+        "userName": "Priya Verma",
+        "rating": 4,
+        "title": "Nice fit and comfortable material",
+        "comment": "The fabric is very soft. True to size.",
+        "createdAt": "2026-07-29",
+        "verifiedPurchase": true
+      }
+    ],
+    "variants": [
+      {
+        "id": "sd-prod-044-var-1",
+        "sku": "SD-SD-PROD-044-BEI-S",
+        "size": "S",
+        "colourName": "Beige",
+        "colourHex": "#F5F5DC",
+        "stock": 15,
+        "price": 2064,
+        "originalPrice": 2889
+      },
+      {
+        "id": "sd-prod-044-var-2",
+        "sku": "SD-SD-PROD-044-BEI-M",
+        "size": "M",
+        "colourName": "Beige",
+        "colourHex": "#F5F5DC",
+        "stock": 15,
+        "price": 2064,
+        "originalPrice": 2889
+      },
+      {
+        "id": "sd-prod-044-var-3",
+        "sku": "SD-SD-PROD-044-BEI-L",
+        "size": "L",
+        "colourName": "Beige",
+        "colourHex": "#F5F5DC",
+        "stock": 15,
+        "price": 2064,
+        "originalPrice": 2889
+      },
+      {
+        "id": "sd-prod-044-var-4",
+        "sku": "SD-SD-PROD-044-BEI-XL",
+        "size": "XL",
+        "colourName": "Beige",
+        "colourHex": "#F5F5DC",
+        "stock": 15,
+        "price": 2064,
+        "originalPrice": 2889
+      },
+      {
+        "id": "sd-prod-044-var-5",
+        "sku": "SD-SD-PROD-044-BEI-XXL",
+        "size": "XXL",
+        "colourName": "Beige",
+        "colourHex": "#F5F5DC",
+        "stock": 15,
+        "price": 2064,
+        "originalPrice": 2889
+      },
+      {
+        "id": "sd-prod-044-var-6",
+        "sku": "SD-SD-PROD-044-CHA-S",
+        "size": "S",
+        "colourName": "Charcoal Gray",
+        "colourHex": "#36454F",
+        "stock": 15,
+        "price": 2064,
+        "originalPrice": 2889
+      },
+      {
+        "id": "sd-prod-044-var-7",
+        "sku": "SD-SD-PROD-044-CHA-M",
+        "size": "M",
+        "colourName": "Charcoal Gray",
+        "colourHex": "#36454F",
+        "stock": 0,
+        "price": 2064,
+        "originalPrice": 2889
+      },
+      {
+        "id": "sd-prod-044-var-8",
+        "sku": "SD-SD-PROD-044-CHA-L",
+        "size": "L",
+        "colourName": "Charcoal Gray",
+        "colourHex": "#36454F",
+        "stock": 15,
+        "price": 2064,
+        "originalPrice": 2889
+      },
+      {
+        "id": "sd-prod-044-var-9",
+        "sku": "SD-SD-PROD-044-CHA-XL",
+        "size": "XL",
+        "colourName": "Charcoal Gray",
+        "colourHex": "#36454F",
+        "stock": 15,
+        "price": 2064,
+        "originalPrice": 2889
+      },
+      {
+        "id": "sd-prod-044-var-10",
+        "sku": "SD-SD-PROD-044-CHA-XXL",
+        "size": "XXL",
+        "colourName": "Charcoal Gray",
+        "colourHex": "#36454F",
+        "stock": 15,
+        "price": 2064,
+        "originalPrice": 2889
+      }
+    ],
+    "tags": [
+      "wrap-around front wrap dress",
+      "women",
+      "dresses",
+      "maxi",
+      "roadster",
+      "fashion",
+      "trending"
+    ],
+    "badge": "Trending",
+    "newArrival": true,
+    "trending": false,
+    "featured": false,
+    "expressDelivery": true,
+    "estimatedDeliveryMinutes": 60,
+    "returnWindowDays": 7,
+    "exchangeAvailable": true,
+    "vendorId": "v-ethnic-vibe",
+    "commissionPercent": 12,
+    "sponsored": false,
+    "active": true,
+    "createdAt": "2026-07-01T00:00:00Z",
+    "updatedAt": "2026-08-01T00:00:00Z"
+  },
+  {
+    "id": "sd-prod-045",
+    "slug": "ribbed-knit-bodycon-dress-sd-prod-045",
+    "name": "Ribbed Knit Bodycon Dress",
+    "brand": "HRX",
+    "department": "women",
+    "category": "Dresses",
+    "subcategory": "Maxi",
+    "collection": "Summer Essentials 2026",
+    "shortDescription": "Premium quality ribbed knit bodycon dress crafted for comfort and style.",
+    "description": "Elevate your daily fashion with this Ribbed Knit Bodycon Dress. Features premium fabric construction, tailored fit, and durable craftsmanship ideal for everyday wear.",
+    "material": "100% Premium Combed Cotton",
+    "fit": "Regular Fit",
+    "pattern": "Solid / Textured",
+    "occasion": [
+      "Casual",
+      "Everyday",
+      "Party"
+    ],
+    "careInstructions": [
+      "Machine wash cold",
+      "Do not bleach",
+      "Tumble dry low",
+      "Warm iron if needed"
+    ],
+    "price": 2101,
+    "originalPrice": 2941,
+    "discount": 28,
+    "images": [
+      "https://images.unsplash.com/photo-1529374255404-311a2a4f1fd9?auto=format&fit=crop&w=800&q=80",
+      "https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&w=800&q=80"
+    ],
+    "thumbnail": "https://images.unsplash.com/photo-1529374255404-311a2a4f1fd9?auto=format&fit=crop&w=800&q=80",
+    "rating": 4.8,
+    "reviewCount": 70,
+    "reviews": [
+      {
+        "id": "rev-sd-prod-045-1",
+        "userName": "Aman Sharma",
+        "rating": 5,
+        "title": "Great quality and fast delivery!",
+        "comment": "Delivered in Neemuch within 45 minutes! Quality is top notch.",
+        "createdAt": "2026-07-28",
+        "verifiedPurchase": true
+      },
+      {
+        "id": "rev-sd-prod-045-2",
+        "userName": "Priya Verma",
+        "rating": 4,
+        "title": "Nice fit and comfortable material",
+        "comment": "The fabric is very soft. True to size.",
+        "createdAt": "2026-07-29",
+        "verifiedPurchase": true
+      }
+    ],
+    "variants": [
+      {
+        "id": "sd-prod-045-var-1",
+        "sku": "SD-SD-PROD-045-CHA-S",
+        "size": "S",
+        "colourName": "Charcoal Gray",
+        "colourHex": "#36454F",
+        "stock": 15,
+        "price": 2101,
+        "originalPrice": 2941
+      },
+      {
+        "id": "sd-prod-045-var-2",
+        "sku": "SD-SD-PROD-045-CHA-M",
+        "size": "M",
+        "colourName": "Charcoal Gray",
+        "colourHex": "#36454F",
+        "stock": 15,
+        "price": 2101,
+        "originalPrice": 2941
+      },
+      {
+        "id": "sd-prod-045-var-3",
+        "sku": "SD-SD-PROD-045-CHA-L",
+        "size": "L",
+        "colourName": "Charcoal Gray",
+        "colourHex": "#36454F",
+        "stock": 15,
+        "price": 2101,
+        "originalPrice": 2941
+      },
+      {
+        "id": "sd-prod-045-var-4",
+        "sku": "SD-SD-PROD-045-CHA-XL",
+        "size": "XL",
+        "colourName": "Charcoal Gray",
+        "colourHex": "#36454F",
+        "stock": 15,
+        "price": 2101,
+        "originalPrice": 2941
+      },
+      {
+        "id": "sd-prod-045-var-5",
+        "sku": "SD-SD-PROD-045-CHA-XXL",
+        "size": "XXL",
+        "colourName": "Charcoal Gray",
+        "colourHex": "#36454F",
+        "stock": 15,
+        "price": 2101,
+        "originalPrice": 2941
+      },
+      {
+        "id": "sd-prod-045-var-6",
+        "sku": "SD-SD-PROD-045-MUS-S",
+        "size": "S",
+        "colourName": "Mustard Yellow",
+        "colourHex": "#FFDB58",
+        "stock": 15,
+        "price": 2101,
+        "originalPrice": 2941
+      },
+      {
+        "id": "sd-prod-045-var-7",
+        "sku": "SD-SD-PROD-045-MUS-M",
+        "size": "M",
+        "colourName": "Mustard Yellow",
+        "colourHex": "#FFDB58",
+        "stock": 0,
+        "price": 2101,
+        "originalPrice": 2941
+      },
+      {
+        "id": "sd-prod-045-var-8",
+        "sku": "SD-SD-PROD-045-MUS-L",
+        "size": "L",
+        "colourName": "Mustard Yellow",
+        "colourHex": "#FFDB58",
+        "stock": 15,
+        "price": 2101,
+        "originalPrice": 2941
+      },
+      {
+        "id": "sd-prod-045-var-9",
+        "sku": "SD-SD-PROD-045-MUS-XL",
+        "size": "XL",
+        "colourName": "Mustard Yellow",
+        "colourHex": "#FFDB58",
+        "stock": 15,
+        "price": 2101,
+        "originalPrice": 2941
+      },
+      {
+        "id": "sd-prod-045-var-10",
+        "sku": "SD-SD-PROD-045-MUS-XXL",
+        "size": "XXL",
+        "colourName": "Mustard Yellow",
+        "colourHex": "#FFDB58",
+        "stock": 15,
+        "price": 2101,
+        "originalPrice": 2941
+      }
+    ],
+    "tags": [
+      "ribbed knit bodycon dress",
+      "women",
+      "dresses",
+      "maxi",
+      "hrx",
+      "fashion",
+      "trending"
+    ],
+    "badge": "Express",
+    "newArrival": false,
+    "trending": true,
+    "featured": false,
+    "expressDelivery": true,
+    "estimatedDeliveryMinutes": 60,
+    "returnWindowDays": 7,
+    "exchangeAvailable": true,
+    "vendorId": "v-urban-style",
+    "commissionPercent": 12,
+    "sponsored": false,
+    "active": true,
+    "createdAt": "2026-07-01T00:00:00Z",
+    "updatedAt": "2026-08-01T00:00:00Z"
+  },
+  {
+    "id": "sd-prod-046",
+    "slug": "ribbed-square-neck-crop-top-sd-prod-046",
+    "name": "Ribbed Square Neck Crop Top",
+    "brand": "StyleDash Studio",
+    "department": "women",
+    "category": "Tops & Tees",
+    "subcategory": "Crop Tops",
+    "collection": "Summer Essentials 2026",
+    "shortDescription": "Premium quality ribbed square neck crop top crafted for comfort and style.",
+    "description": "Elevate your daily fashion with this Ribbed Square Neck Crop Top. Features premium fabric construction, tailored fit, and durable craftsmanship ideal for everyday wear.",
+    "material": "100% Premium Combed Cotton",
+    "fit": "Regular Fit",
+    "pattern": "Solid / Textured",
+    "occasion": [
+      "Casual",
+      "Everyday",
+      "Party"
+    ],
+    "careInstructions": [
+      "Machine wash cold",
+      "Do not bleach",
+      "Tumble dry low",
+      "Warm iron if needed"
+    ],
+    "price": 2138,
+    "originalPrice": 2993,
+    "discount": 28,
+    "images": [
+      "https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&w=800&q=80",
+      "https://images.unsplash.com/photo-1521572267360-ee0c2909d518?auto=format&fit=crop&w=800&q=80"
+    ],
+    "thumbnail": "https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&w=800&q=80",
+    "rating": 4.9,
+    "reviewCount": 83,
+    "reviews": [
+      {
+        "id": "rev-sd-prod-046-1",
+        "userName": "Aman Sharma",
+        "rating": 5,
+        "title": "Great quality and fast delivery!",
+        "comment": "Delivered in Neemuch within 45 minutes! Quality is top notch.",
+        "createdAt": "2026-07-28",
+        "verifiedPurchase": true
+      },
+      {
+        "id": "rev-sd-prod-046-2",
+        "userName": "Priya Verma",
+        "rating": 4,
+        "title": "Nice fit and comfortable material",
+        "comment": "The fabric is very soft. True to size.",
+        "createdAt": "2026-07-29",
+        "verifiedPurchase": true
+      }
+    ],
+    "variants": [
+      {
+        "id": "sd-prod-046-var-1",
+        "sku": "SD-SD-PROD-046-MUS-S",
+        "size": "S",
+        "colourName": "Mustard Yellow",
+        "colourHex": "#FFDB58",
+        "stock": 15,
+        "price": 2138,
+        "originalPrice": 2993
+      },
+      {
+        "id": "sd-prod-046-var-2",
+        "sku": "SD-SD-PROD-046-MUS-M",
+        "size": "M",
+        "colourName": "Mustard Yellow",
+        "colourHex": "#FFDB58",
+        "stock": 15,
+        "price": 2138,
+        "originalPrice": 2993
+      },
+      {
+        "id": "sd-prod-046-var-3",
+        "sku": "SD-SD-PROD-046-MUS-L",
+        "size": "L",
+        "colourName": "Mustard Yellow",
+        "colourHex": "#FFDB58",
+        "stock": 15,
+        "price": 2138,
+        "originalPrice": 2993
+      },
+      {
+        "id": "sd-prod-046-var-4",
+        "sku": "SD-SD-PROD-046-MUS-XL",
+        "size": "XL",
+        "colourName": "Mustard Yellow",
+        "colourHex": "#FFDB58",
+        "stock": 15,
+        "price": 2138,
+        "originalPrice": 2993
+      },
+      {
+        "id": "sd-prod-046-var-5",
+        "sku": "SD-SD-PROD-046-MUS-XXL",
+        "size": "XXL",
+        "colourName": "Mustard Yellow",
+        "colourHex": "#FFDB58",
+        "stock": 15,
+        "price": 2138,
+        "originalPrice": 2993
+      },
+      {
+        "id": "sd-prod-046-var-6",
+        "sku": "SD-SD-PROD-046-BLA-S",
+        "size": "S",
+        "colourName": "Black",
+        "colourHex": "#000000",
+        "stock": 15,
+        "price": 2138,
+        "originalPrice": 2993
+      },
+      {
+        "id": "sd-prod-046-var-7",
+        "sku": "SD-SD-PROD-046-BLA-M",
+        "size": "M",
+        "colourName": "Black",
+        "colourHex": "#000000",
+        "stock": 0,
+        "price": 2138,
+        "originalPrice": 2993
+      },
+      {
+        "id": "sd-prod-046-var-8",
+        "sku": "SD-SD-PROD-046-BLA-L",
+        "size": "L",
+        "colourName": "Black",
+        "colourHex": "#000000",
+        "stock": 15,
+        "price": 2138,
+        "originalPrice": 2993
+      },
+      {
+        "id": "sd-prod-046-var-9",
+        "sku": "SD-SD-PROD-046-BLA-XL",
+        "size": "XL",
+        "colourName": "Black",
+        "colourHex": "#000000",
+        "stock": 15,
+        "price": 2138,
+        "originalPrice": 2993
+      },
+      {
+        "id": "sd-prod-046-var-10",
+        "sku": "SD-SD-PROD-046-BLA-XXL",
+        "size": "XXL",
+        "colourName": "Black",
+        "colourHex": "#000000",
+        "stock": 15,
+        "price": 2138,
+        "originalPrice": 2993
+      }
+    ],
+    "tags": [
+      "ribbed square neck crop top",
+      "women",
+      "tops & tees",
+      "crop tops",
+      "styledash studio",
+      "fashion",
+      "trending"
+    ],
+    "badge": "New",
+    "newArrival": false,
+    "trending": false,
+    "featured": false,
+    "expressDelivery": true,
+    "estimatedDeliveryMinutes": 60,
+    "returnWindowDays": 7,
+    "exchangeAvailable": true,
+    "vendorId": "v-ethnic-vibe",
+    "commissionPercent": 12,
+    "sponsored": false,
+    "active": true,
+    "createdAt": "2026-07-01T00:00:00Z",
+    "updatedAt": "2026-08-01T00:00:00Z"
+  },
+  {
+    "id": "sd-prod-047",
+    "slug": "schiffli-embroidered-cotton-blouse-sd-prod-047",
+    "name": "Schiffli Embroidered Cotton Blouse",
+    "brand": "Anouk",
+    "department": "women",
+    "category": "Tops & Tees",
+    "subcategory": "Crop Tops",
+    "collection": "Summer Essentials 2026",
+    "shortDescription": "Premium quality schiffli embroidered cotton blouse crafted for comfort and style.",
+    "description": "Elevate your daily fashion with this Schiffli Embroidered Cotton Blouse. Features premium fabric construction, tailored fit, and durable craftsmanship ideal for everyday wear.",
+    "material": "100% Premium Combed Cotton",
+    "fit": "Regular Fit",
+    "pattern": "Solid / Textured",
+    "occasion": [
+      "Casual",
+      "Everyday",
+      "Party"
+    ],
+    "careInstructions": [
+      "Machine wash cold",
+      "Do not bleach",
+      "Tumble dry low",
+      "Warm iron if needed"
+    ],
+    "price": 2175,
+    "originalPrice": 3045,
+    "discount": 28,
+    "images": [
+      "https://images.unsplash.com/photo-1521572267360-ee0c2909d518?auto=format&fit=crop&w=800&q=80",
+      "https://images.unsplash.com/photo-1503342217505-b0a15ec3261c?auto=format&fit=crop&w=800&q=80"
+    ],
+    "thumbnail": "https://images.unsplash.com/photo-1521572267360-ee0c2909d518?auto=format&fit=crop&w=800&q=80",
+    "rating": 3.8,
+    "reviewCount": 96,
+    "reviews": [
+      {
+        "id": "rev-sd-prod-047-1",
+        "userName": "Aman Sharma",
+        "rating": 5,
+        "title": "Great quality and fast delivery!",
+        "comment": "Delivered in Neemuch within 45 minutes! Quality is top notch.",
+        "createdAt": "2026-07-28",
+        "verifiedPurchase": true
+      },
+      {
+        "id": "rev-sd-prod-047-2",
+        "userName": "Priya Verma",
+        "rating": 4,
+        "title": "Nice fit and comfortable material",
+        "comment": "The fabric is very soft. True to size.",
+        "createdAt": "2026-07-29",
+        "verifiedPurchase": true
+      }
+    ],
+    "variants": [
+      {
+        "id": "sd-prod-047-var-1",
+        "sku": "SD-SD-PROD-047-BLA-S",
+        "size": "S",
+        "colourName": "Black",
+        "colourHex": "#000000",
+        "stock": 15,
+        "price": 2175,
+        "originalPrice": 3045
+      },
+      {
+        "id": "sd-prod-047-var-2",
+        "sku": "SD-SD-PROD-047-BLA-M",
+        "size": "M",
+        "colourName": "Black",
+        "colourHex": "#000000",
+        "stock": 15,
+        "price": 2175,
+        "originalPrice": 3045
+      },
+      {
+        "id": "sd-prod-047-var-3",
+        "sku": "SD-SD-PROD-047-BLA-L",
+        "size": "L",
+        "colourName": "Black",
+        "colourHex": "#000000",
+        "stock": 15,
+        "price": 2175,
+        "originalPrice": 3045
+      },
+      {
+        "id": "sd-prod-047-var-4",
+        "sku": "SD-SD-PROD-047-BLA-XL",
+        "size": "XL",
+        "colourName": "Black",
+        "colourHex": "#000000",
+        "stock": 15,
+        "price": 2175,
+        "originalPrice": 3045
+      },
+      {
+        "id": "sd-prod-047-var-5",
+        "sku": "SD-SD-PROD-047-BLA-XXL",
+        "size": "XXL",
+        "colourName": "Black",
+        "colourHex": "#000000",
+        "stock": 15,
+        "price": 2175,
+        "originalPrice": 3045
+      },
+      {
+        "id": "sd-prod-047-var-6",
+        "sku": "SD-SD-PROD-047-WHI-S",
+        "size": "S",
+        "colourName": "White",
+        "colourHex": "#FFFFFF",
+        "stock": 15,
+        "price": 2175,
+        "originalPrice": 3045
+      },
+      {
+        "id": "sd-prod-047-var-7",
+        "sku": "SD-SD-PROD-047-WHI-M",
+        "size": "M",
+        "colourName": "White",
+        "colourHex": "#FFFFFF",
+        "stock": 0,
+        "price": 2175,
+        "originalPrice": 3045
+      },
+      {
+        "id": "sd-prod-047-var-8",
+        "sku": "SD-SD-PROD-047-WHI-L",
+        "size": "L",
+        "colourName": "White",
+        "colourHex": "#FFFFFF",
+        "stock": 15,
+        "price": 2175,
+        "originalPrice": 3045
+      },
+      {
+        "id": "sd-prod-047-var-9",
+        "sku": "SD-SD-PROD-047-WHI-XL",
+        "size": "XL",
+        "colourName": "White",
+        "colourHex": "#FFFFFF",
+        "stock": 15,
+        "price": 2175,
+        "originalPrice": 3045
+      },
+      {
+        "id": "sd-prod-047-var-10",
+        "sku": "SD-SD-PROD-047-WHI-XXL",
+        "size": "XXL",
+        "colourName": "White",
+        "colourHex": "#FFFFFF",
+        "stock": 15,
+        "price": 2175,
+        "originalPrice": 3045
+      }
+    ],
+    "tags": [
+      "schiffli embroidered cotton blouse",
+      "women",
+      "tops & tees",
+      "crop tops",
+      "anouk",
+      "fashion",
+      "trending"
+    ],
+    "badge": "Trending",
+    "newArrival": true,
+    "trending": true,
+    "featured": true,
+    "expressDelivery": true,
+    "estimatedDeliveryMinutes": 60,
+    "returnWindowDays": 7,
+    "exchangeAvailable": true,
+    "vendorId": "v-urban-style",
+    "commissionPercent": 12,
+    "sponsored": false,
+    "active": true,
+    "createdAt": "2026-07-01T00:00:00Z",
+    "updatedAt": "2026-08-01T00:00:00Z"
+  },
+  {
+    "id": "sd-prod-048",
+    "slug": "oversized-boyfriend-graphic-tee-sd-prod-048",
+    "name": "Oversized Boyfriend Graphic Tee",
+    "brand": "Mast & Harbour",
+    "department": "women",
+    "category": "Tops & Tees",
+    "subcategory": "Crop Tops",
+    "collection": "Summer Essentials 2026",
+    "shortDescription": "Premium quality oversized boyfriend graphic tee crafted for comfort and style.",
+    "description": "Elevate your daily fashion with this Oversized Boyfriend Graphic Tee. Features premium fabric construction, tailored fit, and durable craftsmanship ideal for everyday wear.",
+    "material": "100% Premium Combed Cotton",
+    "fit": "Regular Fit",
+    "pattern": "Solid / Textured",
+    "occasion": [
+      "Casual",
+      "Everyday",
+      "Party"
+    ],
+    "careInstructions": [
+      "Machine wash cold",
+      "Do not bleach",
+      "Tumble dry low",
+      "Warm iron if needed"
+    ],
+    "price": 2212,
+    "originalPrice": 3096,
+    "discount": 28,
+    "images": [
+      "https://images.unsplash.com/photo-1503342217505-b0a15ec3261c?auto=format&fit=crop&w=800&q=80",
+      "https://images.unsplash.com/photo-1576995853123-5a10305d93c0?auto=format&fit=crop&w=800&q=80"
+    ],
+    "thumbnail": "https://images.unsplash.com/photo-1503342217505-b0a15ec3261c?auto=format&fit=crop&w=800&q=80",
+    "rating": 3.9,
+    "reviewCount": 109,
+    "reviews": [
+      {
+        "id": "rev-sd-prod-048-1",
+        "userName": "Aman Sharma",
+        "rating": 5,
+        "title": "Great quality and fast delivery!",
+        "comment": "Delivered in Neemuch within 45 minutes! Quality is top notch.",
+        "createdAt": "2026-07-28",
+        "verifiedPurchase": true
+      },
+      {
+        "id": "rev-sd-prod-048-2",
+        "userName": "Priya Verma",
+        "rating": 4,
+        "title": "Nice fit and comfortable material",
+        "comment": "The fabric is very soft. True to size.",
+        "createdAt": "2026-07-29",
+        "verifiedPurchase": true
+      }
+    ],
+    "variants": [
+      {
+        "id": "sd-prod-048-var-1",
+        "sku": "SD-SD-PROD-048-WHI-S",
+        "size": "S",
+        "colourName": "White",
+        "colourHex": "#FFFFFF",
+        "stock": 15,
+        "price": 2212,
+        "originalPrice": 3096
+      },
+      {
+        "id": "sd-prod-048-var-2",
+        "sku": "SD-SD-PROD-048-WHI-M",
+        "size": "M",
+        "colourName": "White",
+        "colourHex": "#FFFFFF",
+        "stock": 15,
+        "price": 2212,
+        "originalPrice": 3096
+      },
+      {
+        "id": "sd-prod-048-var-3",
+        "sku": "SD-SD-PROD-048-WHI-L",
+        "size": "L",
+        "colourName": "White",
+        "colourHex": "#FFFFFF",
+        "stock": 15,
+        "price": 2212,
+        "originalPrice": 3096
+      },
+      {
+        "id": "sd-prod-048-var-4",
+        "sku": "SD-SD-PROD-048-WHI-XL",
+        "size": "XL",
+        "colourName": "White",
+        "colourHex": "#FFFFFF",
+        "stock": 15,
+        "price": 2212,
+        "originalPrice": 3096
+      },
+      {
+        "id": "sd-prod-048-var-5",
+        "sku": "SD-SD-PROD-048-WHI-XXL",
+        "size": "XXL",
+        "colourName": "White",
+        "colourHex": "#FFFFFF",
+        "stock": 15,
+        "price": 2212,
+        "originalPrice": 3096
+      },
+      {
+        "id": "sd-prod-048-var-6",
+        "sku": "SD-SD-PROD-048-NAV-S",
+        "size": "S",
+        "colourName": "Navy Blue",
+        "colourHex": "#000080",
+        "stock": 15,
+        "price": 2212,
+        "originalPrice": 3096
+      },
+      {
+        "id": "sd-prod-048-var-7",
+        "sku": "SD-SD-PROD-048-NAV-M",
+        "size": "M",
+        "colourName": "Navy Blue",
+        "colourHex": "#000080",
+        "stock": 0,
+        "price": 2212,
+        "originalPrice": 3096
+      },
+      {
+        "id": "sd-prod-048-var-8",
+        "sku": "SD-SD-PROD-048-NAV-L",
+        "size": "L",
+        "colourName": "Navy Blue",
+        "colourHex": "#000080",
+        "stock": 15,
+        "price": 2212,
+        "originalPrice": 3096
+      },
+      {
+        "id": "sd-prod-048-var-9",
+        "sku": "SD-SD-PROD-048-NAV-XL",
+        "size": "XL",
+        "colourName": "Navy Blue",
+        "colourHex": "#000080",
+        "stock": 15,
+        "price": 2212,
+        "originalPrice": 3096
+      },
+      {
+        "id": "sd-prod-048-var-10",
+        "sku": "SD-SD-PROD-048-NAV-XXL",
+        "size": "XXL",
+        "colourName": "Navy Blue",
+        "colourHex": "#000080",
+        "stock": 15,
+        "price": 2212,
+        "originalPrice": 3096
+      }
+    ],
+    "tags": [
+      "oversized boyfriend graphic tee",
+      "women",
+      "tops & tees",
+      "crop tops",
+      "mast & harbour",
+      "fashion",
+      "trending"
+    ],
+    "badge": "New",
+    "newArrival": false,
+    "trending": false,
+    "featured": false,
+    "expressDelivery": true,
+    "estimatedDeliveryMinutes": 60,
+    "returnWindowDays": 7,
+    "exchangeAvailable": true,
+    "vendorId": "v-ethnic-vibe",
+    "commissionPercent": 12,
+    "sponsored": true,
+    "active": true,
+    "createdAt": "2026-07-01T00:00:00Z",
+    "updatedAt": "2026-08-01T00:00:00Z"
+  },
+  {
+    "id": "sd-prod-049",
+    "slug": "puff-sleeve-peplum-top-sd-prod-049",
+    "name": "Puff Sleeve Peplum Top",
+    "brand": "Highlander",
+    "department": "women",
+    "category": "Tops & Tees",
+    "subcategory": "Crop Tops",
+    "collection": "Summer Essentials 2026",
+    "shortDescription": "Premium quality puff sleeve peplum top crafted for comfort and style.",
+    "description": "Elevate your daily fashion with this Puff Sleeve Peplum Top. Features premium fabric construction, tailored fit, and durable craftsmanship ideal for everyday wear.",
+    "material": "100% Premium Combed Cotton",
+    "fit": "Regular Fit",
+    "pattern": "Solid / Textured",
+    "occasion": [
+      "Casual",
+      "Everyday",
+      "Party"
+    ],
+    "careInstructions": [
+      "Machine wash cold",
+      "Do not bleach",
+      "Tumble dry low",
+      "Warm iron if needed"
+    ],
+    "price": 2249,
+    "originalPrice": 3148,
+    "discount": 28,
+    "images": [
+      "https://images.unsplash.com/photo-1576995853123-5a10305d93c0?auto=format&fit=crop&w=800&q=80",
+      "https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?auto=format&fit=crop&w=800&q=80"
+    ],
+    "thumbnail": "https://images.unsplash.com/photo-1576995853123-5a10305d93c0?auto=format&fit=crop&w=800&q=80",
+    "rating": 4.0,
+    "reviewCount": 122,
+    "reviews": [
+      {
+        "id": "rev-sd-prod-049-1",
+        "userName": "Aman Sharma",
+        "rating": 5,
+        "title": "Great quality and fast delivery!",
+        "comment": "Delivered in Neemuch within 45 minutes! Quality is top notch.",
+        "createdAt": "2026-07-28",
+        "verifiedPurchase": true
+      },
+      {
+        "id": "rev-sd-prod-049-2",
+        "userName": "Priya Verma",
+        "rating": 4,
+        "title": "Nice fit and comfortable material",
+        "comment": "The fabric is very soft. True to size.",
+        "createdAt": "2026-07-29",
+        "verifiedPurchase": true
+      }
+    ],
+    "variants": [
+      {
+        "id": "sd-prod-049-var-1",
+        "sku": "SD-SD-PROD-049-NAV-S",
+        "size": "S",
+        "colourName": "Navy Blue",
+        "colourHex": "#000080",
+        "stock": 15,
+        "price": 2249,
+        "originalPrice": 3148
+      },
+      {
+        "id": "sd-prod-049-var-2",
+        "sku": "SD-SD-PROD-049-NAV-M",
+        "size": "M",
+        "colourName": "Navy Blue",
+        "colourHex": "#000080",
+        "stock": 15,
+        "price": 2249,
+        "originalPrice": 3148
+      },
+      {
+        "id": "sd-prod-049-var-3",
+        "sku": "SD-SD-PROD-049-NAV-L",
+        "size": "L",
+        "colourName": "Navy Blue",
+        "colourHex": "#000080",
+        "stock": 15,
+        "price": 2249,
+        "originalPrice": 3148
+      },
+      {
+        "id": "sd-prod-049-var-4",
+        "sku": "SD-SD-PROD-049-NAV-XL",
+        "size": "XL",
+        "colourName": "Navy Blue",
+        "colourHex": "#000080",
+        "stock": 15,
+        "price": 2249,
+        "originalPrice": 3148
+      },
+      {
+        "id": "sd-prod-049-var-5",
+        "sku": "SD-SD-PROD-049-NAV-XXL",
+        "size": "XXL",
+        "colourName": "Navy Blue",
+        "colourHex": "#000080",
+        "stock": 15,
+        "price": 2249,
+        "originalPrice": 3148
+      },
+      {
+        "id": "sd-prod-049-var-6",
+        "sku": "SD-SD-PROD-049-OLI-S",
+        "size": "S",
+        "colourName": "Olive Green",
+        "colourHex": "#556B2F",
+        "stock": 15,
+        "price": 2249,
+        "originalPrice": 3148
+      },
+      {
+        "id": "sd-prod-049-var-7",
+        "sku": "SD-SD-PROD-049-OLI-M",
+        "size": "M",
+        "colourName": "Olive Green",
+        "colourHex": "#556B2F",
+        "stock": 0,
+        "price": 2249,
+        "originalPrice": 3148
+      },
+      {
+        "id": "sd-prod-049-var-8",
+        "sku": "SD-SD-PROD-049-OLI-L",
+        "size": "L",
+        "colourName": "Olive Green",
+        "colourHex": "#556B2F",
+        "stock": 15,
+        "price": 2249,
+        "originalPrice": 3148
+      },
+      {
+        "id": "sd-prod-049-var-9",
+        "sku": "SD-SD-PROD-049-OLI-XL",
+        "size": "XL",
+        "colourName": "Olive Green",
+        "colourHex": "#556B2F",
+        "stock": 15,
+        "price": 2249,
+        "originalPrice": 3148
+      },
+      {
+        "id": "sd-prod-049-var-10",
+        "sku": "SD-SD-PROD-049-OLI-XXL",
+        "size": "XXL",
+        "colourName": "Olive Green",
+        "colourHex": "#556B2F",
+        "stock": 15,
+        "price": 2249,
+        "originalPrice": 3148
+      }
+    ],
+    "tags": [
+      "puff sleeve peplum top",
+      "women",
+      "tops & tees",
+      "crop tops",
+      "highlander",
+      "fashion",
+      "trending"
+    ],
+    "badge": "Express",
+    "newArrival": false,
+    "trending": true,
+    "featured": false,
+    "expressDelivery": true,
+    "estimatedDeliveryMinutes": 60,
+    "returnWindowDays": 7,
+    "exchangeAvailable": true,
+    "vendorId": "v-urban-style",
+    "commissionPercent": 12,
+    "sponsored": false,
+    "active": true,
+    "createdAt": "2026-07-01T00:00:00Z",
+    "updatedAt": "2026-08-01T00:00:00Z"
+  },
+  {
+    "id": "sd-prod-050",
+    "slug": "satin-cowl-neck-camisole-sd-prod-050",
+    "name": "Satin Cowl Neck Camisole",
+    "brand": "Bawree",
+    "department": "women",
+    "category": "Tops & Tees",
+    "subcategory": "Crop Tops",
+    "collection": "Summer Essentials 2026",
+    "shortDescription": "Premium quality satin cowl neck camisole crafted for comfort and style.",
+    "description": "Elevate your daily fashion with this Satin Cowl Neck Camisole. Features premium fabric construction, tailored fit, and durable craftsmanship ideal for everyday wear.",
+    "material": "100% Premium Combed Cotton",
+    "fit": "Regular Fit",
+    "pattern": "Solid / Textured",
+    "occasion": [
+      "Casual",
+      "Everyday",
+      "Party"
+    ],
+    "careInstructions": [
+      "Machine wash cold",
+      "Do not bleach",
+      "Tumble dry low",
+      "Warm iron if needed"
+    ],
+    "price": 2286,
+    "originalPrice": 3200,
+    "discount": 28,
+    "images": [
+      "https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?auto=format&fit=crop&w=800&q=80",
+      "https://images.unsplash.com/photo-1529374255404-311a2a4f1fd9?auto=format&fit=crop&w=800&q=80"
+    ],
+    "thumbnail": "https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?auto=format&fit=crop&w=800&q=80",
+    "rating": 4.1,
+    "reviewCount": 135,
+    "reviews": [
+      {
+        "id": "rev-sd-prod-050-1",
+        "userName": "Aman Sharma",
+        "rating": 5,
+        "title": "Great quality and fast delivery!",
+        "comment": "Delivered in Neemuch within 45 minutes! Quality is top notch.",
+        "createdAt": "2026-07-28",
+        "verifiedPurchase": true
+      },
+      {
+        "id": "rev-sd-prod-050-2",
+        "userName": "Priya Verma",
+        "rating": 4,
+        "title": "Nice fit and comfortable material",
+        "comment": "The fabric is very soft. True to size.",
+        "createdAt": "2026-07-29",
+        "verifiedPurchase": true
+      }
+    ],
+    "variants": [
+      {
+        "id": "sd-prod-050-var-1",
+        "sku": "SD-SD-PROD-050-OLI-S",
+        "size": "S",
+        "colourName": "Olive Green",
+        "colourHex": "#556B2F",
+        "stock": 15,
+        "price": 2286,
+        "originalPrice": 3200
+      },
+      {
+        "id": "sd-prod-050-var-2",
+        "sku": "SD-SD-PROD-050-OLI-M",
+        "size": "M",
+        "colourName": "Olive Green",
+        "colourHex": "#556B2F",
+        "stock": 15,
+        "price": 2286,
+        "originalPrice": 3200
+      },
+      {
+        "id": "sd-prod-050-var-3",
+        "sku": "SD-SD-PROD-050-OLI-L",
+        "size": "L",
+        "colourName": "Olive Green",
+        "colourHex": "#556B2F",
+        "stock": 15,
+        "price": 2286,
+        "originalPrice": 3200
+      },
+      {
+        "id": "sd-prod-050-var-4",
+        "sku": "SD-SD-PROD-050-OLI-XL",
+        "size": "XL",
+        "colourName": "Olive Green",
+        "colourHex": "#556B2F",
+        "stock": 15,
+        "price": 2286,
+        "originalPrice": 3200
+      },
+      {
+        "id": "sd-prod-050-var-5",
+        "sku": "SD-SD-PROD-050-OLI-XXL",
+        "size": "XXL",
+        "colourName": "Olive Green",
+        "colourHex": "#556B2F",
+        "stock": 15,
+        "price": 2286,
+        "originalPrice": 3200
+      },
+      {
+        "id": "sd-prod-050-var-6",
+        "sku": "SD-SD-PROD-050-CRI-S",
+        "size": "S",
+        "colourName": "Crimson Red",
+        "colourHex": "#DC143C",
+        "stock": 15,
+        "price": 2286,
+        "originalPrice": 3200
+      },
+      {
+        "id": "sd-prod-050-var-7",
+        "sku": "SD-SD-PROD-050-CRI-M",
+        "size": "M",
+        "colourName": "Crimson Red",
+        "colourHex": "#DC143C",
+        "stock": 0,
+        "price": 2286,
+        "originalPrice": 3200
+      },
+      {
+        "id": "sd-prod-050-var-8",
+        "sku": "SD-SD-PROD-050-CRI-L",
+        "size": "L",
+        "colourName": "Crimson Red",
+        "colourHex": "#DC143C",
+        "stock": 15,
+        "price": 2286,
+        "originalPrice": 3200
+      },
+      {
+        "id": "sd-prod-050-var-9",
+        "sku": "SD-SD-PROD-050-CRI-XL",
+        "size": "XL",
+        "colourName": "Crimson Red",
+        "colourHex": "#DC143C",
+        "stock": 15,
+        "price": 2286,
+        "originalPrice": 3200
+      },
+      {
+        "id": "sd-prod-050-var-10",
+        "sku": "SD-SD-PROD-050-CRI-XXL",
+        "size": "XXL",
+        "colourName": "Crimson Red",
+        "colourHex": "#DC143C",
+        "stock": 15,
+        "price": 2286,
+        "originalPrice": 3200
+      }
+    ],
+    "tags": [
+      "satin cowl neck camisole",
+      "women",
+      "tops & tees",
+      "crop tops",
+      "bawree",
+      "fashion",
+      "trending"
+    ],
+    "badge": "Trending",
+    "newArrival": true,
+    "trending": false,
+    "featured": false,
+    "expressDelivery": true,
+    "estimatedDeliveryMinutes": 60,
+    "returnWindowDays": 7,
+    "exchangeAvailable": true,
+    "vendorId": "v-ethnic-vibe",
+    "commissionPercent": 12,
+    "sponsored": false,
+    "active": true,
+    "createdAt": "2026-07-01T00:00:00Z",
+    "updatedAt": "2026-08-01T00:00:00Z"
+  },
+  {
+    "id": "sd-prod-051",
+    "slug": "high-waist-wide-leg-denim-sd-prod-051",
+    "name": "High-Waist Wide-Leg Denim",
+    "brand": "Snitch",
+    "department": "women",
+    "category": "Jeans & Jeggings",
+    "subcategory": "High Rise",
+    "collection": "Summer Essentials 2026",
+    "shortDescription": "Premium quality high-waist wide-leg denim crafted for comfort and style.",
+    "description": "Elevate your daily fashion with this High-Waist Wide-Leg Denim. Features premium fabric construction, tailored fit, and durable craftsmanship ideal for everyday wear.",
+    "material": "100% Premium Combed Cotton",
+    "fit": "Regular Fit",
+    "pattern": "Solid / Textured",
+    "occasion": [
+      "Casual",
+      "Everyday",
+      "Party"
+    ],
+    "careInstructions": [
+      "Machine wash cold",
+      "Do not bleach",
+      "Tumble dry low",
+      "Warm iron if needed"
+    ],
+    "price": 2323,
+    "originalPrice": 3252,
+    "discount": 28,
+    "images": [
+      "https://images.unsplash.com/photo-1529374255404-311a2a4f1fd9?auto=format&fit=crop&w=800&q=80",
+      "https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&w=800&q=80"
+    ],
+    "thumbnail": "https://images.unsplash.com/photo-1529374255404-311a2a4f1fd9?auto=format&fit=crop&w=800&q=80",
+    "rating": 4.2,
+    "reviewCount": 148,
+    "reviews": [
+      {
+        "id": "rev-sd-prod-051-1",
+        "userName": "Aman Sharma",
+        "rating": 5,
+        "title": "Great quality and fast delivery!",
+        "comment": "Delivered in Neemuch within 45 minutes! Quality is top notch.",
+        "createdAt": "2026-07-28",
+        "verifiedPurchase": true
+      },
+      {
+        "id": "rev-sd-prod-051-2",
+        "userName": "Priya Verma",
+        "rating": 4,
+        "title": "Nice fit and comfortable material",
+        "comment": "The fabric is very soft. True to size.",
+        "createdAt": "2026-07-29",
+        "verifiedPurchase": true
+      }
+    ],
+    "variants": [
+      {
+        "id": "sd-prod-051-var-1",
+        "sku": "SD-SD-PROD-051-CRI-S",
+        "size": "S",
+        "colourName": "Crimson Red",
+        "colourHex": "#DC143C",
+        "stock": 15,
+        "price": 2323,
+        "originalPrice": 3252
+      },
+      {
+        "id": "sd-prod-051-var-2",
+        "sku": "SD-SD-PROD-051-CRI-M",
+        "size": "M",
+        "colourName": "Crimson Red",
+        "colourHex": "#DC143C",
+        "stock": 15,
+        "price": 2323,
+        "originalPrice": 3252
+      },
+      {
+        "id": "sd-prod-051-var-3",
+        "sku": "SD-SD-PROD-051-CRI-L",
+        "size": "L",
+        "colourName": "Crimson Red",
+        "colourHex": "#DC143C",
+        "stock": 15,
+        "price": 2323,
+        "originalPrice": 3252
+      },
+      {
+        "id": "sd-prod-051-var-4",
+        "sku": "SD-SD-PROD-051-CRI-XL",
+        "size": "XL",
+        "colourName": "Crimson Red",
+        "colourHex": "#DC143C",
+        "stock": 15,
+        "price": 2323,
+        "originalPrice": 3252
+      },
+      {
+        "id": "sd-prod-051-var-5",
+        "sku": "SD-SD-PROD-051-CRI-XXL",
+        "size": "XXL",
+        "colourName": "Crimson Red",
+        "colourHex": "#DC143C",
+        "stock": 15,
+        "price": 2323,
+        "originalPrice": 3252
+      },
+      {
+        "id": "sd-prod-051-var-6",
+        "sku": "SD-SD-PROD-051-BEI-S",
+        "size": "S",
+        "colourName": "Beige",
+        "colourHex": "#F5F5DC",
+        "stock": 15,
+        "price": 2323,
+        "originalPrice": 3252
+      },
+      {
+        "id": "sd-prod-051-var-7",
+        "sku": "SD-SD-PROD-051-BEI-M",
+        "size": "M",
+        "colourName": "Beige",
+        "colourHex": "#F5F5DC",
+        "stock": 0,
+        "price": 2323,
+        "originalPrice": 3252
+      },
+      {
+        "id": "sd-prod-051-var-8",
+        "sku": "SD-SD-PROD-051-BEI-L",
+        "size": "L",
+        "colourName": "Beige",
+        "colourHex": "#F5F5DC",
+        "stock": 15,
+        "price": 2323,
+        "originalPrice": 3252
+      },
+      {
+        "id": "sd-prod-051-var-9",
+        "sku": "SD-SD-PROD-051-BEI-XL",
+        "size": "XL",
+        "colourName": "Beige",
+        "colourHex": "#F5F5DC",
+        "stock": 15,
+        "price": 2323,
+        "originalPrice": 3252
+      },
+      {
+        "id": "sd-prod-051-var-10",
+        "sku": "SD-SD-PROD-051-BEI-XXL",
+        "size": "XXL",
+        "colourName": "Beige",
+        "colourHex": "#F5F5DC",
+        "stock": 15,
+        "price": 2323,
+        "originalPrice": 3252
+      }
+    ],
+    "tags": [
+      "high-waist wide-leg denim",
+      "women",
+      "jeans & jeggings",
+      "high rise",
+      "snitch",
+      "fashion",
+      "trending"
+    ],
+    "badge": "Express",
+    "newArrival": false,
+    "trending": true,
+    "featured": true,
+    "expressDelivery": true,
+    "estimatedDeliveryMinutes": 60,
+    "returnWindowDays": 7,
+    "exchangeAvailable": true,
+    "vendorId": "v-urban-style",
+    "commissionPercent": 12,
+    "sponsored": false,
+    "active": true,
+    "createdAt": "2026-07-01T00:00:00Z",
+    "updatedAt": "2026-08-01T00:00:00Z"
+  },
+  {
+    "id": "sd-prod-052",
+    "slug": "distressed-mom-fit-jeans-sd-prod-052",
+    "name": "Distressed Mom Fit Jeans",
+    "brand": "Wrong",
+    "department": "women",
+    "category": "Jeans & Jeggings",
+    "subcategory": "High Rise",
+    "collection": "Summer Essentials 2026",
+    "shortDescription": "Premium quality distressed mom fit jeans crafted for comfort and style.",
+    "description": "Elevate your daily fashion with this Distressed Mom Fit Jeans. Features premium fabric construction, tailored fit, and durable craftsmanship ideal for everyday wear.",
+    "material": "100% Premium Combed Cotton",
+    "fit": "Regular Fit",
+    "pattern": "Solid / Textured",
+    "occasion": [
+      "Casual",
+      "Everyday",
+      "Party"
+    ],
+    "careInstructions": [
+      "Machine wash cold",
+      "Do not bleach",
+      "Tumble dry low",
+      "Warm iron if needed"
+    ],
+    "price": 2360,
+    "originalPrice": 3304,
+    "discount": 28,
+    "images": [
+      "https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&w=800&q=80",
+      "https://images.unsplash.com/photo-1521572267360-ee0c2909d518?auto=format&fit=crop&w=800&q=80"
+    ],
+    "thumbnail": "https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&w=800&q=80",
+    "rating": 4.3,
+    "reviewCount": 161,
+    "reviews": [
+      {
+        "id": "rev-sd-prod-052-1",
+        "userName": "Aman Sharma",
+        "rating": 5,
+        "title": "Great quality and fast delivery!",
+        "comment": "Delivered in Neemuch within 45 minutes! Quality is top notch.",
+        "createdAt": "2026-07-28",
+        "verifiedPurchase": true
+      },
+      {
+        "id": "rev-sd-prod-052-2",
+        "userName": "Priya Verma",
+        "rating": 4,
+        "title": "Nice fit and comfortable material",
+        "comment": "The fabric is very soft. True to size.",
+        "createdAt": "2026-07-29",
+        "verifiedPurchase": true
+      }
+    ],
+    "variants": [
+      {
+        "id": "sd-prod-052-var-1",
+        "sku": "SD-SD-PROD-052-BEI-S",
+        "size": "S",
+        "colourName": "Beige",
+        "colourHex": "#F5F5DC",
+        "stock": 15,
+        "price": 2360,
+        "originalPrice": 3304
+      },
+      {
+        "id": "sd-prod-052-var-2",
+        "sku": "SD-SD-PROD-052-BEI-M",
+        "size": "M",
+        "colourName": "Beige",
+        "colourHex": "#F5F5DC",
+        "stock": 15,
+        "price": 2360,
+        "originalPrice": 3304
+      },
+      {
+        "id": "sd-prod-052-var-3",
+        "sku": "SD-SD-PROD-052-BEI-L",
+        "size": "L",
+        "colourName": "Beige",
+        "colourHex": "#F5F5DC",
+        "stock": 15,
+        "price": 2360,
+        "originalPrice": 3304
+      },
+      {
+        "id": "sd-prod-052-var-4",
+        "sku": "SD-SD-PROD-052-BEI-XL",
+        "size": "XL",
+        "colourName": "Beige",
+        "colourHex": "#F5F5DC",
+        "stock": 15,
+        "price": 2360,
+        "originalPrice": 3304
+      },
+      {
+        "id": "sd-prod-052-var-5",
+        "sku": "SD-SD-PROD-052-BEI-XXL",
+        "size": "XXL",
+        "colourName": "Beige",
+        "colourHex": "#F5F5DC",
+        "stock": 15,
+        "price": 2360,
+        "originalPrice": 3304
+      },
+      {
+        "id": "sd-prod-052-var-6",
+        "sku": "SD-SD-PROD-052-CHA-S",
+        "size": "S",
+        "colourName": "Charcoal Gray",
+        "colourHex": "#36454F",
+        "stock": 15,
+        "price": 2360,
+        "originalPrice": 3304
+      },
+      {
+        "id": "sd-prod-052-var-7",
+        "sku": "SD-SD-PROD-052-CHA-M",
+        "size": "M",
+        "colourName": "Charcoal Gray",
+        "colourHex": "#36454F",
+        "stock": 0,
+        "price": 2360,
+        "originalPrice": 3304
+      },
+      {
+        "id": "sd-prod-052-var-8",
+        "sku": "SD-SD-PROD-052-CHA-L",
+        "size": "L",
+        "colourName": "Charcoal Gray",
+        "colourHex": "#36454F",
+        "stock": 15,
+        "price": 2360,
+        "originalPrice": 3304
+      },
+      {
+        "id": "sd-prod-052-var-9",
+        "sku": "SD-SD-PROD-052-CHA-XL",
+        "size": "XL",
+        "colourName": "Charcoal Gray",
+        "colourHex": "#36454F",
+        "stock": 15,
+        "price": 2360,
+        "originalPrice": 3304
+      },
+      {
+        "id": "sd-prod-052-var-10",
+        "sku": "SD-SD-PROD-052-CHA-XXL",
+        "size": "XXL",
+        "colourName": "Charcoal Gray",
+        "colourHex": "#36454F",
+        "stock": 15,
+        "price": 2360,
+        "originalPrice": 3304
+      }
+    ],
+    "tags": [
+      "distressed mom fit jeans",
+      "women",
+      "jeans & jeggings",
+      "high rise",
+      "wrong",
+      "fashion",
+      "trending"
+    ],
+    "badge": "New",
+    "newArrival": false,
+    "trending": false,
+    "featured": false,
+    "expressDelivery": true,
+    "estimatedDeliveryMinutes": 60,
+    "returnWindowDays": 7,
+    "exchangeAvailable": true,
+    "vendorId": "v-ethnic-vibe",
+    "commissionPercent": 12,
+    "sponsored": false,
+    "active": true,
+    "createdAt": "2026-07-01T00:00:00Z",
+    "updatedAt": "2026-08-01T00:00:00Z"
+  },
+  {
+    "id": "sd-prod-053",
+    "slug": "ankle-length-stretch-jeggings-sd-prod-053",
+    "name": "Ankle-Length Stretch Jeggings",
+    "brand": "Roadster",
+    "department": "women",
+    "category": "Jeans & Jeggings",
+    "subcategory": "High Rise",
+    "collection": "Summer Essentials 2026",
+    "shortDescription": "Premium quality ankle-length stretch jeggings crafted for comfort and style.",
+    "description": "Elevate your daily fashion with this Ankle-Length Stretch Jeggings. Features premium fabric construction, tailored fit, and durable craftsmanship ideal for everyday wear.",
+    "material": "100% Premium Combed Cotton",
+    "fit": "Regular Fit",
+    "pattern": "Solid / Textured",
+    "occasion": [
+      "Casual",
+      "Everyday",
+      "Party"
+    ],
+    "careInstructions": [
+      "Machine wash cold",
+      "Do not bleach",
+      "Tumble dry low",
+      "Warm iron if needed"
+    ],
+    "price": 2397,
+    "originalPrice": 3355,
+    "discount": 28,
+    "images": [
+      "https://images.unsplash.com/photo-1521572267360-ee0c2909d518?auto=format&fit=crop&w=800&q=80",
+      "https://images.unsplash.com/photo-1503342217505-b0a15ec3261c?auto=format&fit=crop&w=800&q=80"
+    ],
+    "thumbnail": "https://images.unsplash.com/photo-1521572267360-ee0c2909d518?auto=format&fit=crop&w=800&q=80",
+    "rating": 4.4,
+    "reviewCount": 174,
+    "reviews": [
+      {
+        "id": "rev-sd-prod-053-1",
+        "userName": "Aman Sharma",
+        "rating": 5,
+        "title": "Great quality and fast delivery!",
+        "comment": "Delivered in Neemuch within 45 minutes! Quality is top notch.",
+        "createdAt": "2026-07-28",
+        "verifiedPurchase": true
+      },
+      {
+        "id": "rev-sd-prod-053-2",
+        "userName": "Priya Verma",
+        "rating": 4,
+        "title": "Nice fit and comfortable material",
+        "comment": "The fabric is very soft. True to size.",
+        "createdAt": "2026-07-29",
+        "verifiedPurchase": true
+      }
+    ],
+    "variants": [
+      {
+        "id": "sd-prod-053-var-1",
+        "sku": "SD-SD-PROD-053-CHA-S",
+        "size": "S",
+        "colourName": "Charcoal Gray",
+        "colourHex": "#36454F",
+        "stock": 15,
+        "price": 2397,
+        "originalPrice": 3355
+      },
+      {
+        "id": "sd-prod-053-var-2",
+        "sku": "SD-SD-PROD-053-CHA-M",
+        "size": "M",
+        "colourName": "Charcoal Gray",
+        "colourHex": "#36454F",
+        "stock": 15,
+        "price": 2397,
+        "originalPrice": 3355
+      },
+      {
+        "id": "sd-prod-053-var-3",
+        "sku": "SD-SD-PROD-053-CHA-L",
+        "size": "L",
+        "colourName": "Charcoal Gray",
+        "colourHex": "#36454F",
+        "stock": 15,
+        "price": 2397,
+        "originalPrice": 3355
+      },
+      {
+        "id": "sd-prod-053-var-4",
+        "sku": "SD-SD-PROD-053-CHA-XL",
+        "size": "XL",
+        "colourName": "Charcoal Gray",
+        "colourHex": "#36454F",
+        "stock": 15,
+        "price": 2397,
+        "originalPrice": 3355
+      },
+      {
+        "id": "sd-prod-053-var-5",
+        "sku": "SD-SD-PROD-053-CHA-XXL",
+        "size": "XXL",
+        "colourName": "Charcoal Gray",
+        "colourHex": "#36454F",
+        "stock": 15,
+        "price": 2397,
+        "originalPrice": 3355
+      },
+      {
+        "id": "sd-prod-053-var-6",
+        "sku": "SD-SD-PROD-053-MUS-S",
+        "size": "S",
+        "colourName": "Mustard Yellow",
+        "colourHex": "#FFDB58",
+        "stock": 15,
+        "price": 2397,
+        "originalPrice": 3355
+      },
+      {
+        "id": "sd-prod-053-var-7",
+        "sku": "SD-SD-PROD-053-MUS-M",
+        "size": "M",
+        "colourName": "Mustard Yellow",
+        "colourHex": "#FFDB58",
+        "stock": 0,
+        "price": 2397,
+        "originalPrice": 3355
+      },
+      {
+        "id": "sd-prod-053-var-8",
+        "sku": "SD-SD-PROD-053-MUS-L",
+        "size": "L",
+        "colourName": "Mustard Yellow",
+        "colourHex": "#FFDB58",
+        "stock": 15,
+        "price": 2397,
+        "originalPrice": 3355
+      },
+      {
+        "id": "sd-prod-053-var-9",
+        "sku": "SD-SD-PROD-053-MUS-XL",
+        "size": "XL",
+        "colourName": "Mustard Yellow",
+        "colourHex": "#FFDB58",
+        "stock": 15,
+        "price": 2397,
+        "originalPrice": 3355
+      },
+      {
+        "id": "sd-prod-053-var-10",
+        "sku": "SD-SD-PROD-053-MUS-XXL",
+        "size": "XXL",
+        "colourName": "Mustard Yellow",
+        "colourHex": "#FFDB58",
+        "stock": 15,
+        "price": 2397,
+        "originalPrice": 3355
+      }
+    ],
+    "tags": [
+      "ankle-length stretch jeggings",
+      "women",
+      "jeans & jeggings",
+      "high rise",
+      "roadster",
+      "fashion",
+      "trending"
+    ],
+    "badge": "Trending",
+    "newArrival": true,
+    "trending": true,
+    "featured": false,
+    "expressDelivery": true,
+    "estimatedDeliveryMinutes": 60,
+    "returnWindowDays": 7,
+    "exchangeAvailable": true,
+    "vendorId": "v-urban-style",
+    "commissionPercent": 12,
+    "sponsored": false,
+    "active": true,
+    "createdAt": "2026-07-01T00:00:00Z",
+    "updatedAt": "2026-08-01T00:00:00Z"
+  },
+  {
+    "id": "sd-prod-054",
+    "slug": "straight-fit-vintage-wash-jeans-sd-prod-054",
+    "name": "Straight Fit Vintage Wash Jeans",
+    "brand": "HRX",
+    "department": "women",
+    "category": "Jeans & Jeggings",
+    "subcategory": "High Rise",
+    "collection": "Summer Essentials 2026",
+    "shortDescription": "Premium quality straight fit vintage wash jeans crafted for comfort and style.",
+    "description": "Elevate your daily fashion with this Straight Fit Vintage Wash Jeans. Features premium fabric construction, tailored fit, and durable craftsmanship ideal for everyday wear.",
+    "material": "100% Premium Combed Cotton",
+    "fit": "Regular Fit",
+    "pattern": "Solid / Textured",
+    "occasion": [
+      "Casual",
+      "Everyday",
+      "Party"
+    ],
+    "careInstructions": [
+      "Machine wash cold",
+      "Do not bleach",
+      "Tumble dry low",
+      "Warm iron if needed"
+    ],
+    "price": 434,
+    "originalPrice": 607,
+    "discount": 28,
+    "images": [
+      "https://images.unsplash.com/photo-1503342217505-b0a15ec3261c?auto=format&fit=crop&w=800&q=80",
+      "https://images.unsplash.com/photo-1576995853123-5a10305d93c0?auto=format&fit=crop&w=800&q=80"
+    ],
+    "thumbnail": "https://images.unsplash.com/photo-1503342217505-b0a15ec3261c?auto=format&fit=crop&w=800&q=80",
+    "rating": 4.5,
+    "reviewCount": 187,
+    "reviews": [
+      {
+        "id": "rev-sd-prod-054-1",
+        "userName": "Aman Sharma",
+        "rating": 5,
+        "title": "Great quality and fast delivery!",
+        "comment": "Delivered in Neemuch within 45 minutes! Quality is top notch.",
+        "createdAt": "2026-07-28",
+        "verifiedPurchase": true
+      },
+      {
+        "id": "rev-sd-prod-054-2",
+        "userName": "Priya Verma",
+        "rating": 4,
+        "title": "Nice fit and comfortable material",
+        "comment": "The fabric is very soft. True to size.",
+        "createdAt": "2026-07-29",
+        "verifiedPurchase": true
+      }
+    ],
+    "variants": [
+      {
+        "id": "sd-prod-054-var-1",
+        "sku": "SD-SD-PROD-054-MUS-S",
+        "size": "S",
+        "colourName": "Mustard Yellow",
+        "colourHex": "#FFDB58",
+        "stock": 15,
+        "price": 434,
+        "originalPrice": 607
+      },
+      {
+        "id": "sd-prod-054-var-2",
+        "sku": "SD-SD-PROD-054-MUS-M",
+        "size": "M",
+        "colourName": "Mustard Yellow",
+        "colourHex": "#FFDB58",
+        "stock": 15,
+        "price": 434,
+        "originalPrice": 607
+      },
+      {
+        "id": "sd-prod-054-var-3",
+        "sku": "SD-SD-PROD-054-MUS-L",
+        "size": "L",
+        "colourName": "Mustard Yellow",
+        "colourHex": "#FFDB58",
+        "stock": 15,
+        "price": 434,
+        "originalPrice": 607
+      },
+      {
+        "id": "sd-prod-054-var-4",
+        "sku": "SD-SD-PROD-054-MUS-XL",
+        "size": "XL",
+        "colourName": "Mustard Yellow",
+        "colourHex": "#FFDB58",
+        "stock": 15,
+        "price": 434,
+        "originalPrice": 607
+      },
+      {
+        "id": "sd-prod-054-var-5",
+        "sku": "SD-SD-PROD-054-MUS-XXL",
+        "size": "XXL",
+        "colourName": "Mustard Yellow",
+        "colourHex": "#FFDB58",
+        "stock": 15,
+        "price": 434,
+        "originalPrice": 607
+      },
+      {
+        "id": "sd-prod-054-var-6",
+        "sku": "SD-SD-PROD-054-BLA-S",
+        "size": "S",
+        "colourName": "Black",
+        "colourHex": "#000000",
+        "stock": 15,
+        "price": 434,
+        "originalPrice": 607
+      },
+      {
+        "id": "sd-prod-054-var-7",
+        "sku": "SD-SD-PROD-054-BLA-M",
+        "size": "M",
+        "colourName": "Black",
+        "colourHex": "#000000",
+        "stock": 0,
+        "price": 434,
+        "originalPrice": 607
+      },
+      {
+        "id": "sd-prod-054-var-8",
+        "sku": "SD-SD-PROD-054-BLA-L",
+        "size": "L",
+        "colourName": "Black",
+        "colourHex": "#000000",
+        "stock": 15,
+        "price": 434,
+        "originalPrice": 607
+      },
+      {
+        "id": "sd-prod-054-var-9",
+        "sku": "SD-SD-PROD-054-BLA-XL",
+        "size": "XL",
+        "colourName": "Black",
+        "colourHex": "#000000",
+        "stock": 15,
+        "price": 434,
+        "originalPrice": 607
+      },
+      {
+        "id": "sd-prod-054-var-10",
+        "sku": "SD-SD-PROD-054-BLA-XXL",
+        "size": "XXL",
+        "colourName": "Black",
+        "colourHex": "#000000",
+        "stock": 15,
+        "price": 434,
+        "originalPrice": 607
+      }
+    ],
+    "tags": [
+      "straight fit vintage wash jeans",
+      "women",
+      "jeans & jeggings",
+      "high rise",
+      "hrx",
+      "fashion",
+      "trending"
+    ],
+    "badge": "New",
+    "newArrival": false,
+    "trending": false,
+    "featured": false,
+    "expressDelivery": true,
+    "estimatedDeliveryMinutes": 60,
+    "returnWindowDays": 7,
+    "exchangeAvailable": true,
+    "vendorId": "v-ethnic-vibe",
+    "commissionPercent": 12,
+    "sponsored": false,
+    "active": true,
+    "createdAt": "2026-07-01T00:00:00Z",
+    "updatedAt": "2026-08-01T00:00:00Z"
+  },
+  {
+    "id": "sd-prod-055",
+    "slug": "black-high-rise-bootcut-jeans-sd-prod-055",
+    "name": "Black High-Rise Bootcut Jeans",
+    "brand": "StyleDash Studio",
+    "department": "women",
+    "category": "Jeans & Jeggings",
+    "subcategory": "High Rise",
+    "collection": "Summer Essentials 2026",
+    "shortDescription": "Premium quality black high-rise bootcut jeans crafted for comfort and style.",
+    "description": "Elevate your daily fashion with this Black High-Rise Bootcut Jeans. Features premium fabric construction, tailored fit, and durable craftsmanship ideal for everyday wear.",
+    "material": "100% Premium Combed Cotton",
+    "fit": "Regular Fit",
+    "pattern": "Solid / Textured",
+    "occasion": [
+      "Casual",
+      "Everyday",
+      "Party"
+    ],
+    "careInstructions": [
+      "Machine wash cold",
+      "Do not bleach",
+      "Tumble dry low",
+      "Warm iron if needed"
+    ],
+    "price": 471,
+    "originalPrice": 659,
+    "discount": 28,
+    "images": [
+      "https://images.unsplash.com/photo-1576995853123-5a10305d93c0?auto=format&fit=crop&w=800&q=80",
+      "https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?auto=format&fit=crop&w=800&q=80"
+    ],
+    "thumbnail": "https://images.unsplash.com/photo-1576995853123-5a10305d93c0?auto=format&fit=crop&w=800&q=80",
+    "rating": 4.6,
+    "reviewCount": 20,
+    "reviews": [
+      {
+        "id": "rev-sd-prod-055-1",
+        "userName": "Aman Sharma",
+        "rating": 5,
+        "title": "Great quality and fast delivery!",
+        "comment": "Delivered in Neemuch within 45 minutes! Quality is top notch.",
+        "createdAt": "2026-07-28",
+        "verifiedPurchase": true
+      },
+      {
+        "id": "rev-sd-prod-055-2",
+        "userName": "Priya Verma",
+        "rating": 4,
+        "title": "Nice fit and comfortable material",
+        "comment": "The fabric is very soft. True to size.",
+        "createdAt": "2026-07-29",
+        "verifiedPurchase": true
+      }
+    ],
+    "variants": [
+      {
+        "id": "sd-prod-055-var-1",
+        "sku": "SD-SD-PROD-055-BLA-S",
+        "size": "S",
+        "colourName": "Black",
+        "colourHex": "#000000",
+        "stock": 15,
+        "price": 471,
+        "originalPrice": 659
+      },
+      {
+        "id": "sd-prod-055-var-2",
+        "sku": "SD-SD-PROD-055-BLA-M",
+        "size": "M",
+        "colourName": "Black",
+        "colourHex": "#000000",
+        "stock": 15,
+        "price": 471,
+        "originalPrice": 659
+      },
+      {
+        "id": "sd-prod-055-var-3",
+        "sku": "SD-SD-PROD-055-BLA-L",
+        "size": "L",
+        "colourName": "Black",
+        "colourHex": "#000000",
+        "stock": 15,
+        "price": 471,
+        "originalPrice": 659
+      },
+      {
+        "id": "sd-prod-055-var-4",
+        "sku": "SD-SD-PROD-055-BLA-XL",
+        "size": "XL",
+        "colourName": "Black",
+        "colourHex": "#000000",
+        "stock": 15,
+        "price": 471,
+        "originalPrice": 659
+      },
+      {
+        "id": "sd-prod-055-var-5",
+        "sku": "SD-SD-PROD-055-BLA-XXL",
+        "size": "XXL",
+        "colourName": "Black",
+        "colourHex": "#000000",
+        "stock": 15,
+        "price": 471,
+        "originalPrice": 659
+      },
+      {
+        "id": "sd-prod-055-var-6",
+        "sku": "SD-SD-PROD-055-WHI-S",
+        "size": "S",
+        "colourName": "White",
+        "colourHex": "#FFFFFF",
+        "stock": 15,
+        "price": 471,
+        "originalPrice": 659
+      },
+      {
+        "id": "sd-prod-055-var-7",
+        "sku": "SD-SD-PROD-055-WHI-M",
+        "size": "M",
+        "colourName": "White",
+        "colourHex": "#FFFFFF",
+        "stock": 0,
+        "price": 471,
+        "originalPrice": 659
+      },
+      {
+        "id": "sd-prod-055-var-8",
+        "sku": "SD-SD-PROD-055-WHI-L",
+        "size": "L",
+        "colourName": "White",
+        "colourHex": "#FFFFFF",
+        "stock": 15,
+        "price": 471,
+        "originalPrice": 659
+      },
+      {
+        "id": "sd-prod-055-var-9",
+        "sku": "SD-SD-PROD-055-WHI-XL",
+        "size": "XL",
+        "colourName": "White",
+        "colourHex": "#FFFFFF",
+        "stock": 15,
+        "price": 471,
+        "originalPrice": 659
+      },
+      {
+        "id": "sd-prod-055-var-10",
+        "sku": "SD-SD-PROD-055-WHI-XXL",
+        "size": "XXL",
+        "colourName": "White",
+        "colourHex": "#FFFFFF",
+        "stock": 15,
+        "price": 471,
+        "originalPrice": 659
+      }
+    ],
+    "tags": [
+      "black high-rise bootcut jeans",
+      "women",
+      "jeans & jeggings",
+      "high rise",
+      "styledash studio",
+      "fashion",
+      "trending"
+    ],
+    "badge": "Express",
+    "newArrival": false,
+    "trending": true,
+    "featured": true,
+    "expressDelivery": true,
+    "estimatedDeliveryMinutes": 60,
+    "returnWindowDays": 7,
+    "exchangeAvailable": true,
+    "vendorId": "v-urban-style",
+    "commissionPercent": 12,
+    "sponsored": true,
+    "active": true,
+    "createdAt": "2026-07-01T00:00:00Z",
+    "updatedAt": "2026-08-01T00:00:00Z"
+  },
+  {
+    "id": "sd-prod-056",
+    "slug": "chanderi-silk-printed-kurta-set-sd-prod-056",
+    "name": "Chanderi Silk Printed Kurta Set",
+    "brand": "Anouk",
+    "department": "women",
+    "category": "Kurtas & Suits",
+    "subcategory": "Kurta Sets",
+    "collection": "Summer Essentials 2026",
+    "shortDescription": "Premium quality chanderi silk printed kurta set crafted for comfort and style.",
+    "description": "Elevate your daily fashion with this Chanderi Silk Printed Kurta Set. Features premium fabric construction, tailored fit, and durable craftsmanship ideal for everyday wear.",
+    "material": "100% Premium Combed Cotton",
+    "fit": "Regular Fit",
+    "pattern": "Solid / Textured",
+    "occasion": [
+      "Casual",
+      "Everyday",
+      "Party"
+    ],
+    "careInstructions": [
+      "Machine wash cold",
+      "Do not bleach",
+      "Tumble dry low",
+      "Warm iron if needed"
+    ],
+    "price": 508,
+    "originalPrice": 711,
+    "discount": 28,
+    "images": [
+      "https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?auto=format&fit=crop&w=800&q=80",
+      "https://images.unsplash.com/photo-1529374255404-311a2a4f1fd9?auto=format&fit=crop&w=800&q=80"
+    ],
+    "thumbnail": "https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?auto=format&fit=crop&w=800&q=80",
+    "rating": 4.7,
+    "reviewCount": 33,
+    "reviews": [
+      {
+        "id": "rev-sd-prod-056-1",
+        "userName": "Aman Sharma",
+        "rating": 5,
+        "title": "Great quality and fast delivery!",
+        "comment": "Delivered in Neemuch within 45 minutes! Quality is top notch.",
+        "createdAt": "2026-07-28",
+        "verifiedPurchase": true
+      },
+      {
+        "id": "rev-sd-prod-056-2",
+        "userName": "Priya Verma",
+        "rating": 4,
+        "title": "Nice fit and comfortable material",
+        "comment": "The fabric is very soft. True to size.",
+        "createdAt": "2026-07-29",
+        "verifiedPurchase": true
+      }
+    ],
+    "variants": [
+      {
+        "id": "sd-prod-056-var-1",
+        "sku": "SD-SD-PROD-056-WHI-S",
+        "size": "S",
+        "colourName": "White",
+        "colourHex": "#FFFFFF",
+        "stock": 15,
+        "price": 508,
+        "originalPrice": 711
+      },
+      {
+        "id": "sd-prod-056-var-2",
+        "sku": "SD-SD-PROD-056-WHI-M",
+        "size": "M",
+        "colourName": "White",
+        "colourHex": "#FFFFFF",
+        "stock": 15,
+        "price": 508,
+        "originalPrice": 711
+      },
+      {
+        "id": "sd-prod-056-var-3",
+        "sku": "SD-SD-PROD-056-WHI-L",
+        "size": "L",
+        "colourName": "White",
+        "colourHex": "#FFFFFF",
+        "stock": 15,
+        "price": 508,
+        "originalPrice": 711
+      },
+      {
+        "id": "sd-prod-056-var-4",
+        "sku": "SD-SD-PROD-056-WHI-XL",
+        "size": "XL",
+        "colourName": "White",
+        "colourHex": "#FFFFFF",
+        "stock": 15,
+        "price": 508,
+        "originalPrice": 711
+      },
+      {
+        "id": "sd-prod-056-var-5",
+        "sku": "SD-SD-PROD-056-WHI-XXL",
+        "size": "XXL",
+        "colourName": "White",
+        "colourHex": "#FFFFFF",
+        "stock": 15,
+        "price": 508,
+        "originalPrice": 711
+      },
+      {
+        "id": "sd-prod-056-var-6",
+        "sku": "SD-SD-PROD-056-NAV-S",
+        "size": "S",
+        "colourName": "Navy Blue",
+        "colourHex": "#000080",
+        "stock": 15,
+        "price": 508,
+        "originalPrice": 711
+      },
+      {
+        "id": "sd-prod-056-var-7",
+        "sku": "SD-SD-PROD-056-NAV-M",
+        "size": "M",
+        "colourName": "Navy Blue",
+        "colourHex": "#000080",
+        "stock": 0,
+        "price": 508,
+        "originalPrice": 711
+      },
+      {
+        "id": "sd-prod-056-var-8",
+        "sku": "SD-SD-PROD-056-NAV-L",
+        "size": "L",
+        "colourName": "Navy Blue",
+        "colourHex": "#000080",
+        "stock": 15,
+        "price": 508,
+        "originalPrice": 711
+      },
+      {
+        "id": "sd-prod-056-var-9",
+        "sku": "SD-SD-PROD-056-NAV-XL",
+        "size": "XL",
+        "colourName": "Navy Blue",
+        "colourHex": "#000080",
+        "stock": 15,
+        "price": 508,
+        "originalPrice": 711
+      },
+      {
+        "id": "sd-prod-056-var-10",
+        "sku": "SD-SD-PROD-056-NAV-XXL",
+        "size": "XXL",
+        "colourName": "Navy Blue",
+        "colourHex": "#000080",
+        "stock": 15,
+        "price": 508,
+        "originalPrice": 711
+      }
+    ],
+    "tags": [
+      "chanderi silk printed kurta set",
+      "women",
+      "kurtas & suits",
+      "kurta sets",
+      "anouk",
+      "fashion",
+      "trending"
+    ],
+    "badge": "Trending",
+    "newArrival": true,
+    "trending": false,
+    "featured": false,
+    "expressDelivery": true,
+    "estimatedDeliveryMinutes": 60,
+    "returnWindowDays": 7,
+    "exchangeAvailable": true,
+    "vendorId": "v-ethnic-vibe",
+    "commissionPercent": 12,
+    "sponsored": false,
+    "active": true,
+    "createdAt": "2026-07-01T00:00:00Z",
+    "updatedAt": "2026-08-01T00:00:00Z"
+  },
+  {
+    "id": "sd-prod-057",
+    "slug": "anarkali-cotton-kurta-with-dupatta-sd-prod-057",
+    "name": "Anarkali Cotton Kurta with Dupatta",
+    "brand": "Mast & Harbour",
+    "department": "women",
+    "category": "Kurtas & Suits",
+    "subcategory": "Kurta Sets",
+    "collection": "Summer Essentials 2026",
+    "shortDescription": "Premium quality anarkali cotton kurta with dupatta crafted for comfort and style.",
+    "description": "Elevate your daily fashion with this Anarkali Cotton Kurta with Dupatta. Features premium fabric construction, tailored fit, and durable craftsmanship ideal for everyday wear.",
+    "material": "100% Premium Combed Cotton",
+    "fit": "Regular Fit",
+    "pattern": "Solid / Textured",
+    "occasion": [
+      "Casual",
+      "Everyday",
+      "Party"
+    ],
+    "careInstructions": [
+      "Machine wash cold",
+      "Do not bleach",
+      "Tumble dry low",
+      "Warm iron if needed"
+    ],
+    "price": 545,
+    "originalPrice": 763,
+    "discount": 28,
+    "images": [
+      "https://images.unsplash.com/photo-1529374255404-311a2a4f1fd9?auto=format&fit=crop&w=800&q=80",
+      "https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&w=800&q=80"
+    ],
+    "thumbnail": "https://images.unsplash.com/photo-1529374255404-311a2a4f1fd9?auto=format&fit=crop&w=800&q=80",
+    "rating": 4.8,
+    "reviewCount": 46,
+    "reviews": [
+      {
+        "id": "rev-sd-prod-057-1",
+        "userName": "Aman Sharma",
+        "rating": 5,
+        "title": "Great quality and fast delivery!",
+        "comment": "Delivered in Neemuch within 45 minutes! Quality is top notch.",
+        "createdAt": "2026-07-28",
+        "verifiedPurchase": true
+      },
+      {
+        "id": "rev-sd-prod-057-2",
+        "userName": "Priya Verma",
+        "rating": 4,
+        "title": "Nice fit and comfortable material",
+        "comment": "The fabric is very soft. True to size.",
+        "createdAt": "2026-07-29",
+        "verifiedPurchase": true
+      }
+    ],
+    "variants": [
+      {
+        "id": "sd-prod-057-var-1",
+        "sku": "SD-SD-PROD-057-NAV-S",
+        "size": "S",
+        "colourName": "Navy Blue",
+        "colourHex": "#000080",
+        "stock": 15,
+        "price": 545,
+        "originalPrice": 763
+      },
+      {
+        "id": "sd-prod-057-var-2",
+        "sku": "SD-SD-PROD-057-NAV-M",
+        "size": "M",
+        "colourName": "Navy Blue",
+        "colourHex": "#000080",
+        "stock": 15,
+        "price": 545,
+        "originalPrice": 763
+      },
+      {
+        "id": "sd-prod-057-var-3",
+        "sku": "SD-SD-PROD-057-NAV-L",
+        "size": "L",
+        "colourName": "Navy Blue",
+        "colourHex": "#000080",
+        "stock": 15,
+        "price": 545,
+        "originalPrice": 763
+      },
+      {
+        "id": "sd-prod-057-var-4",
+        "sku": "SD-SD-PROD-057-NAV-XL",
+        "size": "XL",
+        "colourName": "Navy Blue",
+        "colourHex": "#000080",
+        "stock": 15,
+        "price": 545,
+        "originalPrice": 763
+      },
+      {
+        "id": "sd-prod-057-var-5",
+        "sku": "SD-SD-PROD-057-NAV-XXL",
+        "size": "XXL",
+        "colourName": "Navy Blue",
+        "colourHex": "#000080",
+        "stock": 15,
+        "price": 545,
+        "originalPrice": 763
+      },
+      {
+        "id": "sd-prod-057-var-6",
+        "sku": "SD-SD-PROD-057-OLI-S",
+        "size": "S",
+        "colourName": "Olive Green",
+        "colourHex": "#556B2F",
+        "stock": 15,
+        "price": 545,
+        "originalPrice": 763
+      },
+      {
+        "id": "sd-prod-057-var-7",
+        "sku": "SD-SD-PROD-057-OLI-M",
+        "size": "M",
+        "colourName": "Olive Green",
+        "colourHex": "#556B2F",
+        "stock": 0,
+        "price": 545,
+        "originalPrice": 763
+      },
+      {
+        "id": "sd-prod-057-var-8",
+        "sku": "SD-SD-PROD-057-OLI-L",
+        "size": "L",
+        "colourName": "Olive Green",
+        "colourHex": "#556B2F",
+        "stock": 15,
+        "price": 545,
+        "originalPrice": 763
+      },
+      {
+        "id": "sd-prod-057-var-9",
+        "sku": "SD-SD-PROD-057-OLI-XL",
+        "size": "XL",
+        "colourName": "Olive Green",
+        "colourHex": "#556B2F",
+        "stock": 15,
+        "price": 545,
+        "originalPrice": 763
+      },
+      {
+        "id": "sd-prod-057-var-10",
+        "sku": "SD-SD-PROD-057-OLI-XXL",
+        "size": "XXL",
+        "colourName": "Olive Green",
+        "colourHex": "#556B2F",
+        "stock": 15,
+        "price": 545,
+        "originalPrice": 763
+      }
+    ],
+    "tags": [
+      "anarkali cotton kurta with dupatta",
+      "women",
+      "kurtas & suits",
+      "kurta sets",
+      "mast & harbour",
+      "fashion",
+      "trending"
+    ],
+    "badge": "Express",
+    "newArrival": false,
+    "trending": true,
+    "featured": false,
+    "expressDelivery": true,
+    "estimatedDeliveryMinutes": 60,
+    "returnWindowDays": 7,
+    "exchangeAvailable": true,
+    "vendorId": "v-urban-style",
+    "commissionPercent": 12,
+    "sponsored": false,
+    "active": true,
+    "createdAt": "2026-07-01T00:00:00Z",
+    "updatedAt": "2026-08-01T00:00:00Z"
+  },
+  {
+    "id": "sd-prod-058",
+    "slug": "straight-cut-chikankari-kurta-sd-prod-058",
+    "name": "Straight Cut Chikankari Kurta",
+    "brand": "Highlander",
+    "department": "women",
+    "category": "Kurtas & Suits",
+    "subcategory": "Kurta Sets",
+    "collection": "Summer Essentials 2026",
+    "shortDescription": "Premium quality straight cut chikankari kurta crafted for comfort and style.",
+    "description": "Elevate your daily fashion with this Straight Cut Chikankari Kurta. Features premium fabric construction, tailored fit, and durable craftsmanship ideal for everyday wear.",
+    "material": "100% Premium Combed Cotton",
+    "fit": "Regular Fit",
+    "pattern": "Solid / Textured",
+    "occasion": [
+      "Casual",
+      "Everyday",
+      "Party"
+    ],
+    "careInstructions": [
+      "Machine wash cold",
+      "Do not bleach",
+      "Tumble dry low",
+      "Warm iron if needed"
+    ],
+    "price": 582,
+    "originalPrice": 814,
+    "discount": 28,
+    "images": [
+      "https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&w=800&q=80",
+      "https://images.unsplash.com/photo-1521572267360-ee0c2909d518?auto=format&fit=crop&w=800&q=80"
+    ],
+    "thumbnail": "https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&w=800&q=80",
+    "rating": 4.9,
+    "reviewCount": 59,
+    "reviews": [
+      {
+        "id": "rev-sd-prod-058-1",
+        "userName": "Aman Sharma",
+        "rating": 5,
+        "title": "Great quality and fast delivery!",
+        "comment": "Delivered in Neemuch within 45 minutes! Quality is top notch.",
+        "createdAt": "2026-07-28",
+        "verifiedPurchase": true
+      },
+      {
+        "id": "rev-sd-prod-058-2",
+        "userName": "Priya Verma",
+        "rating": 4,
+        "title": "Nice fit and comfortable material",
+        "comment": "The fabric is very soft. True to size.",
+        "createdAt": "2026-07-29",
+        "verifiedPurchase": true
+      }
+    ],
+    "variants": [
+      {
+        "id": "sd-prod-058-var-1",
+        "sku": "SD-SD-PROD-058-OLI-S",
+        "size": "S",
+        "colourName": "Olive Green",
+        "colourHex": "#556B2F",
+        "stock": 15,
+        "price": 582,
+        "originalPrice": 814
+      },
+      {
+        "id": "sd-prod-058-var-2",
+        "sku": "SD-SD-PROD-058-OLI-M",
+        "size": "M",
+        "colourName": "Olive Green",
+        "colourHex": "#556B2F",
+        "stock": 15,
+        "price": 582,
+        "originalPrice": 814
+      },
+      {
+        "id": "sd-prod-058-var-3",
+        "sku": "SD-SD-PROD-058-OLI-L",
+        "size": "L",
+        "colourName": "Olive Green",
+        "colourHex": "#556B2F",
+        "stock": 15,
+        "price": 582,
+        "originalPrice": 814
+      },
+      {
+        "id": "sd-prod-058-var-4",
+        "sku": "SD-SD-PROD-058-OLI-XL",
+        "size": "XL",
+        "colourName": "Olive Green",
+        "colourHex": "#556B2F",
+        "stock": 15,
+        "price": 582,
+        "originalPrice": 814
+      },
+      {
+        "id": "sd-prod-058-var-5",
+        "sku": "SD-SD-PROD-058-OLI-XXL",
+        "size": "XXL",
+        "colourName": "Olive Green",
+        "colourHex": "#556B2F",
+        "stock": 15,
+        "price": 582,
+        "originalPrice": 814
+      },
+      {
+        "id": "sd-prod-058-var-6",
+        "sku": "SD-SD-PROD-058-CRI-S",
+        "size": "S",
+        "colourName": "Crimson Red",
+        "colourHex": "#DC143C",
+        "stock": 15,
+        "price": 582,
+        "originalPrice": 814
+      },
+      {
+        "id": "sd-prod-058-var-7",
+        "sku": "SD-SD-PROD-058-CRI-M",
+        "size": "M",
+        "colourName": "Crimson Red",
+        "colourHex": "#DC143C",
+        "stock": 0,
+        "price": 582,
+        "originalPrice": 814
+      },
+      {
+        "id": "sd-prod-058-var-8",
+        "sku": "SD-SD-PROD-058-CRI-L",
+        "size": "L",
+        "colourName": "Crimson Red",
+        "colourHex": "#DC143C",
+        "stock": 15,
+        "price": 582,
+        "originalPrice": 814
+      },
+      {
+        "id": "sd-prod-058-var-9",
+        "sku": "SD-SD-PROD-058-CRI-XL",
+        "size": "XL",
+        "colourName": "Crimson Red",
+        "colourHex": "#DC143C",
+        "stock": 15,
+        "price": 582,
+        "originalPrice": 814
+      },
+      {
+        "id": "sd-prod-058-var-10",
+        "sku": "SD-SD-PROD-058-CRI-XXL",
+        "size": "XXL",
+        "colourName": "Crimson Red",
+        "colourHex": "#DC143C",
+        "stock": 15,
+        "price": 582,
+        "originalPrice": 814
+      }
+    ],
+    "tags": [
+      "straight cut chikankari kurta",
+      "women",
+      "kurtas & suits",
+      "kurta sets",
+      "highlander",
+      "fashion",
+      "trending"
+    ],
+    "badge": "New",
+    "newArrival": false,
+    "trending": false,
+    "featured": false,
+    "expressDelivery": true,
+    "estimatedDeliveryMinutes": 60,
+    "returnWindowDays": 7,
+    "exchangeAvailable": true,
+    "vendorId": "v-ethnic-vibe",
+    "commissionPercent": 12,
+    "sponsored": false,
+    "active": true,
+    "createdAt": "2026-07-01T00:00:00Z",
+    "updatedAt": "2026-08-01T00:00:00Z"
+  },
+  {
+    "id": "sd-prod-059",
+    "slug": "palazzo-suit-with-embroidered-dupatta-sd-prod-059",
+    "name": "Palazzo Suit with Embroidered Dupatta",
+    "brand": "Bawree",
+    "department": "women",
+    "category": "Kurtas & Suits",
+    "subcategory": "Kurta Sets",
+    "collection": "Summer Essentials 2026",
+    "shortDescription": "Premium quality palazzo suit with embroidered dupatta crafted for comfort and style.",
+    "description": "Elevate your daily fashion with this Palazzo Suit with Embroidered Dupatta. Features premium fabric construction, tailored fit, and durable craftsmanship ideal for everyday wear.",
+    "material": "100% Premium Combed Cotton",
+    "fit": "Regular Fit",
+    "pattern": "Solid / Textured",
+    "occasion": [
+      "Casual",
+      "Everyday",
+      "Party"
+    ],
+    "careInstructions": [
+      "Machine wash cold",
+      "Do not bleach",
+      "Tumble dry low",
+      "Warm iron if needed"
+    ],
+    "price": 619,
+    "originalPrice": 866,
+    "discount": 28,
+    "images": [
+      "https://images.unsplash.com/photo-1521572267360-ee0c2909d518?auto=format&fit=crop&w=800&q=80",
+      "https://images.unsplash.com/photo-1503342217505-b0a15ec3261c?auto=format&fit=crop&w=800&q=80"
+    ],
+    "thumbnail": "https://images.unsplash.com/photo-1521572267360-ee0c2909d518?auto=format&fit=crop&w=800&q=80",
+    "rating": 3.8,
+    "reviewCount": 72,
+    "reviews": [
+      {
+        "id": "rev-sd-prod-059-1",
+        "userName": "Aman Sharma",
+        "rating": 5,
+        "title": "Great quality and fast delivery!",
+        "comment": "Delivered in Neemuch within 45 minutes! Quality is top notch.",
+        "createdAt": "2026-07-28",
+        "verifiedPurchase": true
+      },
+      {
+        "id": "rev-sd-prod-059-2",
+        "userName": "Priya Verma",
+        "rating": 4,
+        "title": "Nice fit and comfortable material",
+        "comment": "The fabric is very soft. True to size.",
+        "createdAt": "2026-07-29",
+        "verifiedPurchase": true
+      }
+    ],
+    "variants": [
+      {
+        "id": "sd-prod-059-var-1",
+        "sku": "SD-SD-PROD-059-CRI-S",
+        "size": "S",
+        "colourName": "Crimson Red",
+        "colourHex": "#DC143C",
+        "stock": 15,
+        "price": 619,
+        "originalPrice": 866
+      },
+      {
+        "id": "sd-prod-059-var-2",
+        "sku": "SD-SD-PROD-059-CRI-M",
+        "size": "M",
+        "colourName": "Crimson Red",
+        "colourHex": "#DC143C",
+        "stock": 15,
+        "price": 619,
+        "originalPrice": 866
+      },
+      {
+        "id": "sd-prod-059-var-3",
+        "sku": "SD-SD-PROD-059-CRI-L",
+        "size": "L",
+        "colourName": "Crimson Red",
+        "colourHex": "#DC143C",
+        "stock": 15,
+        "price": 619,
+        "originalPrice": 866
+      },
+      {
+        "id": "sd-prod-059-var-4",
+        "sku": "SD-SD-PROD-059-CRI-XL",
+        "size": "XL",
+        "colourName": "Crimson Red",
+        "colourHex": "#DC143C",
+        "stock": 15,
+        "price": 619,
+        "originalPrice": 866
+      },
+      {
+        "id": "sd-prod-059-var-5",
+        "sku": "SD-SD-PROD-059-CRI-XXL",
+        "size": "XXL",
+        "colourName": "Crimson Red",
+        "colourHex": "#DC143C",
+        "stock": 15,
+        "price": 619,
+        "originalPrice": 866
+      },
+      {
+        "id": "sd-prod-059-var-6",
+        "sku": "SD-SD-PROD-059-BEI-S",
+        "size": "S",
+        "colourName": "Beige",
+        "colourHex": "#F5F5DC",
+        "stock": 15,
+        "price": 619,
+        "originalPrice": 866
+      },
+      {
+        "id": "sd-prod-059-var-7",
+        "sku": "SD-SD-PROD-059-BEI-M",
+        "size": "M",
+        "colourName": "Beige",
+        "colourHex": "#F5F5DC",
+        "stock": 0,
+        "price": 619,
+        "originalPrice": 866
+      },
+      {
+        "id": "sd-prod-059-var-8",
+        "sku": "SD-SD-PROD-059-BEI-L",
+        "size": "L",
+        "colourName": "Beige",
+        "colourHex": "#F5F5DC",
+        "stock": 15,
+        "price": 619,
+        "originalPrice": 866
+      },
+      {
+        "id": "sd-prod-059-var-9",
+        "sku": "SD-SD-PROD-059-BEI-XL",
+        "size": "XL",
+        "colourName": "Beige",
+        "colourHex": "#F5F5DC",
+        "stock": 15,
+        "price": 619,
+        "originalPrice": 866
+      },
+      {
+        "id": "sd-prod-059-var-10",
+        "sku": "SD-SD-PROD-059-BEI-XXL",
+        "size": "XXL",
+        "colourName": "Beige",
+        "colourHex": "#F5F5DC",
+        "stock": 15,
+        "price": 619,
+        "originalPrice": 866
+      }
+    ],
+    "tags": [
+      "palazzo suit with embroidered dupatta",
+      "women",
+      "kurtas & suits",
+      "kurta sets",
+      "bawree",
+      "fashion",
+      "trending"
+    ],
+    "badge": "Trending",
+    "newArrival": true,
+    "trending": true,
+    "featured": true,
+    "expressDelivery": true,
+    "estimatedDeliveryMinutes": 60,
+    "returnWindowDays": 7,
+    "exchangeAvailable": true,
+    "vendorId": "v-urban-style",
+    "commissionPercent": 12,
+    "sponsored": false,
+    "active": true,
+    "createdAt": "2026-07-01T00:00:00Z",
+    "updatedAt": "2026-08-01T00:00:00Z"
+  },
+  {
+    "id": "sd-prod-060",
+    "slug": "angrakha-style-festive-kurta-sd-prod-060",
+    "name": "Angrakha Style Festive Kurta",
+    "brand": "Snitch",
+    "department": "women",
+    "category": "Kurtas & Suits",
+    "subcategory": "Kurta Sets",
+    "collection": "Summer Essentials 2026",
+    "shortDescription": "Premium quality angrakha style festive kurta crafted for comfort and style.",
+    "description": "Elevate your daily fashion with this Angrakha Style Festive Kurta. Features premium fabric construction, tailored fit, and durable craftsmanship ideal for everyday wear.",
+    "material": "100% Premium Combed Cotton",
+    "fit": "Regular Fit",
+    "pattern": "Solid / Textured",
+    "occasion": [
+      "Casual",
+      "Everyday",
+      "Party"
+    ],
+    "careInstructions": [
+      "Machine wash cold",
+      "Do not bleach",
+      "Tumble dry low",
+      "Warm iron if needed"
+    ],
+    "price": 656,
+    "originalPrice": 918,
+    "discount": 28,
+    "images": [
+      "https://images.unsplash.com/photo-1503342217505-b0a15ec3261c?auto=format&fit=crop&w=800&q=80",
+      "https://images.unsplash.com/photo-1576995853123-5a10305d93c0?auto=format&fit=crop&w=800&q=80"
+    ],
+    "thumbnail": "https://images.unsplash.com/photo-1503342217505-b0a15ec3261c?auto=format&fit=crop&w=800&q=80",
+    "rating": 3.9,
+    "reviewCount": 85,
+    "reviews": [
+      {
+        "id": "rev-sd-prod-060-1",
+        "userName": "Aman Sharma",
+        "rating": 5,
+        "title": "Great quality and fast delivery!",
+        "comment": "Delivered in Neemuch within 45 minutes! Quality is top notch.",
+        "createdAt": "2026-07-28",
+        "verifiedPurchase": true
+      },
+      {
+        "id": "rev-sd-prod-060-2",
+        "userName": "Priya Verma",
+        "rating": 4,
+        "title": "Nice fit and comfortable material",
+        "comment": "The fabric is very soft. True to size.",
+        "createdAt": "2026-07-29",
+        "verifiedPurchase": true
+      }
+    ],
+    "variants": [
+      {
+        "id": "sd-prod-060-var-1",
+        "sku": "SD-SD-PROD-060-BEI-S",
+        "size": "S",
+        "colourName": "Beige",
+        "colourHex": "#F5F5DC",
+        "stock": 15,
+        "price": 656,
+        "originalPrice": 918
+      },
+      {
+        "id": "sd-prod-060-var-2",
+        "sku": "SD-SD-PROD-060-BEI-M",
+        "size": "M",
+        "colourName": "Beige",
+        "colourHex": "#F5F5DC",
+        "stock": 15,
+        "price": 656,
+        "originalPrice": 918
+      },
+      {
+        "id": "sd-prod-060-var-3",
+        "sku": "SD-SD-PROD-060-BEI-L",
+        "size": "L",
+        "colourName": "Beige",
+        "colourHex": "#F5F5DC",
+        "stock": 15,
+        "price": 656,
+        "originalPrice": 918
+      },
+      {
+        "id": "sd-prod-060-var-4",
+        "sku": "SD-SD-PROD-060-BEI-XL",
+        "size": "XL",
+        "colourName": "Beige",
+        "colourHex": "#F5F5DC",
+        "stock": 15,
+        "price": 656,
+        "originalPrice": 918
+      },
+      {
+        "id": "sd-prod-060-var-5",
+        "sku": "SD-SD-PROD-060-BEI-XXL",
+        "size": "XXL",
+        "colourName": "Beige",
+        "colourHex": "#F5F5DC",
+        "stock": 15,
+        "price": 656,
+        "originalPrice": 918
+      },
+      {
+        "id": "sd-prod-060-var-6",
+        "sku": "SD-SD-PROD-060-CHA-S",
+        "size": "S",
+        "colourName": "Charcoal Gray",
+        "colourHex": "#36454F",
+        "stock": 15,
+        "price": 656,
+        "originalPrice": 918
+      },
+      {
+        "id": "sd-prod-060-var-7",
+        "sku": "SD-SD-PROD-060-CHA-M",
+        "size": "M",
+        "colourName": "Charcoal Gray",
+        "colourHex": "#36454F",
+        "stock": 0,
+        "price": 656,
+        "originalPrice": 918
+      },
+      {
+        "id": "sd-prod-060-var-8",
+        "sku": "SD-SD-PROD-060-CHA-L",
+        "size": "L",
+        "colourName": "Charcoal Gray",
+        "colourHex": "#36454F",
+        "stock": 15,
+        "price": 656,
+        "originalPrice": 918
+      },
+      {
+        "id": "sd-prod-060-var-9",
+        "sku": "SD-SD-PROD-060-CHA-XL",
+        "size": "XL",
+        "colourName": "Charcoal Gray",
+        "colourHex": "#36454F",
+        "stock": 15,
+        "price": 656,
+        "originalPrice": 918
+      },
+      {
+        "id": "sd-prod-060-var-10",
+        "sku": "SD-SD-PROD-060-CHA-XXL",
+        "size": "XXL",
+        "colourName": "Charcoal Gray",
+        "colourHex": "#36454F",
+        "stock": 15,
+        "price": 656,
+        "originalPrice": 918
+      }
+    ],
+    "tags": [
+      "angrakha style festive kurta",
+      "women",
+      "kurtas & suits",
+      "kurta sets",
+      "snitch",
+      "fashion",
+      "trending"
+    ],
+    "badge": "New",
+    "newArrival": false,
+    "trending": false,
+    "featured": false,
+    "expressDelivery": true,
+    "estimatedDeliveryMinutes": 60,
+    "returnWindowDays": 7,
+    "exchangeAvailable": true,
+    "vendorId": "v-ethnic-vibe",
+    "commissionPercent": 12,
+    "sponsored": false,
+    "active": true,
+    "createdAt": "2026-07-01T00:00:00Z",
+    "updatedAt": "2026-08-01T00:00:00Z"
+  },
+  {
+    "id": "sd-prod-061",
+    "slug": "kanjeevaram-art-silk-saree-sd-prod-061",
+    "name": "Kanjeevaram Art Silk Saree",
+    "brand": "Wrong",
+    "department": "women",
+    "category": "Sarees",
+    "subcategory": "Silk",
+    "collection": "Summer Essentials 2026",
+    "shortDescription": "Premium quality kanjeevaram art silk saree crafted for comfort and style.",
+    "description": "Elevate your daily fashion with this Kanjeevaram Art Silk Saree. Features premium fabric construction, tailored fit, and durable craftsmanship ideal for everyday wear.",
+    "material": "100% Premium Combed Cotton",
+    "fit": "Regular Fit",
+    "pattern": "Solid / Textured",
+    "occasion": [
+      "Casual",
+      "Everyday",
+      "Party"
+    ],
+    "careInstructions": [
+      "Machine wash cold",
+      "Do not bleach",
+      "Tumble dry low",
+      "Warm iron if needed"
+    ],
+    "price": 693,
+    "originalPrice": 970,
+    "discount": 28,
+    "images": [
+      "https://images.unsplash.com/photo-1576995853123-5a10305d93c0?auto=format&fit=crop&w=800&q=80",
+      "https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?auto=format&fit=crop&w=800&q=80"
+    ],
+    "thumbnail": "https://images.unsplash.com/photo-1576995853123-5a10305d93c0?auto=format&fit=crop&w=800&q=80",
+    "rating": 4.0,
+    "reviewCount": 98,
+    "reviews": [
+      {
+        "id": "rev-sd-prod-061-1",
+        "userName": "Aman Sharma",
+        "rating": 5,
+        "title": "Great quality and fast delivery!",
+        "comment": "Delivered in Neemuch within 45 minutes! Quality is top notch.",
+        "createdAt": "2026-07-28",
+        "verifiedPurchase": true
+      },
+      {
+        "id": "rev-sd-prod-061-2",
+        "userName": "Priya Verma",
+        "rating": 4,
+        "title": "Nice fit and comfortable material",
+        "comment": "The fabric is very soft. True to size.",
+        "createdAt": "2026-07-29",
+        "verifiedPurchase": true
+      }
+    ],
+    "variants": [
+      {
+        "id": "sd-prod-061-var-1",
+        "sku": "SD-SD-PROD-061-CHA-S",
+        "size": "S",
+        "colourName": "Charcoal Gray",
+        "colourHex": "#36454F",
+        "stock": 15,
+        "price": 693,
+        "originalPrice": 970
+      },
+      {
+        "id": "sd-prod-061-var-2",
+        "sku": "SD-SD-PROD-061-CHA-M",
+        "size": "M",
+        "colourName": "Charcoal Gray",
+        "colourHex": "#36454F",
+        "stock": 15,
+        "price": 693,
+        "originalPrice": 970
+      },
+      {
+        "id": "sd-prod-061-var-3",
+        "sku": "SD-SD-PROD-061-CHA-L",
+        "size": "L",
+        "colourName": "Charcoal Gray",
+        "colourHex": "#36454F",
+        "stock": 15,
+        "price": 693,
+        "originalPrice": 970
+      },
+      {
+        "id": "sd-prod-061-var-4",
+        "sku": "SD-SD-PROD-061-CHA-XL",
+        "size": "XL",
+        "colourName": "Charcoal Gray",
+        "colourHex": "#36454F",
+        "stock": 15,
+        "price": 693,
+        "originalPrice": 970
+      },
+      {
+        "id": "sd-prod-061-var-5",
+        "sku": "SD-SD-PROD-061-CHA-XXL",
+        "size": "XXL",
+        "colourName": "Charcoal Gray",
+        "colourHex": "#36454F",
+        "stock": 15,
+        "price": 693,
+        "originalPrice": 970
+      },
+      {
+        "id": "sd-prod-061-var-6",
+        "sku": "SD-SD-PROD-061-MUS-S",
+        "size": "S",
+        "colourName": "Mustard Yellow",
+        "colourHex": "#FFDB58",
+        "stock": 15,
+        "price": 693,
+        "originalPrice": 970
+      },
+      {
+        "id": "sd-prod-061-var-7",
+        "sku": "SD-SD-PROD-061-MUS-M",
+        "size": "M",
+        "colourName": "Mustard Yellow",
+        "colourHex": "#FFDB58",
+        "stock": 0,
+        "price": 693,
+        "originalPrice": 970
+      },
+      {
+        "id": "sd-prod-061-var-8",
+        "sku": "SD-SD-PROD-061-MUS-L",
+        "size": "L",
+        "colourName": "Mustard Yellow",
+        "colourHex": "#FFDB58",
+        "stock": 15,
+        "price": 693,
+        "originalPrice": 970
+      },
+      {
+        "id": "sd-prod-061-var-9",
+        "sku": "SD-SD-PROD-061-MUS-XL",
+        "size": "XL",
+        "colourName": "Mustard Yellow",
+        "colourHex": "#FFDB58",
+        "stock": 15,
+        "price": 693,
+        "originalPrice": 970
+      },
+      {
+        "id": "sd-prod-061-var-10",
+        "sku": "SD-SD-PROD-061-MUS-XXL",
+        "size": "XXL",
+        "colourName": "Mustard Yellow",
+        "colourHex": "#FFDB58",
+        "stock": 15,
+        "price": 693,
+        "originalPrice": 970
+      }
+    ],
+    "tags": [
+      "kanjeevaram art silk saree",
+      "women",
+      "sarees",
+      "silk",
+      "wrong",
+      "fashion",
+      "trending"
+    ],
+    "badge": "Express",
+    "newArrival": false,
+    "trending": true,
+    "featured": false,
+    "expressDelivery": true,
+    "estimatedDeliveryMinutes": 60,
+    "returnWindowDays": 7,
+    "exchangeAvailable": true,
+    "vendorId": "v-urban-style",
+    "commissionPercent": 12,
+    "sponsored": false,
+    "active": true,
+    "createdAt": "2026-07-01T00:00:00Z",
+    "updatedAt": "2026-08-01T00:00:00Z"
+  },
+  {
+    "id": "sd-prod-062",
+    "slug": "chanderi-printed-cotton-saree-sd-prod-062",
+    "name": "Chanderi Printed Cotton Saree",
+    "brand": "Roadster",
+    "department": "women",
+    "category": "Sarees",
+    "subcategory": "Silk",
+    "collection": "Summer Essentials 2026",
+    "shortDescription": "Premium quality chanderi printed cotton saree crafted for comfort and style.",
+    "description": "Elevate your daily fashion with this Chanderi Printed Cotton Saree. Features premium fabric construction, tailored fit, and durable craftsmanship ideal for everyday wear.",
+    "material": "100% Premium Combed Cotton",
+    "fit": "Regular Fit",
+    "pattern": "Solid / Textured",
+    "occasion": [
+      "Casual",
+      "Everyday",
+      "Party"
+    ],
+    "careInstructions": [
+      "Machine wash cold",
+      "Do not bleach",
+      "Tumble dry low",
+      "Warm iron if needed"
+    ],
+    "price": 730,
+    "originalPrice": 1021,
+    "discount": 28,
+    "images": [
+      "https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?auto=format&fit=crop&w=800&q=80",
+      "https://images.unsplash.com/photo-1529374255404-311a2a4f1fd9?auto=format&fit=crop&w=800&q=80"
+    ],
+    "thumbnail": "https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?auto=format&fit=crop&w=800&q=80",
+    "rating": 4.1,
+    "reviewCount": 111,
+    "reviews": [
+      {
+        "id": "rev-sd-prod-062-1",
+        "userName": "Aman Sharma",
+        "rating": 5,
+        "title": "Great quality and fast delivery!",
+        "comment": "Delivered in Neemuch within 45 minutes! Quality is top notch.",
+        "createdAt": "2026-07-28",
+        "verifiedPurchase": true
+      },
+      {
+        "id": "rev-sd-prod-062-2",
+        "userName": "Priya Verma",
+        "rating": 4,
+        "title": "Nice fit and comfortable material",
+        "comment": "The fabric is very soft. True to size.",
+        "createdAt": "2026-07-29",
+        "verifiedPurchase": true
+      }
+    ],
+    "variants": [
+      {
+        "id": "sd-prod-062-var-1",
+        "sku": "SD-SD-PROD-062-MUS-S",
+        "size": "S",
+        "colourName": "Mustard Yellow",
+        "colourHex": "#FFDB58",
+        "stock": 15,
+        "price": 730,
+        "originalPrice": 1021
+      },
+      {
+        "id": "sd-prod-062-var-2",
+        "sku": "SD-SD-PROD-062-MUS-M",
+        "size": "M",
+        "colourName": "Mustard Yellow",
+        "colourHex": "#FFDB58",
+        "stock": 15,
+        "price": 730,
+        "originalPrice": 1021
+      },
+      {
+        "id": "sd-prod-062-var-3",
+        "sku": "SD-SD-PROD-062-MUS-L",
+        "size": "L",
+        "colourName": "Mustard Yellow",
+        "colourHex": "#FFDB58",
+        "stock": 15,
+        "price": 730,
+        "originalPrice": 1021
+      },
+      {
+        "id": "sd-prod-062-var-4",
+        "sku": "SD-SD-PROD-062-MUS-XL",
+        "size": "XL",
+        "colourName": "Mustard Yellow",
+        "colourHex": "#FFDB58",
+        "stock": 15,
+        "price": 730,
+        "originalPrice": 1021
+      },
+      {
+        "id": "sd-prod-062-var-5",
+        "sku": "SD-SD-PROD-062-MUS-XXL",
+        "size": "XXL",
+        "colourName": "Mustard Yellow",
+        "colourHex": "#FFDB58",
+        "stock": 15,
+        "price": 730,
+        "originalPrice": 1021
+      },
+      {
+        "id": "sd-prod-062-var-6",
+        "sku": "SD-SD-PROD-062-BLA-S",
+        "size": "S",
+        "colourName": "Black",
+        "colourHex": "#000000",
+        "stock": 15,
+        "price": 730,
+        "originalPrice": 1021
+      },
+      {
+        "id": "sd-prod-062-var-7",
+        "sku": "SD-SD-PROD-062-BLA-M",
+        "size": "M",
+        "colourName": "Black",
+        "colourHex": "#000000",
+        "stock": 0,
+        "price": 730,
+        "originalPrice": 1021
+      },
+      {
+        "id": "sd-prod-062-var-8",
+        "sku": "SD-SD-PROD-062-BLA-L",
+        "size": "L",
+        "colourName": "Black",
+        "colourHex": "#000000",
+        "stock": 15,
+        "price": 730,
+        "originalPrice": 1021
+      },
+      {
+        "id": "sd-prod-062-var-9",
+        "sku": "SD-SD-PROD-062-BLA-XL",
+        "size": "XL",
+        "colourName": "Black",
+        "colourHex": "#000000",
+        "stock": 15,
+        "price": 730,
+        "originalPrice": 1021
+      },
+      {
+        "id": "sd-prod-062-var-10",
+        "sku": "SD-SD-PROD-062-BLA-XXL",
+        "size": "XXL",
+        "colourName": "Black",
+        "colourHex": "#000000",
+        "stock": 15,
+        "price": 730,
+        "originalPrice": 1021
+      }
+    ],
+    "tags": [
+      "chanderi printed cotton saree",
+      "women",
+      "sarees",
+      "silk",
+      "roadster",
+      "fashion",
+      "trending"
+    ],
+    "badge": "Trending",
+    "newArrival": true,
+    "trending": false,
+    "featured": false,
+    "expressDelivery": true,
+    "estimatedDeliveryMinutes": 60,
+    "returnWindowDays": 7,
+    "exchangeAvailable": true,
+    "vendorId": "v-ethnic-vibe",
+    "commissionPercent": 12,
+    "sponsored": true,
+    "active": true,
+    "createdAt": "2026-07-01T00:00:00Z",
+    "updatedAt": "2026-08-01T00:00:00Z"
+  },
+  {
+    "id": "sd-prod-063",
+    "slug": "zari-border-georgette-saree-sd-prod-063",
+    "name": "Zari Border Georgette Saree",
+    "brand": "HRX",
+    "department": "women",
+    "category": "Sarees",
+    "subcategory": "Silk",
+    "collection": "Summer Essentials 2026",
+    "shortDescription": "Premium quality zari border georgette saree crafted for comfort and style.",
+    "description": "Elevate your daily fashion with this Zari Border Georgette Saree. Features premium fabric construction, tailored fit, and durable craftsmanship ideal for everyday wear.",
+    "material": "100% Premium Combed Cotton",
+    "fit": "Regular Fit",
+    "pattern": "Solid / Textured",
+    "occasion": [
+      "Casual",
+      "Everyday",
+      "Party"
+    ],
+    "careInstructions": [
+      "Machine wash cold",
+      "Do not bleach",
+      "Tumble dry low",
+      "Warm iron if needed"
+    ],
+    "price": 767,
+    "originalPrice": 1073,
+    "discount": 28,
+    "images": [
+      "https://images.unsplash.com/photo-1529374255404-311a2a4f1fd9?auto=format&fit=crop&w=800&q=80",
+      "https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&w=800&q=80"
+    ],
+    "thumbnail": "https://images.unsplash.com/photo-1529374255404-311a2a4f1fd9?auto=format&fit=crop&w=800&q=80",
+    "rating": 4.2,
+    "reviewCount": 124,
+    "reviews": [
+      {
+        "id": "rev-sd-prod-063-1",
+        "userName": "Aman Sharma",
+        "rating": 5,
+        "title": "Great quality and fast delivery!",
+        "comment": "Delivered in Neemuch within 45 minutes! Quality is top notch.",
+        "createdAt": "2026-07-28",
+        "verifiedPurchase": true
+      },
+      {
+        "id": "rev-sd-prod-063-2",
+        "userName": "Priya Verma",
+        "rating": 4,
+        "title": "Nice fit and comfortable material",
+        "comment": "The fabric is very soft. True to size.",
+        "createdAt": "2026-07-29",
+        "verifiedPurchase": true
+      }
+    ],
+    "variants": [
+      {
+        "id": "sd-prod-063-var-1",
+        "sku": "SD-SD-PROD-063-BLA-S",
+        "size": "S",
+        "colourName": "Black",
+        "colourHex": "#000000",
+        "stock": 15,
+        "price": 767,
+        "originalPrice": 1073
+      },
+      {
+        "id": "sd-prod-063-var-2",
+        "sku": "SD-SD-PROD-063-BLA-M",
+        "size": "M",
+        "colourName": "Black",
+        "colourHex": "#000000",
+        "stock": 15,
+        "price": 767,
+        "originalPrice": 1073
+      },
+      {
+        "id": "sd-prod-063-var-3",
+        "sku": "SD-SD-PROD-063-BLA-L",
+        "size": "L",
+        "colourName": "Black",
+        "colourHex": "#000000",
+        "stock": 15,
+        "price": 767,
+        "originalPrice": 1073
+      },
+      {
+        "id": "sd-prod-063-var-4",
+        "sku": "SD-SD-PROD-063-BLA-XL",
+        "size": "XL",
+        "colourName": "Black",
+        "colourHex": "#000000",
+        "stock": 15,
+        "price": 767,
+        "originalPrice": 1073
+      },
+      {
+        "id": "sd-prod-063-var-5",
+        "sku": "SD-SD-PROD-063-BLA-XXL",
+        "size": "XXL",
+        "colourName": "Black",
+        "colourHex": "#000000",
+        "stock": 15,
+        "price": 767,
+        "originalPrice": 1073
+      },
+      {
+        "id": "sd-prod-063-var-6",
+        "sku": "SD-SD-PROD-063-WHI-S",
+        "size": "S",
+        "colourName": "White",
+        "colourHex": "#FFFFFF",
+        "stock": 15,
+        "price": 767,
+        "originalPrice": 1073
+      },
+      {
+        "id": "sd-prod-063-var-7",
+        "sku": "SD-SD-PROD-063-WHI-M",
+        "size": "M",
+        "colourName": "White",
+        "colourHex": "#FFFFFF",
+        "stock": 0,
+        "price": 767,
+        "originalPrice": 1073
+      },
+      {
+        "id": "sd-prod-063-var-8",
+        "sku": "SD-SD-PROD-063-WHI-L",
+        "size": "L",
+        "colourName": "White",
+        "colourHex": "#FFFFFF",
+        "stock": 15,
+        "price": 767,
+        "originalPrice": 1073
+      },
+      {
+        "id": "sd-prod-063-var-9",
+        "sku": "SD-SD-PROD-063-WHI-XL",
+        "size": "XL",
+        "colourName": "White",
+        "colourHex": "#FFFFFF",
+        "stock": 15,
+        "price": 767,
+        "originalPrice": 1073
+      },
+      {
+        "id": "sd-prod-063-var-10",
+        "sku": "SD-SD-PROD-063-WHI-XXL",
+        "size": "XXL",
+        "colourName": "White",
+        "colourHex": "#FFFFFF",
+        "stock": 15,
+        "price": 767,
+        "originalPrice": 1073
+      }
+    ],
+    "tags": [
+      "zari border georgette saree",
+      "women",
+      "sarees",
+      "silk",
+      "hrx",
+      "fashion",
+      "trending"
+    ],
+    "badge": "Express",
+    "newArrival": false,
+    "trending": true,
+    "featured": true,
+    "expressDelivery": true,
+    "estimatedDeliveryMinutes": 60,
+    "returnWindowDays": 7,
+    "exchangeAvailable": true,
+    "vendorId": "v-urban-style",
+    "commissionPercent": 12,
+    "sponsored": false,
+    "active": true,
+    "createdAt": "2026-07-01T00:00:00Z",
+    "updatedAt": "2026-08-01T00:00:00Z"
+  },
+  {
+    "id": "sd-prod-064",
+    "slug": "organza-floral-print-saree-sd-prod-064",
+    "name": "Organza Floral Print Saree",
+    "brand": "StyleDash Studio",
+    "department": "women",
+    "category": "Sarees",
+    "subcategory": "Silk",
+    "collection": "Summer Essentials 2026",
+    "shortDescription": "Premium quality organza floral print saree crafted for comfort and style.",
+    "description": "Elevate your daily fashion with this Organza Floral Print Saree. Features premium fabric construction, tailored fit, and durable craftsmanship ideal for everyday wear.",
+    "material": "100% Premium Combed Cotton",
+    "fit": "Regular Fit",
+    "pattern": "Solid / Textured",
+    "occasion": [
+      "Casual",
+      "Everyday",
+      "Party"
+    ],
+    "careInstructions": [
+      "Machine wash cold",
+      "Do not bleach",
+      "Tumble dry low",
+      "Warm iron if needed"
+    ],
+    "price": 804,
+    "originalPrice": 1125,
+    "discount": 28,
+    "images": [
+      "https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&w=800&q=80",
+      "https://images.unsplash.com/photo-1521572267360-ee0c2909d518?auto=format&fit=crop&w=800&q=80"
+    ],
+    "thumbnail": "https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&w=800&q=80",
+    "rating": 4.3,
+    "reviewCount": 137,
+    "reviews": [
+      {
+        "id": "rev-sd-prod-064-1",
+        "userName": "Aman Sharma",
+        "rating": 5,
+        "title": "Great quality and fast delivery!",
+        "comment": "Delivered in Neemuch within 45 minutes! Quality is top notch.",
+        "createdAt": "2026-07-28",
+        "verifiedPurchase": true
+      },
+      {
+        "id": "rev-sd-prod-064-2",
+        "userName": "Priya Verma",
+        "rating": 4,
+        "title": "Nice fit and comfortable material",
+        "comment": "The fabric is very soft. True to size.",
+        "createdAt": "2026-07-29",
+        "verifiedPurchase": true
+      }
+    ],
+    "variants": [
+      {
+        "id": "sd-prod-064-var-1",
+        "sku": "SD-SD-PROD-064-WHI-S",
+        "size": "S",
+        "colourName": "White",
+        "colourHex": "#FFFFFF",
+        "stock": 15,
+        "price": 804,
+        "originalPrice": 1125
+      },
+      {
+        "id": "sd-prod-064-var-2",
+        "sku": "SD-SD-PROD-064-WHI-M",
+        "size": "M",
+        "colourName": "White",
+        "colourHex": "#FFFFFF",
+        "stock": 15,
+        "price": 804,
+        "originalPrice": 1125
+      },
+      {
+        "id": "sd-prod-064-var-3",
+        "sku": "SD-SD-PROD-064-WHI-L",
+        "size": "L",
+        "colourName": "White",
+        "colourHex": "#FFFFFF",
+        "stock": 15,
+        "price": 804,
+        "originalPrice": 1125
+      },
+      {
+        "id": "sd-prod-064-var-4",
+        "sku": "SD-SD-PROD-064-WHI-XL",
+        "size": "XL",
+        "colourName": "White",
+        "colourHex": "#FFFFFF",
+        "stock": 15,
+        "price": 804,
+        "originalPrice": 1125
+      },
+      {
+        "id": "sd-prod-064-var-5",
+        "sku": "SD-SD-PROD-064-WHI-XXL",
+        "size": "XXL",
+        "colourName": "White",
+        "colourHex": "#FFFFFF",
+        "stock": 15,
+        "price": 804,
+        "originalPrice": 1125
+      },
+      {
+        "id": "sd-prod-064-var-6",
+        "sku": "SD-SD-PROD-064-NAV-S",
+        "size": "S",
+        "colourName": "Navy Blue",
+        "colourHex": "#000080",
+        "stock": 15,
+        "price": 804,
+        "originalPrice": 1125
+      },
+      {
+        "id": "sd-prod-064-var-7",
+        "sku": "SD-SD-PROD-064-NAV-M",
+        "size": "M",
+        "colourName": "Navy Blue",
+        "colourHex": "#000080",
+        "stock": 0,
+        "price": 804,
+        "originalPrice": 1125
+      },
+      {
+        "id": "sd-prod-064-var-8",
+        "sku": "SD-SD-PROD-064-NAV-L",
+        "size": "L",
+        "colourName": "Navy Blue",
+        "colourHex": "#000080",
+        "stock": 15,
+        "price": 804,
+        "originalPrice": 1125
+      },
+      {
+        "id": "sd-prod-064-var-9",
+        "sku": "SD-SD-PROD-064-NAV-XL",
+        "size": "XL",
+        "colourName": "Navy Blue",
+        "colourHex": "#000080",
+        "stock": 15,
+        "price": 804,
+        "originalPrice": 1125
+      },
+      {
+        "id": "sd-prod-064-var-10",
+        "sku": "SD-SD-PROD-064-NAV-XXL",
+        "size": "XXL",
+        "colourName": "Navy Blue",
+        "colourHex": "#000080",
+        "stock": 15,
+        "price": 804,
+        "originalPrice": 1125
+      }
+    ],
+    "tags": [
+      "organza floral print saree",
+      "women",
+      "sarees",
+      "silk",
+      "styledash studio",
+      "fashion",
+      "trending"
+    ],
+    "badge": "New",
+    "newArrival": false,
+    "trending": false,
+    "featured": false,
+    "expressDelivery": true,
+    "estimatedDeliveryMinutes": 60,
+    "returnWindowDays": 7,
+    "exchangeAvailable": true,
+    "vendorId": "v-ethnic-vibe",
+    "commissionPercent": 12,
+    "sponsored": false,
+    "active": true,
+    "createdAt": "2026-07-01T00:00:00Z",
+    "updatedAt": "2026-08-01T00:00:00Z"
+  },
+  {
+    "id": "sd-prod-065",
+    "slug": "traditional-bandhani-saree-sd-prod-065",
+    "name": "Traditional Bandhani Saree",
+    "brand": "Anouk",
+    "department": "women",
+    "category": "Sarees",
+    "subcategory": "Silk",
+    "collection": "Summer Essentials 2026",
+    "shortDescription": "Premium quality traditional bandhani saree crafted for comfort and style.",
+    "description": "Elevate your daily fashion with this Traditional Bandhani Saree. Features premium fabric construction, tailored fit, and durable craftsmanship ideal for everyday wear.",
+    "material": "100% Premium Combed Cotton",
+    "fit": "Regular Fit",
+    "pattern": "Solid / Textured",
+    "occasion": [
+      "Casual",
+      "Everyday",
+      "Party"
+    ],
+    "careInstructions": [
+      "Machine wash cold",
+      "Do not bleach",
+      "Tumble dry low",
+      "Warm iron if needed"
+    ],
+    "price": 841,
+    "originalPrice": 1177,
+    "discount": 28,
+    "images": [
+      "https://images.unsplash.com/photo-1521572267360-ee0c2909d518?auto=format&fit=crop&w=800&q=80",
+      "https://images.unsplash.com/photo-1503342217505-b0a15ec3261c?auto=format&fit=crop&w=800&q=80"
+    ],
+    "thumbnail": "https://images.unsplash.com/photo-1521572267360-ee0c2909d518?auto=format&fit=crop&w=800&q=80",
+    "rating": 4.4,
+    "reviewCount": 150,
+    "reviews": [
+      {
+        "id": "rev-sd-prod-065-1",
+        "userName": "Aman Sharma",
+        "rating": 5,
+        "title": "Great quality and fast delivery!",
+        "comment": "Delivered in Neemuch within 45 minutes! Quality is top notch.",
+        "createdAt": "2026-07-28",
+        "verifiedPurchase": true
+      },
+      {
+        "id": "rev-sd-prod-065-2",
+        "userName": "Priya Verma",
+        "rating": 4,
+        "title": "Nice fit and comfortable material",
+        "comment": "The fabric is very soft. True to size.",
+        "createdAt": "2026-07-29",
+        "verifiedPurchase": true
+      }
+    ],
+    "variants": [
+      {
+        "id": "sd-prod-065-var-1",
+        "sku": "SD-SD-PROD-065-NAV-S",
+        "size": "S",
+        "colourName": "Navy Blue",
+        "colourHex": "#000080",
+        "stock": 15,
+        "price": 841,
+        "originalPrice": 1177
+      },
+      {
+        "id": "sd-prod-065-var-2",
+        "sku": "SD-SD-PROD-065-NAV-M",
+        "size": "M",
+        "colourName": "Navy Blue",
+        "colourHex": "#000080",
+        "stock": 15,
+        "price": 841,
+        "originalPrice": 1177
+      },
+      {
+        "id": "sd-prod-065-var-3",
+        "sku": "SD-SD-PROD-065-NAV-L",
+        "size": "L",
+        "colourName": "Navy Blue",
+        "colourHex": "#000080",
+        "stock": 15,
+        "price": 841,
+        "originalPrice": 1177
+      },
+      {
+        "id": "sd-prod-065-var-4",
+        "sku": "SD-SD-PROD-065-NAV-XL",
+        "size": "XL",
+        "colourName": "Navy Blue",
+        "colourHex": "#000080",
+        "stock": 15,
+        "price": 841,
+        "originalPrice": 1177
+      },
+      {
+        "id": "sd-prod-065-var-5",
+        "sku": "SD-SD-PROD-065-NAV-XXL",
+        "size": "XXL",
+        "colourName": "Navy Blue",
+        "colourHex": "#000080",
+        "stock": 15,
+        "price": 841,
+        "originalPrice": 1177
+      },
+      {
+        "id": "sd-prod-065-var-6",
+        "sku": "SD-SD-PROD-065-OLI-S",
+        "size": "S",
+        "colourName": "Olive Green",
+        "colourHex": "#556B2F",
+        "stock": 15,
+        "price": 841,
+        "originalPrice": 1177
+      },
+      {
+        "id": "sd-prod-065-var-7",
+        "sku": "SD-SD-PROD-065-OLI-M",
+        "size": "M",
+        "colourName": "Olive Green",
+        "colourHex": "#556B2F",
+        "stock": 0,
+        "price": 841,
+        "originalPrice": 1177
+      },
+      {
+        "id": "sd-prod-065-var-8",
+        "sku": "SD-SD-PROD-065-OLI-L",
+        "size": "L",
+        "colourName": "Olive Green",
+        "colourHex": "#556B2F",
+        "stock": 15,
+        "price": 841,
+        "originalPrice": 1177
+      },
+      {
+        "id": "sd-prod-065-var-9",
+        "sku": "SD-SD-PROD-065-OLI-XL",
+        "size": "XL",
+        "colourName": "Olive Green",
+        "colourHex": "#556B2F",
+        "stock": 15,
+        "price": 841,
+        "originalPrice": 1177
+      },
+      {
+        "id": "sd-prod-065-var-10",
+        "sku": "SD-SD-PROD-065-OLI-XXL",
+        "size": "XXL",
+        "colourName": "Olive Green",
+        "colourHex": "#556B2F",
+        "stock": 15,
+        "price": 841,
+        "originalPrice": 1177
+      }
+    ],
+    "tags": [
+      "traditional bandhani saree",
+      "women",
+      "sarees",
+      "silk",
+      "anouk",
+      "fashion",
+      "trending"
+    ],
+    "badge": "Trending",
+    "newArrival": true,
+    "trending": true,
+    "featured": false,
+    "expressDelivery": true,
+    "estimatedDeliveryMinutes": 60,
+    "returnWindowDays": 7,
+    "exchangeAvailable": true,
+    "vendorId": "v-urban-style",
+    "commissionPercent": 12,
+    "sponsored": false,
+    "active": true,
+    "createdAt": "2026-07-01T00:00:00Z",
+    "updatedAt": "2026-08-01T00:00:00Z"
+  },
+  {
+    "id": "sd-prod-066",
+    "slug": "linen-blend-shirt-and-shorts-co-ord-sd-prod-066",
+    "name": "Linen Blend Shirt & Shorts Co-ord",
+    "brand": "Mast & Harbour",
+    "department": "women",
+    "category": "Co-ord Sets",
+    "subcategory": "Casual Sets",
+    "collection": "Summer Essentials 2026",
+    "shortDescription": "Premium quality linen blend shirt & shorts co-ord crafted for comfort and style.",
+    "description": "Elevate your daily fashion with this Linen Blend Shirt & Shorts Co-ord. Features premium fabric construction, tailored fit, and durable craftsmanship ideal for everyday wear.",
+    "material": "100% Premium Combed Cotton",
+    "fit": "Regular Fit",
+    "pattern": "Solid / Textured",
+    "occasion": [
+      "Casual",
+      "Everyday",
+      "Party"
+    ],
+    "careInstructions": [
+      "Machine wash cold",
+      "Do not bleach",
+      "Tumble dry low",
+      "Warm iron if needed"
+    ],
+    "price": 878,
+    "originalPrice": 1229,
+    "discount": 28,
+    "images": [
+      "https://images.unsplash.com/photo-1503342217505-b0a15ec3261c?auto=format&fit=crop&w=800&q=80",
+      "https://images.unsplash.com/photo-1576995853123-5a10305d93c0?auto=format&fit=crop&w=800&q=80"
+    ],
+    "thumbnail": "https://images.unsplash.com/photo-1503342217505-b0a15ec3261c?auto=format&fit=crop&w=800&q=80",
+    "rating": 4.5,
+    "reviewCount": 163,
+    "reviews": [
+      {
+        "id": "rev-sd-prod-066-1",
+        "userName": "Aman Sharma",
+        "rating": 5,
+        "title": "Great quality and fast delivery!",
+        "comment": "Delivered in Neemuch within 45 minutes! Quality is top notch.",
+        "createdAt": "2026-07-28",
+        "verifiedPurchase": true
+      },
+      {
+        "id": "rev-sd-prod-066-2",
+        "userName": "Priya Verma",
+        "rating": 4,
+        "title": "Nice fit and comfortable material",
+        "comment": "The fabric is very soft. True to size.",
+        "createdAt": "2026-07-29",
+        "verifiedPurchase": true
+      }
+    ],
+    "variants": [
+      {
+        "id": "sd-prod-066-var-1",
+        "sku": "SD-SD-PROD-066-OLI-S",
+        "size": "S",
+        "colourName": "Olive Green",
+        "colourHex": "#556B2F",
+        "stock": 15,
+        "price": 878,
+        "originalPrice": 1229
+      },
+      {
+        "id": "sd-prod-066-var-2",
+        "sku": "SD-SD-PROD-066-OLI-M",
+        "size": "M",
+        "colourName": "Olive Green",
+        "colourHex": "#556B2F",
+        "stock": 15,
+        "price": 878,
+        "originalPrice": 1229
+      },
+      {
+        "id": "sd-prod-066-var-3",
+        "sku": "SD-SD-PROD-066-OLI-L",
+        "size": "L",
+        "colourName": "Olive Green",
+        "colourHex": "#556B2F",
+        "stock": 15,
+        "price": 878,
+        "originalPrice": 1229
+      },
+      {
+        "id": "sd-prod-066-var-4",
+        "sku": "SD-SD-PROD-066-OLI-XL",
+        "size": "XL",
+        "colourName": "Olive Green",
+        "colourHex": "#556B2F",
+        "stock": 15,
+        "price": 878,
+        "originalPrice": 1229
+      },
+      {
+        "id": "sd-prod-066-var-5",
+        "sku": "SD-SD-PROD-066-OLI-XXL",
+        "size": "XXL",
+        "colourName": "Olive Green",
+        "colourHex": "#556B2F",
+        "stock": 15,
+        "price": 878,
+        "originalPrice": 1229
+      },
+      {
+        "id": "sd-prod-066-var-6",
+        "sku": "SD-SD-PROD-066-CRI-S",
+        "size": "S",
+        "colourName": "Crimson Red",
+        "colourHex": "#DC143C",
+        "stock": 15,
+        "price": 878,
+        "originalPrice": 1229
+      },
+      {
+        "id": "sd-prod-066-var-7",
+        "sku": "SD-SD-PROD-066-CRI-M",
+        "size": "M",
+        "colourName": "Crimson Red",
+        "colourHex": "#DC143C",
+        "stock": 0,
+        "price": 878,
+        "originalPrice": 1229
+      },
+      {
+        "id": "sd-prod-066-var-8",
+        "sku": "SD-SD-PROD-066-CRI-L",
+        "size": "L",
+        "colourName": "Crimson Red",
+        "colourHex": "#DC143C",
+        "stock": 15,
+        "price": 878,
+        "originalPrice": 1229
+      },
+      {
+        "id": "sd-prod-066-var-9",
+        "sku": "SD-SD-PROD-066-CRI-XL",
+        "size": "XL",
+        "colourName": "Crimson Red",
+        "colourHex": "#DC143C",
+        "stock": 15,
+        "price": 878,
+        "originalPrice": 1229
+      },
+      {
+        "id": "sd-prod-066-var-10",
+        "sku": "SD-SD-PROD-066-CRI-XXL",
+        "size": "XXL",
+        "colourName": "Crimson Red",
+        "colourHex": "#DC143C",
+        "stock": 15,
+        "price": 878,
+        "originalPrice": 1229
+      }
+    ],
+    "tags": [
+      "linen blend shirt & shorts co-ord",
+      "women",
+      "co-ord sets",
+      "casual sets",
+      "mast & harbour",
+      "fashion",
+      "trending"
+    ],
+    "badge": "New",
+    "newArrival": false,
+    "trending": false,
+    "featured": false,
+    "expressDelivery": true,
+    "estimatedDeliveryMinutes": 60,
+    "returnWindowDays": 7,
+    "exchangeAvailable": true,
+    "vendorId": "v-ethnic-vibe",
+    "commissionPercent": 12,
+    "sponsored": false,
+    "active": true,
+    "createdAt": "2026-07-01T00:00:00Z",
+    "updatedAt": "2026-08-01T00:00:00Z"
+  },
+  {
+    "id": "sd-prod-067",
+    "slug": "printed-satin-lounge-set-sd-prod-067",
+    "name": "Printed Satin Lounge Set",
+    "brand": "Highlander",
+    "department": "women",
+    "category": "Co-ord Sets",
+    "subcategory": "Casual Sets",
+    "collection": "Summer Essentials 2026",
+    "shortDescription": "Premium quality printed satin lounge set crafted for comfort and style.",
+    "description": "Elevate your daily fashion with this Printed Satin Lounge Set. Features premium fabric construction, tailored fit, and durable craftsmanship ideal for everyday wear.",
+    "material": "100% Premium Combed Cotton",
+    "fit": "Regular Fit",
+    "pattern": "Solid / Textured",
+    "occasion": [
+      "Casual",
+      "Everyday",
+      "Party"
+    ],
+    "careInstructions": [
+      "Machine wash cold",
+      "Do not bleach",
+      "Tumble dry low",
+      "Warm iron if needed"
+    ],
+    "price": 915,
+    "originalPrice": 1281,
+    "discount": 28,
+    "images": [
+      "https://images.unsplash.com/photo-1576995853123-5a10305d93c0?auto=format&fit=crop&w=800&q=80",
+      "https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?auto=format&fit=crop&w=800&q=80"
+    ],
+    "thumbnail": "https://images.unsplash.com/photo-1576995853123-5a10305d93c0?auto=format&fit=crop&w=800&q=80",
+    "rating": 4.6,
+    "reviewCount": 176,
+    "reviews": [
+      {
+        "id": "rev-sd-prod-067-1",
+        "userName": "Aman Sharma",
+        "rating": 5,
+        "title": "Great quality and fast delivery!",
+        "comment": "Delivered in Neemuch within 45 minutes! Quality is top notch.",
+        "createdAt": "2026-07-28",
+        "verifiedPurchase": true
+      },
+      {
+        "id": "rev-sd-prod-067-2",
+        "userName": "Priya Verma",
+        "rating": 4,
+        "title": "Nice fit and comfortable material",
+        "comment": "The fabric is very soft. True to size.",
+        "createdAt": "2026-07-29",
+        "verifiedPurchase": true
+      }
+    ],
+    "variants": [
+      {
+        "id": "sd-prod-067-var-1",
+        "sku": "SD-SD-PROD-067-CRI-S",
+        "size": "S",
+        "colourName": "Crimson Red",
+        "colourHex": "#DC143C",
+        "stock": 15,
+        "price": 915,
+        "originalPrice": 1281
+      },
+      {
+        "id": "sd-prod-067-var-2",
+        "sku": "SD-SD-PROD-067-CRI-M",
+        "size": "M",
+        "colourName": "Crimson Red",
+        "colourHex": "#DC143C",
+        "stock": 15,
+        "price": 915,
+        "originalPrice": 1281
+      },
+      {
+        "id": "sd-prod-067-var-3",
+        "sku": "SD-SD-PROD-067-CRI-L",
+        "size": "L",
+        "colourName": "Crimson Red",
+        "colourHex": "#DC143C",
+        "stock": 15,
+        "price": 915,
+        "originalPrice": 1281
+      },
+      {
+        "id": "sd-prod-067-var-4",
+        "sku": "SD-SD-PROD-067-CRI-XL",
+        "size": "XL",
+        "colourName": "Crimson Red",
+        "colourHex": "#DC143C",
+        "stock": 15,
+        "price": 915,
+        "originalPrice": 1281
+      },
+      {
+        "id": "sd-prod-067-var-5",
+        "sku": "SD-SD-PROD-067-CRI-XXL",
+        "size": "XXL",
+        "colourName": "Crimson Red",
+        "colourHex": "#DC143C",
+        "stock": 15,
+        "price": 915,
+        "originalPrice": 1281
+      },
+      {
+        "id": "sd-prod-067-var-6",
+        "sku": "SD-SD-PROD-067-BEI-S",
+        "size": "S",
+        "colourName": "Beige",
+        "colourHex": "#F5F5DC",
+        "stock": 15,
+        "price": 915,
+        "originalPrice": 1281
+      },
+      {
+        "id": "sd-prod-067-var-7",
+        "sku": "SD-SD-PROD-067-BEI-M",
+        "size": "M",
+        "colourName": "Beige",
+        "colourHex": "#F5F5DC",
+        "stock": 0,
+        "price": 915,
+        "originalPrice": 1281
+      },
+      {
+        "id": "sd-prod-067-var-8",
+        "sku": "SD-SD-PROD-067-BEI-L",
+        "size": "L",
+        "colourName": "Beige",
+        "colourHex": "#F5F5DC",
+        "stock": 15,
+        "price": 915,
+        "originalPrice": 1281
+      },
+      {
+        "id": "sd-prod-067-var-9",
+        "sku": "SD-SD-PROD-067-BEI-XL",
+        "size": "XL",
+        "colourName": "Beige",
+        "colourHex": "#F5F5DC",
+        "stock": 15,
+        "price": 915,
+        "originalPrice": 1281
+      },
+      {
+        "id": "sd-prod-067-var-10",
+        "sku": "SD-SD-PROD-067-BEI-XXL",
+        "size": "XXL",
+        "colourName": "Beige",
+        "colourHex": "#F5F5DC",
+        "stock": 15,
+        "price": 915,
+        "originalPrice": 1281
+      }
+    ],
+    "tags": [
+      "printed satin lounge set",
+      "women",
+      "co-ord sets",
+      "casual sets",
+      "highlander",
+      "fashion",
+      "trending"
+    ],
+    "badge": "Express",
+    "newArrival": false,
+    "trending": true,
+    "featured": true,
+    "expressDelivery": true,
+    "estimatedDeliveryMinutes": 60,
+    "returnWindowDays": 7,
+    "exchangeAvailable": true,
+    "vendorId": "v-urban-style",
+    "commissionPercent": 12,
+    "sponsored": false,
+    "active": true,
+    "createdAt": "2026-07-01T00:00:00Z",
+    "updatedAt": "2026-08-01T00:00:00Z"
+  },
+  {
+    "id": "sd-prod-068",
+    "slug": "ribbed-knit-top-and-trousers-set-sd-prod-068",
+    "name": "Ribbed Knit Top & Trousers Set",
+    "brand": "Bawree",
+    "department": "women",
+    "category": "Co-ord Sets",
+    "subcategory": "Casual Sets",
+    "collection": "Summer Essentials 2026",
+    "shortDescription": "Premium quality ribbed knit top & trousers set crafted for comfort and style.",
+    "description": "Elevate your daily fashion with this Ribbed Knit Top & Trousers Set. Features premium fabric construction, tailored fit, and durable craftsmanship ideal for everyday wear.",
+    "material": "100% Premium Combed Cotton",
+    "fit": "Regular Fit",
+    "pattern": "Solid / Textured",
+    "occasion": [
+      "Casual",
+      "Everyday",
+      "Party"
+    ],
+    "careInstructions": [
+      "Machine wash cold",
+      "Do not bleach",
+      "Tumble dry low",
+      "Warm iron if needed"
+    ],
+    "price": 952,
+    "originalPrice": 1332,
+    "discount": 28,
+    "images": [
+      "https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?auto=format&fit=crop&w=800&q=80",
+      "https://images.unsplash.com/photo-1529374255404-311a2a4f1fd9?auto=format&fit=crop&w=800&q=80"
+    ],
+    "thumbnail": "https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?auto=format&fit=crop&w=800&q=80",
+    "rating": 4.7,
+    "reviewCount": 189,
+    "reviews": [
+      {
+        "id": "rev-sd-prod-068-1",
+        "userName": "Aman Sharma",
+        "rating": 5,
+        "title": "Great quality and fast delivery!",
+        "comment": "Delivered in Neemuch within 45 minutes! Quality is top notch.",
+        "createdAt": "2026-07-28",
+        "verifiedPurchase": true
+      },
+      {
+        "id": "rev-sd-prod-068-2",
+        "userName": "Priya Verma",
+        "rating": 4,
+        "title": "Nice fit and comfortable material",
+        "comment": "The fabric is very soft. True to size.",
+        "createdAt": "2026-07-29",
+        "verifiedPurchase": true
+      }
+    ],
+    "variants": [
+      {
+        "id": "sd-prod-068-var-1",
+        "sku": "SD-SD-PROD-068-BEI-S",
+        "size": "S",
+        "colourName": "Beige",
+        "colourHex": "#F5F5DC",
+        "stock": 15,
+        "price": 952,
+        "originalPrice": 1332
+      },
+      {
+        "id": "sd-prod-068-var-2",
+        "sku": "SD-SD-PROD-068-BEI-M",
+        "size": "M",
+        "colourName": "Beige",
+        "colourHex": "#F5F5DC",
+        "stock": 15,
+        "price": 952,
+        "originalPrice": 1332
+      },
+      {
+        "id": "sd-prod-068-var-3",
+        "sku": "SD-SD-PROD-068-BEI-L",
+        "size": "L",
+        "colourName": "Beige",
+        "colourHex": "#F5F5DC",
+        "stock": 15,
+        "price": 952,
+        "originalPrice": 1332
+      },
+      {
+        "id": "sd-prod-068-var-4",
+        "sku": "SD-SD-PROD-068-BEI-XL",
+        "size": "XL",
+        "colourName": "Beige",
+        "colourHex": "#F5F5DC",
+        "stock": 15,
+        "price": 952,
+        "originalPrice": 1332
+      },
+      {
+        "id": "sd-prod-068-var-5",
+        "sku": "SD-SD-PROD-068-BEI-XXL",
+        "size": "XXL",
+        "colourName": "Beige",
+        "colourHex": "#F5F5DC",
+        "stock": 15,
+        "price": 952,
+        "originalPrice": 1332
+      },
+      {
+        "id": "sd-prod-068-var-6",
+        "sku": "SD-SD-PROD-068-CHA-S",
+        "size": "S",
+        "colourName": "Charcoal Gray",
+        "colourHex": "#36454F",
+        "stock": 15,
+        "price": 952,
+        "originalPrice": 1332
+      },
+      {
+        "id": "sd-prod-068-var-7",
+        "sku": "SD-SD-PROD-068-CHA-M",
+        "size": "M",
+        "colourName": "Charcoal Gray",
+        "colourHex": "#36454F",
+        "stock": 0,
+        "price": 952,
+        "originalPrice": 1332
+      },
+      {
+        "id": "sd-prod-068-var-8",
+        "sku": "SD-SD-PROD-068-CHA-L",
+        "size": "L",
+        "colourName": "Charcoal Gray",
+        "colourHex": "#36454F",
+        "stock": 15,
+        "price": 952,
+        "originalPrice": 1332
+      },
+      {
+        "id": "sd-prod-068-var-9",
+        "sku": "SD-SD-PROD-068-CHA-XL",
+        "size": "XL",
+        "colourName": "Charcoal Gray",
+        "colourHex": "#36454F",
+        "stock": 15,
+        "price": 952,
+        "originalPrice": 1332
+      },
+      {
+        "id": "sd-prod-068-var-10",
+        "sku": "SD-SD-PROD-068-CHA-XXL",
+        "size": "XXL",
+        "colourName": "Charcoal Gray",
+        "colourHex": "#36454F",
+        "stock": 15,
+        "price": 952,
+        "originalPrice": 1332
+      }
+    ],
+    "tags": [
+      "ribbed knit top & trousers set",
+      "women",
+      "co-ord sets",
+      "casual sets",
+      "bawree",
+      "fashion",
+      "trending"
+    ],
+    "badge": "Trending",
+    "newArrival": true,
+    "trending": false,
+    "featured": false,
+    "expressDelivery": true,
+    "estimatedDeliveryMinutes": 60,
+    "returnWindowDays": 7,
+    "exchangeAvailable": true,
+    "vendorId": "v-ethnic-vibe",
+    "commissionPercent": 12,
+    "sponsored": false,
+    "active": true,
+    "createdAt": "2026-07-01T00:00:00Z",
+    "updatedAt": "2026-08-01T00:00:00Z"
+  },
+  {
+    "id": "sd-prod-069",
+    "slug": "festive-silk-blend-co-ord-set-sd-prod-069",
+    "name": "Festive Silk Blend Co-ord Set",
+    "brand": "Snitch",
+    "department": "women",
+    "category": "Co-ord Sets",
+    "subcategory": "Casual Sets",
+    "collection": "Summer Essentials 2026",
+    "shortDescription": "Premium quality festive silk blend co-ord set crafted for comfort and style.",
+    "description": "Elevate your daily fashion with this Festive Silk Blend Co-ord Set. Features premium fabric construction, tailored fit, and durable craftsmanship ideal for everyday wear.",
+    "material": "100% Premium Combed Cotton",
+    "fit": "Regular Fit",
+    "pattern": "Solid / Textured",
+    "occasion": [
+      "Casual",
+      "Everyday",
+      "Party"
+    ],
+    "careInstructions": [
+      "Machine wash cold",
+      "Do not bleach",
+      "Tumble dry low",
+      "Warm iron if needed"
+    ],
+    "price": 989,
+    "originalPrice": 1384,
+    "discount": 28,
+    "images": [
+      "https://images.unsplash.com/photo-1529374255404-311a2a4f1fd9?auto=format&fit=crop&w=800&q=80",
+      "https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&w=800&q=80"
+    ],
+    "thumbnail": "https://images.unsplash.com/photo-1529374255404-311a2a4f1fd9?auto=format&fit=crop&w=800&q=80",
+    "rating": 4.8,
+    "reviewCount": 22,
+    "reviews": [
+      {
+        "id": "rev-sd-prod-069-1",
+        "userName": "Aman Sharma",
+        "rating": 5,
+        "title": "Great quality and fast delivery!",
+        "comment": "Delivered in Neemuch within 45 minutes! Quality is top notch.",
+        "createdAt": "2026-07-28",
+        "verifiedPurchase": true
+      },
+      {
+        "id": "rev-sd-prod-069-2",
+        "userName": "Priya Verma",
+        "rating": 4,
+        "title": "Nice fit and comfortable material",
+        "comment": "The fabric is very soft. True to size.",
+        "createdAt": "2026-07-29",
+        "verifiedPurchase": true
+      }
+    ],
+    "variants": [
+      {
+        "id": "sd-prod-069-var-1",
+        "sku": "SD-SD-PROD-069-CHA-S",
+        "size": "S",
+        "colourName": "Charcoal Gray",
+        "colourHex": "#36454F",
+        "stock": 15,
+        "price": 989,
+        "originalPrice": 1384
+      },
+      {
+        "id": "sd-prod-069-var-2",
+        "sku": "SD-SD-PROD-069-CHA-M",
+        "size": "M",
+        "colourName": "Charcoal Gray",
+        "colourHex": "#36454F",
+        "stock": 15,
+        "price": 989,
+        "originalPrice": 1384
+      },
+      {
+        "id": "sd-prod-069-var-3",
+        "sku": "SD-SD-PROD-069-CHA-L",
+        "size": "L",
+        "colourName": "Charcoal Gray",
+        "colourHex": "#36454F",
+        "stock": 15,
+        "price": 989,
+        "originalPrice": 1384
+      },
+      {
+        "id": "sd-prod-069-var-4",
+        "sku": "SD-SD-PROD-069-CHA-XL",
+        "size": "XL",
+        "colourName": "Charcoal Gray",
+        "colourHex": "#36454F",
+        "stock": 15,
+        "price": 989,
+        "originalPrice": 1384
+      },
+      {
+        "id": "sd-prod-069-var-5",
+        "sku": "SD-SD-PROD-069-CHA-XXL",
+        "size": "XXL",
+        "colourName": "Charcoal Gray",
+        "colourHex": "#36454F",
+        "stock": 15,
+        "price": 989,
+        "originalPrice": 1384
+      },
+      {
+        "id": "sd-prod-069-var-6",
+        "sku": "SD-SD-PROD-069-MUS-S",
+        "size": "S",
+        "colourName": "Mustard Yellow",
+        "colourHex": "#FFDB58",
+        "stock": 15,
+        "price": 989,
+        "originalPrice": 1384
+      },
+      {
+        "id": "sd-prod-069-var-7",
+        "sku": "SD-SD-PROD-069-MUS-M",
+        "size": "M",
+        "colourName": "Mustard Yellow",
+        "colourHex": "#FFDB58",
+        "stock": 0,
+        "price": 989,
+        "originalPrice": 1384
+      },
+      {
+        "id": "sd-prod-069-var-8",
+        "sku": "SD-SD-PROD-069-MUS-L",
+        "size": "L",
+        "colourName": "Mustard Yellow",
+        "colourHex": "#FFDB58",
+        "stock": 15,
+        "price": 989,
+        "originalPrice": 1384
+      },
+      {
+        "id": "sd-prod-069-var-9",
+        "sku": "SD-SD-PROD-069-MUS-XL",
+        "size": "XL",
+        "colourName": "Mustard Yellow",
+        "colourHex": "#FFDB58",
+        "stock": 15,
+        "price": 989,
+        "originalPrice": 1384
+      },
+      {
+        "id": "sd-prod-069-var-10",
+        "sku": "SD-SD-PROD-069-MUS-XXL",
+        "size": "XXL",
+        "colourName": "Mustard Yellow",
+        "colourHex": "#FFDB58",
+        "stock": 15,
+        "price": 989,
+        "originalPrice": 1384
+      }
+    ],
+    "tags": [
+      "festive silk blend co-ord set",
+      "women",
+      "co-ord sets",
+      "casual sets",
+      "snitch",
+      "fashion",
+      "trending"
+    ],
+    "badge": "Express",
+    "newArrival": false,
+    "trending": true,
+    "featured": false,
+    "expressDelivery": true,
+    "estimatedDeliveryMinutes": 60,
+    "returnWindowDays": 7,
+    "exchangeAvailable": true,
+    "vendorId": "v-urban-style",
+    "commissionPercent": 12,
+    "sponsored": true,
+    "active": true,
+    "createdAt": "2026-07-01T00:00:00Z",
+    "updatedAt": "2026-08-01T00:00:00Z"
+  },
+  {
+    "id": "sd-prod-070",
+    "slug": "athleisure-crop-and-jogger-set-sd-prod-070",
+    "name": "Athleisure Crop & Jogger Set",
+    "brand": "Wrong",
+    "department": "women",
+    "category": "Co-ord Sets",
+    "subcategory": "Casual Sets",
+    "collection": "Summer Essentials 2026",
+    "shortDescription": "Premium quality athleisure crop & jogger set crafted for comfort and style.",
+    "description": "Elevate your daily fashion with this Athleisure Crop & Jogger Set. Features premium fabric construction, tailored fit, and durable craftsmanship ideal for everyday wear.",
+    "material": "100% Premium Combed Cotton",
+    "fit": "Regular Fit",
+    "pattern": "Solid / Textured",
+    "occasion": [
+      "Casual",
+      "Everyday",
+      "Party"
+    ],
+    "careInstructions": [
+      "Machine wash cold",
+      "Do not bleach",
+      "Tumble dry low",
+      "Warm iron if needed"
+    ],
+    "price": 1026,
+    "originalPrice": 1436,
+    "discount": 28,
+    "images": [
+      "https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&w=800&q=80",
+      "https://images.unsplash.com/photo-1521572267360-ee0c2909d518?auto=format&fit=crop&w=800&q=80"
+    ],
+    "thumbnail": "https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&w=800&q=80",
+    "rating": 4.9,
+    "reviewCount": 35,
+    "reviews": [
+      {
+        "id": "rev-sd-prod-070-1",
+        "userName": "Aman Sharma",
+        "rating": 5,
+        "title": "Great quality and fast delivery!",
+        "comment": "Delivered in Neemuch within 45 minutes! Quality is top notch.",
+        "createdAt": "2026-07-28",
+        "verifiedPurchase": true
+      },
+      {
+        "id": "rev-sd-prod-070-2",
+        "userName": "Priya Verma",
+        "rating": 4,
+        "title": "Nice fit and comfortable material",
+        "comment": "The fabric is very soft. True to size.",
+        "createdAt": "2026-07-29",
+        "verifiedPurchase": true
+      }
+    ],
+    "variants": [
+      {
+        "id": "sd-prod-070-var-1",
+        "sku": "SD-SD-PROD-070-MUS-S",
+        "size": "S",
+        "colourName": "Mustard Yellow",
+        "colourHex": "#FFDB58",
+        "stock": 15,
+        "price": 1026,
+        "originalPrice": 1436
+      },
+      {
+        "id": "sd-prod-070-var-2",
+        "sku": "SD-SD-PROD-070-MUS-M",
+        "size": "M",
+        "colourName": "Mustard Yellow",
+        "colourHex": "#FFDB58",
+        "stock": 15,
+        "price": 1026,
+        "originalPrice": 1436
+      },
+      {
+        "id": "sd-prod-070-var-3",
+        "sku": "SD-SD-PROD-070-MUS-L",
+        "size": "L",
+        "colourName": "Mustard Yellow",
+        "colourHex": "#FFDB58",
+        "stock": 15,
+        "price": 1026,
+        "originalPrice": 1436
+      },
+      {
+        "id": "sd-prod-070-var-4",
+        "sku": "SD-SD-PROD-070-MUS-XL",
+        "size": "XL",
+        "colourName": "Mustard Yellow",
+        "colourHex": "#FFDB58",
+        "stock": 15,
+        "price": 1026,
+        "originalPrice": 1436
+      },
+      {
+        "id": "sd-prod-070-var-5",
+        "sku": "SD-SD-PROD-070-MUS-XXL",
+        "size": "XXL",
+        "colourName": "Mustard Yellow",
+        "colourHex": "#FFDB58",
+        "stock": 15,
+        "price": 1026,
+        "originalPrice": 1436
+      },
+      {
+        "id": "sd-prod-070-var-6",
+        "sku": "SD-SD-PROD-070-BLA-S",
+        "size": "S",
+        "colourName": "Black",
+        "colourHex": "#000000",
+        "stock": 15,
+        "price": 1026,
+        "originalPrice": 1436
+      },
+      {
+        "id": "sd-prod-070-var-7",
+        "sku": "SD-SD-PROD-070-BLA-M",
+        "size": "M",
+        "colourName": "Black",
+        "colourHex": "#000000",
+        "stock": 0,
+        "price": 1026,
+        "originalPrice": 1436
+      },
+      {
+        "id": "sd-prod-070-var-8",
+        "sku": "SD-SD-PROD-070-BLA-L",
+        "size": "L",
+        "colourName": "Black",
+        "colourHex": "#000000",
+        "stock": 15,
+        "price": 1026,
+        "originalPrice": 1436
+      },
+      {
+        "id": "sd-prod-070-var-9",
+        "sku": "SD-SD-PROD-070-BLA-XL",
+        "size": "XL",
+        "colourName": "Black",
+        "colourHex": "#000000",
+        "stock": 15,
+        "price": 1026,
+        "originalPrice": 1436
+      },
+      {
+        "id": "sd-prod-070-var-10",
+        "sku": "SD-SD-PROD-070-BLA-XXL",
+        "size": "XXL",
+        "colourName": "Black",
+        "colourHex": "#000000",
+        "stock": 15,
+        "price": 1026,
+        "originalPrice": 1436
+      }
+    ],
+    "tags": [
+      "athleisure crop & jogger set",
+      "women",
+      "co-ord sets",
+      "casual sets",
+      "wrong",
+      "fashion",
+      "trending"
+    ],
+    "badge": "New",
+    "newArrival": false,
+    "trending": false,
+    "featured": false,
+    "expressDelivery": true,
+    "estimatedDeliveryMinutes": 60,
+    "returnWindowDays": 7,
+    "exchangeAvailable": true,
+    "vendorId": "v-ethnic-vibe",
+    "commissionPercent": 12,
+    "sponsored": false,
+    "active": true,
+    "createdAt": "2026-07-01T00:00:00Z",
+    "updatedAt": "2026-08-01T00:00:00Z"
+  },
+  {
+    "id": "sd-prod-071",
+    "slug": "high-impact-support-sports-bra-sd-prod-071",
+    "name": "High-Impact Support Sports Bra",
+    "brand": "Roadster",
+    "department": "women",
+    "category": "Activewear",
+    "subcategory": "Sports Bras",
+    "collection": "Summer Essentials 2026",
+    "shortDescription": "Premium quality high-impact support sports bra crafted for comfort and style.",
+    "description": "Elevate your daily fashion with this High-Impact Support Sports Bra. Features premium fabric construction, tailored fit, and durable craftsmanship ideal for everyday wear.",
+    "material": "100% Premium Combed Cotton",
+    "fit": "Regular Fit",
+    "pattern": "Solid / Textured",
+    "occasion": [
+      "Casual",
+      "Everyday",
+      "Party"
+    ],
+    "careInstructions": [
+      "Machine wash cold",
+      "Do not bleach",
+      "Tumble dry low",
+      "Warm iron if needed"
+    ],
+    "price": 1063,
+    "originalPrice": 1488,
+    "discount": 28,
+    "images": [
+      "https://images.unsplash.com/photo-1521572267360-ee0c2909d518?auto=format&fit=crop&w=800&q=80",
+      "https://images.unsplash.com/photo-1503342217505-b0a15ec3261c?auto=format&fit=crop&w=800&q=80"
+    ],
+    "thumbnail": "https://images.unsplash.com/photo-1521572267360-ee0c2909d518?auto=format&fit=crop&w=800&q=80",
+    "rating": 3.8,
+    "reviewCount": 48,
+    "reviews": [
+      {
+        "id": "rev-sd-prod-071-1",
+        "userName": "Aman Sharma",
+        "rating": 5,
+        "title": "Great quality and fast delivery!",
+        "comment": "Delivered in Neemuch within 45 minutes! Quality is top notch.",
+        "createdAt": "2026-07-28",
+        "verifiedPurchase": true
+      },
+      {
+        "id": "rev-sd-prod-071-2",
+        "userName": "Priya Verma",
+        "rating": 4,
+        "title": "Nice fit and comfortable material",
+        "comment": "The fabric is very soft. True to size.",
+        "createdAt": "2026-07-29",
+        "verifiedPurchase": true
+      }
+    ],
+    "variants": [
+      {
+        "id": "sd-prod-071-var-1",
+        "sku": "SD-SD-PROD-071-BLA-S",
+        "size": "S",
+        "colourName": "Black",
+        "colourHex": "#000000",
+        "stock": 15,
+        "price": 1063,
+        "originalPrice": 1488
+      },
+      {
+        "id": "sd-prod-071-var-2",
+        "sku": "SD-SD-PROD-071-BLA-M",
+        "size": "M",
+        "colourName": "Black",
+        "colourHex": "#000000",
+        "stock": 15,
+        "price": 1063,
+        "originalPrice": 1488
+      },
+      {
+        "id": "sd-prod-071-var-3",
+        "sku": "SD-SD-PROD-071-BLA-L",
+        "size": "L",
+        "colourName": "Black",
+        "colourHex": "#000000",
+        "stock": 15,
+        "price": 1063,
+        "originalPrice": 1488
+      },
+      {
+        "id": "sd-prod-071-var-4",
+        "sku": "SD-SD-PROD-071-BLA-XL",
+        "size": "XL",
+        "colourName": "Black",
+        "colourHex": "#000000",
+        "stock": 15,
+        "price": 1063,
+        "originalPrice": 1488
+      },
+      {
+        "id": "sd-prod-071-var-5",
+        "sku": "SD-SD-PROD-071-BLA-XXL",
+        "size": "XXL",
+        "colourName": "Black",
+        "colourHex": "#000000",
+        "stock": 15,
+        "price": 1063,
+        "originalPrice": 1488
+      },
+      {
+        "id": "sd-prod-071-var-6",
+        "sku": "SD-SD-PROD-071-WHI-S",
+        "size": "S",
+        "colourName": "White",
+        "colourHex": "#FFFFFF",
+        "stock": 15,
+        "price": 1063,
+        "originalPrice": 1488
+      },
+      {
+        "id": "sd-prod-071-var-7",
+        "sku": "SD-SD-PROD-071-WHI-M",
+        "size": "M",
+        "colourName": "White",
+        "colourHex": "#FFFFFF",
+        "stock": 0,
+        "price": 1063,
+        "originalPrice": 1488
+      },
+      {
+        "id": "sd-prod-071-var-8",
+        "sku": "SD-SD-PROD-071-WHI-L",
+        "size": "L",
+        "colourName": "White",
+        "colourHex": "#FFFFFF",
+        "stock": 15,
+        "price": 1063,
+        "originalPrice": 1488
+      },
+      {
+        "id": "sd-prod-071-var-9",
+        "sku": "SD-SD-PROD-071-WHI-XL",
+        "size": "XL",
+        "colourName": "White",
+        "colourHex": "#FFFFFF",
+        "stock": 15,
+        "price": 1063,
+        "originalPrice": 1488
+      },
+      {
+        "id": "sd-prod-071-var-10",
+        "sku": "SD-SD-PROD-071-WHI-XXL",
+        "size": "XXL",
+        "colourName": "White",
+        "colourHex": "#FFFFFF",
+        "stock": 15,
+        "price": 1063,
+        "originalPrice": 1488
+      }
+    ],
+    "tags": [
+      "high-impact support sports bra",
+      "women",
+      "activewear",
+      "sports bras",
+      "roadster",
+      "fashion",
+      "trending"
+    ],
+    "badge": "Trending",
+    "newArrival": true,
+    "trending": true,
+    "featured": true,
+    "expressDelivery": true,
+    "estimatedDeliveryMinutes": 60,
+    "returnWindowDays": 7,
+    "exchangeAvailable": true,
+    "vendorId": "v-urban-style",
+    "commissionPercent": 12,
+    "sponsored": false,
+    "active": true,
+    "createdAt": "2026-07-01T00:00:00Z",
+    "updatedAt": "2026-08-01T00:00:00Z"
+  },
+  {
+    "id": "sd-prod-072",
+    "slug": "seamless-high-waist-workout-leggings-sd-prod-072",
+    "name": "Seamless High-Waist Workout Leggings",
+    "brand": "HRX",
+    "department": "women",
+    "category": "Activewear",
+    "subcategory": "Sports Bras",
+    "collection": "Summer Essentials 2026",
+    "shortDescription": "Premium quality seamless high-waist workout leggings crafted for comfort and style.",
+    "description": "Elevate your daily fashion with this Seamless High-Waist Workout Leggings. Features premium fabric construction, tailored fit, and durable craftsmanship ideal for everyday wear.",
+    "material": "100% Premium Combed Cotton",
+    "fit": "Regular Fit",
+    "pattern": "Solid / Textured",
+    "occasion": [
+      "Casual",
+      "Everyday",
+      "Party"
+    ],
+    "careInstructions": [
+      "Machine wash cold",
+      "Do not bleach",
+      "Tumble dry low",
+      "Warm iron if needed"
+    ],
+    "price": 1100,
+    "originalPrice": 1540,
+    "discount": 28,
+    "images": [
+      "https://images.unsplash.com/photo-1503342217505-b0a15ec3261c?auto=format&fit=crop&w=800&q=80",
+      "https://images.unsplash.com/photo-1576995853123-5a10305d93c0?auto=format&fit=crop&w=800&q=80"
+    ],
+    "thumbnail": "https://images.unsplash.com/photo-1503342217505-b0a15ec3261c?auto=format&fit=crop&w=800&q=80",
+    "rating": 3.9,
+    "reviewCount": 61,
+    "reviews": [
+      {
+        "id": "rev-sd-prod-072-1",
+        "userName": "Aman Sharma",
+        "rating": 5,
+        "title": "Great quality and fast delivery!",
+        "comment": "Delivered in Neemuch within 45 minutes! Quality is top notch.",
+        "createdAt": "2026-07-28",
+        "verifiedPurchase": true
+      },
+      {
+        "id": "rev-sd-prod-072-2",
+        "userName": "Priya Verma",
+        "rating": 4,
+        "title": "Nice fit and comfortable material",
+        "comment": "The fabric is very soft. True to size.",
+        "createdAt": "2026-07-29",
+        "verifiedPurchase": true
+      }
+    ],
+    "variants": [
+      {
+        "id": "sd-prod-072-var-1",
+        "sku": "SD-SD-PROD-072-WHI-S",
+        "size": "S",
+        "colourName": "White",
+        "colourHex": "#FFFFFF",
+        "stock": 15,
+        "price": 1100,
+        "originalPrice": 1540
+      },
+      {
+        "id": "sd-prod-072-var-2",
+        "sku": "SD-SD-PROD-072-WHI-M",
+        "size": "M",
+        "colourName": "White",
+        "colourHex": "#FFFFFF",
+        "stock": 15,
+        "price": 1100,
+        "originalPrice": 1540
+      },
+      {
+        "id": "sd-prod-072-var-3",
+        "sku": "SD-SD-PROD-072-WHI-L",
+        "size": "L",
+        "colourName": "White",
+        "colourHex": "#FFFFFF",
+        "stock": 15,
+        "price": 1100,
+        "originalPrice": 1540
+      },
+      {
+        "id": "sd-prod-072-var-4",
+        "sku": "SD-SD-PROD-072-WHI-XL",
+        "size": "XL",
+        "colourName": "White",
+        "colourHex": "#FFFFFF",
+        "stock": 15,
+        "price": 1100,
+        "originalPrice": 1540
+      },
+      {
+        "id": "sd-prod-072-var-5",
+        "sku": "SD-SD-PROD-072-WHI-XXL",
+        "size": "XXL",
+        "colourName": "White",
+        "colourHex": "#FFFFFF",
+        "stock": 15,
+        "price": 1100,
+        "originalPrice": 1540
+      },
+      {
+        "id": "sd-prod-072-var-6",
+        "sku": "SD-SD-PROD-072-NAV-S",
+        "size": "S",
+        "colourName": "Navy Blue",
+        "colourHex": "#000080",
+        "stock": 15,
+        "price": 1100,
+        "originalPrice": 1540
+      },
+      {
+        "id": "sd-prod-072-var-7",
+        "sku": "SD-SD-PROD-072-NAV-M",
+        "size": "M",
+        "colourName": "Navy Blue",
+        "colourHex": "#000080",
+        "stock": 0,
+        "price": 1100,
+        "originalPrice": 1540
+      },
+      {
+        "id": "sd-prod-072-var-8",
+        "sku": "SD-SD-PROD-072-NAV-L",
+        "size": "L",
+        "colourName": "Navy Blue",
+        "colourHex": "#000080",
+        "stock": 15,
+        "price": 1100,
+        "originalPrice": 1540
+      },
+      {
+        "id": "sd-prod-072-var-9",
+        "sku": "SD-SD-PROD-072-NAV-XL",
+        "size": "XL",
+        "colourName": "Navy Blue",
+        "colourHex": "#000080",
+        "stock": 15,
+        "price": 1100,
+        "originalPrice": 1540
+      },
+      {
+        "id": "sd-prod-072-var-10",
+        "sku": "SD-SD-PROD-072-NAV-XXL",
+        "size": "XXL",
+        "colourName": "Navy Blue",
+        "colourHex": "#000080",
+        "stock": 15,
+        "price": 1100,
+        "originalPrice": 1540
+      }
+    ],
+    "tags": [
+      "seamless high-waist workout leggings",
+      "women",
+      "activewear",
+      "sports bras",
+      "hrx",
+      "fashion",
+      "trending"
+    ],
+    "badge": "New",
+    "newArrival": false,
+    "trending": false,
+    "featured": false,
+    "expressDelivery": true,
+    "estimatedDeliveryMinutes": 60,
+    "returnWindowDays": 7,
+    "exchangeAvailable": true,
+    "vendorId": "v-ethnic-vibe",
+    "commissionPercent": 12,
+    "sponsored": false,
+    "active": true,
+    "createdAt": "2026-07-01T00:00:00Z",
+    "updatedAt": "2026-08-01T00:00:00Z"
+  },
+  {
+    "id": "sd-prod-073",
+    "slug": "dry-fit-training-tank-top-sd-prod-073",
+    "name": "Dry-Fit Training Tank Top",
+    "brand": "StyleDash Studio",
+    "department": "women",
+    "category": "Activewear",
+    "subcategory": "Sports Bras",
+    "collection": "Summer Essentials 2026",
+    "shortDescription": "Premium quality dry-fit training tank top crafted for comfort and style.",
+    "description": "Elevate your daily fashion with this Dry-Fit Training Tank Top. Features premium fabric construction, tailored fit, and durable craftsmanship ideal for everyday wear.",
+    "material": "100% Premium Combed Cotton",
+    "fit": "Regular Fit",
+    "pattern": "Solid / Textured",
+    "occasion": [
+      "Casual",
+      "Everyday",
+      "Party"
+    ],
+    "careInstructions": [
+      "Machine wash cold",
+      "Do not bleach",
+      "Tumble dry low",
+      "Warm iron if needed"
+    ],
+    "price": 1137,
+    "originalPrice": 1591,
+    "discount": 28,
+    "images": [
+      "https://images.unsplash.com/photo-1576995853123-5a10305d93c0?auto=format&fit=crop&w=800&q=80",
+      "https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?auto=format&fit=crop&w=800&q=80"
+    ],
+    "thumbnail": "https://images.unsplash.com/photo-1576995853123-5a10305d93c0?auto=format&fit=crop&w=800&q=80",
+    "rating": 4.0,
+    "reviewCount": 74,
+    "reviews": [
+      {
+        "id": "rev-sd-prod-073-1",
+        "userName": "Aman Sharma",
+        "rating": 5,
+        "title": "Great quality and fast delivery!",
+        "comment": "Delivered in Neemuch within 45 minutes! Quality is top notch.",
+        "createdAt": "2026-07-28",
+        "verifiedPurchase": true
+      },
+      {
+        "id": "rev-sd-prod-073-2",
+        "userName": "Priya Verma",
+        "rating": 4,
+        "title": "Nice fit and comfortable material",
+        "comment": "The fabric is very soft. True to size.",
+        "createdAt": "2026-07-29",
+        "verifiedPurchase": true
+      }
+    ],
+    "variants": [
+      {
+        "id": "sd-prod-073-var-1",
+        "sku": "SD-SD-PROD-073-NAV-S",
+        "size": "S",
+        "colourName": "Navy Blue",
+        "colourHex": "#000080",
+        "stock": 15,
+        "price": 1137,
+        "originalPrice": 1591
+      },
+      {
+        "id": "sd-prod-073-var-2",
+        "sku": "SD-SD-PROD-073-NAV-M",
+        "size": "M",
+        "colourName": "Navy Blue",
+        "colourHex": "#000080",
+        "stock": 15,
+        "price": 1137,
+        "originalPrice": 1591
+      },
+      {
+        "id": "sd-prod-073-var-3",
+        "sku": "SD-SD-PROD-073-NAV-L",
+        "size": "L",
+        "colourName": "Navy Blue",
+        "colourHex": "#000080",
+        "stock": 15,
+        "price": 1137,
+        "originalPrice": 1591
+      },
+      {
+        "id": "sd-prod-073-var-4",
+        "sku": "SD-SD-PROD-073-NAV-XL",
+        "size": "XL",
+        "colourName": "Navy Blue",
+        "colourHex": "#000080",
+        "stock": 15,
+        "price": 1137,
+        "originalPrice": 1591
+      },
+      {
+        "id": "sd-prod-073-var-5",
+        "sku": "SD-SD-PROD-073-NAV-XXL",
+        "size": "XXL",
+        "colourName": "Navy Blue",
+        "colourHex": "#000080",
+        "stock": 15,
+        "price": 1137,
+        "originalPrice": 1591
+      },
+      {
+        "id": "sd-prod-073-var-6",
+        "sku": "SD-SD-PROD-073-OLI-S",
+        "size": "S",
+        "colourName": "Olive Green",
+        "colourHex": "#556B2F",
+        "stock": 15,
+        "price": 1137,
+        "originalPrice": 1591
+      },
+      {
+        "id": "sd-prod-073-var-7",
+        "sku": "SD-SD-PROD-073-OLI-M",
+        "size": "M",
+        "colourName": "Olive Green",
+        "colourHex": "#556B2F",
+        "stock": 0,
+        "price": 1137,
+        "originalPrice": 1591
+      },
+      {
+        "id": "sd-prod-073-var-8",
+        "sku": "SD-SD-PROD-073-OLI-L",
+        "size": "L",
+        "colourName": "Olive Green",
+        "colourHex": "#556B2F",
+        "stock": 15,
+        "price": 1137,
+        "originalPrice": 1591
+      },
+      {
+        "id": "sd-prod-073-var-9",
+        "sku": "SD-SD-PROD-073-OLI-XL",
+        "size": "XL",
+        "colourName": "Olive Green",
+        "colourHex": "#556B2F",
+        "stock": 15,
+        "price": 1137,
+        "originalPrice": 1591
+      },
+      {
+        "id": "sd-prod-073-var-10",
+        "sku": "SD-SD-PROD-073-OLI-XXL",
+        "size": "XXL",
+        "colourName": "Olive Green",
+        "colourHex": "#556B2F",
+        "stock": 15,
+        "price": 1137,
+        "originalPrice": 1591
+      }
+    ],
+    "tags": [
+      "dry-fit training tank top",
+      "women",
+      "activewear",
+      "sports bras",
+      "styledash studio",
+      "fashion",
+      "trending"
+    ],
+    "badge": "Express",
+    "newArrival": false,
+    "trending": true,
+    "featured": false,
+    "expressDelivery": true,
+    "estimatedDeliveryMinutes": 60,
+    "returnWindowDays": 7,
+    "exchangeAvailable": true,
+    "vendorId": "v-urban-style",
+    "commissionPercent": 12,
+    "sponsored": false,
+    "active": true,
+    "createdAt": "2026-07-01T00:00:00Z",
+    "updatedAt": "2026-08-01T00:00:00Z"
+  },
+  {
+    "id": "sd-prod-074",
+    "slug": "running-shorts-with-inner-liner-sd-prod-074",
+    "name": "Running Shorts with Inner Liner",
+    "brand": "Anouk",
+    "department": "women",
+    "category": "Activewear",
+    "subcategory": "Sports Bras",
+    "collection": "Summer Essentials 2026",
+    "shortDescription": "Premium quality running shorts with inner liner crafted for comfort and style.",
+    "description": "Elevate your daily fashion with this Running Shorts with Inner Liner. Features premium fabric construction, tailored fit, and durable craftsmanship ideal for everyday wear.",
+    "material": "100% Premium Combed Cotton",
+    "fit": "Regular Fit",
+    "pattern": "Solid / Textured",
+    "occasion": [
+      "Casual",
+      "Everyday",
+      "Party"
+    ],
+    "careInstructions": [
+      "Machine wash cold",
+      "Do not bleach",
+      "Tumble dry low",
+      "Warm iron if needed"
+    ],
+    "price": 1174,
+    "originalPrice": 1643,
+    "discount": 28,
+    "images": [
+      "https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?auto=format&fit=crop&w=800&q=80",
+      "https://images.unsplash.com/photo-1529374255404-311a2a4f1fd9?auto=format&fit=crop&w=800&q=80"
+    ],
+    "thumbnail": "https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?auto=format&fit=crop&w=800&q=80",
+    "rating": 4.1,
+    "reviewCount": 87,
+    "reviews": [
+      {
+        "id": "rev-sd-prod-074-1",
+        "userName": "Aman Sharma",
+        "rating": 5,
+        "title": "Great quality and fast delivery!",
+        "comment": "Delivered in Neemuch within 45 minutes! Quality is top notch.",
+        "createdAt": "2026-07-28",
+        "verifiedPurchase": true
+      },
+      {
+        "id": "rev-sd-prod-074-2",
+        "userName": "Priya Verma",
+        "rating": 4,
+        "title": "Nice fit and comfortable material",
+        "comment": "The fabric is very soft. True to size.",
+        "createdAt": "2026-07-29",
+        "verifiedPurchase": true
+      }
+    ],
+    "variants": [
+      {
+        "id": "sd-prod-074-var-1",
+        "sku": "SD-SD-PROD-074-OLI-S",
+        "size": "S",
+        "colourName": "Olive Green",
+        "colourHex": "#556B2F",
+        "stock": 15,
+        "price": 1174,
+        "originalPrice": 1643
+      },
+      {
+        "id": "sd-prod-074-var-2",
+        "sku": "SD-SD-PROD-074-OLI-M",
+        "size": "M",
+        "colourName": "Olive Green",
+        "colourHex": "#556B2F",
+        "stock": 15,
+        "price": 1174,
+        "originalPrice": 1643
+      },
+      {
+        "id": "sd-prod-074-var-3",
+        "sku": "SD-SD-PROD-074-OLI-L",
+        "size": "L",
+        "colourName": "Olive Green",
+        "colourHex": "#556B2F",
+        "stock": 15,
+        "price": 1174,
+        "originalPrice": 1643
+      },
+      {
+        "id": "sd-prod-074-var-4",
+        "sku": "SD-SD-PROD-074-OLI-XL",
+        "size": "XL",
+        "colourName": "Olive Green",
+        "colourHex": "#556B2F",
+        "stock": 15,
+        "price": 1174,
+        "originalPrice": 1643
+      },
+      {
+        "id": "sd-prod-074-var-5",
+        "sku": "SD-SD-PROD-074-OLI-XXL",
+        "size": "XXL",
+        "colourName": "Olive Green",
+        "colourHex": "#556B2F",
+        "stock": 15,
+        "price": 1174,
+        "originalPrice": 1643
+      },
+      {
+        "id": "sd-prod-074-var-6",
+        "sku": "SD-SD-PROD-074-CRI-S",
+        "size": "S",
+        "colourName": "Crimson Red",
+        "colourHex": "#DC143C",
+        "stock": 15,
+        "price": 1174,
+        "originalPrice": 1643
+      },
+      {
+        "id": "sd-prod-074-var-7",
+        "sku": "SD-SD-PROD-074-CRI-M",
+        "size": "M",
+        "colourName": "Crimson Red",
+        "colourHex": "#DC143C",
+        "stock": 0,
+        "price": 1174,
+        "originalPrice": 1643
+      },
+      {
+        "id": "sd-prod-074-var-8",
+        "sku": "SD-SD-PROD-074-CRI-L",
+        "size": "L",
+        "colourName": "Crimson Red",
+        "colourHex": "#DC143C",
+        "stock": 15,
+        "price": 1174,
+        "originalPrice": 1643
+      },
+      {
+        "id": "sd-prod-074-var-9",
+        "sku": "SD-SD-PROD-074-CRI-XL",
+        "size": "XL",
+        "colourName": "Crimson Red",
+        "colourHex": "#DC143C",
+        "stock": 15,
+        "price": 1174,
+        "originalPrice": 1643
+      },
+      {
+        "id": "sd-prod-074-var-10",
+        "sku": "SD-SD-PROD-074-CRI-XXL",
+        "size": "XXL",
+        "colourName": "Crimson Red",
+        "colourHex": "#DC143C",
+        "stock": 15,
+        "price": 1174,
+        "originalPrice": 1643
+      }
+    ],
+    "tags": [
+      "running shorts with inner liner",
+      "women",
+      "activewear",
+      "sports bras",
+      "anouk",
+      "fashion",
+      "trending"
+    ],
+    "badge": "Trending",
+    "newArrival": true,
+    "trending": false,
+    "featured": false,
+    "expressDelivery": true,
+    "estimatedDeliveryMinutes": 60,
+    "returnWindowDays": 7,
+    "exchangeAvailable": true,
+    "vendorId": "v-ethnic-vibe",
+    "commissionPercent": 12,
+    "sponsored": false,
+    "active": true,
+    "createdAt": "2026-07-01T00:00:00Z",
+    "updatedAt": "2026-08-01T00:00:00Z"
+  },
+  {
+    "id": "sd-prod-075",
+    "slug": "yoga-capri-leggings-sd-prod-075",
+    "name": "Yoga Capri Leggings",
+    "brand": "Mast & Harbour",
+    "department": "women",
+    "category": "Activewear",
+    "subcategory": "Sports Bras",
+    "collection": "Summer Essentials 2026",
+    "shortDescription": "Premium quality yoga capri leggings crafted for comfort and style.",
+    "description": "Elevate your daily fashion with this Yoga Capri Leggings. Features premium fabric construction, tailored fit, and durable craftsmanship ideal for everyday wear.",
+    "material": "100% Premium Combed Cotton",
+    "fit": "Regular Fit",
+    "pattern": "Solid / Textured",
+    "occasion": [
+      "Casual",
+      "Everyday",
+      "Party"
+    ],
+    "careInstructions": [
+      "Machine wash cold",
+      "Do not bleach",
+      "Tumble dry low",
+      "Warm iron if needed"
+    ],
+    "price": 1211,
+    "originalPrice": 1695,
+    "discount": 28,
+    "images": [
+      "https://images.unsplash.com/photo-1529374255404-311a2a4f1fd9?auto=format&fit=crop&w=800&q=80",
+      "https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&w=800&q=80"
+    ],
+    "thumbnail": "https://images.unsplash.com/photo-1529374255404-311a2a4f1fd9?auto=format&fit=crop&w=800&q=80",
+    "rating": 4.2,
+    "reviewCount": 100,
+    "reviews": [
+      {
+        "id": "rev-sd-prod-075-1",
+        "userName": "Aman Sharma",
+        "rating": 5,
+        "title": "Great quality and fast delivery!",
+        "comment": "Delivered in Neemuch within 45 minutes! Quality is top notch.",
+        "createdAt": "2026-07-28",
+        "verifiedPurchase": true
+      },
+      {
+        "id": "rev-sd-prod-075-2",
+        "userName": "Priya Verma",
+        "rating": 4,
+        "title": "Nice fit and comfortable material",
+        "comment": "The fabric is very soft. True to size.",
+        "createdAt": "2026-07-29",
+        "verifiedPurchase": true
+      }
+    ],
+    "variants": [
+      {
+        "id": "sd-prod-075-var-1",
+        "sku": "SD-SD-PROD-075-CRI-S",
+        "size": "S",
+        "colourName": "Crimson Red",
+        "colourHex": "#DC143C",
+        "stock": 15,
+        "price": 1211,
+        "originalPrice": 1695
+      },
+      {
+        "id": "sd-prod-075-var-2",
+        "sku": "SD-SD-PROD-075-CRI-M",
+        "size": "M",
+        "colourName": "Crimson Red",
+        "colourHex": "#DC143C",
+        "stock": 15,
+        "price": 1211,
+        "originalPrice": 1695
+      },
+      {
+        "id": "sd-prod-075-var-3",
+        "sku": "SD-SD-PROD-075-CRI-L",
+        "size": "L",
+        "colourName": "Crimson Red",
+        "colourHex": "#DC143C",
+        "stock": 15,
+        "price": 1211,
+        "originalPrice": 1695
+      },
+      {
+        "id": "sd-prod-075-var-4",
+        "sku": "SD-SD-PROD-075-CRI-XL",
+        "size": "XL",
+        "colourName": "Crimson Red",
+        "colourHex": "#DC143C",
+        "stock": 15,
+        "price": 1211,
+        "originalPrice": 1695
+      },
+      {
+        "id": "sd-prod-075-var-5",
+        "sku": "SD-SD-PROD-075-CRI-XXL",
+        "size": "XXL",
+        "colourName": "Crimson Red",
+        "colourHex": "#DC143C",
+        "stock": 15,
+        "price": 1211,
+        "originalPrice": 1695
+      },
+      {
+        "id": "sd-prod-075-var-6",
+        "sku": "SD-SD-PROD-075-BEI-S",
+        "size": "S",
+        "colourName": "Beige",
+        "colourHex": "#F5F5DC",
+        "stock": 15,
+        "price": 1211,
+        "originalPrice": 1695
+      },
+      {
+        "id": "sd-prod-075-var-7",
+        "sku": "SD-SD-PROD-075-BEI-M",
+        "size": "M",
+        "colourName": "Beige",
+        "colourHex": "#F5F5DC",
+        "stock": 0,
+        "price": 1211,
+        "originalPrice": 1695
+      },
+      {
+        "id": "sd-prod-075-var-8",
+        "sku": "SD-SD-PROD-075-BEI-L",
+        "size": "L",
+        "colourName": "Beige",
+        "colourHex": "#F5F5DC",
+        "stock": 15,
+        "price": 1211,
+        "originalPrice": 1695
+      },
+      {
+        "id": "sd-prod-075-var-9",
+        "sku": "SD-SD-PROD-075-BEI-XL",
+        "size": "XL",
+        "colourName": "Beige",
+        "colourHex": "#F5F5DC",
+        "stock": 15,
+        "price": 1211,
+        "originalPrice": 1695
+      },
+      {
+        "id": "sd-prod-075-var-10",
+        "sku": "SD-SD-PROD-075-BEI-XXL",
+        "size": "XXL",
+        "colourName": "Beige",
+        "colourHex": "#F5F5DC",
+        "stock": 15,
+        "price": 1211,
+        "originalPrice": 1695
+      }
+    ],
+    "tags": [
+      "yoga capri leggings",
+      "women",
+      "activewear",
+      "sports bras",
+      "mast & harbour",
+      "fashion",
+      "trending"
+    ],
+    "badge": "Express",
+    "newArrival": false,
+    "trending": true,
+    "featured": true,
+    "expressDelivery": true,
+    "estimatedDeliveryMinutes": 60,
+    "returnWindowDays": 7,
+    "exchangeAvailable": true,
+    "vendorId": "v-urban-style",
+    "commissionPercent": 12,
+    "sponsored": false,
+    "active": true,
+    "createdAt": "2026-07-01T00:00:00Z",
+    "updatedAt": "2026-08-01T00:00:00Z"
+  },
+  {
+    "id": "sd-prod-076",
+    "slug": "seamless-t-shirt-bra-sd-prod-076",
+    "name": "Seamless T-Shirt Bra",
+    "brand": "Highlander",
+    "department": "women",
+    "category": "Innerwear & Essentials",
+    "subcategory": "Lingerie",
+    "collection": "Summer Essentials 2026",
+    "shortDescription": "Premium quality seamless t-shirt bra crafted for comfort and style.",
+    "description": "Elevate your daily fashion with this Seamless T-Shirt Bra. Features premium fabric construction, tailored fit, and durable craftsmanship ideal for everyday wear.",
+    "material": "100% Premium Combed Cotton",
+    "fit": "Regular Fit",
+    "pattern": "Solid / Textured",
+    "occasion": [
+      "Casual",
+      "Everyday",
+      "Party"
+    ],
+    "careInstructions": [
+      "Machine wash cold",
+      "Do not bleach",
+      "Tumble dry low",
+      "Warm iron if needed"
+    ],
+    "price": 1248,
+    "originalPrice": 1747,
+    "discount": 28,
+    "images": [
+      "https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&w=800&q=80",
+      "https://images.unsplash.com/photo-1521572267360-ee0c2909d518?auto=format&fit=crop&w=800&q=80"
+    ],
+    "thumbnail": "https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&w=800&q=80",
+    "rating": 4.3,
+    "reviewCount": 113,
+    "reviews": [
+      {
+        "id": "rev-sd-prod-076-1",
+        "userName": "Aman Sharma",
+        "rating": 5,
+        "title": "Great quality and fast delivery!",
+        "comment": "Delivered in Neemuch within 45 minutes! Quality is top notch.",
+        "createdAt": "2026-07-28",
+        "verifiedPurchase": true
+      },
+      {
+        "id": "rev-sd-prod-076-2",
+        "userName": "Priya Verma",
+        "rating": 4,
+        "title": "Nice fit and comfortable material",
+        "comment": "The fabric is very soft. True to size.",
+        "createdAt": "2026-07-29",
+        "verifiedPurchase": true
+      }
+    ],
+    "variants": [
+      {
+        "id": "sd-prod-076-var-1",
+        "sku": "SD-SD-PROD-076-BEI-S",
+        "size": "S",
+        "colourName": "Beige",
+        "colourHex": "#F5F5DC",
+        "stock": 15,
+        "price": 1248,
+        "originalPrice": 1747
+      },
+      {
+        "id": "sd-prod-076-var-2",
+        "sku": "SD-SD-PROD-076-BEI-M",
+        "size": "M",
+        "colourName": "Beige",
+        "colourHex": "#F5F5DC",
+        "stock": 15,
+        "price": 1248,
+        "originalPrice": 1747
+      },
+      {
+        "id": "sd-prod-076-var-3",
+        "sku": "SD-SD-PROD-076-BEI-L",
+        "size": "L",
+        "colourName": "Beige",
+        "colourHex": "#F5F5DC",
+        "stock": 15,
+        "price": 1248,
+        "originalPrice": 1747
+      },
+      {
+        "id": "sd-prod-076-var-4",
+        "sku": "SD-SD-PROD-076-BEI-XL",
+        "size": "XL",
+        "colourName": "Beige",
+        "colourHex": "#F5F5DC",
+        "stock": 15,
+        "price": 1248,
+        "originalPrice": 1747
+      },
+      {
+        "id": "sd-prod-076-var-5",
+        "sku": "SD-SD-PROD-076-BEI-XXL",
+        "size": "XXL",
+        "colourName": "Beige",
+        "colourHex": "#F5F5DC",
+        "stock": 15,
+        "price": 1248,
+        "originalPrice": 1747
+      },
+      {
+        "id": "sd-prod-076-var-6",
+        "sku": "SD-SD-PROD-076-CHA-S",
+        "size": "S",
+        "colourName": "Charcoal Gray",
+        "colourHex": "#36454F",
+        "stock": 15,
+        "price": 1248,
+        "originalPrice": 1747
+      },
+      {
+        "id": "sd-prod-076-var-7",
+        "sku": "SD-SD-PROD-076-CHA-M",
+        "size": "M",
+        "colourName": "Charcoal Gray",
+        "colourHex": "#36454F",
+        "stock": 0,
+        "price": 1248,
+        "originalPrice": 1747
+      },
+      {
+        "id": "sd-prod-076-var-8",
+        "sku": "SD-SD-PROD-076-CHA-L",
+        "size": "L",
+        "colourName": "Charcoal Gray",
+        "colourHex": "#36454F",
+        "stock": 15,
+        "price": 1248,
+        "originalPrice": 1747
+      },
+      {
+        "id": "sd-prod-076-var-9",
+        "sku": "SD-SD-PROD-076-CHA-XL",
+        "size": "XL",
+        "colourName": "Charcoal Gray",
+        "colourHex": "#36454F",
+        "stock": 15,
+        "price": 1248,
+        "originalPrice": 1747
+      },
+      {
+        "id": "sd-prod-076-var-10",
+        "sku": "SD-SD-PROD-076-CHA-XXL",
+        "size": "XXL",
+        "colourName": "Charcoal Gray",
+        "colourHex": "#36454F",
+        "stock": 15,
+        "price": 1248,
+        "originalPrice": 1747
+      }
+    ],
+    "tags": [
+      "seamless t-shirt bra",
+      "women",
+      "innerwear & essentials",
+      "lingerie",
+      "highlander",
+      "fashion",
+      "trending"
+    ],
+    "badge": "New",
+    "newArrival": false,
+    "trending": false,
+    "featured": false,
+    "expressDelivery": true,
+    "estimatedDeliveryMinutes": 60,
+    "returnWindowDays": 7,
+    "exchangeAvailable": true,
+    "vendorId": "v-ethnic-vibe",
+    "commissionPercent": 12,
+    "sponsored": true,
+    "active": true,
+    "createdAt": "2026-07-01T00:00:00Z",
+    "updatedAt": "2026-08-01T00:00:00Z"
+  },
+  {
+    "id": "sd-prod-077",
+    "slug": "cotton-full-coverage-bra-sd-prod-077",
+    "name": "Cotton Full-Coverage Bra",
+    "brand": "Bawree",
+    "department": "women",
+    "category": "Innerwear & Essentials",
+    "subcategory": "Lingerie",
+    "collection": "Summer Essentials 2026",
+    "shortDescription": "Premium quality cotton full-coverage bra crafted for comfort and style.",
+    "description": "Elevate your daily fashion with this Cotton Full-Coverage Bra. Features premium fabric construction, tailored fit, and durable craftsmanship ideal for everyday wear.",
+    "material": "100% Premium Combed Cotton",
+    "fit": "Regular Fit",
+    "pattern": "Solid / Textured",
+    "occasion": [
+      "Casual",
+      "Everyday",
+      "Party"
+    ],
+    "careInstructions": [
+      "Machine wash cold",
+      "Do not bleach",
+      "Tumble dry low",
+      "Warm iron if needed"
+    ],
+    "price": 1285,
+    "originalPrice": 1798,
+    "discount": 28,
+    "images": [
+      "https://images.unsplash.com/photo-1521572267360-ee0c2909d518?auto=format&fit=crop&w=800&q=80",
+      "https://images.unsplash.com/photo-1503342217505-b0a15ec3261c?auto=format&fit=crop&w=800&q=80"
+    ],
+    "thumbnail": "https://images.unsplash.com/photo-1521572267360-ee0c2909d518?auto=format&fit=crop&w=800&q=80",
+    "rating": 4.4,
+    "reviewCount": 126,
+    "reviews": [
+      {
+        "id": "rev-sd-prod-077-1",
+        "userName": "Aman Sharma",
+        "rating": 5,
+        "title": "Great quality and fast delivery!",
+        "comment": "Delivered in Neemuch within 45 minutes! Quality is top notch.",
+        "createdAt": "2026-07-28",
+        "verifiedPurchase": true
+      },
+      {
+        "id": "rev-sd-prod-077-2",
+        "userName": "Priya Verma",
+        "rating": 4,
+        "title": "Nice fit and comfortable material",
+        "comment": "The fabric is very soft. True to size.",
+        "createdAt": "2026-07-29",
+        "verifiedPurchase": true
+      }
+    ],
+    "variants": [
+      {
+        "id": "sd-prod-077-var-1",
+        "sku": "SD-SD-PROD-077-CHA-S",
+        "size": "S",
+        "colourName": "Charcoal Gray",
+        "colourHex": "#36454F",
+        "stock": 15,
+        "price": 1285,
+        "originalPrice": 1798
+      },
+      {
+        "id": "sd-prod-077-var-2",
+        "sku": "SD-SD-PROD-077-CHA-M",
+        "size": "M",
+        "colourName": "Charcoal Gray",
+        "colourHex": "#36454F",
+        "stock": 15,
+        "price": 1285,
+        "originalPrice": 1798
+      },
+      {
+        "id": "sd-prod-077-var-3",
+        "sku": "SD-SD-PROD-077-CHA-L",
+        "size": "L",
+        "colourName": "Charcoal Gray",
+        "colourHex": "#36454F",
+        "stock": 15,
+        "price": 1285,
+        "originalPrice": 1798
+      },
+      {
+        "id": "sd-prod-077-var-4",
+        "sku": "SD-SD-PROD-077-CHA-XL",
+        "size": "XL",
+        "colourName": "Charcoal Gray",
+        "colourHex": "#36454F",
+        "stock": 15,
+        "price": 1285,
+        "originalPrice": 1798
+      },
+      {
+        "id": "sd-prod-077-var-5",
+        "sku": "SD-SD-PROD-077-CHA-XXL",
+        "size": "XXL",
+        "colourName": "Charcoal Gray",
+        "colourHex": "#36454F",
+        "stock": 15,
+        "price": 1285,
+        "originalPrice": 1798
+      },
+      {
+        "id": "sd-prod-077-var-6",
+        "sku": "SD-SD-PROD-077-MUS-S",
+        "size": "S",
+        "colourName": "Mustard Yellow",
+        "colourHex": "#FFDB58",
+        "stock": 15,
+        "price": 1285,
+        "originalPrice": 1798
+      },
+      {
+        "id": "sd-prod-077-var-7",
+        "sku": "SD-SD-PROD-077-MUS-M",
+        "size": "M",
+        "colourName": "Mustard Yellow",
+        "colourHex": "#FFDB58",
+        "stock": 0,
+        "price": 1285,
+        "originalPrice": 1798
+      },
+      {
+        "id": "sd-prod-077-var-8",
+        "sku": "SD-SD-PROD-077-MUS-L",
+        "size": "L",
+        "colourName": "Mustard Yellow",
+        "colourHex": "#FFDB58",
+        "stock": 15,
+        "price": 1285,
+        "originalPrice": 1798
+      },
+      {
+        "id": "sd-prod-077-var-9",
+        "sku": "SD-SD-PROD-077-MUS-XL",
+        "size": "XL",
+        "colourName": "Mustard Yellow",
+        "colourHex": "#FFDB58",
+        "stock": 15,
+        "price": 1285,
+        "originalPrice": 1798
+      },
+      {
+        "id": "sd-prod-077-var-10",
+        "sku": "SD-SD-PROD-077-MUS-XXL",
+        "size": "XXL",
+        "colourName": "Mustard Yellow",
+        "colourHex": "#FFDB58",
+        "stock": 15,
+        "price": 1285,
+        "originalPrice": 1798
+      }
+    ],
+    "tags": [
+      "cotton full-coverage bra",
+      "women",
+      "innerwear & essentials",
+      "lingerie",
+      "bawree",
+      "fashion",
+      "trending"
+    ],
+    "badge": "Trending",
+    "newArrival": true,
+    "trending": true,
+    "featured": false,
+    "expressDelivery": true,
+    "estimatedDeliveryMinutes": 60,
+    "returnWindowDays": 7,
+    "exchangeAvailable": true,
+    "vendorId": "v-urban-style",
+    "commissionPercent": 12,
+    "sponsored": false,
+    "active": true,
+    "createdAt": "2026-07-01T00:00:00Z",
+    "updatedAt": "2026-08-01T00:00:00Z"
+  },
+  {
+    "id": "sd-prod-078",
+    "slug": "invisible-edge-seamless-panties-sd-prod-078",
+    "name": "Invisible Edge Seamless Panties",
+    "brand": "Snitch",
+    "department": "women",
+    "category": "Innerwear & Essentials",
+    "subcategory": "Lingerie",
+    "collection": "Summer Essentials 2026",
+    "shortDescription": "Premium quality invisible edge seamless panties crafted for comfort and style.",
+    "description": "Elevate your daily fashion with this Invisible Edge Seamless Panties. Features premium fabric construction, tailored fit, and durable craftsmanship ideal for everyday wear.",
+    "material": "100% Premium Combed Cotton",
+    "fit": "Regular Fit",
+    "pattern": "Solid / Textured",
+    "occasion": [
+      "Casual",
+      "Everyday",
+      "Party"
+    ],
+    "careInstructions": [
+      "Machine wash cold",
+      "Do not bleach",
+      "Tumble dry low",
+      "Warm iron if needed"
+    ],
+    "price": 1322,
+    "originalPrice": 1850,
+    "discount": 28,
+    "images": [
+      "https://images.unsplash.com/photo-1503342217505-b0a15ec3261c?auto=format&fit=crop&w=800&q=80",
+      "https://images.unsplash.com/photo-1576995853123-5a10305d93c0?auto=format&fit=crop&w=800&q=80"
+    ],
+    "thumbnail": "https://images.unsplash.com/photo-1503342217505-b0a15ec3261c?auto=format&fit=crop&w=800&q=80",
+    "rating": 4.5,
+    "reviewCount": 139,
+    "reviews": [
+      {
+        "id": "rev-sd-prod-078-1",
+        "userName": "Aman Sharma",
+        "rating": 5,
+        "title": "Great quality and fast delivery!",
+        "comment": "Delivered in Neemuch within 45 minutes! Quality is top notch.",
+        "createdAt": "2026-07-28",
+        "verifiedPurchase": true
+      },
+      {
+        "id": "rev-sd-prod-078-2",
+        "userName": "Priya Verma",
+        "rating": 4,
+        "title": "Nice fit and comfortable material",
+        "comment": "The fabric is very soft. True to size.",
+        "createdAt": "2026-07-29",
+        "verifiedPurchase": true
+      }
+    ],
+    "variants": [
+      {
+        "id": "sd-prod-078-var-1",
+        "sku": "SD-SD-PROD-078-MUS-S",
+        "size": "S",
+        "colourName": "Mustard Yellow",
+        "colourHex": "#FFDB58",
+        "stock": 15,
+        "price": 1322,
+        "originalPrice": 1850
+      },
+      {
+        "id": "sd-prod-078-var-2",
+        "sku": "SD-SD-PROD-078-MUS-M",
+        "size": "M",
+        "colourName": "Mustard Yellow",
+        "colourHex": "#FFDB58",
+        "stock": 15,
+        "price": 1322,
+        "originalPrice": 1850
+      },
+      {
+        "id": "sd-prod-078-var-3",
+        "sku": "SD-SD-PROD-078-MUS-L",
+        "size": "L",
+        "colourName": "Mustard Yellow",
+        "colourHex": "#FFDB58",
+        "stock": 15,
+        "price": 1322,
+        "originalPrice": 1850
+      },
+      {
+        "id": "sd-prod-078-var-4",
+        "sku": "SD-SD-PROD-078-MUS-XL",
+        "size": "XL",
+        "colourName": "Mustard Yellow",
+        "colourHex": "#FFDB58",
+        "stock": 15,
+        "price": 1322,
+        "originalPrice": 1850
+      },
+      {
+        "id": "sd-prod-078-var-5",
+        "sku": "SD-SD-PROD-078-MUS-XXL",
+        "size": "XXL",
+        "colourName": "Mustard Yellow",
+        "colourHex": "#FFDB58",
+        "stock": 15,
+        "price": 1322,
+        "originalPrice": 1850
+      },
+      {
+        "id": "sd-prod-078-var-6",
+        "sku": "SD-SD-PROD-078-BLA-S",
+        "size": "S",
+        "colourName": "Black",
+        "colourHex": "#000000",
+        "stock": 15,
+        "price": 1322,
+        "originalPrice": 1850
+      },
+      {
+        "id": "sd-prod-078-var-7",
+        "sku": "SD-SD-PROD-078-BLA-M",
+        "size": "M",
+        "colourName": "Black",
+        "colourHex": "#000000",
+        "stock": 0,
+        "price": 1322,
+        "originalPrice": 1850
+      },
+      {
+        "id": "sd-prod-078-var-8",
+        "sku": "SD-SD-PROD-078-BLA-L",
+        "size": "L",
+        "colourName": "Black",
+        "colourHex": "#000000",
+        "stock": 15,
+        "price": 1322,
+        "originalPrice": 1850
+      },
+      {
+        "id": "sd-prod-078-var-9",
+        "sku": "SD-SD-PROD-078-BLA-XL",
+        "size": "XL",
+        "colourName": "Black",
+        "colourHex": "#000000",
+        "stock": 15,
+        "price": 1322,
+        "originalPrice": 1850
+      },
+      {
+        "id": "sd-prod-078-var-10",
+        "sku": "SD-SD-PROD-078-BLA-XXL",
+        "size": "XXL",
+        "colourName": "Black",
+        "colourHex": "#000000",
+        "stock": 15,
+        "price": 1322,
+        "originalPrice": 1850
+      }
+    ],
+    "tags": [
+      "invisible edge seamless panties",
+      "women",
+      "innerwear & essentials",
+      "lingerie",
+      "snitch",
+      "fashion",
+      "trending"
+    ],
+    "badge": "New",
+    "newArrival": false,
+    "trending": false,
+    "featured": false,
+    "expressDelivery": true,
+    "estimatedDeliveryMinutes": 60,
+    "returnWindowDays": 7,
+    "exchangeAvailable": true,
+    "vendorId": "v-ethnic-vibe",
+    "commissionPercent": 12,
+    "sponsored": false,
+    "active": true,
+    "createdAt": "2026-07-01T00:00:00Z",
+    "updatedAt": "2026-08-01T00:00:00Z"
+  },
+  {
+    "id": "sd-prod-079",
+    "slug": "satin-robe-and-nightwear-set-sd-prod-079",
+    "name": "Satin Robe & Nightwear Set",
+    "brand": "Wrong",
+    "department": "women",
+    "category": "Innerwear & Essentials",
+    "subcategory": "Lingerie",
+    "collection": "Summer Essentials 2026",
+    "shortDescription": "Premium quality satin robe & nightwear set crafted for comfort and style.",
+    "description": "Elevate your daily fashion with this Satin Robe & Nightwear Set. Features premium fabric construction, tailored fit, and durable craftsmanship ideal for everyday wear.",
+    "material": "100% Premium Combed Cotton",
+    "fit": "Regular Fit",
+    "pattern": "Solid / Textured",
+    "occasion": [
+      "Casual",
+      "Everyday",
+      "Party"
+    ],
+    "careInstructions": [
+      "Machine wash cold",
+      "Do not bleach",
+      "Tumble dry low",
+      "Warm iron if needed"
+    ],
+    "price": 1359,
+    "originalPrice": 1902,
+    "discount": 28,
+    "images": [
+      "https://images.unsplash.com/photo-1576995853123-5a10305d93c0?auto=format&fit=crop&w=800&q=80",
+      "https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?auto=format&fit=crop&w=800&q=80"
+    ],
+    "thumbnail": "https://images.unsplash.com/photo-1576995853123-5a10305d93c0?auto=format&fit=crop&w=800&q=80",
+    "rating": 4.6,
+    "reviewCount": 152,
+    "reviews": [
+      {
+        "id": "rev-sd-prod-079-1",
+        "userName": "Aman Sharma",
+        "rating": 5,
+        "title": "Great quality and fast delivery!",
+        "comment": "Delivered in Neemuch within 45 minutes! Quality is top notch.",
+        "createdAt": "2026-07-28",
+        "verifiedPurchase": true
+      },
+      {
+        "id": "rev-sd-prod-079-2",
+        "userName": "Priya Verma",
+        "rating": 4,
+        "title": "Nice fit and comfortable material",
+        "comment": "The fabric is very soft. True to size.",
+        "createdAt": "2026-07-29",
+        "verifiedPurchase": true
+      }
+    ],
+    "variants": [
+      {
+        "id": "sd-prod-079-var-1",
+        "sku": "SD-SD-PROD-079-BLA-S",
+        "size": "S",
+        "colourName": "Black",
+        "colourHex": "#000000",
+        "stock": 15,
+        "price": 1359,
+        "originalPrice": 1902
+      },
+      {
+        "id": "sd-prod-079-var-2",
+        "sku": "SD-SD-PROD-079-BLA-M",
+        "size": "M",
+        "colourName": "Black",
+        "colourHex": "#000000",
+        "stock": 15,
+        "price": 1359,
+        "originalPrice": 1902
+      },
+      {
+        "id": "sd-prod-079-var-3",
+        "sku": "SD-SD-PROD-079-BLA-L",
+        "size": "L",
+        "colourName": "Black",
+        "colourHex": "#000000",
+        "stock": 15,
+        "price": 1359,
+        "originalPrice": 1902
+      },
+      {
+        "id": "sd-prod-079-var-4",
+        "sku": "SD-SD-PROD-079-BLA-XL",
+        "size": "XL",
+        "colourName": "Black",
+        "colourHex": "#000000",
+        "stock": 15,
+        "price": 1359,
+        "originalPrice": 1902
+      },
+      {
+        "id": "sd-prod-079-var-5",
+        "sku": "SD-SD-PROD-079-BLA-XXL",
+        "size": "XXL",
+        "colourName": "Black",
+        "colourHex": "#000000",
+        "stock": 15,
+        "price": 1359,
+        "originalPrice": 1902
+      },
+      {
+        "id": "sd-prod-079-var-6",
+        "sku": "SD-SD-PROD-079-WHI-S",
+        "size": "S",
+        "colourName": "White",
+        "colourHex": "#FFFFFF",
+        "stock": 15,
+        "price": 1359,
+        "originalPrice": 1902
+      },
+      {
+        "id": "sd-prod-079-var-7",
+        "sku": "SD-SD-PROD-079-WHI-M",
+        "size": "M",
+        "colourName": "White",
+        "colourHex": "#FFFFFF",
+        "stock": 0,
+        "price": 1359,
+        "originalPrice": 1902
+      },
+      {
+        "id": "sd-prod-079-var-8",
+        "sku": "SD-SD-PROD-079-WHI-L",
+        "size": "L",
+        "colourName": "White",
+        "colourHex": "#FFFFFF",
+        "stock": 15,
+        "price": 1359,
+        "originalPrice": 1902
+      },
+      {
+        "id": "sd-prod-079-var-9",
+        "sku": "SD-SD-PROD-079-WHI-XL",
+        "size": "XL",
+        "colourName": "White",
+        "colourHex": "#FFFFFF",
+        "stock": 15,
+        "price": 1359,
+        "originalPrice": 1902
+      },
+      {
+        "id": "sd-prod-079-var-10",
+        "sku": "SD-SD-PROD-079-WHI-XXL",
+        "size": "XXL",
+        "colourName": "White",
+        "colourHex": "#FFFFFF",
+        "stock": 15,
+        "price": 1359,
+        "originalPrice": 1902
+      }
+    ],
+    "tags": [
+      "satin robe & nightwear set",
+      "women",
+      "innerwear & essentials",
+      "lingerie",
+      "wrong",
+      "fashion",
+      "trending"
+    ],
+    "badge": "Express",
+    "newArrival": false,
+    "trending": true,
+    "featured": true,
+    "expressDelivery": true,
+    "estimatedDeliveryMinutes": 60,
+    "returnWindowDays": 7,
+    "exchangeAvailable": true,
+    "vendorId": "v-urban-style",
+    "commissionPercent": 12,
+    "sponsored": false,
+    "active": true,
+    "createdAt": "2026-07-01T00:00:00Z",
+    "updatedAt": "2026-08-01T00:00:00Z"
+  },
+  {
+    "id": "sd-prod-080",
+    "slug": "thermal-top-innerwear-sd-prod-080",
+    "name": "Thermal Top Innerwear",
+    "brand": "Roadster",
+    "department": "women",
+    "category": "Innerwear & Essentials",
+    "subcategory": "Lingerie",
+    "collection": "Summer Essentials 2026",
+    "shortDescription": "Premium quality thermal top innerwear crafted for comfort and style.",
+    "description": "Elevate your daily fashion with this Thermal Top Innerwear. Features premium fabric construction, tailored fit, and durable craftsmanship ideal for everyday wear.",
+    "material": "100% Premium Combed Cotton",
+    "fit": "Regular Fit",
+    "pattern": "Solid / Textured",
+    "occasion": [
+      "Casual",
+      "Everyday",
+      "Party"
+    ],
+    "careInstructions": [
+      "Machine wash cold",
+      "Do not bleach",
+      "Tumble dry low",
+      "Warm iron if needed"
+    ],
+    "price": 1396,
+    "originalPrice": 1954,
+    "discount": 28,
+    "images": [
+      "https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?auto=format&fit=crop&w=800&q=80",
+      "https://images.unsplash.com/photo-1529374255404-311a2a4f1fd9?auto=format&fit=crop&w=800&q=80"
+    ],
+    "thumbnail": "https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?auto=format&fit=crop&w=800&q=80",
+    "rating": 4.7,
+    "reviewCount": 165,
+    "reviews": [
+      {
+        "id": "rev-sd-prod-080-1",
+        "userName": "Aman Sharma",
+        "rating": 5,
+        "title": "Great quality and fast delivery!",
+        "comment": "Delivered in Neemuch within 45 minutes! Quality is top notch.",
+        "createdAt": "2026-07-28",
+        "verifiedPurchase": true
+      },
+      {
+        "id": "rev-sd-prod-080-2",
+        "userName": "Priya Verma",
+        "rating": 4,
+        "title": "Nice fit and comfortable material",
+        "comment": "The fabric is very soft. True to size.",
+        "createdAt": "2026-07-29",
+        "verifiedPurchase": true
+      }
+    ],
+    "variants": [
+      {
+        "id": "sd-prod-080-var-1",
+        "sku": "SD-SD-PROD-080-WHI-S",
+        "size": "S",
+        "colourName": "White",
+        "colourHex": "#FFFFFF",
+        "stock": 15,
+        "price": 1396,
+        "originalPrice": 1954
+      },
+      {
+        "id": "sd-prod-080-var-2",
+        "sku": "SD-SD-PROD-080-WHI-M",
+        "size": "M",
+        "colourName": "White",
+        "colourHex": "#FFFFFF",
+        "stock": 15,
+        "price": 1396,
+        "originalPrice": 1954
+      },
+      {
+        "id": "sd-prod-080-var-3",
+        "sku": "SD-SD-PROD-080-WHI-L",
+        "size": "L",
+        "colourName": "White",
+        "colourHex": "#FFFFFF",
+        "stock": 15,
+        "price": 1396,
+        "originalPrice": 1954
+      },
+      {
+        "id": "sd-prod-080-var-4",
+        "sku": "SD-SD-PROD-080-WHI-XL",
+        "size": "XL",
+        "colourName": "White",
+        "colourHex": "#FFFFFF",
+        "stock": 15,
+        "price": 1396,
+        "originalPrice": 1954
+      },
+      {
+        "id": "sd-prod-080-var-5",
+        "sku": "SD-SD-PROD-080-WHI-XXL",
+        "size": "XXL",
+        "colourName": "White",
+        "colourHex": "#FFFFFF",
+        "stock": 15,
+        "price": 1396,
+        "originalPrice": 1954
+      },
+      {
+        "id": "sd-prod-080-var-6",
+        "sku": "SD-SD-PROD-080-NAV-S",
+        "size": "S",
+        "colourName": "Navy Blue",
+        "colourHex": "#000080",
+        "stock": 15,
+        "price": 1396,
+        "originalPrice": 1954
+      },
+      {
+        "id": "sd-prod-080-var-7",
+        "sku": "SD-SD-PROD-080-NAV-M",
+        "size": "M",
+        "colourName": "Navy Blue",
+        "colourHex": "#000080",
+        "stock": 0,
+        "price": 1396,
+        "originalPrice": 1954
+      },
+      {
+        "id": "sd-prod-080-var-8",
+        "sku": "SD-SD-PROD-080-NAV-L",
+        "size": "L",
+        "colourName": "Navy Blue",
+        "colourHex": "#000080",
+        "stock": 15,
+        "price": 1396,
+        "originalPrice": 1954
+      },
+      {
+        "id": "sd-prod-080-var-9",
+        "sku": "SD-SD-PROD-080-NAV-XL",
+        "size": "XL",
+        "colourName": "Navy Blue",
+        "colourHex": "#000080",
+        "stock": 15,
+        "price": 1396,
+        "originalPrice": 1954
+      },
+      {
+        "id": "sd-prod-080-var-10",
+        "sku": "SD-SD-PROD-080-NAV-XXL",
+        "size": "XXL",
+        "colourName": "Navy Blue",
+        "colourHex": "#000080",
+        "stock": 15,
+        "price": 1396,
+        "originalPrice": 1954
+      }
+    ],
+    "tags": [
+      "thermal top innerwear",
+      "women",
+      "innerwear & essentials",
+      "lingerie",
+      "roadster",
+      "fashion",
+      "trending"
+    ],
+    "badge": "Trending",
+    "newArrival": true,
+    "trending": false,
+    "featured": false,
+    "expressDelivery": true,
+    "estimatedDeliveryMinutes": 60,
+    "returnWindowDays": 7,
+    "exchangeAvailable": true,
+    "vendorId": "v-ethnic-vibe",
+    "commissionPercent": 12,
+    "sponsored": false,
+    "active": true,
+    "createdAt": "2026-07-01T00:00:00Z",
+    "updatedAt": "2026-08-01T00:00:00Z"
+  },
+  {
+    "id": "sd-prod-081",
+    "slug": "superhero-printed-cotton-tee-sd-prod-081",
+    "name": "Superhero Printed Cotton Tee",
+    "brand": "HRX",
+    "department": "kids",
+    "category": "Boys Clothing",
+    "subcategory": "T-Shirts",
+    "collection": "Summer Essentials 2026",
+    "shortDescription": "Premium quality superhero printed cotton tee crafted for comfort and style.",
+    "description": "Elevate your daily fashion with this Superhero Printed Cotton Tee. Features premium fabric construction, tailored fit, and durable craftsmanship ideal for everyday wear.",
+    "material": "100% Premium Combed Cotton",
+    "fit": "Regular Fit",
+    "pattern": "Solid / Textured",
+    "occasion": [
+      "Casual",
+      "Everyday",
+      "Party"
+    ],
+    "careInstructions": [
+      "Machine wash cold",
+      "Do not bleach",
+      "Tumble dry low",
+      "Warm iron if needed"
+    ],
+    "price": 1433,
+    "originalPrice": 2006,
+    "discount": 28,
+    "images": [
+      "https://images.unsplash.com/photo-1529374255404-311a2a4f1fd9?auto=format&fit=crop&w=800&q=80",
+      "https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&w=800&q=80"
+    ],
+    "thumbnail": "https://images.unsplash.com/photo-1529374255404-311a2a4f1fd9?auto=format&fit=crop&w=800&q=80",
+    "rating": 4.8,
+    "reviewCount": 178,
+    "reviews": [
+      {
+        "id": "rev-sd-prod-081-1",
+        "userName": "Aman Sharma",
+        "rating": 5,
+        "title": "Great quality and fast delivery!",
+        "comment": "Delivered in Neemuch within 45 minutes! Quality is top notch.",
+        "createdAt": "2026-07-28",
+        "verifiedPurchase": true
+      },
+      {
+        "id": "rev-sd-prod-081-2",
+        "userName": "Priya Verma",
+        "rating": 4,
+        "title": "Nice fit and comfortable material",
+        "comment": "The fabric is very soft. True to size.",
+        "createdAt": "2026-07-29",
+        "verifiedPurchase": true
+      }
+    ],
+    "variants": [
+      {
+        "id": "sd-prod-081-var-1",
+        "sku": "SD-SD-PROD-081-NAV-S",
+        "size": "S",
+        "colourName": "Navy Blue",
+        "colourHex": "#000080",
+        "stock": 15,
+        "price": 1433,
+        "originalPrice": 2006
+      },
+      {
+        "id": "sd-prod-081-var-2",
+        "sku": "SD-SD-PROD-081-NAV-M",
+        "size": "M",
+        "colourName": "Navy Blue",
+        "colourHex": "#000080",
+        "stock": 15,
+        "price": 1433,
+        "originalPrice": 2006
+      },
+      {
+        "id": "sd-prod-081-var-3",
+        "sku": "SD-SD-PROD-081-NAV-L",
+        "size": "L",
+        "colourName": "Navy Blue",
+        "colourHex": "#000080",
+        "stock": 15,
+        "price": 1433,
+        "originalPrice": 2006
+      },
+      {
+        "id": "sd-prod-081-var-4",
+        "sku": "SD-SD-PROD-081-NAV-XL",
+        "size": "XL",
+        "colourName": "Navy Blue",
+        "colourHex": "#000080",
+        "stock": 15,
+        "price": 1433,
+        "originalPrice": 2006
+      },
+      {
+        "id": "sd-prod-081-var-5",
+        "sku": "SD-SD-PROD-081-NAV-XXL",
+        "size": "XXL",
+        "colourName": "Navy Blue",
+        "colourHex": "#000080",
+        "stock": 15,
+        "price": 1433,
+        "originalPrice": 2006
+      },
+      {
+        "id": "sd-prod-081-var-6",
+        "sku": "SD-SD-PROD-081-OLI-S",
+        "size": "S",
+        "colourName": "Olive Green",
+        "colourHex": "#556B2F",
+        "stock": 15,
+        "price": 1433,
+        "originalPrice": 2006
+      },
+      {
+        "id": "sd-prod-081-var-7",
+        "sku": "SD-SD-PROD-081-OLI-M",
+        "size": "M",
+        "colourName": "Olive Green",
+        "colourHex": "#556B2F",
+        "stock": 0,
+        "price": 1433,
+        "originalPrice": 2006
+      },
+      {
+        "id": "sd-prod-081-var-8",
+        "sku": "SD-SD-PROD-081-OLI-L",
+        "size": "L",
+        "colourName": "Olive Green",
+        "colourHex": "#556B2F",
+        "stock": 15,
+        "price": 1433,
+        "originalPrice": 2006
+      },
+      {
+        "id": "sd-prod-081-var-9",
+        "sku": "SD-SD-PROD-081-OLI-XL",
+        "size": "XL",
+        "colourName": "Olive Green",
+        "colourHex": "#556B2F",
+        "stock": 15,
+        "price": 1433,
+        "originalPrice": 2006
+      },
+      {
+        "id": "sd-prod-081-var-10",
+        "sku": "SD-SD-PROD-081-OLI-XXL",
+        "size": "XXL",
+        "colourName": "Olive Green",
+        "colourHex": "#556B2F",
+        "stock": 15,
+        "price": 1433,
+        "originalPrice": 2006
+      }
+    ],
+    "tags": [
+      "superhero printed cotton tee",
+      "kids",
+      "boys clothing",
+      "t-shirts",
+      "hrx",
+      "fashion",
+      "trending"
+    ],
+    "badge": "Express",
+    "newArrival": false,
+    "trending": true,
+    "featured": false,
+    "expressDelivery": true,
+    "estimatedDeliveryMinutes": 60,
+    "returnWindowDays": 7,
+    "exchangeAvailable": true,
+    "vendorId": "v-urban-style",
+    "commissionPercent": 12,
+    "sponsored": false,
+    "active": true,
+    "createdAt": "2026-07-01T00:00:00Z",
+    "updatedAt": "2026-08-01T00:00:00Z"
+  },
+  {
+    "id": "sd-prod-082",
+    "slug": "denim-shorts-with-elastic-waist-sd-prod-082",
+    "name": "Denim Shorts with Elastic Waist",
+    "brand": "StyleDash Studio",
+    "department": "kids",
+    "category": "Boys Clothing",
+    "subcategory": "T-Shirts",
+    "collection": "Summer Essentials 2026",
+    "shortDescription": "Premium quality denim shorts with elastic waist crafted for comfort and style.",
+    "description": "Elevate your daily fashion with this Denim Shorts with Elastic Waist. Features premium fabric construction, tailored fit, and durable craftsmanship ideal for everyday wear.",
+    "material": "100% Premium Combed Cotton",
+    "fit": "Regular Fit",
+    "pattern": "Solid / Textured",
+    "occasion": [
+      "Casual",
+      "Everyday",
+      "Party"
+    ],
+    "careInstructions": [
+      "Machine wash cold",
+      "Do not bleach",
+      "Tumble dry low",
+      "Warm iron if needed"
+    ],
+    "price": 1470,
+    "originalPrice": 2058,
+    "discount": 28,
+    "images": [
+      "https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&w=800&q=80",
+      "https://images.unsplash.com/photo-1521572267360-ee0c2909d518?auto=format&fit=crop&w=800&q=80"
+    ],
+    "thumbnail": "https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&w=800&q=80",
+    "rating": 4.9,
+    "reviewCount": 191,
+    "reviews": [
+      {
+        "id": "rev-sd-prod-082-1",
+        "userName": "Aman Sharma",
+        "rating": 5,
+        "title": "Great quality and fast delivery!",
+        "comment": "Delivered in Neemuch within 45 minutes! Quality is top notch.",
+        "createdAt": "2026-07-28",
+        "verifiedPurchase": true
+      },
+      {
+        "id": "rev-sd-prod-082-2",
+        "userName": "Priya Verma",
+        "rating": 4,
+        "title": "Nice fit and comfortable material",
+        "comment": "The fabric is very soft. True to size.",
+        "createdAt": "2026-07-29",
+        "verifiedPurchase": true
+      }
+    ],
+    "variants": [
+      {
+        "id": "sd-prod-082-var-1",
+        "sku": "SD-SD-PROD-082-OLI-S",
+        "size": "S",
+        "colourName": "Olive Green",
+        "colourHex": "#556B2F",
+        "stock": 15,
+        "price": 1470,
+        "originalPrice": 2058
+      },
+      {
+        "id": "sd-prod-082-var-2",
+        "sku": "SD-SD-PROD-082-OLI-M",
+        "size": "M",
+        "colourName": "Olive Green",
+        "colourHex": "#556B2F",
+        "stock": 15,
+        "price": 1470,
+        "originalPrice": 2058
+      },
+      {
+        "id": "sd-prod-082-var-3",
+        "sku": "SD-SD-PROD-082-OLI-L",
+        "size": "L",
+        "colourName": "Olive Green",
+        "colourHex": "#556B2F",
+        "stock": 15,
+        "price": 1470,
+        "originalPrice": 2058
+      },
+      {
+        "id": "sd-prod-082-var-4",
+        "sku": "SD-SD-PROD-082-OLI-XL",
+        "size": "XL",
+        "colourName": "Olive Green",
+        "colourHex": "#556B2F",
+        "stock": 15,
+        "price": 1470,
+        "originalPrice": 2058
+      },
+      {
+        "id": "sd-prod-082-var-5",
+        "sku": "SD-SD-PROD-082-OLI-XXL",
+        "size": "XXL",
+        "colourName": "Olive Green",
+        "colourHex": "#556B2F",
+        "stock": 15,
+        "price": 1470,
+        "originalPrice": 2058
+      },
+      {
+        "id": "sd-prod-082-var-6",
+        "sku": "SD-SD-PROD-082-CRI-S",
+        "size": "S",
+        "colourName": "Crimson Red",
+        "colourHex": "#DC143C",
+        "stock": 15,
+        "price": 1470,
+        "originalPrice": 2058
+      },
+      {
+        "id": "sd-prod-082-var-7",
+        "sku": "SD-SD-PROD-082-CRI-M",
+        "size": "M",
+        "colourName": "Crimson Red",
+        "colourHex": "#DC143C",
+        "stock": 0,
+        "price": 1470,
+        "originalPrice": 2058
+      },
+      {
+        "id": "sd-prod-082-var-8",
+        "sku": "SD-SD-PROD-082-CRI-L",
+        "size": "L",
+        "colourName": "Crimson Red",
+        "colourHex": "#DC143C",
+        "stock": 15,
+        "price": 1470,
+        "originalPrice": 2058
+      },
+      {
+        "id": "sd-prod-082-var-9",
+        "sku": "SD-SD-PROD-082-CRI-XL",
+        "size": "XL",
+        "colourName": "Crimson Red",
+        "colourHex": "#DC143C",
+        "stock": 15,
+        "price": 1470,
+        "originalPrice": 2058
+      },
+      {
+        "id": "sd-prod-082-var-10",
+        "sku": "SD-SD-PROD-082-CRI-XXL",
+        "size": "XXL",
+        "colourName": "Crimson Red",
+        "colourHex": "#DC143C",
+        "stock": 15,
+        "price": 1470,
+        "originalPrice": 2058
+      }
+    ],
+    "tags": [
+      "denim shorts with elastic waist",
+      "kids",
+      "boys clothing",
+      "t-shirts",
+      "styledash studio",
+      "fashion",
+      "trending"
+    ],
+    "badge": "New",
+    "newArrival": false,
+    "trending": false,
+    "featured": false,
+    "expressDelivery": true,
+    "estimatedDeliveryMinutes": 60,
+    "returnWindowDays": 7,
+    "exchangeAvailable": true,
+    "vendorId": "v-ethnic-vibe",
+    "commissionPercent": 12,
+    "sponsored": false,
+    "active": true,
+    "createdAt": "2026-07-01T00:00:00Z",
+    "updatedAt": "2026-08-01T00:00:00Z"
+  },
+  {
+    "id": "sd-prod-083",
+    "slug": "printed-cotton-casual-shirt-sd-prod-083",
+    "name": "Printed Cotton Casual Shirt",
+    "brand": "Anouk",
+    "department": "kids",
+    "category": "Boys Clothing",
+    "subcategory": "T-Shirts",
+    "collection": "Summer Essentials 2026",
+    "shortDescription": "Premium quality printed cotton casual shirt crafted for comfort and style.",
+    "description": "Elevate your daily fashion with this Printed Cotton Casual Shirt. Features premium fabric construction, tailored fit, and durable craftsmanship ideal for everyday wear.",
+    "material": "100% Premium Combed Cotton",
+    "fit": "Regular Fit",
+    "pattern": "Solid / Textured",
+    "occasion": [
+      "Casual",
+      "Everyday",
+      "Party"
+    ],
+    "careInstructions": [
+      "Machine wash cold",
+      "Do not bleach",
+      "Tumble dry low",
+      "Warm iron if needed"
+    ],
+    "price": 1507,
+    "originalPrice": 2109,
+    "discount": 28,
+    "images": [
+      "https://images.unsplash.com/photo-1521572267360-ee0c2909d518?auto=format&fit=crop&w=800&q=80",
+      "https://images.unsplash.com/photo-1503342217505-b0a15ec3261c?auto=format&fit=crop&w=800&q=80"
+    ],
+    "thumbnail": "https://images.unsplash.com/photo-1521572267360-ee0c2909d518?auto=format&fit=crop&w=800&q=80",
+    "rating": 3.8,
+    "reviewCount": 24,
+    "reviews": [
+      {
+        "id": "rev-sd-prod-083-1",
+        "userName": "Aman Sharma",
+        "rating": 5,
+        "title": "Great quality and fast delivery!",
+        "comment": "Delivered in Neemuch within 45 minutes! Quality is top notch.",
+        "createdAt": "2026-07-28",
+        "verifiedPurchase": true
+      },
+      {
+        "id": "rev-sd-prod-083-2",
+        "userName": "Priya Verma",
+        "rating": 4,
+        "title": "Nice fit and comfortable material",
+        "comment": "The fabric is very soft. True to size.",
+        "createdAt": "2026-07-29",
+        "verifiedPurchase": true
+      }
+    ],
+    "variants": [
+      {
+        "id": "sd-prod-083-var-1",
+        "sku": "SD-SD-PROD-083-CRI-S",
+        "size": "S",
+        "colourName": "Crimson Red",
+        "colourHex": "#DC143C",
+        "stock": 15,
+        "price": 1507,
+        "originalPrice": 2109
+      },
+      {
+        "id": "sd-prod-083-var-2",
+        "sku": "SD-SD-PROD-083-CRI-M",
+        "size": "M",
+        "colourName": "Crimson Red",
+        "colourHex": "#DC143C",
+        "stock": 15,
+        "price": 1507,
+        "originalPrice": 2109
+      },
+      {
+        "id": "sd-prod-083-var-3",
+        "sku": "SD-SD-PROD-083-CRI-L",
+        "size": "L",
+        "colourName": "Crimson Red",
+        "colourHex": "#DC143C",
+        "stock": 15,
+        "price": 1507,
+        "originalPrice": 2109
+      },
+      {
+        "id": "sd-prod-083-var-4",
+        "sku": "SD-SD-PROD-083-CRI-XL",
+        "size": "XL",
+        "colourName": "Crimson Red",
+        "colourHex": "#DC143C",
+        "stock": 15,
+        "price": 1507,
+        "originalPrice": 2109
+      },
+      {
+        "id": "sd-prod-083-var-5",
+        "sku": "SD-SD-PROD-083-CRI-XXL",
+        "size": "XXL",
+        "colourName": "Crimson Red",
+        "colourHex": "#DC143C",
+        "stock": 15,
+        "price": 1507,
+        "originalPrice": 2109
+      },
+      {
+        "id": "sd-prod-083-var-6",
+        "sku": "SD-SD-PROD-083-BEI-S",
+        "size": "S",
+        "colourName": "Beige",
+        "colourHex": "#F5F5DC",
+        "stock": 15,
+        "price": 1507,
+        "originalPrice": 2109
+      },
+      {
+        "id": "sd-prod-083-var-7",
+        "sku": "SD-SD-PROD-083-BEI-M",
+        "size": "M",
+        "colourName": "Beige",
+        "colourHex": "#F5F5DC",
+        "stock": 0,
+        "price": 1507,
+        "originalPrice": 2109
+      },
+      {
+        "id": "sd-prod-083-var-8",
+        "sku": "SD-SD-PROD-083-BEI-L",
+        "size": "L",
+        "colourName": "Beige",
+        "colourHex": "#F5F5DC",
+        "stock": 15,
+        "price": 1507,
+        "originalPrice": 2109
+      },
+      {
+        "id": "sd-prod-083-var-9",
+        "sku": "SD-SD-PROD-083-BEI-XL",
+        "size": "XL",
+        "colourName": "Beige",
+        "colourHex": "#F5F5DC",
+        "stock": 15,
+        "price": 1507,
+        "originalPrice": 2109
+      },
+      {
+        "id": "sd-prod-083-var-10",
+        "sku": "SD-SD-PROD-083-BEI-XXL",
+        "size": "XXL",
+        "colourName": "Beige",
+        "colourHex": "#F5F5DC",
+        "stock": 15,
+        "price": 1507,
+        "originalPrice": 2109
+      }
+    ],
+    "tags": [
+      "printed cotton casual shirt",
+      "kids",
+      "boys clothing",
+      "t-shirts",
+      "anouk",
+      "fashion",
+      "trending"
+    ],
+    "badge": "Trending",
+    "newArrival": true,
+    "trending": true,
+    "featured": true,
+    "expressDelivery": true,
+    "estimatedDeliveryMinutes": 60,
+    "returnWindowDays": 7,
+    "exchangeAvailable": true,
+    "vendorId": "v-urban-style",
+    "commissionPercent": 12,
+    "sponsored": true,
+    "active": true,
+    "createdAt": "2026-07-01T00:00:00Z",
+    "updatedAt": "2026-08-01T00:00:00Z"
+  },
+  {
+    "id": "sd-prod-084",
+    "slug": "graphic-sweatshirt-and-jogger-set-sd-prod-084",
+    "name": "Graphic Sweatshirt & Jogger Set",
+    "brand": "Mast & Harbour",
+    "department": "kids",
+    "category": "Boys Clothing",
+    "subcategory": "T-Shirts",
+    "collection": "Summer Essentials 2026",
+    "shortDescription": "Premium quality graphic sweatshirt & jogger set crafted for comfort and style.",
+    "description": "Elevate your daily fashion with this Graphic Sweatshirt & Jogger Set. Features premium fabric construction, tailored fit, and durable craftsmanship ideal for everyday wear.",
+    "material": "100% Premium Combed Cotton",
+    "fit": "Regular Fit",
+    "pattern": "Solid / Textured",
+    "occasion": [
+      "Casual",
+      "Everyday",
+      "Party"
+    ],
+    "careInstructions": [
+      "Machine wash cold",
+      "Do not bleach",
+      "Tumble dry low",
+      "Warm iron if needed"
+    ],
+    "price": 1544,
+    "originalPrice": 2161,
+    "discount": 28,
+    "images": [
+      "https://images.unsplash.com/photo-1503342217505-b0a15ec3261c?auto=format&fit=crop&w=800&q=80",
+      "https://images.unsplash.com/photo-1576995853123-5a10305d93c0?auto=format&fit=crop&w=800&q=80"
+    ],
+    "thumbnail": "https://images.unsplash.com/photo-1503342217505-b0a15ec3261c?auto=format&fit=crop&w=800&q=80",
+    "rating": 3.9,
+    "reviewCount": 37,
+    "reviews": [
+      {
+        "id": "rev-sd-prod-084-1",
+        "userName": "Aman Sharma",
+        "rating": 5,
+        "title": "Great quality and fast delivery!",
+        "comment": "Delivered in Neemuch within 45 minutes! Quality is top notch.",
+        "createdAt": "2026-07-28",
+        "verifiedPurchase": true
+      },
+      {
+        "id": "rev-sd-prod-084-2",
+        "userName": "Priya Verma",
+        "rating": 4,
+        "title": "Nice fit and comfortable material",
+        "comment": "The fabric is very soft. True to size.",
+        "createdAt": "2026-07-29",
+        "verifiedPurchase": true
+      }
+    ],
+    "variants": [
+      {
+        "id": "sd-prod-084-var-1",
+        "sku": "SD-SD-PROD-084-BEI-S",
+        "size": "S",
+        "colourName": "Beige",
+        "colourHex": "#F5F5DC",
+        "stock": 15,
+        "price": 1544,
+        "originalPrice": 2161
+      },
+      {
+        "id": "sd-prod-084-var-2",
+        "sku": "SD-SD-PROD-084-BEI-M",
+        "size": "M",
+        "colourName": "Beige",
+        "colourHex": "#F5F5DC",
+        "stock": 15,
+        "price": 1544,
+        "originalPrice": 2161
+      },
+      {
+        "id": "sd-prod-084-var-3",
+        "sku": "SD-SD-PROD-084-BEI-L",
+        "size": "L",
+        "colourName": "Beige",
+        "colourHex": "#F5F5DC",
+        "stock": 15,
+        "price": 1544,
+        "originalPrice": 2161
+      },
+      {
+        "id": "sd-prod-084-var-4",
+        "sku": "SD-SD-PROD-084-BEI-XL",
+        "size": "XL",
+        "colourName": "Beige",
+        "colourHex": "#F5F5DC",
+        "stock": 15,
+        "price": 1544,
+        "originalPrice": 2161
+      },
+      {
+        "id": "sd-prod-084-var-5",
+        "sku": "SD-SD-PROD-084-BEI-XXL",
+        "size": "XXL",
+        "colourName": "Beige",
+        "colourHex": "#F5F5DC",
+        "stock": 15,
+        "price": 1544,
+        "originalPrice": 2161
+      },
+      {
+        "id": "sd-prod-084-var-6",
+        "sku": "SD-SD-PROD-084-CHA-S",
+        "size": "S",
+        "colourName": "Charcoal Gray",
+        "colourHex": "#36454F",
+        "stock": 15,
+        "price": 1544,
+        "originalPrice": 2161
+      },
+      {
+        "id": "sd-prod-084-var-7",
+        "sku": "SD-SD-PROD-084-CHA-M",
+        "size": "M",
+        "colourName": "Charcoal Gray",
+        "colourHex": "#36454F",
+        "stock": 0,
+        "price": 1544,
+        "originalPrice": 2161
+      },
+      {
+        "id": "sd-prod-084-var-8",
+        "sku": "SD-SD-PROD-084-CHA-L",
+        "size": "L",
+        "colourName": "Charcoal Gray",
+        "colourHex": "#36454F",
+        "stock": 15,
+        "price": 1544,
+        "originalPrice": 2161
+      },
+      {
+        "id": "sd-prod-084-var-9",
+        "sku": "SD-SD-PROD-084-CHA-XL",
+        "size": "XL",
+        "colourName": "Charcoal Gray",
+        "colourHex": "#36454F",
+        "stock": 15,
+        "price": 1544,
+        "originalPrice": 2161
+      },
+      {
+        "id": "sd-prod-084-var-10",
+        "sku": "SD-SD-PROD-084-CHA-XXL",
+        "size": "XXL",
+        "colourName": "Charcoal Gray",
+        "colourHex": "#36454F",
+        "stock": 15,
+        "price": 1544,
+        "originalPrice": 2161
+      }
+    ],
+    "tags": [
+      "graphic sweatshirt & jogger set",
+      "kids",
+      "boys clothing",
+      "t-shirts",
+      "mast & harbour",
+      "fashion",
+      "trending"
+    ],
+    "badge": "New",
+    "newArrival": false,
+    "trending": false,
+    "featured": false,
+    "expressDelivery": true,
+    "estimatedDeliveryMinutes": 60,
+    "returnWindowDays": 7,
+    "exchangeAvailable": true,
+    "vendorId": "v-ethnic-vibe",
+    "commissionPercent": 12,
+    "sponsored": false,
+    "active": true,
+    "createdAt": "2026-07-01T00:00:00Z",
+    "updatedAt": "2026-08-01T00:00:00Z"
+  },
+  {
+    "id": "sd-prod-085",
+    "slug": "festive-kurta-pyjama-set-sd-prod-085",
+    "name": "Festive Kurta Pyjama Set",
+    "brand": "Highlander",
+    "department": "kids",
+    "category": "Boys Clothing",
+    "subcategory": "T-Shirts",
+    "collection": "Summer Essentials 2026",
+    "shortDescription": "Premium quality festive kurta pyjama set crafted for comfort and style.",
+    "description": "Elevate your daily fashion with this Festive Kurta Pyjama Set. Features premium fabric construction, tailored fit, and durable craftsmanship ideal for everyday wear.",
+    "material": "100% Premium Combed Cotton",
+    "fit": "Regular Fit",
+    "pattern": "Solid / Textured",
+    "occasion": [
+      "Casual",
+      "Everyday",
+      "Party"
+    ],
+    "careInstructions": [
+      "Machine wash cold",
+      "Do not bleach",
+      "Tumble dry low",
+      "Warm iron if needed"
+    ],
+    "price": 1581,
+    "originalPrice": 2213,
+    "discount": 28,
+    "images": [
+      "https://images.unsplash.com/photo-1576995853123-5a10305d93c0?auto=format&fit=crop&w=800&q=80",
+      "https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?auto=format&fit=crop&w=800&q=80"
+    ],
+    "thumbnail": "https://images.unsplash.com/photo-1576995853123-5a10305d93c0?auto=format&fit=crop&w=800&q=80",
+    "rating": 4.0,
+    "reviewCount": 50,
+    "reviews": [
+      {
+        "id": "rev-sd-prod-085-1",
+        "userName": "Aman Sharma",
+        "rating": 5,
+        "title": "Great quality and fast delivery!",
+        "comment": "Delivered in Neemuch within 45 minutes! Quality is top notch.",
+        "createdAt": "2026-07-28",
+        "verifiedPurchase": true
+      },
+      {
+        "id": "rev-sd-prod-085-2",
+        "userName": "Priya Verma",
+        "rating": 4,
+        "title": "Nice fit and comfortable material",
+        "comment": "The fabric is very soft. True to size.",
+        "createdAt": "2026-07-29",
+        "verifiedPurchase": true
+      }
+    ],
+    "variants": [
+      {
+        "id": "sd-prod-085-var-1",
+        "sku": "SD-SD-PROD-085-CHA-S",
+        "size": "S",
+        "colourName": "Charcoal Gray",
+        "colourHex": "#36454F",
+        "stock": 15,
+        "price": 1581,
+        "originalPrice": 2213
+      },
+      {
+        "id": "sd-prod-085-var-2",
+        "sku": "SD-SD-PROD-085-CHA-M",
+        "size": "M",
+        "colourName": "Charcoal Gray",
+        "colourHex": "#36454F",
+        "stock": 15,
+        "price": 1581,
+        "originalPrice": 2213
+      },
+      {
+        "id": "sd-prod-085-var-3",
+        "sku": "SD-SD-PROD-085-CHA-L",
+        "size": "L",
+        "colourName": "Charcoal Gray",
+        "colourHex": "#36454F",
+        "stock": 15,
+        "price": 1581,
+        "originalPrice": 2213
+      },
+      {
+        "id": "sd-prod-085-var-4",
+        "sku": "SD-SD-PROD-085-CHA-XL",
+        "size": "XL",
+        "colourName": "Charcoal Gray",
+        "colourHex": "#36454F",
+        "stock": 15,
+        "price": 1581,
+        "originalPrice": 2213
+      },
+      {
+        "id": "sd-prod-085-var-5",
+        "sku": "SD-SD-PROD-085-CHA-XXL",
+        "size": "XXL",
+        "colourName": "Charcoal Gray",
+        "colourHex": "#36454F",
+        "stock": 15,
+        "price": 1581,
+        "originalPrice": 2213
+      },
+      {
+        "id": "sd-prod-085-var-6",
+        "sku": "SD-SD-PROD-085-MUS-S",
+        "size": "S",
+        "colourName": "Mustard Yellow",
+        "colourHex": "#FFDB58",
+        "stock": 15,
+        "price": 1581,
+        "originalPrice": 2213
+      },
+      {
+        "id": "sd-prod-085-var-7",
+        "sku": "SD-SD-PROD-085-MUS-M",
+        "size": "M",
+        "colourName": "Mustard Yellow",
+        "colourHex": "#FFDB58",
+        "stock": 0,
+        "price": 1581,
+        "originalPrice": 2213
+      },
+      {
+        "id": "sd-prod-085-var-8",
+        "sku": "SD-SD-PROD-085-MUS-L",
+        "size": "L",
+        "colourName": "Mustard Yellow",
+        "colourHex": "#FFDB58",
+        "stock": 15,
+        "price": 1581,
+        "originalPrice": 2213
+      },
+      {
+        "id": "sd-prod-085-var-9",
+        "sku": "SD-SD-PROD-085-MUS-XL",
+        "size": "XL",
+        "colourName": "Mustard Yellow",
+        "colourHex": "#FFDB58",
+        "stock": 15,
+        "price": 1581,
+        "originalPrice": 2213
+      },
+      {
+        "id": "sd-prod-085-var-10",
+        "sku": "SD-SD-PROD-085-MUS-XXL",
+        "size": "XXL",
+        "colourName": "Mustard Yellow",
+        "colourHex": "#FFDB58",
+        "stock": 15,
+        "price": 1581,
+        "originalPrice": 2213
+      }
+    ],
+    "tags": [
+      "festive kurta pyjama set",
+      "kids",
+      "boys clothing",
+      "t-shirts",
+      "highlander",
+      "fashion",
+      "trending"
+    ],
+    "badge": "Express",
+    "newArrival": false,
+    "trending": true,
+    "featured": false,
+    "expressDelivery": true,
+    "estimatedDeliveryMinutes": 60,
+    "returnWindowDays": 7,
+    "exchangeAvailable": true,
+    "vendorId": "v-urban-style",
+    "commissionPercent": 12,
+    "sponsored": false,
+    "active": true,
+    "createdAt": "2026-07-01T00:00:00Z",
+    "updatedAt": "2026-08-01T00:00:00Z"
+  },
+  {
+    "id": "sd-prod-086",
+    "slug": "tulle-party-dress-with-bow-sd-prod-086",
+    "name": "Tulle Party Dress with Bow",
+    "brand": "Bawree",
+    "department": "kids",
+    "category": "Girls Clothing",
+    "subcategory": "Frocks",
+    "collection": "Summer Essentials 2026",
+    "shortDescription": "Premium quality tulle party dress with bow crafted for comfort and style.",
+    "description": "Elevate your daily fashion with this Tulle Party Dress with Bow. Features premium fabric construction, tailored fit, and durable craftsmanship ideal for everyday wear.",
+    "material": "100% Premium Combed Cotton",
+    "fit": "Regular Fit",
+    "pattern": "Solid / Textured",
+    "occasion": [
+      "Casual",
+      "Everyday",
+      "Party"
+    ],
+    "careInstructions": [
+      "Machine wash cold",
+      "Do not bleach",
+      "Tumble dry low",
+      "Warm iron if needed"
+    ],
+    "price": 1618,
+    "originalPrice": 2265,
+    "discount": 28,
+    "images": [
+      "https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?auto=format&fit=crop&w=800&q=80",
+      "https://images.unsplash.com/photo-1529374255404-311a2a4f1fd9?auto=format&fit=crop&w=800&q=80"
+    ],
+    "thumbnail": "https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?auto=format&fit=crop&w=800&q=80",
+    "rating": 4.1,
+    "reviewCount": 63,
+    "reviews": [
+      {
+        "id": "rev-sd-prod-086-1",
+        "userName": "Aman Sharma",
+        "rating": 5,
+        "title": "Great quality and fast delivery!",
+        "comment": "Delivered in Neemuch within 45 minutes! Quality is top notch.",
+        "createdAt": "2026-07-28",
+        "verifiedPurchase": true
+      },
+      {
+        "id": "rev-sd-prod-086-2",
+        "userName": "Priya Verma",
+        "rating": 4,
+        "title": "Nice fit and comfortable material",
+        "comment": "The fabric is very soft. True to size.",
+        "createdAt": "2026-07-29",
+        "verifiedPurchase": true
+      }
+    ],
+    "variants": [
+      {
+        "id": "sd-prod-086-var-1",
+        "sku": "SD-SD-PROD-086-MUS-S",
+        "size": "S",
+        "colourName": "Mustard Yellow",
+        "colourHex": "#FFDB58",
+        "stock": 15,
+        "price": 1618,
+        "originalPrice": 2265
+      },
+      {
+        "id": "sd-prod-086-var-2",
+        "sku": "SD-SD-PROD-086-MUS-M",
+        "size": "M",
+        "colourName": "Mustard Yellow",
+        "colourHex": "#FFDB58",
+        "stock": 15,
+        "price": 1618,
+        "originalPrice": 2265
+      },
+      {
+        "id": "sd-prod-086-var-3",
+        "sku": "SD-SD-PROD-086-MUS-L",
+        "size": "L",
+        "colourName": "Mustard Yellow",
+        "colourHex": "#FFDB58",
+        "stock": 15,
+        "price": 1618,
+        "originalPrice": 2265
+      },
+      {
+        "id": "sd-prod-086-var-4",
+        "sku": "SD-SD-PROD-086-MUS-XL",
+        "size": "XL",
+        "colourName": "Mustard Yellow",
+        "colourHex": "#FFDB58",
+        "stock": 15,
+        "price": 1618,
+        "originalPrice": 2265
+      },
+      {
+        "id": "sd-prod-086-var-5",
+        "sku": "SD-SD-PROD-086-MUS-XXL",
+        "size": "XXL",
+        "colourName": "Mustard Yellow",
+        "colourHex": "#FFDB58",
+        "stock": 15,
+        "price": 1618,
+        "originalPrice": 2265
+      },
+      {
+        "id": "sd-prod-086-var-6",
+        "sku": "SD-SD-PROD-086-BLA-S",
+        "size": "S",
+        "colourName": "Black",
+        "colourHex": "#000000",
+        "stock": 15,
+        "price": 1618,
+        "originalPrice": 2265
+      },
+      {
+        "id": "sd-prod-086-var-7",
+        "sku": "SD-SD-PROD-086-BLA-M",
+        "size": "M",
+        "colourName": "Black",
+        "colourHex": "#000000",
+        "stock": 0,
+        "price": 1618,
+        "originalPrice": 2265
+      },
+      {
+        "id": "sd-prod-086-var-8",
+        "sku": "SD-SD-PROD-086-BLA-L",
+        "size": "L",
+        "colourName": "Black",
+        "colourHex": "#000000",
+        "stock": 15,
+        "price": 1618,
+        "originalPrice": 2265
+      },
+      {
+        "id": "sd-prod-086-var-9",
+        "sku": "SD-SD-PROD-086-BLA-XL",
+        "size": "XL",
+        "colourName": "Black",
+        "colourHex": "#000000",
+        "stock": 15,
+        "price": 1618,
+        "originalPrice": 2265
+      },
+      {
+        "id": "sd-prod-086-var-10",
+        "sku": "SD-SD-PROD-086-BLA-XXL",
+        "size": "XXL",
+        "colourName": "Black",
+        "colourHex": "#000000",
+        "stock": 15,
+        "price": 1618,
+        "originalPrice": 2265
+      }
+    ],
+    "tags": [
+      "tulle party dress with bow",
+      "kids",
+      "girls clothing",
+      "frocks",
+      "bawree",
+      "fashion",
+      "trending"
+    ],
+    "badge": "Trending",
+    "newArrival": true,
+    "trending": false,
+    "featured": false,
+    "expressDelivery": true,
+    "estimatedDeliveryMinutes": 60,
+    "returnWindowDays": 7,
+    "exchangeAvailable": true,
+    "vendorId": "v-ethnic-vibe",
+    "commissionPercent": 12,
+    "sponsored": false,
+    "active": true,
+    "createdAt": "2026-07-01T00:00:00Z",
+    "updatedAt": "2026-08-01T00:00:00Z"
+  },
+  {
+    "id": "sd-prod-087",
+    "slug": "floral-cotton-summer-frock-sd-prod-087",
+    "name": "Floral Cotton Summer Frock",
+    "brand": "Snitch",
+    "department": "kids",
+    "category": "Girls Clothing",
+    "subcategory": "Frocks",
+    "collection": "Summer Essentials 2026",
+    "shortDescription": "Premium quality floral cotton summer frock crafted for comfort and style.",
+    "description": "Elevate your daily fashion with this Floral Cotton Summer Frock. Features premium fabric construction, tailored fit, and durable craftsmanship ideal for everyday wear.",
+    "material": "100% Premium Combed Cotton",
+    "fit": "Regular Fit",
+    "pattern": "Solid / Textured",
+    "occasion": [
+      "Casual",
+      "Everyday",
+      "Party"
+    ],
+    "careInstructions": [
+      "Machine wash cold",
+      "Do not bleach",
+      "Tumble dry low",
+      "Warm iron if needed"
+    ],
+    "price": 1655,
+    "originalPrice": 2317,
+    "discount": 28,
+    "images": [
+      "https://images.unsplash.com/photo-1529374255404-311a2a4f1fd9?auto=format&fit=crop&w=800&q=80",
+      "https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&w=800&q=80"
+    ],
+    "thumbnail": "https://images.unsplash.com/photo-1529374255404-311a2a4f1fd9?auto=format&fit=crop&w=800&q=80",
+    "rating": 4.2,
+    "reviewCount": 76,
+    "reviews": [
+      {
+        "id": "rev-sd-prod-087-1",
+        "userName": "Aman Sharma",
+        "rating": 5,
+        "title": "Great quality and fast delivery!",
+        "comment": "Delivered in Neemuch within 45 minutes! Quality is top notch.",
+        "createdAt": "2026-07-28",
+        "verifiedPurchase": true
+      },
+      {
+        "id": "rev-sd-prod-087-2",
+        "userName": "Priya Verma",
+        "rating": 4,
+        "title": "Nice fit and comfortable material",
+        "comment": "The fabric is very soft. True to size.",
+        "createdAt": "2026-07-29",
+        "verifiedPurchase": true
+      }
+    ],
+    "variants": [
+      {
+        "id": "sd-prod-087-var-1",
+        "sku": "SD-SD-PROD-087-BLA-S",
+        "size": "S",
+        "colourName": "Black",
+        "colourHex": "#000000",
+        "stock": 15,
+        "price": 1655,
+        "originalPrice": 2317
+      },
+      {
+        "id": "sd-prod-087-var-2",
+        "sku": "SD-SD-PROD-087-BLA-M",
+        "size": "M",
+        "colourName": "Black",
+        "colourHex": "#000000",
+        "stock": 15,
+        "price": 1655,
+        "originalPrice": 2317
+      },
+      {
+        "id": "sd-prod-087-var-3",
+        "sku": "SD-SD-PROD-087-BLA-L",
+        "size": "L",
+        "colourName": "Black",
+        "colourHex": "#000000",
+        "stock": 15,
+        "price": 1655,
+        "originalPrice": 2317
+      },
+      {
+        "id": "sd-prod-087-var-4",
+        "sku": "SD-SD-PROD-087-BLA-XL",
+        "size": "XL",
+        "colourName": "Black",
+        "colourHex": "#000000",
+        "stock": 15,
+        "price": 1655,
+        "originalPrice": 2317
+      },
+      {
+        "id": "sd-prod-087-var-5",
+        "sku": "SD-SD-PROD-087-BLA-XXL",
+        "size": "XXL",
+        "colourName": "Black",
+        "colourHex": "#000000",
+        "stock": 15,
+        "price": 1655,
+        "originalPrice": 2317
+      },
+      {
+        "id": "sd-prod-087-var-6",
+        "sku": "SD-SD-PROD-087-WHI-S",
+        "size": "S",
+        "colourName": "White",
+        "colourHex": "#FFFFFF",
+        "stock": 15,
+        "price": 1655,
+        "originalPrice": 2317
+      },
+      {
+        "id": "sd-prod-087-var-7",
+        "sku": "SD-SD-PROD-087-WHI-M",
+        "size": "M",
+        "colourName": "White",
+        "colourHex": "#FFFFFF",
+        "stock": 0,
+        "price": 1655,
+        "originalPrice": 2317
+      },
+      {
+        "id": "sd-prod-087-var-8",
+        "sku": "SD-SD-PROD-087-WHI-L",
+        "size": "L",
+        "colourName": "White",
+        "colourHex": "#FFFFFF",
+        "stock": 15,
+        "price": 1655,
+        "originalPrice": 2317
+      },
+      {
+        "id": "sd-prod-087-var-9",
+        "sku": "SD-SD-PROD-087-WHI-XL",
+        "size": "XL",
+        "colourName": "White",
+        "colourHex": "#FFFFFF",
+        "stock": 15,
+        "price": 1655,
+        "originalPrice": 2317
+      },
+      {
+        "id": "sd-prod-087-var-10",
+        "sku": "SD-SD-PROD-087-WHI-XXL",
+        "size": "XXL",
+        "colourName": "White",
+        "colourHex": "#FFFFFF",
+        "stock": 15,
+        "price": 1655,
+        "originalPrice": 2317
+      }
+    ],
+    "tags": [
+      "floral cotton summer frock",
+      "kids",
+      "girls clothing",
+      "frocks",
+      "snitch",
+      "fashion",
+      "trending"
+    ],
+    "badge": "Express",
+    "newArrival": false,
+    "trending": true,
+    "featured": true,
+    "expressDelivery": true,
+    "estimatedDeliveryMinutes": 60,
+    "returnWindowDays": 7,
+    "exchangeAvailable": true,
+    "vendorId": "v-urban-style",
+    "commissionPercent": 12,
+    "sponsored": false,
+    "active": true,
+    "createdAt": "2026-07-01T00:00:00Z",
+    "updatedAt": "2026-08-01T00:00:00Z"
+  },
+  {
+    "id": "sd-prod-088",
+    "slug": "printed-crop-top-and-skirt-set-sd-prod-088",
+    "name": "Printed Crop Top & Skirt Set",
+    "brand": "Wrong",
+    "department": "kids",
+    "category": "Girls Clothing",
+    "subcategory": "Frocks",
+    "collection": "Summer Essentials 2026",
+    "shortDescription": "Premium quality printed crop top & skirt set crafted for comfort and style.",
+    "description": "Elevate your daily fashion with this Printed Crop Top & Skirt Set. Features premium fabric construction, tailored fit, and durable craftsmanship ideal for everyday wear.",
+    "material": "100% Premium Combed Cotton",
+    "fit": "Regular Fit",
+    "pattern": "Solid / Textured",
+    "occasion": [
+      "Casual",
+      "Everyday",
+      "Party"
+    ],
+    "careInstructions": [
+      "Machine wash cold",
+      "Do not bleach",
+      "Tumble dry low",
+      "Warm iron if needed"
+    ],
+    "price": 1692,
+    "originalPrice": 2368,
+    "discount": 28,
+    "images": [
+      "https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&w=800&q=80",
+      "https://images.unsplash.com/photo-1521572267360-ee0c2909d518?auto=format&fit=crop&w=800&q=80"
+    ],
+    "thumbnail": "https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&w=800&q=80",
+    "rating": 4.3,
+    "reviewCount": 89,
+    "reviews": [
+      {
+        "id": "rev-sd-prod-088-1",
+        "userName": "Aman Sharma",
+        "rating": 5,
+        "title": "Great quality and fast delivery!",
+        "comment": "Delivered in Neemuch within 45 minutes! Quality is top notch.",
+        "createdAt": "2026-07-28",
+        "verifiedPurchase": true
+      },
+      {
+        "id": "rev-sd-prod-088-2",
+        "userName": "Priya Verma",
+        "rating": 4,
+        "title": "Nice fit and comfortable material",
+        "comment": "The fabric is very soft. True to size.",
+        "createdAt": "2026-07-29",
+        "verifiedPurchase": true
+      }
+    ],
+    "variants": [
+      {
+        "id": "sd-prod-088-var-1",
+        "sku": "SD-SD-PROD-088-WHI-S",
+        "size": "S",
+        "colourName": "White",
+        "colourHex": "#FFFFFF",
+        "stock": 15,
+        "price": 1692,
+        "originalPrice": 2368
+      },
+      {
+        "id": "sd-prod-088-var-2",
+        "sku": "SD-SD-PROD-088-WHI-M",
+        "size": "M",
+        "colourName": "White",
+        "colourHex": "#FFFFFF",
+        "stock": 15,
+        "price": 1692,
+        "originalPrice": 2368
+      },
+      {
+        "id": "sd-prod-088-var-3",
+        "sku": "SD-SD-PROD-088-WHI-L",
+        "size": "L",
+        "colourName": "White",
+        "colourHex": "#FFFFFF",
+        "stock": 15,
+        "price": 1692,
+        "originalPrice": 2368
+      },
+      {
+        "id": "sd-prod-088-var-4",
+        "sku": "SD-SD-PROD-088-WHI-XL",
+        "size": "XL",
+        "colourName": "White",
+        "colourHex": "#FFFFFF",
+        "stock": 15,
+        "price": 1692,
+        "originalPrice": 2368
+      },
+      {
+        "id": "sd-prod-088-var-5",
+        "sku": "SD-SD-PROD-088-WHI-XXL",
+        "size": "XXL",
+        "colourName": "White",
+        "colourHex": "#FFFFFF",
+        "stock": 15,
+        "price": 1692,
+        "originalPrice": 2368
+      },
+      {
+        "id": "sd-prod-088-var-6",
+        "sku": "SD-SD-PROD-088-NAV-S",
+        "size": "S",
+        "colourName": "Navy Blue",
+        "colourHex": "#000080",
+        "stock": 15,
+        "price": 1692,
+        "originalPrice": 2368
+      },
+      {
+        "id": "sd-prod-088-var-7",
+        "sku": "SD-SD-PROD-088-NAV-M",
+        "size": "M",
+        "colourName": "Navy Blue",
+        "colourHex": "#000080",
+        "stock": 0,
+        "price": 1692,
+        "originalPrice": 2368
+      },
+      {
+        "id": "sd-prod-088-var-8",
+        "sku": "SD-SD-PROD-088-NAV-L",
+        "size": "L",
+        "colourName": "Navy Blue",
+        "colourHex": "#000080",
+        "stock": 15,
+        "price": 1692,
+        "originalPrice": 2368
+      },
+      {
+        "id": "sd-prod-088-var-9",
+        "sku": "SD-SD-PROD-088-NAV-XL",
+        "size": "XL",
+        "colourName": "Navy Blue",
+        "colourHex": "#000080",
+        "stock": 15,
+        "price": 1692,
+        "originalPrice": 2368
+      },
+      {
+        "id": "sd-prod-088-var-10",
+        "sku": "SD-SD-PROD-088-NAV-XXL",
+        "size": "XXL",
+        "colourName": "Navy Blue",
+        "colourHex": "#000080",
+        "stock": 15,
+        "price": 1692,
+        "originalPrice": 2368
+      }
+    ],
+    "tags": [
+      "printed crop top & skirt set",
+      "kids",
+      "girls clothing",
+      "frocks",
+      "wrong",
+      "fashion",
+      "trending"
+    ],
+    "badge": "New",
+    "newArrival": false,
+    "trending": false,
+    "featured": false,
+    "expressDelivery": true,
+    "estimatedDeliveryMinutes": 60,
+    "returnWindowDays": 7,
+    "exchangeAvailable": true,
+    "vendorId": "v-ethnic-vibe",
+    "commissionPercent": 12,
+    "sponsored": false,
+    "active": true,
+    "createdAt": "2026-07-01T00:00:00Z",
+    "updatedAt": "2026-08-01T00:00:00Z"
+  },
+  {
+    "id": "sd-prod-089",
+    "slug": "unicorn-graphic-cotton-tee-sd-prod-089",
+    "name": "Unicorn Graphic Cotton Tee",
+    "brand": "Roadster",
+    "department": "kids",
+    "category": "Girls Clothing",
+    "subcategory": "Frocks",
+    "collection": "Summer Essentials 2026",
+    "shortDescription": "Premium quality unicorn graphic cotton tee crafted for comfort and style.",
+    "description": "Elevate your daily fashion with this Unicorn Graphic Cotton Tee. Features premium fabric construction, tailored fit, and durable craftsmanship ideal for everyday wear.",
+    "material": "100% Premium Combed Cotton",
+    "fit": "Regular Fit",
+    "pattern": "Solid / Textured",
+    "occasion": [
+      "Casual",
+      "Everyday",
+      "Party"
+    ],
+    "careInstructions": [
+      "Machine wash cold",
+      "Do not bleach",
+      "Tumble dry low",
+      "Warm iron if needed"
+    ],
+    "price": 1729,
+    "originalPrice": 2420,
+    "discount": 28,
+    "images": [
+      "https://images.unsplash.com/photo-1521572267360-ee0c2909d518?auto=format&fit=crop&w=800&q=80",
+      "https://images.unsplash.com/photo-1503342217505-b0a15ec3261c?auto=format&fit=crop&w=800&q=80"
+    ],
+    "thumbnail": "https://images.unsplash.com/photo-1521572267360-ee0c2909d518?auto=format&fit=crop&w=800&q=80",
+    "rating": 4.4,
+    "reviewCount": 102,
+    "reviews": [
+      {
+        "id": "rev-sd-prod-089-1",
+        "userName": "Aman Sharma",
+        "rating": 5,
+        "title": "Great quality and fast delivery!",
+        "comment": "Delivered in Neemuch within 45 minutes! Quality is top notch.",
+        "createdAt": "2026-07-28",
+        "verifiedPurchase": true
+      },
+      {
+        "id": "rev-sd-prod-089-2",
+        "userName": "Priya Verma",
+        "rating": 4,
+        "title": "Nice fit and comfortable material",
+        "comment": "The fabric is very soft. True to size.",
+        "createdAt": "2026-07-29",
+        "verifiedPurchase": true
+      }
+    ],
+    "variants": [
+      {
+        "id": "sd-prod-089-var-1",
+        "sku": "SD-SD-PROD-089-NAV-S",
+        "size": "S",
+        "colourName": "Navy Blue",
+        "colourHex": "#000080",
+        "stock": 15,
+        "price": 1729,
+        "originalPrice": 2420
+      },
+      {
+        "id": "sd-prod-089-var-2",
+        "sku": "SD-SD-PROD-089-NAV-M",
+        "size": "M",
+        "colourName": "Navy Blue",
+        "colourHex": "#000080",
+        "stock": 15,
+        "price": 1729,
+        "originalPrice": 2420
+      },
+      {
+        "id": "sd-prod-089-var-3",
+        "sku": "SD-SD-PROD-089-NAV-L",
+        "size": "L",
+        "colourName": "Navy Blue",
+        "colourHex": "#000080",
+        "stock": 15,
+        "price": 1729,
+        "originalPrice": 2420
+      },
+      {
+        "id": "sd-prod-089-var-4",
+        "sku": "SD-SD-PROD-089-NAV-XL",
+        "size": "XL",
+        "colourName": "Navy Blue",
+        "colourHex": "#000080",
+        "stock": 15,
+        "price": 1729,
+        "originalPrice": 2420
+      },
+      {
+        "id": "sd-prod-089-var-5",
+        "sku": "SD-SD-PROD-089-NAV-XXL",
+        "size": "XXL",
+        "colourName": "Navy Blue",
+        "colourHex": "#000080",
+        "stock": 15,
+        "price": 1729,
+        "originalPrice": 2420
+      },
+      {
+        "id": "sd-prod-089-var-6",
+        "sku": "SD-SD-PROD-089-OLI-S",
+        "size": "S",
+        "colourName": "Olive Green",
+        "colourHex": "#556B2F",
+        "stock": 15,
+        "price": 1729,
+        "originalPrice": 2420
+      },
+      {
+        "id": "sd-prod-089-var-7",
+        "sku": "SD-SD-PROD-089-OLI-M",
+        "size": "M",
+        "colourName": "Olive Green",
+        "colourHex": "#556B2F",
+        "stock": 0,
+        "price": 1729,
+        "originalPrice": 2420
+      },
+      {
+        "id": "sd-prod-089-var-8",
+        "sku": "SD-SD-PROD-089-OLI-L",
+        "size": "L",
+        "colourName": "Olive Green",
+        "colourHex": "#556B2F",
+        "stock": 15,
+        "price": 1729,
+        "originalPrice": 2420
+      },
+      {
+        "id": "sd-prod-089-var-9",
+        "sku": "SD-SD-PROD-089-OLI-XL",
+        "size": "XL",
+        "colourName": "Olive Green",
+        "colourHex": "#556B2F",
+        "stock": 15,
+        "price": 1729,
+        "originalPrice": 2420
+      },
+      {
+        "id": "sd-prod-089-var-10",
+        "sku": "SD-SD-PROD-089-OLI-XXL",
+        "size": "XXL",
+        "colourName": "Olive Green",
+        "colourHex": "#556B2F",
+        "stock": 15,
+        "price": 1729,
+        "originalPrice": 2420
+      }
+    ],
+    "tags": [
+      "unicorn graphic cotton tee",
+      "kids",
+      "girls clothing",
+      "frocks",
+      "roadster",
+      "fashion",
+      "trending"
+    ],
+    "badge": "Trending",
+    "newArrival": true,
+    "trending": true,
+    "featured": false,
+    "expressDelivery": true,
+    "estimatedDeliveryMinutes": 60,
+    "returnWindowDays": 7,
+    "exchangeAvailable": true,
+    "vendorId": "v-urban-style",
+    "commissionPercent": 12,
+    "sponsored": false,
+    "active": true,
+    "createdAt": "2026-07-01T00:00:00Z",
+    "updatedAt": "2026-08-01T00:00:00Z"
+  },
+  {
+    "id": "sd-prod-090",
+    "slug": "stretch-denim-dungarees-sd-prod-090",
+    "name": "Stretch Denim Dungarees",
+    "brand": "HRX",
+    "department": "kids",
+    "category": "Girls Clothing",
+    "subcategory": "Frocks",
+    "collection": "Summer Essentials 2026",
+    "shortDescription": "Premium quality stretch denim dungarees crafted for comfort and style.",
+    "description": "Elevate your daily fashion with this Stretch Denim Dungarees. Features premium fabric construction, tailored fit, and durable craftsmanship ideal for everyday wear.",
+    "material": "100% Premium Combed Cotton",
+    "fit": "Regular Fit",
+    "pattern": "Solid / Textured",
+    "occasion": [
+      "Casual",
+      "Everyday",
+      "Party"
+    ],
+    "careInstructions": [
+      "Machine wash cold",
+      "Do not bleach",
+      "Tumble dry low",
+      "Warm iron if needed"
+    ],
+    "price": 1766,
+    "originalPrice": 2472,
+    "discount": 28,
+    "images": [
+      "https://images.unsplash.com/photo-1503342217505-b0a15ec3261c?auto=format&fit=crop&w=800&q=80",
+      "https://images.unsplash.com/photo-1576995853123-5a10305d93c0?auto=format&fit=crop&w=800&q=80"
+    ],
+    "thumbnail": "https://images.unsplash.com/photo-1503342217505-b0a15ec3261c?auto=format&fit=crop&w=800&q=80",
+    "rating": 4.5,
+    "reviewCount": 115,
+    "reviews": [
+      {
+        "id": "rev-sd-prod-090-1",
+        "userName": "Aman Sharma",
+        "rating": 5,
+        "title": "Great quality and fast delivery!",
+        "comment": "Delivered in Neemuch within 45 minutes! Quality is top notch.",
+        "createdAt": "2026-07-28",
+        "verifiedPurchase": true
+      },
+      {
+        "id": "rev-sd-prod-090-2",
+        "userName": "Priya Verma",
+        "rating": 4,
+        "title": "Nice fit and comfortable material",
+        "comment": "The fabric is very soft. True to size.",
+        "createdAt": "2026-07-29",
+        "verifiedPurchase": true
+      }
+    ],
+    "variants": [
+      {
+        "id": "sd-prod-090-var-1",
+        "sku": "SD-SD-PROD-090-OLI-S",
+        "size": "S",
+        "colourName": "Olive Green",
+        "colourHex": "#556B2F",
+        "stock": 15,
+        "price": 1766,
+        "originalPrice": 2472
+      },
+      {
+        "id": "sd-prod-090-var-2",
+        "sku": "SD-SD-PROD-090-OLI-M",
+        "size": "M",
+        "colourName": "Olive Green",
+        "colourHex": "#556B2F",
+        "stock": 15,
+        "price": 1766,
+        "originalPrice": 2472
+      },
+      {
+        "id": "sd-prod-090-var-3",
+        "sku": "SD-SD-PROD-090-OLI-L",
+        "size": "L",
+        "colourName": "Olive Green",
+        "colourHex": "#556B2F",
+        "stock": 15,
+        "price": 1766,
+        "originalPrice": 2472
+      },
+      {
+        "id": "sd-prod-090-var-4",
+        "sku": "SD-SD-PROD-090-OLI-XL",
+        "size": "XL",
+        "colourName": "Olive Green",
+        "colourHex": "#556B2F",
+        "stock": 15,
+        "price": 1766,
+        "originalPrice": 2472
+      },
+      {
+        "id": "sd-prod-090-var-5",
+        "sku": "SD-SD-PROD-090-OLI-XXL",
+        "size": "XXL",
+        "colourName": "Olive Green",
+        "colourHex": "#556B2F",
+        "stock": 15,
+        "price": 1766,
+        "originalPrice": 2472
+      },
+      {
+        "id": "sd-prod-090-var-6",
+        "sku": "SD-SD-PROD-090-CRI-S",
+        "size": "S",
+        "colourName": "Crimson Red",
+        "colourHex": "#DC143C",
+        "stock": 15,
+        "price": 1766,
+        "originalPrice": 2472
+      },
+      {
+        "id": "sd-prod-090-var-7",
+        "sku": "SD-SD-PROD-090-CRI-M",
+        "size": "M",
+        "colourName": "Crimson Red",
+        "colourHex": "#DC143C",
+        "stock": 0,
+        "price": 1766,
+        "originalPrice": 2472
+      },
+      {
+        "id": "sd-prod-090-var-8",
+        "sku": "SD-SD-PROD-090-CRI-L",
+        "size": "L",
+        "colourName": "Crimson Red",
+        "colourHex": "#DC143C",
+        "stock": 15,
+        "price": 1766,
+        "originalPrice": 2472
+      },
+      {
+        "id": "sd-prod-090-var-9",
+        "sku": "SD-SD-PROD-090-CRI-XL",
+        "size": "XL",
+        "colourName": "Crimson Red",
+        "colourHex": "#DC143C",
+        "stock": 15,
+        "price": 1766,
+        "originalPrice": 2472
+      },
+      {
+        "id": "sd-prod-090-var-10",
+        "sku": "SD-SD-PROD-090-CRI-XXL",
+        "size": "XXL",
+        "colourName": "Crimson Red",
+        "colourHex": "#DC143C",
+        "stock": 15,
+        "price": 1766,
+        "originalPrice": 2472
+      }
+    ],
+    "tags": [
+      "stretch denim dungarees",
+      "kids",
+      "girls clothing",
+      "frocks",
+      "hrx",
+      "fashion",
+      "trending"
+    ],
+    "badge": "New",
+    "newArrival": false,
+    "trending": false,
+    "featured": false,
+    "expressDelivery": true,
+    "estimatedDeliveryMinutes": 60,
+    "returnWindowDays": 7,
+    "exchangeAvailable": true,
+    "vendorId": "v-ethnic-vibe",
+    "commissionPercent": 12,
+    "sponsored": true,
+    "active": true,
+    "createdAt": "2026-07-01T00:00:00Z",
+    "updatedAt": "2026-08-01T00:00:00Z"
+  },
+  {
+    "id": "sd-prod-091",
+    "slug": "organic-cotton-romper--pack-of-2-sd-prod-091",
+    "name": "Organic Cotton Romper - Pack of 2",
+    "brand": "StyleDash Studio",
+    "department": "kids",
+    "category": "Infants & Toddlers",
+    "subcategory": "Rompers",
+    "collection": "Summer Essentials 2026",
+    "shortDescription": "Premium quality organic cotton romper - pack of 2 crafted for comfort and style.",
+    "description": "Elevate your daily fashion with this Organic Cotton Romper - Pack of 2. Features premium fabric construction, tailored fit, and durable craftsmanship ideal for everyday wear.",
+    "material": "100% Premium Combed Cotton",
+    "fit": "Regular Fit",
+    "pattern": "Solid / Textured",
+    "occasion": [
+      "Casual",
+      "Everyday",
+      "Party"
+    ],
+    "careInstructions": [
+      "Machine wash cold",
+      "Do not bleach",
+      "Tumble dry low",
+      "Warm iron if needed"
+    ],
+    "price": 1803,
+    "originalPrice": 2524,
+    "discount": 28,
+    "images": [
+      "https://images.unsplash.com/photo-1576995853123-5a10305d93c0?auto=format&fit=crop&w=800&q=80",
+      "https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?auto=format&fit=crop&w=800&q=80"
+    ],
+    "thumbnail": "https://images.unsplash.com/photo-1576995853123-5a10305d93c0?auto=format&fit=crop&w=800&q=80",
+    "rating": 4.6,
+    "reviewCount": 128,
+    "reviews": [
+      {
+        "id": "rev-sd-prod-091-1",
+        "userName": "Aman Sharma",
+        "rating": 5,
+        "title": "Great quality and fast delivery!",
+        "comment": "Delivered in Neemuch within 45 minutes! Quality is top notch.",
+        "createdAt": "2026-07-28",
+        "verifiedPurchase": true
+      },
+      {
+        "id": "rev-sd-prod-091-2",
+        "userName": "Priya Verma",
+        "rating": 4,
+        "title": "Nice fit and comfortable material",
+        "comment": "The fabric is very soft. True to size.",
+        "createdAt": "2026-07-29",
+        "verifiedPurchase": true
+      }
+    ],
+    "variants": [
+      {
+        "id": "sd-prod-091-var-1",
+        "sku": "SD-SD-PROD-091-CRI-S",
+        "size": "S",
+        "colourName": "Crimson Red",
+        "colourHex": "#DC143C",
+        "stock": 15,
+        "price": 1803,
+        "originalPrice": 2524
+      },
+      {
+        "id": "sd-prod-091-var-2",
+        "sku": "SD-SD-PROD-091-CRI-M",
+        "size": "M",
+        "colourName": "Crimson Red",
+        "colourHex": "#DC143C",
+        "stock": 15,
+        "price": 1803,
+        "originalPrice": 2524
+      },
+      {
+        "id": "sd-prod-091-var-3",
+        "sku": "SD-SD-PROD-091-CRI-L",
+        "size": "L",
+        "colourName": "Crimson Red",
+        "colourHex": "#DC143C",
+        "stock": 15,
+        "price": 1803,
+        "originalPrice": 2524
+      },
+      {
+        "id": "sd-prod-091-var-4",
+        "sku": "SD-SD-PROD-091-CRI-XL",
+        "size": "XL",
+        "colourName": "Crimson Red",
+        "colourHex": "#DC143C",
+        "stock": 15,
+        "price": 1803,
+        "originalPrice": 2524
+      },
+      {
+        "id": "sd-prod-091-var-5",
+        "sku": "SD-SD-PROD-091-CRI-XXL",
+        "size": "XXL",
+        "colourName": "Crimson Red",
+        "colourHex": "#DC143C",
+        "stock": 15,
+        "price": 1803,
+        "originalPrice": 2524
+      },
+      {
+        "id": "sd-prod-091-var-6",
+        "sku": "SD-SD-PROD-091-BEI-S",
+        "size": "S",
+        "colourName": "Beige",
+        "colourHex": "#F5F5DC",
+        "stock": 15,
+        "price": 1803,
+        "originalPrice": 2524
+      },
+      {
+        "id": "sd-prod-091-var-7",
+        "sku": "SD-SD-PROD-091-BEI-M",
+        "size": "M",
+        "colourName": "Beige",
+        "colourHex": "#F5F5DC",
+        "stock": 0,
+        "price": 1803,
+        "originalPrice": 2524
+      },
+      {
+        "id": "sd-prod-091-var-8",
+        "sku": "SD-SD-PROD-091-BEI-L",
+        "size": "L",
+        "colourName": "Beige",
+        "colourHex": "#F5F5DC",
+        "stock": 15,
+        "price": 1803,
+        "originalPrice": 2524
+      },
+      {
+        "id": "sd-prod-091-var-9",
+        "sku": "SD-SD-PROD-091-BEI-XL",
+        "size": "XL",
+        "colourName": "Beige",
+        "colourHex": "#F5F5DC",
+        "stock": 15,
+        "price": 1803,
+        "originalPrice": 2524
+      },
+      {
+        "id": "sd-prod-091-var-10",
+        "sku": "SD-SD-PROD-091-BEI-XXL",
+        "size": "XXL",
+        "colourName": "Beige",
+        "colourHex": "#F5F5DC",
+        "stock": 15,
+        "price": 1803,
+        "originalPrice": 2524
+      }
+    ],
+    "tags": [
+      "organic cotton romper - pack of 2",
+      "kids",
+      "infants & toddlers",
+      "rompers",
+      "styledash studio",
+      "fashion",
+      "trending"
+    ],
+    "badge": "Express",
+    "newArrival": false,
+    "trending": true,
+    "featured": true,
+    "expressDelivery": true,
+    "estimatedDeliveryMinutes": 60,
+    "returnWindowDays": 7,
+    "exchangeAvailable": true,
+    "vendorId": "v-urban-style",
+    "commissionPercent": 12,
+    "sponsored": false,
+    "active": true,
+    "createdAt": "2026-07-01T00:00:00Z",
+    "updatedAt": "2026-08-01T00:00:00Z"
+  },
+  {
+    "id": "sd-prod-092",
+    "slug": "snap-button-baby-onesie-sd-prod-092",
+    "name": "Snap-Button Baby Onesie",
+    "brand": "Anouk",
+    "department": "kids",
+    "category": "Infants & Toddlers",
+    "subcategory": "Rompers",
+    "collection": "Summer Essentials 2026",
+    "shortDescription": "Premium quality snap-button baby onesie crafted for comfort and style.",
+    "description": "Elevate your daily fashion with this Snap-Button Baby Onesie. Features premium fabric construction, tailored fit, and durable craftsmanship ideal for everyday wear.",
+    "material": "100% Premium Combed Cotton",
+    "fit": "Regular Fit",
+    "pattern": "Solid / Textured",
+    "occasion": [
+      "Casual",
+      "Everyday",
+      "Party"
+    ],
+    "careInstructions": [
+      "Machine wash cold",
+      "Do not bleach",
+      "Tumble dry low",
+      "Warm iron if needed"
+    ],
+    "price": 1840,
+    "originalPrice": 2576,
+    "discount": 28,
+    "images": [
+      "https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?auto=format&fit=crop&w=800&q=80",
+      "https://images.unsplash.com/photo-1529374255404-311a2a4f1fd9?auto=format&fit=crop&w=800&q=80"
+    ],
+    "thumbnail": "https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?auto=format&fit=crop&w=800&q=80",
+    "rating": 4.7,
+    "reviewCount": 141,
+    "reviews": [
+      {
+        "id": "rev-sd-prod-092-1",
+        "userName": "Aman Sharma",
+        "rating": 5,
+        "title": "Great quality and fast delivery!",
+        "comment": "Delivered in Neemuch within 45 minutes! Quality is top notch.",
+        "createdAt": "2026-07-28",
+        "verifiedPurchase": true
+      },
+      {
+        "id": "rev-sd-prod-092-2",
+        "userName": "Priya Verma",
+        "rating": 4,
+        "title": "Nice fit and comfortable material",
+        "comment": "The fabric is very soft. True to size.",
+        "createdAt": "2026-07-29",
+        "verifiedPurchase": true
+      }
+    ],
+    "variants": [
+      {
+        "id": "sd-prod-092-var-1",
+        "sku": "SD-SD-PROD-092-BEI-S",
+        "size": "S",
+        "colourName": "Beige",
+        "colourHex": "#F5F5DC",
+        "stock": 15,
+        "price": 1840,
+        "originalPrice": 2576
+      },
+      {
+        "id": "sd-prod-092-var-2",
+        "sku": "SD-SD-PROD-092-BEI-M",
+        "size": "M",
+        "colourName": "Beige",
+        "colourHex": "#F5F5DC",
+        "stock": 15,
+        "price": 1840,
+        "originalPrice": 2576
+      },
+      {
+        "id": "sd-prod-092-var-3",
+        "sku": "SD-SD-PROD-092-BEI-L",
+        "size": "L",
+        "colourName": "Beige",
+        "colourHex": "#F5F5DC",
+        "stock": 15,
+        "price": 1840,
+        "originalPrice": 2576
+      },
+      {
+        "id": "sd-prod-092-var-4",
+        "sku": "SD-SD-PROD-092-BEI-XL",
+        "size": "XL",
+        "colourName": "Beige",
+        "colourHex": "#F5F5DC",
+        "stock": 15,
+        "price": 1840,
+        "originalPrice": 2576
+      },
+      {
+        "id": "sd-prod-092-var-5",
+        "sku": "SD-SD-PROD-092-BEI-XXL",
+        "size": "XXL",
+        "colourName": "Beige",
+        "colourHex": "#F5F5DC",
+        "stock": 15,
+        "price": 1840,
+        "originalPrice": 2576
+      },
+      {
+        "id": "sd-prod-092-var-6",
+        "sku": "SD-SD-PROD-092-CHA-S",
+        "size": "S",
+        "colourName": "Charcoal Gray",
+        "colourHex": "#36454F",
+        "stock": 15,
+        "price": 1840,
+        "originalPrice": 2576
+      },
+      {
+        "id": "sd-prod-092-var-7",
+        "sku": "SD-SD-PROD-092-CHA-M",
+        "size": "M",
+        "colourName": "Charcoal Gray",
+        "colourHex": "#36454F",
+        "stock": 0,
+        "price": 1840,
+        "originalPrice": 2576
+      },
+      {
+        "id": "sd-prod-092-var-8",
+        "sku": "SD-SD-PROD-092-CHA-L",
+        "size": "L",
+        "colourName": "Charcoal Gray",
+        "colourHex": "#36454F",
+        "stock": 15,
+        "price": 1840,
+        "originalPrice": 2576
+      },
+      {
+        "id": "sd-prod-092-var-9",
+        "sku": "SD-SD-PROD-092-CHA-XL",
+        "size": "XL",
+        "colourName": "Charcoal Gray",
+        "colourHex": "#36454F",
+        "stock": 15,
+        "price": 1840,
+        "originalPrice": 2576
+      },
+      {
+        "id": "sd-prod-092-var-10",
+        "sku": "SD-SD-PROD-092-CHA-XXL",
+        "size": "XXL",
+        "colourName": "Charcoal Gray",
+        "colourHex": "#36454F",
+        "stock": 15,
+        "price": 1840,
+        "originalPrice": 2576
+      }
+    ],
+    "tags": [
+      "snap-button baby onesie",
+      "kids",
+      "infants & toddlers",
+      "rompers",
+      "anouk",
+      "fashion",
+      "trending"
+    ],
+    "badge": "Trending",
+    "newArrival": true,
+    "trending": false,
+    "featured": false,
+    "expressDelivery": true,
+    "estimatedDeliveryMinutes": 60,
+    "returnWindowDays": 7,
+    "exchangeAvailable": true,
+    "vendorId": "v-ethnic-vibe",
+    "commissionPercent": 12,
+    "sponsored": false,
+    "active": true,
+    "createdAt": "2026-07-01T00:00:00Z",
+    "updatedAt": "2026-08-01T00:00:00Z"
+  },
+  {
+    "id": "sd-prod-093",
+    "slug": "soft-knit-booties-and-hat-set-sd-prod-093",
+    "name": "Soft Knit Booties & Hat Set",
+    "brand": "Mast & Harbour",
+    "department": "kids",
+    "category": "Infants & Toddlers",
+    "subcategory": "Rompers",
+    "collection": "Summer Essentials 2026",
+    "shortDescription": "Premium quality soft knit booties & hat set crafted for comfort and style.",
+    "description": "Elevate your daily fashion with this Soft Knit Booties & Hat Set. Features premium fabric construction, tailored fit, and durable craftsmanship ideal for everyday wear.",
+    "material": "100% Premium Combed Cotton",
+    "fit": "Regular Fit",
+    "pattern": "Solid / Textured",
+    "occasion": [
+      "Casual",
+      "Everyday",
+      "Party"
+    ],
+    "careInstructions": [
+      "Machine wash cold",
+      "Do not bleach",
+      "Tumble dry low",
+      "Warm iron if needed"
+    ],
+    "price": 1877,
+    "originalPrice": 2627,
+    "discount": 28,
+    "images": [
+      "https://images.unsplash.com/photo-1529374255404-311a2a4f1fd9?auto=format&fit=crop&w=800&q=80",
+      "https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&w=800&q=80"
+    ],
+    "thumbnail": "https://images.unsplash.com/photo-1529374255404-311a2a4f1fd9?auto=format&fit=crop&w=800&q=80",
+    "rating": 4.8,
+    "reviewCount": 154,
+    "reviews": [
+      {
+        "id": "rev-sd-prod-093-1",
+        "userName": "Aman Sharma",
+        "rating": 5,
+        "title": "Great quality and fast delivery!",
+        "comment": "Delivered in Neemuch within 45 minutes! Quality is top notch.",
+        "createdAt": "2026-07-28",
+        "verifiedPurchase": true
+      },
+      {
+        "id": "rev-sd-prod-093-2",
+        "userName": "Priya Verma",
+        "rating": 4,
+        "title": "Nice fit and comfortable material",
+        "comment": "The fabric is very soft. True to size.",
+        "createdAt": "2026-07-29",
+        "verifiedPurchase": true
+      }
+    ],
+    "variants": [
+      {
+        "id": "sd-prod-093-var-1",
+        "sku": "SD-SD-PROD-093-CHA-S",
+        "size": "S",
+        "colourName": "Charcoal Gray",
+        "colourHex": "#36454F",
+        "stock": 15,
+        "price": 1877,
+        "originalPrice": 2627
+      },
+      {
+        "id": "sd-prod-093-var-2",
+        "sku": "SD-SD-PROD-093-CHA-M",
+        "size": "M",
+        "colourName": "Charcoal Gray",
+        "colourHex": "#36454F",
+        "stock": 15,
+        "price": 1877,
+        "originalPrice": 2627
+      },
+      {
+        "id": "sd-prod-093-var-3",
+        "sku": "SD-SD-PROD-093-CHA-L",
+        "size": "L",
+        "colourName": "Charcoal Gray",
+        "colourHex": "#36454F",
+        "stock": 15,
+        "price": 1877,
+        "originalPrice": 2627
+      },
+      {
+        "id": "sd-prod-093-var-4",
+        "sku": "SD-SD-PROD-093-CHA-XL",
+        "size": "XL",
+        "colourName": "Charcoal Gray",
+        "colourHex": "#36454F",
+        "stock": 15,
+        "price": 1877,
+        "originalPrice": 2627
+      },
+      {
+        "id": "sd-prod-093-var-5",
+        "sku": "SD-SD-PROD-093-CHA-XXL",
+        "size": "XXL",
+        "colourName": "Charcoal Gray",
+        "colourHex": "#36454F",
+        "stock": 15,
+        "price": 1877,
+        "originalPrice": 2627
+      },
+      {
+        "id": "sd-prod-093-var-6",
+        "sku": "SD-SD-PROD-093-MUS-S",
+        "size": "S",
+        "colourName": "Mustard Yellow",
+        "colourHex": "#FFDB58",
+        "stock": 15,
+        "price": 1877,
+        "originalPrice": 2627
+      },
+      {
+        "id": "sd-prod-093-var-7",
+        "sku": "SD-SD-PROD-093-MUS-M",
+        "size": "M",
+        "colourName": "Mustard Yellow",
+        "colourHex": "#FFDB58",
+        "stock": 0,
+        "price": 1877,
+        "originalPrice": 2627
+      },
+      {
+        "id": "sd-prod-093-var-8",
+        "sku": "SD-SD-PROD-093-MUS-L",
+        "size": "L",
+        "colourName": "Mustard Yellow",
+        "colourHex": "#FFDB58",
+        "stock": 15,
+        "price": 1877,
+        "originalPrice": 2627
+      },
+      {
+        "id": "sd-prod-093-var-9",
+        "sku": "SD-SD-PROD-093-MUS-XL",
+        "size": "XL",
+        "colourName": "Mustard Yellow",
+        "colourHex": "#FFDB58",
+        "stock": 15,
+        "price": 1877,
+        "originalPrice": 2627
+      },
+      {
+        "id": "sd-prod-093-var-10",
+        "sku": "SD-SD-PROD-093-MUS-XXL",
+        "size": "XXL",
+        "colourName": "Mustard Yellow",
+        "colourHex": "#FFDB58",
+        "stock": 15,
+        "price": 1877,
+        "originalPrice": 2627
+      }
+    ],
+    "tags": [
+      "soft knit booties & hat set",
+      "kids",
+      "infants & toddlers",
+      "rompers",
+      "mast & harbour",
+      "fashion",
+      "trending"
+    ],
+    "badge": "Express",
+    "newArrival": false,
+    "trending": true,
+    "featured": false,
+    "expressDelivery": true,
+    "estimatedDeliveryMinutes": 60,
+    "returnWindowDays": 7,
+    "exchangeAvailable": true,
+    "vendorId": "v-urban-style",
+    "commissionPercent": 12,
+    "sponsored": false,
+    "active": true,
+    "createdAt": "2026-07-01T00:00:00Z",
+    "updatedAt": "2026-08-01T00:00:00Z"
+  },
+  {
+    "id": "sd-prod-094",
+    "slug": "printed-cotton-sleepsuit-sd-prod-094",
+    "name": "Printed Cotton Sleepsuit",
+    "brand": "Highlander",
+    "department": "kids",
+    "category": "Infants & Toddlers",
+    "subcategory": "Rompers",
+    "collection": "Summer Essentials 2026",
+    "shortDescription": "Premium quality printed cotton sleepsuit crafted for comfort and style.",
+    "description": "Elevate your daily fashion with this Printed Cotton Sleepsuit. Features premium fabric construction, tailored fit, and durable craftsmanship ideal for everyday wear.",
+    "material": "100% Premium Combed Cotton",
+    "fit": "Regular Fit",
+    "pattern": "Solid / Textured",
+    "occasion": [
+      "Casual",
+      "Everyday",
+      "Party"
+    ],
+    "careInstructions": [
+      "Machine wash cold",
+      "Do not bleach",
+      "Tumble dry low",
+      "Warm iron if needed"
+    ],
+    "price": 1914,
+    "originalPrice": 2679,
+    "discount": 28,
+    "images": [
+      "https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&w=800&q=80",
+      "https://images.unsplash.com/photo-1521572267360-ee0c2909d518?auto=format&fit=crop&w=800&q=80"
+    ],
+    "thumbnail": "https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&w=800&q=80",
+    "rating": 4.9,
+    "reviewCount": 167,
+    "reviews": [
+      {
+        "id": "rev-sd-prod-094-1",
+        "userName": "Aman Sharma",
+        "rating": 5,
+        "title": "Great quality and fast delivery!",
+        "comment": "Delivered in Neemuch within 45 minutes! Quality is top notch.",
+        "createdAt": "2026-07-28",
+        "verifiedPurchase": true
+      },
+      {
+        "id": "rev-sd-prod-094-2",
+        "userName": "Priya Verma",
+        "rating": 4,
+        "title": "Nice fit and comfortable material",
+        "comment": "The fabric is very soft. True to size.",
+        "createdAt": "2026-07-29",
+        "verifiedPurchase": true
+      }
+    ],
+    "variants": [
+      {
+        "id": "sd-prod-094-var-1",
+        "sku": "SD-SD-PROD-094-MUS-S",
+        "size": "S",
+        "colourName": "Mustard Yellow",
+        "colourHex": "#FFDB58",
+        "stock": 15,
+        "price": 1914,
+        "originalPrice": 2679
+      },
+      {
+        "id": "sd-prod-094-var-2",
+        "sku": "SD-SD-PROD-094-MUS-M",
+        "size": "M",
+        "colourName": "Mustard Yellow",
+        "colourHex": "#FFDB58",
+        "stock": 15,
+        "price": 1914,
+        "originalPrice": 2679
+      },
+      {
+        "id": "sd-prod-094-var-3",
+        "sku": "SD-SD-PROD-094-MUS-L",
+        "size": "L",
+        "colourName": "Mustard Yellow",
+        "colourHex": "#FFDB58",
+        "stock": 15,
+        "price": 1914,
+        "originalPrice": 2679
+      },
+      {
+        "id": "sd-prod-094-var-4",
+        "sku": "SD-SD-PROD-094-MUS-XL",
+        "size": "XL",
+        "colourName": "Mustard Yellow",
+        "colourHex": "#FFDB58",
+        "stock": 15,
+        "price": 1914,
+        "originalPrice": 2679
+      },
+      {
+        "id": "sd-prod-094-var-5",
+        "sku": "SD-SD-PROD-094-MUS-XXL",
+        "size": "XXL",
+        "colourName": "Mustard Yellow",
+        "colourHex": "#FFDB58",
+        "stock": 15,
+        "price": 1914,
+        "originalPrice": 2679
+      },
+      {
+        "id": "sd-prod-094-var-6",
+        "sku": "SD-SD-PROD-094-BLA-S",
+        "size": "S",
+        "colourName": "Black",
+        "colourHex": "#000000",
+        "stock": 15,
+        "price": 1914,
+        "originalPrice": 2679
+      },
+      {
+        "id": "sd-prod-094-var-7",
+        "sku": "SD-SD-PROD-094-BLA-M",
+        "size": "M",
+        "colourName": "Black",
+        "colourHex": "#000000",
+        "stock": 0,
+        "price": 1914,
+        "originalPrice": 2679
+      },
+      {
+        "id": "sd-prod-094-var-8",
+        "sku": "SD-SD-PROD-094-BLA-L",
+        "size": "L",
+        "colourName": "Black",
+        "colourHex": "#000000",
+        "stock": 15,
+        "price": 1914,
+        "originalPrice": 2679
+      },
+      {
+        "id": "sd-prod-094-var-9",
+        "sku": "SD-SD-PROD-094-BLA-XL",
+        "size": "XL",
+        "colourName": "Black",
+        "colourHex": "#000000",
+        "stock": 15,
+        "price": 1914,
+        "originalPrice": 2679
+      },
+      {
+        "id": "sd-prod-094-var-10",
+        "sku": "SD-SD-PROD-094-BLA-XXL",
+        "size": "XXL",
+        "colourName": "Black",
+        "colourHex": "#000000",
+        "stock": 15,
+        "price": 1914,
+        "originalPrice": 2679
+      }
+    ],
+    "tags": [
+      "printed cotton sleepsuit",
+      "kids",
+      "infants & toddlers",
+      "rompers",
+      "highlander",
+      "fashion",
+      "trending"
+    ],
+    "badge": "New",
+    "newArrival": false,
+    "trending": false,
+    "featured": false,
+    "expressDelivery": true,
+    "estimatedDeliveryMinutes": 60,
+    "returnWindowDays": 7,
+    "exchangeAvailable": true,
+    "vendorId": "v-ethnic-vibe",
+    "commissionPercent": 12,
+    "sponsored": false,
+    "active": true,
+    "createdAt": "2026-07-01T00:00:00Z",
+    "updatedAt": "2026-08-01T00:00:00Z"
+  },
+  {
+    "id": "sd-prod-095",
+    "slug": "fleece-hooded-baby-suit-sd-prod-095",
+    "name": "Fleece Hooded Baby Suit",
+    "brand": "Bawree",
+    "department": "kids",
+    "category": "Infants & Toddlers",
+    "subcategory": "Rompers",
+    "collection": "Summer Essentials 2026",
+    "shortDescription": "Premium quality fleece hooded baby suit crafted for comfort and style.",
+    "description": "Elevate your daily fashion with this Fleece Hooded Baby Suit. Features premium fabric construction, tailored fit, and durable craftsmanship ideal for everyday wear.",
+    "material": "100% Premium Combed Cotton",
+    "fit": "Regular Fit",
+    "pattern": "Solid / Textured",
+    "occasion": [
+      "Casual",
+      "Everyday",
+      "Party"
+    ],
+    "careInstructions": [
+      "Machine wash cold",
+      "Do not bleach",
+      "Tumble dry low",
+      "Warm iron if needed"
+    ],
+    "price": 1951,
+    "originalPrice": 2731,
+    "discount": 28,
+    "images": [
+      "https://images.unsplash.com/photo-1521572267360-ee0c2909d518?auto=format&fit=crop&w=800&q=80",
+      "https://images.unsplash.com/photo-1503342217505-b0a15ec3261c?auto=format&fit=crop&w=800&q=80"
+    ],
+    "thumbnail": "https://images.unsplash.com/photo-1521572267360-ee0c2909d518?auto=format&fit=crop&w=800&q=80",
+    "rating": 3.8,
+    "reviewCount": 180,
+    "reviews": [
+      {
+        "id": "rev-sd-prod-095-1",
+        "userName": "Aman Sharma",
+        "rating": 5,
+        "title": "Great quality and fast delivery!",
+        "comment": "Delivered in Neemuch within 45 minutes! Quality is top notch.",
+        "createdAt": "2026-07-28",
+        "verifiedPurchase": true
+      },
+      {
+        "id": "rev-sd-prod-095-2",
+        "userName": "Priya Verma",
+        "rating": 4,
+        "title": "Nice fit and comfortable material",
+        "comment": "The fabric is very soft. True to size.",
+        "createdAt": "2026-07-29",
+        "verifiedPurchase": true
+      }
+    ],
+    "variants": [
+      {
+        "id": "sd-prod-095-var-1",
+        "sku": "SD-SD-PROD-095-BLA-S",
+        "size": "S",
+        "colourName": "Black",
+        "colourHex": "#000000",
+        "stock": 15,
+        "price": 1951,
+        "originalPrice": 2731
+      },
+      {
+        "id": "sd-prod-095-var-2",
+        "sku": "SD-SD-PROD-095-BLA-M",
+        "size": "M",
+        "colourName": "Black",
+        "colourHex": "#000000",
+        "stock": 15,
+        "price": 1951,
+        "originalPrice": 2731
+      },
+      {
+        "id": "sd-prod-095-var-3",
+        "sku": "SD-SD-PROD-095-BLA-L",
+        "size": "L",
+        "colourName": "Black",
+        "colourHex": "#000000",
+        "stock": 15,
+        "price": 1951,
+        "originalPrice": 2731
+      },
+      {
+        "id": "sd-prod-095-var-4",
+        "sku": "SD-SD-PROD-095-BLA-XL",
+        "size": "XL",
+        "colourName": "Black",
+        "colourHex": "#000000",
+        "stock": 15,
+        "price": 1951,
+        "originalPrice": 2731
+      },
+      {
+        "id": "sd-prod-095-var-5",
+        "sku": "SD-SD-PROD-095-BLA-XXL",
+        "size": "XXL",
+        "colourName": "Black",
+        "colourHex": "#000000",
+        "stock": 15,
+        "price": 1951,
+        "originalPrice": 2731
+      },
+      {
+        "id": "sd-prod-095-var-6",
+        "sku": "SD-SD-PROD-095-WHI-S",
+        "size": "S",
+        "colourName": "White",
+        "colourHex": "#FFFFFF",
+        "stock": 15,
+        "price": 1951,
+        "originalPrice": 2731
+      },
+      {
+        "id": "sd-prod-095-var-7",
+        "sku": "SD-SD-PROD-095-WHI-M",
+        "size": "M",
+        "colourName": "White",
+        "colourHex": "#FFFFFF",
+        "stock": 0,
+        "price": 1951,
+        "originalPrice": 2731
+      },
+      {
+        "id": "sd-prod-095-var-8",
+        "sku": "SD-SD-PROD-095-WHI-L",
+        "size": "L",
+        "colourName": "White",
+        "colourHex": "#FFFFFF",
+        "stock": 15,
+        "price": 1951,
+        "originalPrice": 2731
+      },
+      {
+        "id": "sd-prod-095-var-9",
+        "sku": "SD-SD-PROD-095-WHI-XL",
+        "size": "XL",
+        "colourName": "White",
+        "colourHex": "#FFFFFF",
+        "stock": 15,
+        "price": 1951,
+        "originalPrice": 2731
+      },
+      {
+        "id": "sd-prod-095-var-10",
+        "sku": "SD-SD-PROD-095-WHI-XXL",
+        "size": "XXL",
+        "colourName": "White",
+        "colourHex": "#FFFFFF",
+        "stock": 15,
+        "price": 1951,
+        "originalPrice": 2731
+      }
+    ],
+    "tags": [
+      "fleece hooded baby suit",
+      "kids",
+      "infants & toddlers",
+      "rompers",
+      "bawree",
+      "fashion",
+      "trending"
+    ],
+    "badge": "Trending",
+    "newArrival": true,
+    "trending": true,
+    "featured": true,
+    "expressDelivery": true,
+    "estimatedDeliveryMinutes": 60,
+    "returnWindowDays": 7,
+    "exchangeAvailable": true,
+    "vendorId": "v-urban-style",
+    "commissionPercent": 12,
+    "sponsored": false,
+    "active": true,
+    "createdAt": "2026-07-01T00:00:00Z",
+    "updatedAt": "2026-08-01T00:00:00Z"
+  },
+  {
+    "id": "sd-prod-096",
+    "slug": "retro-chunky-sole-sneakers-sd-prod-096",
+    "name": "Retro Chunky Sole Sneakers",
+    "brand": "Snitch",
+    "department": "footwear",
+    "category": "Sneakers",
+    "subcategory": "Casual Sneakers",
+    "collection": "Summer Essentials 2026",
+    "shortDescription": "Premium quality retro chunky sole sneakers crafted for comfort and style.",
+    "description": "Elevate your daily fashion with this Retro Chunky Sole Sneakers. Features premium fabric construction, tailored fit, and durable craftsmanship ideal for everyday wear.",
+    "material": "Synthetic Leather & Rubber Sole",
+    "fit": "Comfort Fit",
+    "pattern": "Solid / Textured",
+    "occasion": [
+      "Casual",
+      "Everyday",
+      "Party"
+    ],
+    "careInstructions": [
+      "Machine wash cold",
+      "Do not bleach",
+      "Tumble dry low",
+      "Warm iron if needed"
+    ],
+    "price": 1988,
+    "originalPrice": 2783,
+    "discount": 28,
+    "images": [
+      "https://images.unsplash.com/photo-1503342217505-b0a15ec3261c?auto=format&fit=crop&w=800&q=80",
+      "https://images.unsplash.com/photo-1576995853123-5a10305d93c0?auto=format&fit=crop&w=800&q=80"
+    ],
+    "thumbnail": "https://images.unsplash.com/photo-1503342217505-b0a15ec3261c?auto=format&fit=crop&w=800&q=80",
+    "rating": 3.9,
+    "reviewCount": 13,
+    "reviews": [
+      {
+        "id": "rev-sd-prod-096-1",
+        "userName": "Aman Sharma",
+        "rating": 5,
+        "title": "Great quality and fast delivery!",
+        "comment": "Delivered in Neemuch within 45 minutes! Quality is top notch.",
+        "createdAt": "2026-07-28",
+        "verifiedPurchase": true
+      },
+      {
+        "id": "rev-sd-prod-096-2",
+        "userName": "Priya Verma",
+        "rating": 4,
+        "title": "Nice fit and comfortable material",
+        "comment": "The fabric is very soft. True to size.",
+        "createdAt": "2026-07-29",
+        "verifiedPurchase": true
+      }
+    ],
+    "variants": [
+      {
+        "id": "sd-prod-096-var-1",
+        "sku": "SD-SD-PROD-096-WHI-UK6",
+        "size": "UK 6",
+        "colourName": "White",
+        "colourHex": "#FFFFFF",
+        "stock": 15,
+        "price": 1988,
+        "originalPrice": 2783
+      },
+      {
+        "id": "sd-prod-096-var-2",
+        "sku": "SD-SD-PROD-096-WHI-UK7",
+        "size": "UK 7",
+        "colourName": "White",
+        "colourHex": "#FFFFFF",
+        "stock": 15,
+        "price": 1988,
+        "originalPrice": 2783
+      },
+      {
+        "id": "sd-prod-096-var-3",
+        "sku": "SD-SD-PROD-096-WHI-UK8",
+        "size": "UK 8",
+        "colourName": "White",
+        "colourHex": "#FFFFFF",
+        "stock": 15,
+        "price": 1988,
+        "originalPrice": 2783
+      },
+      {
+        "id": "sd-prod-096-var-4",
+        "sku": "SD-SD-PROD-096-WHI-UK9",
+        "size": "UK 9",
+        "colourName": "White",
+        "colourHex": "#FFFFFF",
+        "stock": 15,
+        "price": 1988,
+        "originalPrice": 2783
+      },
+      {
+        "id": "sd-prod-096-var-5",
+        "sku": "SD-SD-PROD-096-WHI-UK10",
+        "size": "UK 10",
+        "colourName": "White",
+        "colourHex": "#FFFFFF",
+        "stock": 15,
+        "price": 1988,
+        "originalPrice": 2783
+      },
+      {
+        "id": "sd-prod-096-var-6",
+        "sku": "SD-SD-PROD-096-NAV-UK6",
+        "size": "UK 6",
+        "colourName": "Navy Blue",
+        "colourHex": "#000080",
+        "stock": 15,
+        "price": 1988,
+        "originalPrice": 2783
+      },
+      {
+        "id": "sd-prod-096-var-7",
+        "sku": "SD-SD-PROD-096-NAV-UK7",
+        "size": "UK 7",
+        "colourName": "Navy Blue",
+        "colourHex": "#000080",
+        "stock": 0,
+        "price": 1988,
+        "originalPrice": 2783
+      },
+      {
+        "id": "sd-prod-096-var-8",
+        "sku": "SD-SD-PROD-096-NAV-UK8",
+        "size": "UK 8",
+        "colourName": "Navy Blue",
+        "colourHex": "#000080",
+        "stock": 15,
+        "price": 1988,
+        "originalPrice": 2783
+      },
+      {
+        "id": "sd-prod-096-var-9",
+        "sku": "SD-SD-PROD-096-NAV-UK9",
+        "size": "UK 9",
+        "colourName": "Navy Blue",
+        "colourHex": "#000080",
+        "stock": 15,
+        "price": 1988,
+        "originalPrice": 2783
+      },
+      {
+        "id": "sd-prod-096-var-10",
+        "sku": "SD-SD-PROD-096-NAV-UK10",
+        "size": "UK 10",
+        "colourName": "Navy Blue",
+        "colourHex": "#000080",
+        "stock": 15,
+        "price": 1988,
+        "originalPrice": 2783
+      }
+    ],
+    "tags": [
+      "retro chunky sole sneakers",
+      "footwear",
+      "sneakers",
+      "casual sneakers",
+      "snitch",
+      "fashion",
+      "trending"
+    ],
+    "badge": "New",
+    "newArrival": false,
+    "trending": false,
+    "featured": false,
+    "expressDelivery": true,
+    "estimatedDeliveryMinutes": 60,
+    "returnWindowDays": 7,
+    "exchangeAvailable": true,
+    "vendorId": "v-ethnic-vibe",
+    "commissionPercent": 12,
+    "sponsored": false,
+    "active": true,
+    "createdAt": "2026-07-01T00:00:00Z",
+    "updatedAt": "2026-08-01T00:00:00Z"
+  },
+  {
+    "id": "sd-prod-097",
+    "slug": "minimalist-leather-low-tops-sd-prod-097",
+    "name": "Minimalist Leather Low-Tops",
+    "brand": "Wrong",
+    "department": "footwear",
+    "category": "Sneakers",
+    "subcategory": "Casual Sneakers",
+    "collection": "Summer Essentials 2026",
+    "shortDescription": "Premium quality minimalist leather low-tops crafted for comfort and style.",
+    "description": "Elevate your daily fashion with this Minimalist Leather Low-Tops. Features premium fabric construction, tailored fit, and durable craftsmanship ideal for everyday wear.",
+    "material": "Synthetic Leather & Rubber Sole",
+    "fit": "Comfort Fit",
+    "pattern": "Solid / Textured",
+    "occasion": [
+      "Casual",
+      "Everyday",
+      "Party"
+    ],
+    "careInstructions": [
+      "Machine wash cold",
+      "Do not bleach",
+      "Tumble dry low",
+      "Warm iron if needed"
+    ],
+    "price": 2025,
+    "originalPrice": 2835,
+    "discount": 28,
+    "images": [
+      "https://images.unsplash.com/photo-1576995853123-5a10305d93c0?auto=format&fit=crop&w=800&q=80",
+      "https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?auto=format&fit=crop&w=800&q=80"
+    ],
+    "thumbnail": "https://images.unsplash.com/photo-1576995853123-5a10305d93c0?auto=format&fit=crop&w=800&q=80",
+    "rating": 4.0,
+    "reviewCount": 26,
+    "reviews": [
+      {
+        "id": "rev-sd-prod-097-1",
+        "userName": "Aman Sharma",
+        "rating": 5,
+        "title": "Great quality and fast delivery!",
+        "comment": "Delivered in Neemuch within 45 minutes! Quality is top notch.",
+        "createdAt": "2026-07-28",
+        "verifiedPurchase": true
+      },
+      {
+        "id": "rev-sd-prod-097-2",
+        "userName": "Priya Verma",
+        "rating": 4,
+        "title": "Nice fit and comfortable material",
+        "comment": "The fabric is very soft. True to size.",
+        "createdAt": "2026-07-29",
+        "verifiedPurchase": true
+      }
+    ],
+    "variants": [
+      {
+        "id": "sd-prod-097-var-1",
+        "sku": "SD-SD-PROD-097-NAV-UK6",
+        "size": "UK 6",
+        "colourName": "Navy Blue",
+        "colourHex": "#000080",
+        "stock": 15,
+        "price": 2025,
+        "originalPrice": 2835
+      },
+      {
+        "id": "sd-prod-097-var-2",
+        "sku": "SD-SD-PROD-097-NAV-UK7",
+        "size": "UK 7",
+        "colourName": "Navy Blue",
+        "colourHex": "#000080",
+        "stock": 15,
+        "price": 2025,
+        "originalPrice": 2835
+      },
+      {
+        "id": "sd-prod-097-var-3",
+        "sku": "SD-SD-PROD-097-NAV-UK8",
+        "size": "UK 8",
+        "colourName": "Navy Blue",
+        "colourHex": "#000080",
+        "stock": 15,
+        "price": 2025,
+        "originalPrice": 2835
+      },
+      {
+        "id": "sd-prod-097-var-4",
+        "sku": "SD-SD-PROD-097-NAV-UK9",
+        "size": "UK 9",
+        "colourName": "Navy Blue",
+        "colourHex": "#000080",
+        "stock": 15,
+        "price": 2025,
+        "originalPrice": 2835
+      },
+      {
+        "id": "sd-prod-097-var-5",
+        "sku": "SD-SD-PROD-097-NAV-UK10",
+        "size": "UK 10",
+        "colourName": "Navy Blue",
+        "colourHex": "#000080",
+        "stock": 15,
+        "price": 2025,
+        "originalPrice": 2835
+      },
+      {
+        "id": "sd-prod-097-var-6",
+        "sku": "SD-SD-PROD-097-OLI-UK6",
+        "size": "UK 6",
+        "colourName": "Olive Green",
+        "colourHex": "#556B2F",
+        "stock": 15,
+        "price": 2025,
+        "originalPrice": 2835
+      },
+      {
+        "id": "sd-prod-097-var-7",
+        "sku": "SD-SD-PROD-097-OLI-UK7",
+        "size": "UK 7",
+        "colourName": "Olive Green",
+        "colourHex": "#556B2F",
+        "stock": 0,
+        "price": 2025,
+        "originalPrice": 2835
+      },
+      {
+        "id": "sd-prod-097-var-8",
+        "sku": "SD-SD-PROD-097-OLI-UK8",
+        "size": "UK 8",
+        "colourName": "Olive Green",
+        "colourHex": "#556B2F",
+        "stock": 15,
+        "price": 2025,
+        "originalPrice": 2835
+      },
+      {
+        "id": "sd-prod-097-var-9",
+        "sku": "SD-SD-PROD-097-OLI-UK9",
+        "size": "UK 9",
+        "colourName": "Olive Green",
+        "colourHex": "#556B2F",
+        "stock": 15,
+        "price": 2025,
+        "originalPrice": 2835
+      },
+      {
+        "id": "sd-prod-097-var-10",
+        "sku": "SD-SD-PROD-097-OLI-UK10",
+        "size": "UK 10",
+        "colourName": "Olive Green",
+        "colourHex": "#556B2F",
+        "stock": 15,
+        "price": 2025,
+        "originalPrice": 2835
+      }
+    ],
+    "tags": [
+      "minimalist leather low-tops",
+      "footwear",
+      "sneakers",
+      "casual sneakers",
+      "wrong",
+      "fashion",
+      "trending"
+    ],
+    "badge": "Express",
+    "newArrival": false,
+    "trending": true,
+    "featured": false,
+    "expressDelivery": true,
+    "estimatedDeliveryMinutes": 60,
+    "returnWindowDays": 7,
+    "exchangeAvailable": true,
+    "vendorId": "v-urban-style",
+    "commissionPercent": 12,
+    "sponsored": true,
+    "active": true,
+    "createdAt": "2026-07-01T00:00:00Z",
+    "updatedAt": "2026-08-01T00:00:00Z"
+  },
+  {
+    "id": "sd-prod-098",
+    "slug": "breathable-mesh-running-shoes-sd-prod-098",
+    "name": "Breathable Mesh Running Shoes",
+    "brand": "Roadster",
+    "department": "footwear",
+    "category": "Sneakers",
+    "subcategory": "Casual Sneakers",
+    "collection": "Summer Essentials 2026",
+    "shortDescription": "Premium quality breathable mesh running shoes crafted for comfort and style.",
+    "description": "Elevate your daily fashion with this Breathable Mesh Running Shoes. Features premium fabric construction, tailored fit, and durable craftsmanship ideal for everyday wear.",
+    "material": "Synthetic Leather & Rubber Sole",
+    "fit": "Comfort Fit",
+    "pattern": "Solid / Textured",
+    "occasion": [
+      "Casual",
+      "Everyday",
+      "Party"
+    ],
+    "careInstructions": [
+      "Machine wash cold",
+      "Do not bleach",
+      "Tumble dry low",
+      "Warm iron if needed"
+    ],
+    "price": 2062,
+    "originalPrice": 2886,
+    "discount": 28,
+    "images": [
+      "https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?auto=format&fit=crop&w=800&q=80",
+      "https://images.unsplash.com/photo-1529374255404-311a2a4f1fd9?auto=format&fit=crop&w=800&q=80"
+    ],
+    "thumbnail": "https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?auto=format&fit=crop&w=800&q=80",
+    "rating": 4.1,
+    "reviewCount": 39,
+    "reviews": [
+      {
+        "id": "rev-sd-prod-098-1",
+        "userName": "Aman Sharma",
+        "rating": 5,
+        "title": "Great quality and fast delivery!",
+        "comment": "Delivered in Neemuch within 45 minutes! Quality is top notch.",
+        "createdAt": "2026-07-28",
+        "verifiedPurchase": true
+      },
+      {
+        "id": "rev-sd-prod-098-2",
+        "userName": "Priya Verma",
+        "rating": 4,
+        "title": "Nice fit and comfortable material",
+        "comment": "The fabric is very soft. True to size.",
+        "createdAt": "2026-07-29",
+        "verifiedPurchase": true
+      }
+    ],
+    "variants": [
+      {
+        "id": "sd-prod-098-var-1",
+        "sku": "SD-SD-PROD-098-OLI-UK6",
+        "size": "UK 6",
+        "colourName": "Olive Green",
+        "colourHex": "#556B2F",
+        "stock": 15,
+        "price": 2062,
+        "originalPrice": 2886
+      },
+      {
+        "id": "sd-prod-098-var-2",
+        "sku": "SD-SD-PROD-098-OLI-UK7",
+        "size": "UK 7",
+        "colourName": "Olive Green",
+        "colourHex": "#556B2F",
+        "stock": 15,
+        "price": 2062,
+        "originalPrice": 2886
+      },
+      {
+        "id": "sd-prod-098-var-3",
+        "sku": "SD-SD-PROD-098-OLI-UK8",
+        "size": "UK 8",
+        "colourName": "Olive Green",
+        "colourHex": "#556B2F",
+        "stock": 15,
+        "price": 2062,
+        "originalPrice": 2886
+      },
+      {
+        "id": "sd-prod-098-var-4",
+        "sku": "SD-SD-PROD-098-OLI-UK9",
+        "size": "UK 9",
+        "colourName": "Olive Green",
+        "colourHex": "#556B2F",
+        "stock": 15,
+        "price": 2062,
+        "originalPrice": 2886
+      },
+      {
+        "id": "sd-prod-098-var-5",
+        "sku": "SD-SD-PROD-098-OLI-UK10",
+        "size": "UK 10",
+        "colourName": "Olive Green",
+        "colourHex": "#556B2F",
+        "stock": 15,
+        "price": 2062,
+        "originalPrice": 2886
+      },
+      {
+        "id": "sd-prod-098-var-6",
+        "sku": "SD-SD-PROD-098-CRI-UK6",
+        "size": "UK 6",
+        "colourName": "Crimson Red",
+        "colourHex": "#DC143C",
+        "stock": 15,
+        "price": 2062,
+        "originalPrice": 2886
+      },
+      {
+        "id": "sd-prod-098-var-7",
+        "sku": "SD-SD-PROD-098-CRI-UK7",
+        "size": "UK 7",
+        "colourName": "Crimson Red",
+        "colourHex": "#DC143C",
+        "stock": 0,
+        "price": 2062,
+        "originalPrice": 2886
+      },
+      {
+        "id": "sd-prod-098-var-8",
+        "sku": "SD-SD-PROD-098-CRI-UK8",
+        "size": "UK 8",
+        "colourName": "Crimson Red",
+        "colourHex": "#DC143C",
+        "stock": 15,
+        "price": 2062,
+        "originalPrice": 2886
+      },
+      {
+        "id": "sd-prod-098-var-9",
+        "sku": "SD-SD-PROD-098-CRI-UK9",
+        "size": "UK 9",
+        "colourName": "Crimson Red",
+        "colourHex": "#DC143C",
+        "stock": 15,
+        "price": 2062,
+        "originalPrice": 2886
+      },
+      {
+        "id": "sd-prod-098-var-10",
+        "sku": "SD-SD-PROD-098-CRI-UK10",
+        "size": "UK 10",
+        "colourName": "Crimson Red",
+        "colourHex": "#DC143C",
+        "stock": 15,
+        "price": 2062,
+        "originalPrice": 2886
+      }
+    ],
+    "tags": [
+      "breathable mesh running shoes",
+      "footwear",
+      "sneakers",
+      "casual sneakers",
+      "roadster",
+      "fashion",
+      "trending"
+    ],
+    "badge": "Trending",
+    "newArrival": true,
+    "trending": false,
+    "featured": false,
+    "expressDelivery": true,
+    "estimatedDeliveryMinutes": 60,
+    "returnWindowDays": 7,
+    "exchangeAvailable": true,
+    "vendorId": "v-ethnic-vibe",
+    "commissionPercent": 12,
+    "sponsored": false,
+    "active": true,
+    "createdAt": "2026-07-01T00:00:00Z",
+    "updatedAt": "2026-08-01T00:00:00Z"
+  },
+  {
+    "id": "sd-prod-099",
+    "slug": "high-top-canvas-sneakers-sd-prod-099",
+    "name": "High-Top Canvas Sneakers",
+    "brand": "HRX",
+    "department": "footwear",
+    "category": "Sneakers",
+    "subcategory": "Casual Sneakers",
+    "collection": "Summer Essentials 2026",
+    "shortDescription": "Premium quality high-top canvas sneakers crafted for comfort and style.",
+    "description": "Elevate your daily fashion with this High-Top Canvas Sneakers. Features premium fabric construction, tailored fit, and durable craftsmanship ideal for everyday wear.",
+    "material": "Synthetic Leather & Rubber Sole",
+    "fit": "Comfort Fit",
+    "pattern": "Solid / Textured",
+    "occasion": [
+      "Casual",
+      "Everyday",
+      "Party"
+    ],
+    "careInstructions": [
+      "Machine wash cold",
+      "Do not bleach",
+      "Tumble dry low",
+      "Warm iron if needed"
+    ],
+    "price": 2099,
+    "originalPrice": 2938,
+    "discount": 28,
+    "images": [
+      "https://images.unsplash.com/photo-1529374255404-311a2a4f1fd9?auto=format&fit=crop&w=800&q=80",
+      "https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&w=800&q=80"
+    ],
+    "thumbnail": "https://images.unsplash.com/photo-1529374255404-311a2a4f1fd9?auto=format&fit=crop&w=800&q=80",
+    "rating": 4.2,
+    "reviewCount": 52,
+    "reviews": [
+      {
+        "id": "rev-sd-prod-099-1",
+        "userName": "Aman Sharma",
+        "rating": 5,
+        "title": "Great quality and fast delivery!",
+        "comment": "Delivered in Neemuch within 45 minutes! Quality is top notch.",
+        "createdAt": "2026-07-28",
+        "verifiedPurchase": true
+      },
+      {
+        "id": "rev-sd-prod-099-2",
+        "userName": "Priya Verma",
+        "rating": 4,
+        "title": "Nice fit and comfortable material",
+        "comment": "The fabric is very soft. True to size.",
+        "createdAt": "2026-07-29",
+        "verifiedPurchase": true
+      }
+    ],
+    "variants": [
+      {
+        "id": "sd-prod-099-var-1",
+        "sku": "SD-SD-PROD-099-CRI-UK6",
+        "size": "UK 6",
+        "colourName": "Crimson Red",
+        "colourHex": "#DC143C",
+        "stock": 15,
+        "price": 2099,
+        "originalPrice": 2938
+      },
+      {
+        "id": "sd-prod-099-var-2",
+        "sku": "SD-SD-PROD-099-CRI-UK7",
+        "size": "UK 7",
+        "colourName": "Crimson Red",
+        "colourHex": "#DC143C",
+        "stock": 15,
+        "price": 2099,
+        "originalPrice": 2938
+      },
+      {
+        "id": "sd-prod-099-var-3",
+        "sku": "SD-SD-PROD-099-CRI-UK8",
+        "size": "UK 8",
+        "colourName": "Crimson Red",
+        "colourHex": "#DC143C",
+        "stock": 15,
+        "price": 2099,
+        "originalPrice": 2938
+      },
+      {
+        "id": "sd-prod-099-var-4",
+        "sku": "SD-SD-PROD-099-CRI-UK9",
+        "size": "UK 9",
+        "colourName": "Crimson Red",
+        "colourHex": "#DC143C",
+        "stock": 15,
+        "price": 2099,
+        "originalPrice": 2938
+      },
+      {
+        "id": "sd-prod-099-var-5",
+        "sku": "SD-SD-PROD-099-CRI-UK10",
+        "size": "UK 10",
+        "colourName": "Crimson Red",
+        "colourHex": "#DC143C",
+        "stock": 15,
+        "price": 2099,
+        "originalPrice": 2938
+      },
+      {
+        "id": "sd-prod-099-var-6",
+        "sku": "SD-SD-PROD-099-BEI-UK6",
+        "size": "UK 6",
+        "colourName": "Beige",
+        "colourHex": "#F5F5DC",
+        "stock": 15,
+        "price": 2099,
+        "originalPrice": 2938
+      },
+      {
+        "id": "sd-prod-099-var-7",
+        "sku": "SD-SD-PROD-099-BEI-UK7",
+        "size": "UK 7",
+        "colourName": "Beige",
+        "colourHex": "#F5F5DC",
+        "stock": 0,
+        "price": 2099,
+        "originalPrice": 2938
+      },
+      {
+        "id": "sd-prod-099-var-8",
+        "sku": "SD-SD-PROD-099-BEI-UK8",
+        "size": "UK 8",
+        "colourName": "Beige",
+        "colourHex": "#F5F5DC",
+        "stock": 15,
+        "price": 2099,
+        "originalPrice": 2938
+      },
+      {
+        "id": "sd-prod-099-var-9",
+        "sku": "SD-SD-PROD-099-BEI-UK9",
+        "size": "UK 9",
+        "colourName": "Beige",
+        "colourHex": "#F5F5DC",
+        "stock": 15,
+        "price": 2099,
+        "originalPrice": 2938
+      },
+      {
+        "id": "sd-prod-099-var-10",
+        "sku": "SD-SD-PROD-099-BEI-UK10",
+        "size": "UK 10",
+        "colourName": "Beige",
+        "colourHex": "#F5F5DC",
+        "stock": 15,
+        "price": 2099,
+        "originalPrice": 2938
+      }
+    ],
+    "tags": [
+      "high-top canvas sneakers",
+      "footwear",
+      "sneakers",
+      "casual sneakers",
+      "hrx",
+      "fashion",
+      "trending"
+    ],
+    "badge": "Express",
+    "newArrival": false,
+    "trending": true,
+    "featured": true,
+    "expressDelivery": true,
+    "estimatedDeliveryMinutes": 60,
+    "returnWindowDays": 7,
+    "exchangeAvailable": true,
+    "vendorId": "v-urban-style",
+    "commissionPercent": 12,
+    "sponsored": false,
+    "active": true,
+    "createdAt": "2026-07-01T00:00:00Z",
+    "updatedAt": "2026-08-01T00:00:00Z"
+  },
+  {
+    "id": "sd-prod-100",
+    "slug": "lightweight-knit-slip-on-shoes-sd-prod-100",
+    "name": "Lightweight Knit Slip-On Shoes",
+    "brand": "StyleDash Studio",
+    "department": "footwear",
+    "category": "Sneakers",
+    "subcategory": "Casual Sneakers",
+    "collection": "Summer Essentials 2026",
+    "shortDescription": "Premium quality lightweight knit slip-on shoes crafted for comfort and style.",
+    "description": "Elevate your daily fashion with this Lightweight Knit Slip-On Shoes. Features premium fabric construction, tailored fit, and durable craftsmanship ideal for everyday wear.",
+    "material": "Synthetic Leather & Rubber Sole",
+    "fit": "Comfort Fit",
+    "pattern": "Solid / Textured",
+    "occasion": [
+      "Casual",
+      "Everyday",
+      "Party"
+    ],
+    "careInstructions": [
+      "Machine wash cold",
+      "Do not bleach",
+      "Tumble dry low",
+      "Warm iron if needed"
+    ],
+    "price": 2136,
+    "originalPrice": 2990,
+    "discount": 28,
+    "images": [
+      "https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&w=800&q=80",
+      "https://images.unsplash.com/photo-1521572267360-ee0c2909d518?auto=format&fit=crop&w=800&q=80"
+    ],
+    "thumbnail": "https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&w=800&q=80",
+    "rating": 4.3,
+    "reviewCount": 65,
+    "reviews": [
+      {
+        "id": "rev-sd-prod-100-1",
+        "userName": "Aman Sharma",
+        "rating": 5,
+        "title": "Great quality and fast delivery!",
+        "comment": "Delivered in Neemuch within 45 minutes! Quality is top notch.",
+        "createdAt": "2026-07-28",
+        "verifiedPurchase": true
+      },
+      {
+        "id": "rev-sd-prod-100-2",
+        "userName": "Priya Verma",
+        "rating": 4,
+        "title": "Nice fit and comfortable material",
+        "comment": "The fabric is very soft. True to size.",
+        "createdAt": "2026-07-29",
+        "verifiedPurchase": true
+      }
+    ],
+    "variants": [
+      {
+        "id": "sd-prod-100-var-1",
+        "sku": "SD-SD-PROD-100-BEI-UK6",
+        "size": "UK 6",
+        "colourName": "Beige",
+        "colourHex": "#F5F5DC",
+        "stock": 15,
+        "price": 2136,
+        "originalPrice": 2990
+      },
+      {
+        "id": "sd-prod-100-var-2",
+        "sku": "SD-SD-PROD-100-BEI-UK7",
+        "size": "UK 7",
+        "colourName": "Beige",
+        "colourHex": "#F5F5DC",
+        "stock": 15,
+        "price": 2136,
+        "originalPrice": 2990
+      },
+      {
+        "id": "sd-prod-100-var-3",
+        "sku": "SD-SD-PROD-100-BEI-UK8",
+        "size": "UK 8",
+        "colourName": "Beige",
+        "colourHex": "#F5F5DC",
+        "stock": 15,
+        "price": 2136,
+        "originalPrice": 2990
+      },
+      {
+        "id": "sd-prod-100-var-4",
+        "sku": "SD-SD-PROD-100-BEI-UK9",
+        "size": "UK 9",
+        "colourName": "Beige",
+        "colourHex": "#F5F5DC",
+        "stock": 15,
+        "price": 2136,
+        "originalPrice": 2990
+      },
+      {
+        "id": "sd-prod-100-var-5",
+        "sku": "SD-SD-PROD-100-BEI-UK10",
+        "size": "UK 10",
+        "colourName": "Beige",
+        "colourHex": "#F5F5DC",
+        "stock": 15,
+        "price": 2136,
+        "originalPrice": 2990
+      },
+      {
+        "id": "sd-prod-100-var-6",
+        "sku": "SD-SD-PROD-100-CHA-UK6",
+        "size": "UK 6",
+        "colourName": "Charcoal Gray",
+        "colourHex": "#36454F",
+        "stock": 15,
+        "price": 2136,
+        "originalPrice": 2990
+      },
+      {
+        "id": "sd-prod-100-var-7",
+        "sku": "SD-SD-PROD-100-CHA-UK7",
+        "size": "UK 7",
+        "colourName": "Charcoal Gray",
+        "colourHex": "#36454F",
+        "stock": 0,
+        "price": 2136,
+        "originalPrice": 2990
+      },
+      {
+        "id": "sd-prod-100-var-8",
+        "sku": "SD-SD-PROD-100-CHA-UK8",
+        "size": "UK 8",
+        "colourName": "Charcoal Gray",
+        "colourHex": "#36454F",
+        "stock": 15,
+        "price": 2136,
+        "originalPrice": 2990
+      },
+      {
+        "id": "sd-prod-100-var-9",
+        "sku": "SD-SD-PROD-100-CHA-UK9",
+        "size": "UK 9",
+        "colourName": "Charcoal Gray",
+        "colourHex": "#36454F",
+        "stock": 15,
+        "price": 2136,
+        "originalPrice": 2990
+      },
+      {
+        "id": "sd-prod-100-var-10",
+        "sku": "SD-SD-PROD-100-CHA-UK10",
+        "size": "UK 10",
+        "colourName": "Charcoal Gray",
+        "colourHex": "#36454F",
+        "stock": 15,
+        "price": 2136,
+        "originalPrice": 2990
+      }
+    ],
+    "tags": [
+      "lightweight knit slip-on shoes",
+      "footwear",
+      "sneakers",
+      "casual sneakers",
+      "styledash studio",
+      "fashion",
+      "trending"
+    ],
+    "badge": "New",
+    "newArrival": false,
+    "trending": false,
+    "featured": false,
+    "expressDelivery": true,
+    "estimatedDeliveryMinutes": 60,
+    "returnWindowDays": 7,
+    "exchangeAvailable": true,
+    "vendorId": "v-ethnic-vibe",
+    "commissionPercent": 12,
+    "sponsored": false,
+    "active": true,
+    "createdAt": "2026-07-01T00:00:00Z",
+    "updatedAt": "2026-08-01T00:00:00Z"
+  },
+  {
+    "id": "sd-prod-101",
+    "slug": "classic-suede-penny-loafers-sd-prod-101",
+    "name": "Classic Suede Penny Loafers",
+    "brand": "Anouk",
+    "department": "footwear",
+    "category": "Casual & Formals",
+    "subcategory": "Loafers",
+    "collection": "Summer Essentials 2026",
+    "shortDescription": "Premium quality classic suede penny loafers crafted for comfort and style.",
+    "description": "Elevate your daily fashion with this Classic Suede Penny Loafers. Features premium fabric construction, tailored fit, and durable craftsmanship ideal for everyday wear.",
+    "material": "Synthetic Leather & Rubber Sole",
+    "fit": "Comfort Fit",
+    "pattern": "Solid / Textured",
+    "occasion": [
+      "Casual",
+      "Everyday",
+      "Party"
+    ],
+    "careInstructions": [
+      "Machine wash cold",
+      "Do not bleach",
+      "Tumble dry low",
+      "Warm iron if needed"
+    ],
+    "price": 2173,
+    "originalPrice": 3042,
+    "discount": 28,
+    "images": [
+      "https://images.unsplash.com/photo-1521572267360-ee0c2909d518?auto=format&fit=crop&w=800&q=80",
+      "https://images.unsplash.com/photo-1503342217505-b0a15ec3261c?auto=format&fit=crop&w=800&q=80"
+    ],
+    "thumbnail": "https://images.unsplash.com/photo-1521572267360-ee0c2909d518?auto=format&fit=crop&w=800&q=80",
+    "rating": 4.4,
+    "reviewCount": 78,
+    "reviews": [
+      {
+        "id": "rev-sd-prod-101-1",
+        "userName": "Aman Sharma",
+        "rating": 5,
+        "title": "Great quality and fast delivery!",
+        "comment": "Delivered in Neemuch within 45 minutes! Quality is top notch.",
+        "createdAt": "2026-07-28",
+        "verifiedPurchase": true
+      },
+      {
+        "id": "rev-sd-prod-101-2",
+        "userName": "Priya Verma",
+        "rating": 4,
+        "title": "Nice fit and comfortable material",
+        "comment": "The fabric is very soft. True to size.",
+        "createdAt": "2026-07-29",
+        "verifiedPurchase": true
+      }
+    ],
+    "variants": [
+      {
+        "id": "sd-prod-101-var-1",
+        "sku": "SD-SD-PROD-101-CHA-UK6",
+        "size": "UK 6",
+        "colourName": "Charcoal Gray",
+        "colourHex": "#36454F",
+        "stock": 15,
+        "price": 2173,
+        "originalPrice": 3042
+      },
+      {
+        "id": "sd-prod-101-var-2",
+        "sku": "SD-SD-PROD-101-CHA-UK7",
+        "size": "UK 7",
+        "colourName": "Charcoal Gray",
+        "colourHex": "#36454F",
+        "stock": 15,
+        "price": 2173,
+        "originalPrice": 3042
+      },
+      {
+        "id": "sd-prod-101-var-3",
+        "sku": "SD-SD-PROD-101-CHA-UK8",
+        "size": "UK 8",
+        "colourName": "Charcoal Gray",
+        "colourHex": "#36454F",
+        "stock": 15,
+        "price": 2173,
+        "originalPrice": 3042
+      },
+      {
+        "id": "sd-prod-101-var-4",
+        "sku": "SD-SD-PROD-101-CHA-UK9",
+        "size": "UK 9",
+        "colourName": "Charcoal Gray",
+        "colourHex": "#36454F",
+        "stock": 15,
+        "price": 2173,
+        "originalPrice": 3042
+      },
+      {
+        "id": "sd-prod-101-var-5",
+        "sku": "SD-SD-PROD-101-CHA-UK10",
+        "size": "UK 10",
+        "colourName": "Charcoal Gray",
+        "colourHex": "#36454F",
+        "stock": 15,
+        "price": 2173,
+        "originalPrice": 3042
+      },
+      {
+        "id": "sd-prod-101-var-6",
+        "sku": "SD-SD-PROD-101-MUS-UK6",
+        "size": "UK 6",
+        "colourName": "Mustard Yellow",
+        "colourHex": "#FFDB58",
+        "stock": 15,
+        "price": 2173,
+        "originalPrice": 3042
+      },
+      {
+        "id": "sd-prod-101-var-7",
+        "sku": "SD-SD-PROD-101-MUS-UK7",
+        "size": "UK 7",
+        "colourName": "Mustard Yellow",
+        "colourHex": "#FFDB58",
+        "stock": 0,
+        "price": 2173,
+        "originalPrice": 3042
+      },
+      {
+        "id": "sd-prod-101-var-8",
+        "sku": "SD-SD-PROD-101-MUS-UK8",
+        "size": "UK 8",
+        "colourName": "Mustard Yellow",
+        "colourHex": "#FFDB58",
+        "stock": 15,
+        "price": 2173,
+        "originalPrice": 3042
+      },
+      {
+        "id": "sd-prod-101-var-9",
+        "sku": "SD-SD-PROD-101-MUS-UK9",
+        "size": "UK 9",
+        "colourName": "Mustard Yellow",
+        "colourHex": "#FFDB58",
+        "stock": 15,
+        "price": 2173,
+        "originalPrice": 3042
+      },
+      {
+        "id": "sd-prod-101-var-10",
+        "sku": "SD-SD-PROD-101-MUS-UK10",
+        "size": "UK 10",
+        "colourName": "Mustard Yellow",
+        "colourHex": "#FFDB58",
+        "stock": 15,
+        "price": 2173,
+        "originalPrice": 3042
+      }
+    ],
+    "tags": [
+      "classic suede penny loafers",
+      "footwear",
+      "casual & formals",
+      "loafers",
+      "anouk",
+      "fashion",
+      "trending"
+    ],
+    "badge": "Trending",
+    "newArrival": true,
+    "trending": true,
+    "featured": false,
+    "expressDelivery": true,
+    "estimatedDeliveryMinutes": 60,
+    "returnWindowDays": 7,
+    "exchangeAvailable": true,
+    "vendorId": "v-urban-style",
+    "commissionPercent": 12,
+    "sponsored": false,
+    "active": true,
+    "createdAt": "2026-07-01T00:00:00Z",
+    "updatedAt": "2026-08-01T00:00:00Z"
+  },
+  {
+    "id": "sd-prod-102",
+    "slug": "genuine-leather-oxford-shoes-sd-prod-102",
+    "name": "Genuine Leather Oxford Shoes",
+    "brand": "Mast & Harbour",
+    "department": "footwear",
+    "category": "Casual & Formals",
+    "subcategory": "Loafers",
+    "collection": "Summer Essentials 2026",
+    "shortDescription": "Premium quality genuine leather oxford shoes crafted for comfort and style.",
+    "description": "Elevate your daily fashion with this Genuine Leather Oxford Shoes. Features premium fabric construction, tailored fit, and durable craftsmanship ideal for everyday wear.",
+    "material": "Synthetic Leather & Rubber Sole",
+    "fit": "Comfort Fit",
+    "pattern": "Solid / Textured",
+    "occasion": [
+      "Casual",
+      "Everyday",
+      "Party"
+    ],
+    "careInstructions": [
+      "Machine wash cold",
+      "Do not bleach",
+      "Tumble dry low",
+      "Warm iron if needed"
+    ],
+    "price": 2210,
+    "originalPrice": 3094,
+    "discount": 28,
+    "images": [
+      "https://images.unsplash.com/photo-1503342217505-b0a15ec3261c?auto=format&fit=crop&w=800&q=80",
+      "https://images.unsplash.com/photo-1576995853123-5a10305d93c0?auto=format&fit=crop&w=800&q=80"
+    ],
+    "thumbnail": "https://images.unsplash.com/photo-1503342217505-b0a15ec3261c?auto=format&fit=crop&w=800&q=80",
+    "rating": 4.5,
+    "reviewCount": 91,
+    "reviews": [
+      {
+        "id": "rev-sd-prod-102-1",
+        "userName": "Aman Sharma",
+        "rating": 5,
+        "title": "Great quality and fast delivery!",
+        "comment": "Delivered in Neemuch within 45 minutes! Quality is top notch.",
+        "createdAt": "2026-07-28",
+        "verifiedPurchase": true
+      },
+      {
+        "id": "rev-sd-prod-102-2",
+        "userName": "Priya Verma",
+        "rating": 4,
+        "title": "Nice fit and comfortable material",
+        "comment": "The fabric is very soft. True to size.",
+        "createdAt": "2026-07-29",
+        "verifiedPurchase": true
+      }
+    ],
+    "variants": [
+      {
+        "id": "sd-prod-102-var-1",
+        "sku": "SD-SD-PROD-102-MUS-UK6",
+        "size": "UK 6",
+        "colourName": "Mustard Yellow",
+        "colourHex": "#FFDB58",
+        "stock": 15,
+        "price": 2210,
+        "originalPrice": 3094
+      },
+      {
+        "id": "sd-prod-102-var-2",
+        "sku": "SD-SD-PROD-102-MUS-UK7",
+        "size": "UK 7",
+        "colourName": "Mustard Yellow",
+        "colourHex": "#FFDB58",
+        "stock": 15,
+        "price": 2210,
+        "originalPrice": 3094
+      },
+      {
+        "id": "sd-prod-102-var-3",
+        "sku": "SD-SD-PROD-102-MUS-UK8",
+        "size": "UK 8",
+        "colourName": "Mustard Yellow",
+        "colourHex": "#FFDB58",
+        "stock": 15,
+        "price": 2210,
+        "originalPrice": 3094
+      },
+      {
+        "id": "sd-prod-102-var-4",
+        "sku": "SD-SD-PROD-102-MUS-UK9",
+        "size": "UK 9",
+        "colourName": "Mustard Yellow",
+        "colourHex": "#FFDB58",
+        "stock": 15,
+        "price": 2210,
+        "originalPrice": 3094
+      },
+      {
+        "id": "sd-prod-102-var-5",
+        "sku": "SD-SD-PROD-102-MUS-UK10",
+        "size": "UK 10",
+        "colourName": "Mustard Yellow",
+        "colourHex": "#FFDB58",
+        "stock": 15,
+        "price": 2210,
+        "originalPrice": 3094
+      },
+      {
+        "id": "sd-prod-102-var-6",
+        "sku": "SD-SD-PROD-102-BLA-UK6",
+        "size": "UK 6",
+        "colourName": "Black",
+        "colourHex": "#000000",
+        "stock": 15,
+        "price": 2210,
+        "originalPrice": 3094
+      },
+      {
+        "id": "sd-prod-102-var-7",
+        "sku": "SD-SD-PROD-102-BLA-UK7",
+        "size": "UK 7",
+        "colourName": "Black",
+        "colourHex": "#000000",
+        "stock": 0,
+        "price": 2210,
+        "originalPrice": 3094
+      },
+      {
+        "id": "sd-prod-102-var-8",
+        "sku": "SD-SD-PROD-102-BLA-UK8",
+        "size": "UK 8",
+        "colourName": "Black",
+        "colourHex": "#000000",
+        "stock": 15,
+        "price": 2210,
+        "originalPrice": 3094
+      },
+      {
+        "id": "sd-prod-102-var-9",
+        "sku": "SD-SD-PROD-102-BLA-UK9",
+        "size": "UK 9",
+        "colourName": "Black",
+        "colourHex": "#000000",
+        "stock": 15,
+        "price": 2210,
+        "originalPrice": 3094
+      },
+      {
+        "id": "sd-prod-102-var-10",
+        "sku": "SD-SD-PROD-102-BLA-UK10",
+        "size": "UK 10",
+        "colourName": "Black",
+        "colourHex": "#000000",
+        "stock": 15,
+        "price": 2210,
+        "originalPrice": 3094
+      }
+    ],
+    "tags": [
+      "genuine leather oxford shoes",
+      "footwear",
+      "casual & formals",
+      "loafers",
+      "mast & harbour",
+      "fashion",
+      "trending"
+    ],
+    "badge": "New",
+    "newArrival": false,
+    "trending": false,
+    "featured": false,
+    "expressDelivery": true,
+    "estimatedDeliveryMinutes": 60,
+    "returnWindowDays": 7,
+    "exchangeAvailable": true,
+    "vendorId": "v-ethnic-vibe",
+    "commissionPercent": 12,
+    "sponsored": false,
+    "active": true,
+    "createdAt": "2026-07-01T00:00:00Z",
+    "updatedAt": "2026-08-01T00:00:00Z"
+  },
+  {
+    "id": "sd-prod-103",
+    "slug": "slip-on-tassel-loafers-sd-prod-103",
+    "name": "Slip-On Tassel Loafers",
+    "brand": "Highlander",
+    "department": "footwear",
+    "category": "Casual & Formals",
+    "subcategory": "Loafers",
+    "collection": "Summer Essentials 2026",
+    "shortDescription": "Premium quality slip-on tassel loafers crafted for comfort and style.",
+    "description": "Elevate your daily fashion with this Slip-On Tassel Loafers. Features premium fabric construction, tailored fit, and durable craftsmanship ideal for everyday wear.",
+    "material": "Synthetic Leather & Rubber Sole",
+    "fit": "Comfort Fit",
+    "pattern": "Solid / Textured",
+    "occasion": [
+      "Casual",
+      "Everyday",
+      "Party"
+    ],
+    "careInstructions": [
+      "Machine wash cold",
+      "Do not bleach",
+      "Tumble dry low",
+      "Warm iron if needed"
+    ],
+    "price": 2247,
+    "originalPrice": 3145,
+    "discount": 28,
+    "images": [
+      "https://images.unsplash.com/photo-1576995853123-5a10305d93c0?auto=format&fit=crop&w=800&q=80",
+      "https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?auto=format&fit=crop&w=800&q=80"
+    ],
+    "thumbnail": "https://images.unsplash.com/photo-1576995853123-5a10305d93c0?auto=format&fit=crop&w=800&q=80",
+    "rating": 4.6,
+    "reviewCount": 104,
+    "reviews": [
+      {
+        "id": "rev-sd-prod-103-1",
+        "userName": "Aman Sharma",
+        "rating": 5,
+        "title": "Great quality and fast delivery!",
+        "comment": "Delivered in Neemuch within 45 minutes! Quality is top notch.",
+        "createdAt": "2026-07-28",
+        "verifiedPurchase": true
+      },
+      {
+        "id": "rev-sd-prod-103-2",
+        "userName": "Priya Verma",
+        "rating": 4,
+        "title": "Nice fit and comfortable material",
+        "comment": "The fabric is very soft. True to size.",
+        "createdAt": "2026-07-29",
+        "verifiedPurchase": true
+      }
+    ],
+    "variants": [
+      {
+        "id": "sd-prod-103-var-1",
+        "sku": "SD-SD-PROD-103-BLA-UK6",
+        "size": "UK 6",
+        "colourName": "Black",
+        "colourHex": "#000000",
+        "stock": 15,
+        "price": 2247,
+        "originalPrice": 3145
+      },
+      {
+        "id": "sd-prod-103-var-2",
+        "sku": "SD-SD-PROD-103-BLA-UK7",
+        "size": "UK 7",
+        "colourName": "Black",
+        "colourHex": "#000000",
+        "stock": 15,
+        "price": 2247,
+        "originalPrice": 3145
+      },
+      {
+        "id": "sd-prod-103-var-3",
+        "sku": "SD-SD-PROD-103-BLA-UK8",
+        "size": "UK 8",
+        "colourName": "Black",
+        "colourHex": "#000000",
+        "stock": 15,
+        "price": 2247,
+        "originalPrice": 3145
+      },
+      {
+        "id": "sd-prod-103-var-4",
+        "sku": "SD-SD-PROD-103-BLA-UK9",
+        "size": "UK 9",
+        "colourName": "Black",
+        "colourHex": "#000000",
+        "stock": 15,
+        "price": 2247,
+        "originalPrice": 3145
+      },
+      {
+        "id": "sd-prod-103-var-5",
+        "sku": "SD-SD-PROD-103-BLA-UK10",
+        "size": "UK 10",
+        "colourName": "Black",
+        "colourHex": "#000000",
+        "stock": 15,
+        "price": 2247,
+        "originalPrice": 3145
+      },
+      {
+        "id": "sd-prod-103-var-6",
+        "sku": "SD-SD-PROD-103-WHI-UK6",
+        "size": "UK 6",
+        "colourName": "White",
+        "colourHex": "#FFFFFF",
+        "stock": 15,
+        "price": 2247,
+        "originalPrice": 3145
+      },
+      {
+        "id": "sd-prod-103-var-7",
+        "sku": "SD-SD-PROD-103-WHI-UK7",
+        "size": "UK 7",
+        "colourName": "White",
+        "colourHex": "#FFFFFF",
+        "stock": 0,
+        "price": 2247,
+        "originalPrice": 3145
+      },
+      {
+        "id": "sd-prod-103-var-8",
+        "sku": "SD-SD-PROD-103-WHI-UK8",
+        "size": "UK 8",
+        "colourName": "White",
+        "colourHex": "#FFFFFF",
+        "stock": 15,
+        "price": 2247,
+        "originalPrice": 3145
+      },
+      {
+        "id": "sd-prod-103-var-9",
+        "sku": "SD-SD-PROD-103-WHI-UK9",
+        "size": "UK 9",
+        "colourName": "White",
+        "colourHex": "#FFFFFF",
+        "stock": 15,
+        "price": 2247,
+        "originalPrice": 3145
+      },
+      {
+        "id": "sd-prod-103-var-10",
+        "sku": "SD-SD-PROD-103-WHI-UK10",
+        "size": "UK 10",
+        "colourName": "White",
+        "colourHex": "#FFFFFF",
+        "stock": 15,
+        "price": 2247,
+        "originalPrice": 3145
+      }
+    ],
+    "tags": [
+      "slip-on tassel loafers",
+      "footwear",
+      "casual & formals",
+      "loafers",
+      "highlander",
+      "fashion",
+      "trending"
+    ],
+    "badge": "Express",
+    "newArrival": false,
+    "trending": true,
+    "featured": true,
+    "expressDelivery": true,
+    "estimatedDeliveryMinutes": 60,
+    "returnWindowDays": 7,
+    "exchangeAvailable": true,
+    "vendorId": "v-urban-style",
+    "commissionPercent": 12,
+    "sponsored": false,
+    "active": true,
+    "createdAt": "2026-07-01T00:00:00Z",
+    "updatedAt": "2026-08-01T00:00:00Z"
+  },
+  {
+    "id": "sd-prod-104",
+    "slug": "formal-derby-dress-shoes-sd-prod-104",
+    "name": "Formal Derby Dress Shoes",
+    "brand": "Bawree",
+    "department": "footwear",
+    "category": "Casual & Formals",
+    "subcategory": "Loafers",
+    "collection": "Summer Essentials 2026",
+    "shortDescription": "Premium quality formal derby dress shoes crafted for comfort and style.",
+    "description": "Elevate your daily fashion with this Formal Derby Dress Shoes. Features premium fabric construction, tailored fit, and durable craftsmanship ideal for everyday wear.",
+    "material": "Synthetic Leather & Rubber Sole",
+    "fit": "Comfort Fit",
+    "pattern": "Solid / Textured",
+    "occasion": [
+      "Casual",
+      "Everyday",
+      "Party"
+    ],
+    "careInstructions": [
+      "Machine wash cold",
+      "Do not bleach",
+      "Tumble dry low",
+      "Warm iron if needed"
+    ],
+    "price": 2284,
+    "originalPrice": 3197,
+    "discount": 28,
+    "images": [
+      "https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?auto=format&fit=crop&w=800&q=80",
+      "https://images.unsplash.com/photo-1529374255404-311a2a4f1fd9?auto=format&fit=crop&w=800&q=80"
+    ],
+    "thumbnail": "https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?auto=format&fit=crop&w=800&q=80",
+    "rating": 4.7,
+    "reviewCount": 117,
+    "reviews": [
+      {
+        "id": "rev-sd-prod-104-1",
+        "userName": "Aman Sharma",
+        "rating": 5,
+        "title": "Great quality and fast delivery!",
+        "comment": "Delivered in Neemuch within 45 minutes! Quality is top notch.",
+        "createdAt": "2026-07-28",
+        "verifiedPurchase": true
+      },
+      {
+        "id": "rev-sd-prod-104-2",
+        "userName": "Priya Verma",
+        "rating": 4,
+        "title": "Nice fit and comfortable material",
+        "comment": "The fabric is very soft. True to size.",
+        "createdAt": "2026-07-29",
+        "verifiedPurchase": true
+      }
+    ],
+    "variants": [
+      {
+        "id": "sd-prod-104-var-1",
+        "sku": "SD-SD-PROD-104-WHI-UK6",
+        "size": "UK 6",
+        "colourName": "White",
+        "colourHex": "#FFFFFF",
+        "stock": 15,
+        "price": 2284,
+        "originalPrice": 3197
+      },
+      {
+        "id": "sd-prod-104-var-2",
+        "sku": "SD-SD-PROD-104-WHI-UK7",
+        "size": "UK 7",
+        "colourName": "White",
+        "colourHex": "#FFFFFF",
+        "stock": 15,
+        "price": 2284,
+        "originalPrice": 3197
+      },
+      {
+        "id": "sd-prod-104-var-3",
+        "sku": "SD-SD-PROD-104-WHI-UK8",
+        "size": "UK 8",
+        "colourName": "White",
+        "colourHex": "#FFFFFF",
+        "stock": 15,
+        "price": 2284,
+        "originalPrice": 3197
+      },
+      {
+        "id": "sd-prod-104-var-4",
+        "sku": "SD-SD-PROD-104-WHI-UK9",
+        "size": "UK 9",
+        "colourName": "White",
+        "colourHex": "#FFFFFF",
+        "stock": 15,
+        "price": 2284,
+        "originalPrice": 3197
+      },
+      {
+        "id": "sd-prod-104-var-5",
+        "sku": "SD-SD-PROD-104-WHI-UK10",
+        "size": "UK 10",
+        "colourName": "White",
+        "colourHex": "#FFFFFF",
+        "stock": 15,
+        "price": 2284,
+        "originalPrice": 3197
+      },
+      {
+        "id": "sd-prod-104-var-6",
+        "sku": "SD-SD-PROD-104-NAV-UK6",
+        "size": "UK 6",
+        "colourName": "Navy Blue",
+        "colourHex": "#000080",
+        "stock": 15,
+        "price": 2284,
+        "originalPrice": 3197
+      },
+      {
+        "id": "sd-prod-104-var-7",
+        "sku": "SD-SD-PROD-104-NAV-UK7",
+        "size": "UK 7",
+        "colourName": "Navy Blue",
+        "colourHex": "#000080",
+        "stock": 0,
+        "price": 2284,
+        "originalPrice": 3197
+      },
+      {
+        "id": "sd-prod-104-var-8",
+        "sku": "SD-SD-PROD-104-NAV-UK8",
+        "size": "UK 8",
+        "colourName": "Navy Blue",
+        "colourHex": "#000080",
+        "stock": 15,
+        "price": 2284,
+        "originalPrice": 3197
+      },
+      {
+        "id": "sd-prod-104-var-9",
+        "sku": "SD-SD-PROD-104-NAV-UK9",
+        "size": "UK 9",
+        "colourName": "Navy Blue",
+        "colourHex": "#000080",
+        "stock": 15,
+        "price": 2284,
+        "originalPrice": 3197
+      },
+      {
+        "id": "sd-prod-104-var-10",
+        "sku": "SD-SD-PROD-104-NAV-UK10",
+        "size": "UK 10",
+        "colourName": "Navy Blue",
+        "colourHex": "#000080",
+        "stock": 15,
+        "price": 2284,
+        "originalPrice": 3197
+      }
+    ],
+    "tags": [
+      "formal derby dress shoes",
+      "footwear",
+      "casual & formals",
+      "loafers",
+      "bawree",
+      "fashion",
+      "trending"
+    ],
+    "badge": "Trending",
+    "newArrival": true,
+    "trending": false,
+    "featured": false,
+    "expressDelivery": true,
+    "estimatedDeliveryMinutes": 60,
+    "returnWindowDays": 7,
+    "exchangeAvailable": true,
+    "vendorId": "v-ethnic-vibe",
+    "commissionPercent": 12,
+    "sponsored": true,
+    "active": true,
+    "createdAt": "2026-07-01T00:00:00Z",
+    "updatedAt": "2026-08-01T00:00:00Z"
+  },
+  {
+    "id": "sd-prod-105",
+    "slug": "casual-canvas-espadrilles-sd-prod-105",
+    "name": "Casual Canvas Espadrilles",
+    "brand": "Snitch",
+    "department": "footwear",
+    "category": "Casual & Formals",
+    "subcategory": "Loafers",
+    "collection": "Summer Essentials 2026",
+    "shortDescription": "Premium quality casual canvas espadrilles crafted for comfort and style.",
+    "description": "Elevate your daily fashion with this Casual Canvas Espadrilles. Features premium fabric construction, tailored fit, and durable craftsmanship ideal for everyday wear.",
+    "material": "Synthetic Leather & Rubber Sole",
+    "fit": "Comfort Fit",
+    "pattern": "Solid / Textured",
+    "occasion": [
+      "Casual",
+      "Everyday",
+      "Party"
+    ],
+    "careInstructions": [
+      "Machine wash cold",
+      "Do not bleach",
+      "Tumble dry low",
+      "Warm iron if needed"
+    ],
+    "price": 2321,
+    "originalPrice": 3249,
+    "discount": 28,
+    "images": [
+      "https://images.unsplash.com/photo-1529374255404-311a2a4f1fd9?auto=format&fit=crop&w=800&q=80",
+      "https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&w=800&q=80"
+    ],
+    "thumbnail": "https://images.unsplash.com/photo-1529374255404-311a2a4f1fd9?auto=format&fit=crop&w=800&q=80",
+    "rating": 4.8,
+    "reviewCount": 130,
+    "reviews": [
+      {
+        "id": "rev-sd-prod-105-1",
+        "userName": "Aman Sharma",
+        "rating": 5,
+        "title": "Great quality and fast delivery!",
+        "comment": "Delivered in Neemuch within 45 minutes! Quality is top notch.",
+        "createdAt": "2026-07-28",
+        "verifiedPurchase": true
+      },
+      {
+        "id": "rev-sd-prod-105-2",
+        "userName": "Priya Verma",
+        "rating": 4,
+        "title": "Nice fit and comfortable material",
+        "comment": "The fabric is very soft. True to size.",
+        "createdAt": "2026-07-29",
+        "verifiedPurchase": true
+      }
+    ],
+    "variants": [
+      {
+        "id": "sd-prod-105-var-1",
+        "sku": "SD-SD-PROD-105-NAV-UK6",
+        "size": "UK 6",
+        "colourName": "Navy Blue",
+        "colourHex": "#000080",
+        "stock": 15,
+        "price": 2321,
+        "originalPrice": 3249
+      },
+      {
+        "id": "sd-prod-105-var-2",
+        "sku": "SD-SD-PROD-105-NAV-UK7",
+        "size": "UK 7",
+        "colourName": "Navy Blue",
+        "colourHex": "#000080",
+        "stock": 15,
+        "price": 2321,
+        "originalPrice": 3249
+      },
+      {
+        "id": "sd-prod-105-var-3",
+        "sku": "SD-SD-PROD-105-NAV-UK8",
+        "size": "UK 8",
+        "colourName": "Navy Blue",
+        "colourHex": "#000080",
+        "stock": 15,
+        "price": 2321,
+        "originalPrice": 3249
+      },
+      {
+        "id": "sd-prod-105-var-4",
+        "sku": "SD-SD-PROD-105-NAV-UK9",
+        "size": "UK 9",
+        "colourName": "Navy Blue",
+        "colourHex": "#000080",
+        "stock": 15,
+        "price": 2321,
+        "originalPrice": 3249
+      },
+      {
+        "id": "sd-prod-105-var-5",
+        "sku": "SD-SD-PROD-105-NAV-UK10",
+        "size": "UK 10",
+        "colourName": "Navy Blue",
+        "colourHex": "#000080",
+        "stock": 15,
+        "price": 2321,
+        "originalPrice": 3249
+      },
+      {
+        "id": "sd-prod-105-var-6",
+        "sku": "SD-SD-PROD-105-OLI-UK6",
+        "size": "UK 6",
+        "colourName": "Olive Green",
+        "colourHex": "#556B2F",
+        "stock": 15,
+        "price": 2321,
+        "originalPrice": 3249
+      },
+      {
+        "id": "sd-prod-105-var-7",
+        "sku": "SD-SD-PROD-105-OLI-UK7",
+        "size": "UK 7",
+        "colourName": "Olive Green",
+        "colourHex": "#556B2F",
+        "stock": 0,
+        "price": 2321,
+        "originalPrice": 3249
+      },
+      {
+        "id": "sd-prod-105-var-8",
+        "sku": "SD-SD-PROD-105-OLI-UK8",
+        "size": "UK 8",
+        "colourName": "Olive Green",
+        "colourHex": "#556B2F",
+        "stock": 15,
+        "price": 2321,
+        "originalPrice": 3249
+      },
+      {
+        "id": "sd-prod-105-var-9",
+        "sku": "SD-SD-PROD-105-OLI-UK9",
+        "size": "UK 9",
+        "colourName": "Olive Green",
+        "colourHex": "#556B2F",
+        "stock": 15,
+        "price": 2321,
+        "originalPrice": 3249
+      },
+      {
+        "id": "sd-prod-105-var-10",
+        "sku": "SD-SD-PROD-105-OLI-UK10",
+        "size": "UK 10",
+        "colourName": "Olive Green",
+        "colourHex": "#556B2F",
+        "stock": 15,
+        "price": 2321,
+        "originalPrice": 3249
+      }
+    ],
+    "tags": [
+      "casual canvas espadrilles",
+      "footwear",
+      "casual & formals",
+      "loafers",
+      "snitch",
+      "fashion",
+      "trending"
+    ],
+    "badge": "Express",
+    "newArrival": false,
+    "trending": true,
+    "featured": false,
+    "expressDelivery": true,
+    "estimatedDeliveryMinutes": 60,
+    "returnWindowDays": 7,
+    "exchangeAvailable": true,
+    "vendorId": "v-urban-style",
+    "commissionPercent": 12,
+    "sponsored": false,
+    "active": true,
+    "createdAt": "2026-07-01T00:00:00Z",
+    "updatedAt": "2026-08-01T00:00:00Z"
+  },
+  {
+    "id": "sd-prod-106",
+    "slug": "adjustable-strap-utility-floaters-sd-prod-106",
+    "name": "Adjustable Strap Utility Floaters",
+    "brand": "Wrong",
+    "department": "footwear",
+    "category": "Sandals & Slides",
+    "subcategory": "Floaters",
+    "collection": "Summer Essentials 2026",
+    "shortDescription": "Premium quality adjustable strap utility floaters crafted for comfort and style.",
+    "description": "Elevate your daily fashion with this Adjustable Strap Utility Floaters. Features premium fabric construction, tailored fit, and durable craftsmanship ideal for everyday wear.",
+    "material": "Synthetic Leather & Rubber Sole",
+    "fit": "Comfort Fit",
+    "pattern": "Solid / Textured",
+    "occasion": [
+      "Casual",
+      "Everyday",
+      "Party"
+    ],
+    "careInstructions": [
+      "Machine wash cold",
+      "Do not bleach",
+      "Tumble dry low",
+      "Warm iron if needed"
+    ],
+    "price": 2358,
+    "originalPrice": 3301,
+    "discount": 28,
+    "images": [
+      "https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&w=800&q=80",
+      "https://images.unsplash.com/photo-1521572267360-ee0c2909d518?auto=format&fit=crop&w=800&q=80"
+    ],
+    "thumbnail": "https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&w=800&q=80",
+    "rating": 4.9,
+    "reviewCount": 143,
+    "reviews": [
+      {
+        "id": "rev-sd-prod-106-1",
+        "userName": "Aman Sharma",
+        "rating": 5,
+        "title": "Great quality and fast delivery!",
+        "comment": "Delivered in Neemuch within 45 minutes! Quality is top notch.",
+        "createdAt": "2026-07-28",
+        "verifiedPurchase": true
+      },
+      {
+        "id": "rev-sd-prod-106-2",
+        "userName": "Priya Verma",
+        "rating": 4,
+        "title": "Nice fit and comfortable material",
+        "comment": "The fabric is very soft. True to size.",
+        "createdAt": "2026-07-29",
+        "verifiedPurchase": true
+      }
+    ],
+    "variants": [
+      {
+        "id": "sd-prod-106-var-1",
+        "sku": "SD-SD-PROD-106-OLI-UK6",
+        "size": "UK 6",
+        "colourName": "Olive Green",
+        "colourHex": "#556B2F",
+        "stock": 15,
+        "price": 2358,
+        "originalPrice": 3301
+      },
+      {
+        "id": "sd-prod-106-var-2",
+        "sku": "SD-SD-PROD-106-OLI-UK7",
+        "size": "UK 7",
+        "colourName": "Olive Green",
+        "colourHex": "#556B2F",
+        "stock": 15,
+        "price": 2358,
+        "originalPrice": 3301
+      },
+      {
+        "id": "sd-prod-106-var-3",
+        "sku": "SD-SD-PROD-106-OLI-UK8",
+        "size": "UK 8",
+        "colourName": "Olive Green",
+        "colourHex": "#556B2F",
+        "stock": 15,
+        "price": 2358,
+        "originalPrice": 3301
+      },
+      {
+        "id": "sd-prod-106-var-4",
+        "sku": "SD-SD-PROD-106-OLI-UK9",
+        "size": "UK 9",
+        "colourName": "Olive Green",
+        "colourHex": "#556B2F",
+        "stock": 15,
+        "price": 2358,
+        "originalPrice": 3301
+      },
+      {
+        "id": "sd-prod-106-var-5",
+        "sku": "SD-SD-PROD-106-OLI-UK10",
+        "size": "UK 10",
+        "colourName": "Olive Green",
+        "colourHex": "#556B2F",
+        "stock": 15,
+        "price": 2358,
+        "originalPrice": 3301
+      },
+      {
+        "id": "sd-prod-106-var-6",
+        "sku": "SD-SD-PROD-106-CRI-UK6",
+        "size": "UK 6",
+        "colourName": "Crimson Red",
+        "colourHex": "#DC143C",
+        "stock": 15,
+        "price": 2358,
+        "originalPrice": 3301
+      },
+      {
+        "id": "sd-prod-106-var-7",
+        "sku": "SD-SD-PROD-106-CRI-UK7",
+        "size": "UK 7",
+        "colourName": "Crimson Red",
+        "colourHex": "#DC143C",
+        "stock": 0,
+        "price": 2358,
+        "originalPrice": 3301
+      },
+      {
+        "id": "sd-prod-106-var-8",
+        "sku": "SD-SD-PROD-106-CRI-UK8",
+        "size": "UK 8",
+        "colourName": "Crimson Red",
+        "colourHex": "#DC143C",
+        "stock": 15,
+        "price": 2358,
+        "originalPrice": 3301
+      },
+      {
+        "id": "sd-prod-106-var-9",
+        "sku": "SD-SD-PROD-106-CRI-UK9",
+        "size": "UK 9",
+        "colourName": "Crimson Red",
+        "colourHex": "#DC143C",
+        "stock": 15,
+        "price": 2358,
+        "originalPrice": 3301
+      },
+      {
+        "id": "sd-prod-106-var-10",
+        "sku": "SD-SD-PROD-106-CRI-UK10",
+        "size": "UK 10",
+        "colourName": "Crimson Red",
+        "colourHex": "#DC143C",
+        "stock": 15,
+        "price": 2358,
+        "originalPrice": 3301
+      }
+    ],
+    "tags": [
+      "adjustable strap utility floaters",
+      "footwear",
+      "sandals & slides",
+      "floaters",
+      "wrong",
+      "fashion",
+      "trending"
+    ],
+    "badge": "New",
+    "newArrival": false,
+    "trending": false,
+    "featured": false,
+    "expressDelivery": true,
+    "estimatedDeliveryMinutes": 60,
+    "returnWindowDays": 7,
+    "exchangeAvailable": true,
+    "vendorId": "v-ethnic-vibe",
+    "commissionPercent": 12,
+    "sponsored": false,
+    "active": true,
+    "createdAt": "2026-07-01T00:00:00Z",
+    "updatedAt": "2026-08-01T00:00:00Z"
+  },
+  {
+    "id": "sd-prod-107",
+    "slug": "padded-comfort-leather-sandals-sd-prod-107",
+    "name": "Padded Comfort Leather Sandals",
+    "brand": "Roadster",
+    "department": "footwear",
+    "category": "Sandals & Slides",
+    "subcategory": "Floaters",
+    "collection": "Summer Essentials 2026",
+    "shortDescription": "Premium quality padded comfort leather sandals crafted for comfort and style.",
+    "description": "Elevate your daily fashion with this Padded Comfort Leather Sandals. Features premium fabric construction, tailored fit, and durable craftsmanship ideal for everyday wear.",
+    "material": "Synthetic Leather & Rubber Sole",
+    "fit": "Comfort Fit",
+    "pattern": "Solid / Textured",
+    "occasion": [
+      "Casual",
+      "Everyday",
+      "Party"
+    ],
+    "careInstructions": [
+      "Machine wash cold",
+      "Do not bleach",
+      "Tumble dry low",
+      "Warm iron if needed"
+    ],
+    "price": 2395,
+    "originalPrice": 3353,
+    "discount": 28,
+    "images": [
+      "https://images.unsplash.com/photo-1521572267360-ee0c2909d518?auto=format&fit=crop&w=800&q=80",
+      "https://images.unsplash.com/photo-1503342217505-b0a15ec3261c?auto=format&fit=crop&w=800&q=80"
+    ],
+    "thumbnail": "https://images.unsplash.com/photo-1521572267360-ee0c2909d518?auto=format&fit=crop&w=800&q=80",
+    "rating": 3.8,
+    "reviewCount": 156,
+    "reviews": [
+      {
+        "id": "rev-sd-prod-107-1",
+        "userName": "Aman Sharma",
+        "rating": 5,
+        "title": "Great quality and fast delivery!",
+        "comment": "Delivered in Neemuch within 45 minutes! Quality is top notch.",
+        "createdAt": "2026-07-28",
+        "verifiedPurchase": true
+      },
+      {
+        "id": "rev-sd-prod-107-2",
+        "userName": "Priya Verma",
+        "rating": 4,
+        "title": "Nice fit and comfortable material",
+        "comment": "The fabric is very soft. True to size.",
+        "createdAt": "2026-07-29",
+        "verifiedPurchase": true
+      }
+    ],
+    "variants": [
+      {
+        "id": "sd-prod-107-var-1",
+        "sku": "SD-SD-PROD-107-CRI-UK6",
+        "size": "UK 6",
+        "colourName": "Crimson Red",
+        "colourHex": "#DC143C",
+        "stock": 15,
+        "price": 2395,
+        "originalPrice": 3353
+      },
+      {
+        "id": "sd-prod-107-var-2",
+        "sku": "SD-SD-PROD-107-CRI-UK7",
+        "size": "UK 7",
+        "colourName": "Crimson Red",
+        "colourHex": "#DC143C",
+        "stock": 15,
+        "price": 2395,
+        "originalPrice": 3353
+      },
+      {
+        "id": "sd-prod-107-var-3",
+        "sku": "SD-SD-PROD-107-CRI-UK8",
+        "size": "UK 8",
+        "colourName": "Crimson Red",
+        "colourHex": "#DC143C",
+        "stock": 15,
+        "price": 2395,
+        "originalPrice": 3353
+      },
+      {
+        "id": "sd-prod-107-var-4",
+        "sku": "SD-SD-PROD-107-CRI-UK9",
+        "size": "UK 9",
+        "colourName": "Crimson Red",
+        "colourHex": "#DC143C",
+        "stock": 15,
+        "price": 2395,
+        "originalPrice": 3353
+      },
+      {
+        "id": "sd-prod-107-var-5",
+        "sku": "SD-SD-PROD-107-CRI-UK10",
+        "size": "UK 10",
+        "colourName": "Crimson Red",
+        "colourHex": "#DC143C",
+        "stock": 15,
+        "price": 2395,
+        "originalPrice": 3353
+      },
+      {
+        "id": "sd-prod-107-var-6",
+        "sku": "SD-SD-PROD-107-BEI-UK6",
+        "size": "UK 6",
+        "colourName": "Beige",
+        "colourHex": "#F5F5DC",
+        "stock": 15,
+        "price": 2395,
+        "originalPrice": 3353
+      },
+      {
+        "id": "sd-prod-107-var-7",
+        "sku": "SD-SD-PROD-107-BEI-UK7",
+        "size": "UK 7",
+        "colourName": "Beige",
+        "colourHex": "#F5F5DC",
+        "stock": 0,
+        "price": 2395,
+        "originalPrice": 3353
+      },
+      {
+        "id": "sd-prod-107-var-8",
+        "sku": "SD-SD-PROD-107-BEI-UK8",
+        "size": "UK 8",
+        "colourName": "Beige",
+        "colourHex": "#F5F5DC",
+        "stock": 15,
+        "price": 2395,
+        "originalPrice": 3353
+      },
+      {
+        "id": "sd-prod-107-var-9",
+        "sku": "SD-SD-PROD-107-BEI-UK9",
+        "size": "UK 9",
+        "colourName": "Beige",
+        "colourHex": "#F5F5DC",
+        "stock": 15,
+        "price": 2395,
+        "originalPrice": 3353
+      },
+      {
+        "id": "sd-prod-107-var-10",
+        "sku": "SD-SD-PROD-107-BEI-UK10",
+        "size": "UK 10",
+        "colourName": "Beige",
+        "colourHex": "#F5F5DC",
+        "stock": 15,
+        "price": 2395,
+        "originalPrice": 3353
+      }
+    ],
+    "tags": [
+      "padded comfort leather sandals",
+      "footwear",
+      "sandals & slides",
+      "floaters",
+      "roadster",
+      "fashion",
+      "trending"
+    ],
+    "badge": "Trending",
+    "newArrival": true,
+    "trending": true,
+    "featured": true,
+    "expressDelivery": true,
+    "estimatedDeliveryMinutes": 60,
+    "returnWindowDays": 7,
+    "exchangeAvailable": true,
+    "vendorId": "v-urban-style",
+    "commissionPercent": 12,
+    "sponsored": false,
+    "active": true,
+    "createdAt": "2026-07-01T00:00:00Z",
+    "updatedAt": "2026-08-01T00:00:00Z"
+  },
+  {
+    "id": "sd-prod-108",
+    "slug": "cushioned-foam-pool-slides-sd-prod-108",
+    "name": "Cushioned Foam Pool Slides",
+    "brand": "HRX",
+    "department": "footwear",
+    "category": "Sandals & Slides",
+    "subcategory": "Floaters",
+    "collection": "Summer Essentials 2026",
+    "shortDescription": "Premium quality cushioned foam pool slides crafted for comfort and style.",
+    "description": "Elevate your daily fashion with this Cushioned Foam Pool Slides. Features premium fabric construction, tailored fit, and durable craftsmanship ideal for everyday wear.",
+    "material": "Synthetic Leather & Rubber Sole",
+    "fit": "Comfort Fit",
+    "pattern": "Solid / Textured",
+    "occasion": [
+      "Casual",
+      "Everyday",
+      "Party"
+    ],
+    "careInstructions": [
+      "Machine wash cold",
+      "Do not bleach",
+      "Tumble dry low",
+      "Warm iron if needed"
+    ],
+    "price": 432,
+    "originalPrice": 604,
+    "discount": 28,
+    "images": [
+      "https://images.unsplash.com/photo-1503342217505-b0a15ec3261c?auto=format&fit=crop&w=800&q=80",
+      "https://images.unsplash.com/photo-1576995853123-5a10305d93c0?auto=format&fit=crop&w=800&q=80"
+    ],
+    "thumbnail": "https://images.unsplash.com/photo-1503342217505-b0a15ec3261c?auto=format&fit=crop&w=800&q=80",
+    "rating": 3.9,
+    "reviewCount": 169,
+    "reviews": [
+      {
+        "id": "rev-sd-prod-108-1",
+        "userName": "Aman Sharma",
+        "rating": 5,
+        "title": "Great quality and fast delivery!",
+        "comment": "Delivered in Neemuch within 45 minutes! Quality is top notch.",
+        "createdAt": "2026-07-28",
+        "verifiedPurchase": true
+      },
+      {
+        "id": "rev-sd-prod-108-2",
+        "userName": "Priya Verma",
+        "rating": 4,
+        "title": "Nice fit and comfortable material",
+        "comment": "The fabric is very soft. True to size.",
+        "createdAt": "2026-07-29",
+        "verifiedPurchase": true
+      }
+    ],
+    "variants": [
+      {
+        "id": "sd-prod-108-var-1",
+        "sku": "SD-SD-PROD-108-BEI-UK6",
+        "size": "UK 6",
+        "colourName": "Beige",
+        "colourHex": "#F5F5DC",
+        "stock": 15,
+        "price": 432,
+        "originalPrice": 604
+      },
+      {
+        "id": "sd-prod-108-var-2",
+        "sku": "SD-SD-PROD-108-BEI-UK7",
+        "size": "UK 7",
+        "colourName": "Beige",
+        "colourHex": "#F5F5DC",
+        "stock": 15,
+        "price": 432,
+        "originalPrice": 604
+      },
+      {
+        "id": "sd-prod-108-var-3",
+        "sku": "SD-SD-PROD-108-BEI-UK8",
+        "size": "UK 8",
+        "colourName": "Beige",
+        "colourHex": "#F5F5DC",
+        "stock": 15,
+        "price": 432,
+        "originalPrice": 604
+      },
+      {
+        "id": "sd-prod-108-var-4",
+        "sku": "SD-SD-PROD-108-BEI-UK9",
+        "size": "UK 9",
+        "colourName": "Beige",
+        "colourHex": "#F5F5DC",
+        "stock": 15,
+        "price": 432,
+        "originalPrice": 604
+      },
+      {
+        "id": "sd-prod-108-var-5",
+        "sku": "SD-SD-PROD-108-BEI-UK10",
+        "size": "UK 10",
+        "colourName": "Beige",
+        "colourHex": "#F5F5DC",
+        "stock": 15,
+        "price": 432,
+        "originalPrice": 604
+      },
+      {
+        "id": "sd-prod-108-var-6",
+        "sku": "SD-SD-PROD-108-CHA-UK6",
+        "size": "UK 6",
+        "colourName": "Charcoal Gray",
+        "colourHex": "#36454F",
+        "stock": 15,
+        "price": 432,
+        "originalPrice": 604
+      },
+      {
+        "id": "sd-prod-108-var-7",
+        "sku": "SD-SD-PROD-108-CHA-UK7",
+        "size": "UK 7",
+        "colourName": "Charcoal Gray",
+        "colourHex": "#36454F",
+        "stock": 0,
+        "price": 432,
+        "originalPrice": 604
+      },
+      {
+        "id": "sd-prod-108-var-8",
+        "sku": "SD-SD-PROD-108-CHA-UK8",
+        "size": "UK 8",
+        "colourName": "Charcoal Gray",
+        "colourHex": "#36454F",
+        "stock": 15,
+        "price": 432,
+        "originalPrice": 604
+      },
+      {
+        "id": "sd-prod-108-var-9",
+        "sku": "SD-SD-PROD-108-CHA-UK9",
+        "size": "UK 9",
+        "colourName": "Charcoal Gray",
+        "colourHex": "#36454F",
+        "stock": 15,
+        "price": 432,
+        "originalPrice": 604
+      },
+      {
+        "id": "sd-prod-108-var-10",
+        "sku": "SD-SD-PROD-108-CHA-UK10",
+        "size": "UK 10",
+        "colourName": "Charcoal Gray",
+        "colourHex": "#36454F",
+        "stock": 15,
+        "price": 432,
+        "originalPrice": 604
+      }
+    ],
+    "tags": [
+      "cushioned foam pool slides",
+      "footwear",
+      "sandals & slides",
+      "floaters",
+      "hrx",
+      "fashion",
+      "trending"
+    ],
+    "badge": "New",
+    "newArrival": false,
+    "trending": false,
+    "featured": false,
+    "expressDelivery": true,
+    "estimatedDeliveryMinutes": 60,
+    "returnWindowDays": 7,
+    "exchangeAvailable": true,
+    "vendorId": "v-ethnic-vibe",
+    "commissionPercent": 12,
+    "sponsored": false,
+    "active": true,
+    "createdAt": "2026-07-01T00:00:00Z",
+    "updatedAt": "2026-08-01T00:00:00Z"
+  },
+  {
+    "id": "sd-prod-109",
+    "slug": "embellished-ethnic-mojaris-sd-prod-109",
+    "name": "Embellished Ethnic Mojaris",
+    "brand": "StyleDash Studio",
+    "department": "footwear",
+    "category": "Sandals & Slides",
+    "subcategory": "Floaters",
+    "collection": "Summer Essentials 2026",
+    "shortDescription": "Premium quality embellished ethnic mojaris crafted for comfort and style.",
+    "description": "Elevate your daily fashion with this Embellished Ethnic Mojaris. Features premium fabric construction, tailored fit, and durable craftsmanship ideal for everyday wear.",
+    "material": "Synthetic Leather & Rubber Sole",
+    "fit": "Comfort Fit",
+    "pattern": "Solid / Textured",
+    "occasion": [
+      "Casual",
+      "Everyday",
+      "Party"
+    ],
+    "careInstructions": [
+      "Machine wash cold",
+      "Do not bleach",
+      "Tumble dry low",
+      "Warm iron if needed"
+    ],
+    "price": 469,
+    "originalPrice": 656,
+    "discount": 28,
+    "images": [
+      "https://images.unsplash.com/photo-1576995853123-5a10305d93c0?auto=format&fit=crop&w=800&q=80",
+      "https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?auto=format&fit=crop&w=800&q=80"
+    ],
+    "thumbnail": "https://images.unsplash.com/photo-1576995853123-5a10305d93c0?auto=format&fit=crop&w=800&q=80",
+    "rating": 4.0,
+    "reviewCount": 182,
+    "reviews": [
+      {
+        "id": "rev-sd-prod-109-1",
+        "userName": "Aman Sharma",
+        "rating": 5,
+        "title": "Great quality and fast delivery!",
+        "comment": "Delivered in Neemuch within 45 minutes! Quality is top notch.",
+        "createdAt": "2026-07-28",
+        "verifiedPurchase": true
+      },
+      {
+        "id": "rev-sd-prod-109-2",
+        "userName": "Priya Verma",
+        "rating": 4,
+        "title": "Nice fit and comfortable material",
+        "comment": "The fabric is very soft. True to size.",
+        "createdAt": "2026-07-29",
+        "verifiedPurchase": true
+      }
+    ],
+    "variants": [
+      {
+        "id": "sd-prod-109-var-1",
+        "sku": "SD-SD-PROD-109-CHA-UK6",
+        "size": "UK 6",
+        "colourName": "Charcoal Gray",
+        "colourHex": "#36454F",
+        "stock": 15,
+        "price": 469,
+        "originalPrice": 656
+      },
+      {
+        "id": "sd-prod-109-var-2",
+        "sku": "SD-SD-PROD-109-CHA-UK7",
+        "size": "UK 7",
+        "colourName": "Charcoal Gray",
+        "colourHex": "#36454F",
+        "stock": 15,
+        "price": 469,
+        "originalPrice": 656
+      },
+      {
+        "id": "sd-prod-109-var-3",
+        "sku": "SD-SD-PROD-109-CHA-UK8",
+        "size": "UK 8",
+        "colourName": "Charcoal Gray",
+        "colourHex": "#36454F",
+        "stock": 15,
+        "price": 469,
+        "originalPrice": 656
+      },
+      {
+        "id": "sd-prod-109-var-4",
+        "sku": "SD-SD-PROD-109-CHA-UK9",
+        "size": "UK 9",
+        "colourName": "Charcoal Gray",
+        "colourHex": "#36454F",
+        "stock": 15,
+        "price": 469,
+        "originalPrice": 656
+      },
+      {
+        "id": "sd-prod-109-var-5",
+        "sku": "SD-SD-PROD-109-CHA-UK10",
+        "size": "UK 10",
+        "colourName": "Charcoal Gray",
+        "colourHex": "#36454F",
+        "stock": 15,
+        "price": 469,
+        "originalPrice": 656
+      },
+      {
+        "id": "sd-prod-109-var-6",
+        "sku": "SD-SD-PROD-109-MUS-UK6",
+        "size": "UK 6",
+        "colourName": "Mustard Yellow",
+        "colourHex": "#FFDB58",
+        "stock": 15,
+        "price": 469,
+        "originalPrice": 656
+      },
+      {
+        "id": "sd-prod-109-var-7",
+        "sku": "SD-SD-PROD-109-MUS-UK7",
+        "size": "UK 7",
+        "colourName": "Mustard Yellow",
+        "colourHex": "#FFDB58",
+        "stock": 0,
+        "price": 469,
+        "originalPrice": 656
+      },
+      {
+        "id": "sd-prod-109-var-8",
+        "sku": "SD-SD-PROD-109-MUS-UK8",
+        "size": "UK 8",
+        "colourName": "Mustard Yellow",
+        "colourHex": "#FFDB58",
+        "stock": 15,
+        "price": 469,
+        "originalPrice": 656
+      },
+      {
+        "id": "sd-prod-109-var-9",
+        "sku": "SD-SD-PROD-109-MUS-UK9",
+        "size": "UK 9",
+        "colourName": "Mustard Yellow",
+        "colourHex": "#FFDB58",
+        "stock": 15,
+        "price": 469,
+        "originalPrice": 656
+      },
+      {
+        "id": "sd-prod-109-var-10",
+        "sku": "SD-SD-PROD-109-MUS-UK10",
+        "size": "UK 10",
+        "colourName": "Mustard Yellow",
+        "colourHex": "#FFDB58",
+        "stock": 15,
+        "price": 469,
+        "originalPrice": 656
+      }
+    ],
+    "tags": [
+      "embellished ethnic mojaris",
+      "footwear",
+      "sandals & slides",
+      "floaters",
+      "styledash studio",
+      "fashion",
+      "trending"
+    ],
+    "badge": "Express",
+    "newArrival": false,
+    "trending": true,
+    "featured": false,
+    "expressDelivery": true,
+    "estimatedDeliveryMinutes": 60,
+    "returnWindowDays": 7,
+    "exchangeAvailable": true,
+    "vendorId": "v-urban-style",
+    "commissionPercent": 12,
+    "sponsored": false,
+    "active": true,
+    "createdAt": "2026-07-01T00:00:00Z",
+    "updatedAt": "2026-08-01T00:00:00Z"
+  },
+  {
+    "id": "sd-prod-110",
+    "slug": "block-heel-strappy-sandals-sd-prod-110",
+    "name": "Block Heel Strappy Sandals",
+    "brand": "Anouk",
+    "department": "footwear",
+    "category": "Sandals & Slides",
+    "subcategory": "Floaters",
+    "collection": "Summer Essentials 2026",
+    "shortDescription": "Premium quality block heel strappy sandals crafted for comfort and style.",
+    "description": "Elevate your daily fashion with this Block Heel Strappy Sandals. Features premium fabric construction, tailored fit, and durable craftsmanship ideal for everyday wear.",
+    "material": "Synthetic Leather & Rubber Sole",
+    "fit": "Comfort Fit",
+    "pattern": "Solid / Textured",
+    "occasion": [
+      "Casual",
+      "Everyday",
+      "Party"
+    ],
+    "careInstructions": [
+      "Machine wash cold",
+      "Do not bleach",
+      "Tumble dry low",
+      "Warm iron if needed"
+    ],
+    "price": 506,
+    "originalPrice": 708,
+    "discount": 28,
+    "images": [
+      "https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?auto=format&fit=crop&w=800&q=80",
+      "https://images.unsplash.com/photo-1529374255404-311a2a4f1fd9?auto=format&fit=crop&w=800&q=80"
+    ],
+    "thumbnail": "https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?auto=format&fit=crop&w=800&q=80",
+    "rating": 4.1,
+    "reviewCount": 15,
+    "reviews": [
+      {
+        "id": "rev-sd-prod-110-1",
+        "userName": "Aman Sharma",
+        "rating": 5,
+        "title": "Great quality and fast delivery!",
+        "comment": "Delivered in Neemuch within 45 minutes! Quality is top notch.",
+        "createdAt": "2026-07-28",
+        "verifiedPurchase": true
+      },
+      {
+        "id": "rev-sd-prod-110-2",
+        "userName": "Priya Verma",
+        "rating": 4,
+        "title": "Nice fit and comfortable material",
+        "comment": "The fabric is very soft. True to size.",
+        "createdAt": "2026-07-29",
+        "verifiedPurchase": true
+      }
+    ],
+    "variants": [
+      {
+        "id": "sd-prod-110-var-1",
+        "sku": "SD-SD-PROD-110-MUS-UK6",
+        "size": "UK 6",
+        "colourName": "Mustard Yellow",
+        "colourHex": "#FFDB58",
+        "stock": 15,
+        "price": 506,
+        "originalPrice": 708
+      },
+      {
+        "id": "sd-prod-110-var-2",
+        "sku": "SD-SD-PROD-110-MUS-UK7",
+        "size": "UK 7",
+        "colourName": "Mustard Yellow",
+        "colourHex": "#FFDB58",
+        "stock": 15,
+        "price": 506,
+        "originalPrice": 708
+      },
+      {
+        "id": "sd-prod-110-var-3",
+        "sku": "SD-SD-PROD-110-MUS-UK8",
+        "size": "UK 8",
+        "colourName": "Mustard Yellow",
+        "colourHex": "#FFDB58",
+        "stock": 15,
+        "price": 506,
+        "originalPrice": 708
+      },
+      {
+        "id": "sd-prod-110-var-4",
+        "sku": "SD-SD-PROD-110-MUS-UK9",
+        "size": "UK 9",
+        "colourName": "Mustard Yellow",
+        "colourHex": "#FFDB58",
+        "stock": 15,
+        "price": 506,
+        "originalPrice": 708
+      },
+      {
+        "id": "sd-prod-110-var-5",
+        "sku": "SD-SD-PROD-110-MUS-UK10",
+        "size": "UK 10",
+        "colourName": "Mustard Yellow",
+        "colourHex": "#FFDB58",
+        "stock": 15,
+        "price": 506,
+        "originalPrice": 708
+      },
+      {
+        "id": "sd-prod-110-var-6",
+        "sku": "SD-SD-PROD-110-BLA-UK6",
+        "size": "UK 6",
+        "colourName": "Black",
+        "colourHex": "#000000",
+        "stock": 15,
+        "price": 506,
+        "originalPrice": 708
+      },
+      {
+        "id": "sd-prod-110-var-7",
+        "sku": "SD-SD-PROD-110-BLA-UK7",
+        "size": "UK 7",
+        "colourName": "Black",
+        "colourHex": "#000000",
+        "stock": 0,
+        "price": 506,
+        "originalPrice": 708
+      },
+      {
+        "id": "sd-prod-110-var-8",
+        "sku": "SD-SD-PROD-110-BLA-UK8",
+        "size": "UK 8",
+        "colourName": "Black",
+        "colourHex": "#000000",
+        "stock": 15,
+        "price": 506,
+        "originalPrice": 708
+      },
+      {
+        "id": "sd-prod-110-var-9",
+        "sku": "SD-SD-PROD-110-BLA-UK9",
+        "size": "UK 9",
+        "colourName": "Black",
+        "colourHex": "#000000",
+        "stock": 15,
+        "price": 506,
+        "originalPrice": 708
+      },
+      {
+        "id": "sd-prod-110-var-10",
+        "sku": "SD-SD-PROD-110-BLA-UK10",
+        "size": "UK 10",
+        "colourName": "Black",
+        "colourHex": "#000000",
+        "stock": 15,
+        "price": 506,
+        "originalPrice": 708
+      }
+    ],
+    "tags": [
+      "block heel strappy sandals",
+      "footwear",
+      "sandals & slides",
+      "floaters",
+      "anouk",
+      "fashion",
+      "trending"
+    ],
+    "badge": "Trending",
+    "newArrival": true,
+    "trending": false,
+    "featured": false,
+    "expressDelivery": true,
+    "estimatedDeliveryMinutes": 60,
+    "returnWindowDays": 7,
+    "exchangeAvailable": true,
+    "vendorId": "v-ethnic-vibe",
+    "commissionPercent": 12,
+    "sponsored": false,
+    "active": true,
+    "createdAt": "2026-07-01T00:00:00Z",
+    "updatedAt": "2026-08-01T00:00:00Z"
+  },
+  {
+    "id": "sd-prod-111",
+    "slug": "vegan-leather-structured-tote-bag-sd-prod-111",
+    "name": "Vegan Leather Structured Tote Bag",
+    "brand": "Mast & Harbour",
+    "department": "accessories",
+    "category": "Bags & Backpacks",
+    "subcategory": "Backpacks",
+    "collection": "Summer Essentials 2026",
+    "shortDescription": "Premium quality vegan leather structured tote bag crafted for comfort and style.",
+    "description": "Elevate your daily fashion with this Vegan Leather Structured Tote Bag. Features premium fabric construction, tailored fit, and durable craftsmanship ideal for everyday wear.",
+    "material": "100% Premium Combed Cotton",
+    "fit": "Regular Fit",
+    "pattern": "Solid / Textured",
+    "occasion": [
+      "Casual",
+      "Everyday",
+      "Party"
+    ],
+    "careInstructions": [
+      "Machine wash cold",
+      "Do not bleach",
+      "Tumble dry low",
+      "Warm iron if needed"
+    ],
+    "price": 543,
+    "originalPrice": 760,
+    "discount": 28,
+    "images": [
+      "https://images.unsplash.com/photo-1529374255404-311a2a4f1fd9?auto=format&fit=crop&w=800&q=80",
+      "https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&w=800&q=80"
+    ],
+    "thumbnail": "https://images.unsplash.com/photo-1529374255404-311a2a4f1fd9?auto=format&fit=crop&w=800&q=80",
+    "rating": 4.2,
+    "reviewCount": 28,
+    "reviews": [
+      {
+        "id": "rev-sd-prod-111-1",
+        "userName": "Aman Sharma",
+        "rating": 5,
+        "title": "Great quality and fast delivery!",
+        "comment": "Delivered in Neemuch within 45 minutes! Quality is top notch.",
+        "createdAt": "2026-07-28",
+        "verifiedPurchase": true
+      },
+      {
+        "id": "rev-sd-prod-111-2",
+        "userName": "Priya Verma",
+        "rating": 4,
+        "title": "Nice fit and comfortable material",
+        "comment": "The fabric is very soft. True to size.",
+        "createdAt": "2026-07-29",
+        "verifiedPurchase": true
+      }
+    ],
+    "variants": [
+      {
+        "id": "sd-prod-111-var-1",
+        "sku": "SD-SD-PROD-111-BLA-FreeSize",
+        "size": "Free Size",
+        "colourName": "Black",
+        "colourHex": "#000000",
+        "stock": 15,
+        "price": 543,
+        "originalPrice": 760
+      },
+      {
+        "id": "sd-prod-111-var-2",
+        "sku": "SD-SD-PROD-111-WHI-FreeSize",
+        "size": "Free Size",
+        "colourName": "White",
+        "colourHex": "#FFFFFF",
+        "stock": 15,
+        "price": 543,
+        "originalPrice": 760
+      }
+    ],
+    "tags": [
+      "vegan leather structured tote bag",
+      "accessories",
+      "bags & backpacks",
+      "backpacks",
+      "mast & harbour",
+      "fashion",
+      "trending"
+    ],
+    "badge": "Express",
+    "newArrival": false,
+    "trending": true,
+    "featured": true,
+    "expressDelivery": true,
+    "estimatedDeliveryMinutes": 60,
+    "returnWindowDays": 7,
+    "exchangeAvailable": true,
+    "vendorId": "v-urban-style",
+    "commissionPercent": 12,
+    "sponsored": true,
+    "active": true,
+    "createdAt": "2026-07-01T00:00:00Z",
+    "updatedAt": "2026-08-01T00:00:00Z"
+  },
+  {
+    "id": "sd-prod-112",
+    "slug": "water-resistant-laptop-backpack-sd-prod-112",
+    "name": "Water-Resistant Laptop Backpack",
+    "brand": "Highlander",
+    "department": "accessories",
+    "category": "Bags & Backpacks",
+    "subcategory": "Backpacks",
+    "collection": "Summer Essentials 2026",
+    "shortDescription": "Premium quality water-resistant laptop backpack crafted for comfort and style.",
+    "description": "Elevate your daily fashion with this Water-Resistant Laptop Backpack. Features premium fabric construction, tailored fit, and durable craftsmanship ideal for everyday wear.",
+    "material": "100% Premium Combed Cotton",
+    "fit": "Regular Fit",
+    "pattern": "Solid / Textured",
+    "occasion": [
+      "Casual",
+      "Everyday",
+      "Party"
+    ],
+    "careInstructions": [
+      "Machine wash cold",
+      "Do not bleach",
+      "Tumble dry low",
+      "Warm iron if needed"
+    ],
+    "price": 580,
+    "originalPrice": 812,
+    "discount": 28,
+    "images": [
+      "https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&w=800&q=80",
+      "https://images.unsplash.com/photo-1521572267360-ee0c2909d518?auto=format&fit=crop&w=800&q=80"
+    ],
+    "thumbnail": "https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&w=800&q=80",
+    "rating": 4.3,
+    "reviewCount": 41,
+    "reviews": [
+      {
+        "id": "rev-sd-prod-112-1",
+        "userName": "Aman Sharma",
+        "rating": 5,
+        "title": "Great quality and fast delivery!",
+        "comment": "Delivered in Neemuch within 45 minutes! Quality is top notch.",
+        "createdAt": "2026-07-28",
+        "verifiedPurchase": true
+      },
+      {
+        "id": "rev-sd-prod-112-2",
+        "userName": "Priya Verma",
+        "rating": 4,
+        "title": "Nice fit and comfortable material",
+        "comment": "The fabric is very soft. True to size.",
+        "createdAt": "2026-07-29",
+        "verifiedPurchase": true
+      }
+    ],
+    "variants": [
+      {
+        "id": "sd-prod-112-var-1",
+        "sku": "SD-SD-PROD-112-WHI-FreeSize",
+        "size": "Free Size",
+        "colourName": "White",
+        "colourHex": "#FFFFFF",
+        "stock": 15,
+        "price": 580,
+        "originalPrice": 812
+      },
+      {
+        "id": "sd-prod-112-var-2",
+        "sku": "SD-SD-PROD-112-NAV-FreeSize",
+        "size": "Free Size",
+        "colourName": "Navy Blue",
+        "colourHex": "#000080",
+        "stock": 15,
+        "price": 580,
+        "originalPrice": 812
+      }
+    ],
+    "tags": [
+      "water-resistant laptop backpack",
+      "accessories",
+      "bags & backpacks",
+      "backpacks",
+      "highlander",
+      "fashion",
+      "trending"
+    ],
+    "badge": "New",
+    "newArrival": false,
+    "trending": false,
+    "featured": false,
+    "expressDelivery": true,
+    "estimatedDeliveryMinutes": 60,
+    "returnWindowDays": 7,
+    "exchangeAvailable": true,
+    "vendorId": "v-ethnic-vibe",
+    "commissionPercent": 12,
+    "sponsored": false,
+    "active": true,
+    "createdAt": "2026-07-01T00:00:00Z",
+    "updatedAt": "2026-08-01T00:00:00Z"
+  },
+  {
+    "id": "sd-prod-113",
+    "slug": "canvas-crossbody-sling-bag-sd-prod-113",
+    "name": "Canvas Crossbody Sling Bag",
+    "brand": "Bawree",
+    "department": "accessories",
+    "category": "Bags & Backpacks",
+    "subcategory": "Backpacks",
+    "collection": "Summer Essentials 2026",
+    "shortDescription": "Premium quality canvas crossbody sling bag crafted for comfort and style.",
+    "description": "Elevate your daily fashion with this Canvas Crossbody Sling Bag. Features premium fabric construction, tailored fit, and durable craftsmanship ideal for everyday wear.",
+    "material": "100% Premium Combed Cotton",
+    "fit": "Regular Fit",
+    "pattern": "Solid / Textured",
+    "occasion": [
+      "Casual",
+      "Everyday",
+      "Party"
+    ],
+    "careInstructions": [
+      "Machine wash cold",
+      "Do not bleach",
+      "Tumble dry low",
+      "Warm iron if needed"
+    ],
+    "price": 617,
+    "originalPrice": 863,
+    "discount": 28,
+    "images": [
+      "https://images.unsplash.com/photo-1521572267360-ee0c2909d518?auto=format&fit=crop&w=800&q=80",
+      "https://images.unsplash.com/photo-1503342217505-b0a15ec3261c?auto=format&fit=crop&w=800&q=80"
+    ],
+    "thumbnail": "https://images.unsplash.com/photo-1521572267360-ee0c2909d518?auto=format&fit=crop&w=800&q=80",
+    "rating": 4.4,
+    "reviewCount": 54,
+    "reviews": [
+      {
+        "id": "rev-sd-prod-113-1",
+        "userName": "Aman Sharma",
+        "rating": 5,
+        "title": "Great quality and fast delivery!",
+        "comment": "Delivered in Neemuch within 45 minutes! Quality is top notch.",
+        "createdAt": "2026-07-28",
+        "verifiedPurchase": true
+      },
+      {
+        "id": "rev-sd-prod-113-2",
+        "userName": "Priya Verma",
+        "rating": 4,
+        "title": "Nice fit and comfortable material",
+        "comment": "The fabric is very soft. True to size.",
+        "createdAt": "2026-07-29",
+        "verifiedPurchase": true
+      }
+    ],
+    "variants": [
+      {
+        "id": "sd-prod-113-var-1",
+        "sku": "SD-SD-PROD-113-NAV-FreeSize",
+        "size": "Free Size",
+        "colourName": "Navy Blue",
+        "colourHex": "#000080",
+        "stock": 15,
+        "price": 617,
+        "originalPrice": 863
+      },
+      {
+        "id": "sd-prod-113-var-2",
+        "sku": "SD-SD-PROD-113-OLI-FreeSize",
+        "size": "Free Size",
+        "colourName": "Olive Green",
+        "colourHex": "#556B2F",
+        "stock": 15,
+        "price": 617,
+        "originalPrice": 863
+      }
+    ],
+    "tags": [
+      "canvas crossbody sling bag",
+      "accessories",
+      "bags & backpacks",
+      "backpacks",
+      "bawree",
+      "fashion",
+      "trending"
+    ],
+    "badge": "Trending",
+    "newArrival": true,
+    "trending": true,
+    "featured": false,
+    "expressDelivery": true,
+    "estimatedDeliveryMinutes": 60,
+    "returnWindowDays": 7,
+    "exchangeAvailable": true,
+    "vendorId": "v-urban-style",
+    "commissionPercent": 12,
+    "sponsored": false,
+    "active": true,
+    "createdAt": "2026-07-01T00:00:00Z",
+    "updatedAt": "2026-08-01T00:00:00Z"
+  },
+  {
+    "id": "sd-prod-114",
+    "slug": "quilted-chain-shoulder-bag-sd-prod-114",
+    "name": "Quilted Chain Shoulder Bag",
+    "brand": "Snitch",
+    "department": "accessories",
+    "category": "Bags & Backpacks",
+    "subcategory": "Backpacks",
+    "collection": "Summer Essentials 2026",
+    "shortDescription": "Premium quality quilted chain shoulder bag crafted for comfort and style.",
+    "description": "Elevate your daily fashion with this Quilted Chain Shoulder Bag. Features premium fabric construction, tailored fit, and durable craftsmanship ideal for everyday wear.",
+    "material": "100% Premium Combed Cotton",
+    "fit": "Regular Fit",
+    "pattern": "Solid / Textured",
+    "occasion": [
+      "Casual",
+      "Everyday",
+      "Party"
+    ],
+    "careInstructions": [
+      "Machine wash cold",
+      "Do not bleach",
+      "Tumble dry low",
+      "Warm iron if needed"
+    ],
+    "price": 654,
+    "originalPrice": 915,
+    "discount": 28,
+    "images": [
+      "https://images.unsplash.com/photo-1503342217505-b0a15ec3261c?auto=format&fit=crop&w=800&q=80",
+      "https://images.unsplash.com/photo-1576995853123-5a10305d93c0?auto=format&fit=crop&w=800&q=80"
+    ],
+    "thumbnail": "https://images.unsplash.com/photo-1503342217505-b0a15ec3261c?auto=format&fit=crop&w=800&q=80",
+    "rating": 4.5,
+    "reviewCount": 67,
+    "reviews": [
+      {
+        "id": "rev-sd-prod-114-1",
+        "userName": "Aman Sharma",
+        "rating": 5,
+        "title": "Great quality and fast delivery!",
+        "comment": "Delivered in Neemuch within 45 minutes! Quality is top notch.",
+        "createdAt": "2026-07-28",
+        "verifiedPurchase": true
+      },
+      {
+        "id": "rev-sd-prod-114-2",
+        "userName": "Priya Verma",
+        "rating": 4,
+        "title": "Nice fit and comfortable material",
+        "comment": "The fabric is very soft. True to size.",
+        "createdAt": "2026-07-29",
+        "verifiedPurchase": true
+      }
+    ],
+    "variants": [
+      {
+        "id": "sd-prod-114-var-1",
+        "sku": "SD-SD-PROD-114-OLI-FreeSize",
+        "size": "Free Size",
+        "colourName": "Olive Green",
+        "colourHex": "#556B2F",
+        "stock": 15,
+        "price": 654,
+        "originalPrice": 915
+      },
+      {
+        "id": "sd-prod-114-var-2",
+        "sku": "SD-SD-PROD-114-CRI-FreeSize",
+        "size": "Free Size",
+        "colourName": "Crimson Red",
+        "colourHex": "#DC143C",
+        "stock": 15,
+        "price": 654,
+        "originalPrice": 915
+      }
+    ],
+    "tags": [
+      "quilted chain shoulder bag",
+      "accessories",
+      "bags & backpacks",
+      "backpacks",
+      "snitch",
+      "fashion",
+      "trending"
+    ],
+    "badge": "New",
+    "newArrival": false,
+    "trending": false,
+    "featured": false,
+    "expressDelivery": true,
+    "estimatedDeliveryMinutes": 60,
+    "returnWindowDays": 7,
+    "exchangeAvailable": true,
+    "vendorId": "v-ethnic-vibe",
+    "commissionPercent": 12,
+    "sponsored": false,
+    "active": true,
+    "createdAt": "2026-07-01T00:00:00Z",
+    "updatedAt": "2026-08-01T00:00:00Z"
+  },
+  {
+    "id": "sd-prod-115",
+    "slug": "compact-utility-waist-pouch-sd-prod-115",
+    "name": "Compact Utility Waist Pouch",
+    "brand": "Wrong",
+    "department": "accessories",
+    "category": "Bags & Backpacks",
+    "subcategory": "Backpacks",
+    "collection": "Summer Essentials 2026",
+    "shortDescription": "Premium quality compact utility waist pouch crafted for comfort and style.",
+    "description": "Elevate your daily fashion with this Compact Utility Waist Pouch. Features premium fabric construction, tailored fit, and durable craftsmanship ideal for everyday wear.",
+    "material": "100% Premium Combed Cotton",
+    "fit": "Regular Fit",
+    "pattern": "Solid / Textured",
+    "occasion": [
+      "Casual",
+      "Everyday",
+      "Party"
+    ],
+    "careInstructions": [
+      "Machine wash cold",
+      "Do not bleach",
+      "Tumble dry low",
+      "Warm iron if needed"
+    ],
+    "price": 691,
+    "originalPrice": 967,
+    "discount": 28,
+    "images": [
+      "https://images.unsplash.com/photo-1576995853123-5a10305d93c0?auto=format&fit=crop&w=800&q=80",
+      "https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?auto=format&fit=crop&w=800&q=80"
+    ],
+    "thumbnail": "https://images.unsplash.com/photo-1576995853123-5a10305d93c0?auto=format&fit=crop&w=800&q=80",
+    "rating": 4.6,
+    "reviewCount": 80,
+    "reviews": [
+      {
+        "id": "rev-sd-prod-115-1",
+        "userName": "Aman Sharma",
+        "rating": 5,
+        "title": "Great quality and fast delivery!",
+        "comment": "Delivered in Neemuch within 45 minutes! Quality is top notch.",
+        "createdAt": "2026-07-28",
+        "verifiedPurchase": true
+      },
+      {
+        "id": "rev-sd-prod-115-2",
+        "userName": "Priya Verma",
+        "rating": 4,
+        "title": "Nice fit and comfortable material",
+        "comment": "The fabric is very soft. True to size.",
+        "createdAt": "2026-07-29",
+        "verifiedPurchase": true
+      }
+    ],
+    "variants": [
+      {
+        "id": "sd-prod-115-var-1",
+        "sku": "SD-SD-PROD-115-CRI-FreeSize",
+        "size": "Free Size",
+        "colourName": "Crimson Red",
+        "colourHex": "#DC143C",
+        "stock": 15,
+        "price": 691,
+        "originalPrice": 967
+      },
+      {
+        "id": "sd-prod-115-var-2",
+        "sku": "SD-SD-PROD-115-BEI-FreeSize",
+        "size": "Free Size",
+        "colourName": "Beige",
+        "colourHex": "#F5F5DC",
+        "stock": 15,
+        "price": 691,
+        "originalPrice": 967
+      }
+    ],
+    "tags": [
+      "compact utility waist pouch",
+      "accessories",
+      "bags & backpacks",
+      "backpacks",
+      "wrong",
+      "fashion",
+      "trending"
+    ],
+    "badge": "Express",
+    "newArrival": false,
+    "trending": true,
+    "featured": true,
+    "expressDelivery": true,
+    "estimatedDeliveryMinutes": 60,
+    "returnWindowDays": 7,
+    "exchangeAvailable": true,
+    "vendorId": "v-urban-style",
+    "commissionPercent": 12,
+    "sponsored": false,
+    "active": true,
+    "createdAt": "2026-07-01T00:00:00Z",
+    "updatedAt": "2026-08-01T00:00:00Z"
+  },
+  {
+    "id": "sd-prod-116",
+    "slug": "minimalist-stainless-steel-mesh-watch-sd-prod-116",
+    "name": "Minimalist Stainless Steel Mesh Watch",
+    "brand": "Roadster",
+    "department": "accessories",
+    "category": "Watches",
+    "subcategory": "Analog",
+    "collection": "Summer Essentials 2026",
+    "shortDescription": "Premium quality minimalist stainless steel mesh watch crafted for comfort and style.",
+    "description": "Elevate your daily fashion with this Minimalist Stainless Steel Mesh Watch. Features premium fabric construction, tailored fit, and durable craftsmanship ideal for everyday wear.",
+    "material": "100% Premium Combed Cotton",
+    "fit": "Regular Fit",
+    "pattern": "Solid / Textured",
+    "occasion": [
+      "Casual",
+      "Everyday",
+      "Party"
+    ],
+    "careInstructions": [
+      "Machine wash cold",
+      "Do not bleach",
+      "Tumble dry low",
+      "Warm iron if needed"
+    ],
+    "price": 728,
+    "originalPrice": 1019,
+    "discount": 28,
+    "images": [
+      "https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?auto=format&fit=crop&w=800&q=80",
+      "https://images.unsplash.com/photo-1529374255404-311a2a4f1fd9?auto=format&fit=crop&w=800&q=80"
+    ],
+    "thumbnail": "https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?auto=format&fit=crop&w=800&q=80",
+    "rating": 4.7,
+    "reviewCount": 93,
+    "reviews": [
+      {
+        "id": "rev-sd-prod-116-1",
+        "userName": "Aman Sharma",
+        "rating": 5,
+        "title": "Great quality and fast delivery!",
+        "comment": "Delivered in Neemuch within 45 minutes! Quality is top notch.",
+        "createdAt": "2026-07-28",
+        "verifiedPurchase": true
+      },
+      {
+        "id": "rev-sd-prod-116-2",
+        "userName": "Priya Verma",
+        "rating": 4,
+        "title": "Nice fit and comfortable material",
+        "comment": "The fabric is very soft. True to size.",
+        "createdAt": "2026-07-29",
+        "verifiedPurchase": true
+      }
+    ],
+    "variants": [
+      {
+        "id": "sd-prod-116-var-1",
+        "sku": "SD-SD-PROD-116-BEI-FreeSize",
+        "size": "Free Size",
+        "colourName": "Beige",
+        "colourHex": "#F5F5DC",
+        "stock": 15,
+        "price": 728,
+        "originalPrice": 1019
+      },
+      {
+        "id": "sd-prod-116-var-2",
+        "sku": "SD-SD-PROD-116-CHA-FreeSize",
+        "size": "Free Size",
+        "colourName": "Charcoal Gray",
+        "colourHex": "#36454F",
+        "stock": 15,
+        "price": 728,
+        "originalPrice": 1019
+      }
+    ],
+    "tags": [
+      "minimalist stainless steel mesh watch",
+      "accessories",
+      "watches",
+      "analog",
+      "roadster",
+      "fashion",
+      "trending"
+    ],
+    "badge": "Trending",
+    "newArrival": true,
+    "trending": false,
+    "featured": false,
+    "expressDelivery": true,
+    "estimatedDeliveryMinutes": 60,
+    "returnWindowDays": 7,
+    "exchangeAvailable": true,
+    "vendorId": "v-ethnic-vibe",
+    "commissionPercent": 12,
+    "sponsored": false,
+    "active": true,
+    "createdAt": "2026-07-01T00:00:00Z",
+    "updatedAt": "2026-08-01T00:00:00Z"
+  },
+  {
+    "id": "sd-prod-117",
+    "slug": "classic-leather-strap-chronograph-sd-prod-117",
+    "name": "Classic Leather Strap Chronograph",
+    "brand": "HRX",
+    "department": "accessories",
+    "category": "Watches",
+    "subcategory": "Analog",
+    "collection": "Summer Essentials 2026",
+    "shortDescription": "Premium quality classic leather strap chronograph crafted for comfort and style.",
+    "description": "Elevate your daily fashion with this Classic Leather Strap Chronograph. Features premium fabric construction, tailored fit, and durable craftsmanship ideal for everyday wear.",
+    "material": "100% Premium Combed Cotton",
+    "fit": "Regular Fit",
+    "pattern": "Solid / Textured",
+    "occasion": [
+      "Casual",
+      "Everyday",
+      "Party"
+    ],
+    "careInstructions": [
+      "Machine wash cold",
+      "Do not bleach",
+      "Tumble dry low",
+      "Warm iron if needed"
+    ],
+    "price": 765,
+    "originalPrice": 1071,
+    "discount": 28,
+    "images": [
+      "https://images.unsplash.com/photo-1529374255404-311a2a4f1fd9?auto=format&fit=crop&w=800&q=80",
+      "https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&w=800&q=80"
+    ],
+    "thumbnail": "https://images.unsplash.com/photo-1529374255404-311a2a4f1fd9?auto=format&fit=crop&w=800&q=80",
+    "rating": 4.8,
+    "reviewCount": 106,
+    "reviews": [
+      {
+        "id": "rev-sd-prod-117-1",
+        "userName": "Aman Sharma",
+        "rating": 5,
+        "title": "Great quality and fast delivery!",
+        "comment": "Delivered in Neemuch within 45 minutes! Quality is top notch.",
+        "createdAt": "2026-07-28",
+        "verifiedPurchase": true
+      },
+      {
+        "id": "rev-sd-prod-117-2",
+        "userName": "Priya Verma",
+        "rating": 4,
+        "title": "Nice fit and comfortable material",
+        "comment": "The fabric is very soft. True to size.",
+        "createdAt": "2026-07-29",
+        "verifiedPurchase": true
+      }
+    ],
+    "variants": [
+      {
+        "id": "sd-prod-117-var-1",
+        "sku": "SD-SD-PROD-117-CHA-FreeSize",
+        "size": "Free Size",
+        "colourName": "Charcoal Gray",
+        "colourHex": "#36454F",
+        "stock": 15,
+        "price": 765,
+        "originalPrice": 1071
+      },
+      {
+        "id": "sd-prod-117-var-2",
+        "sku": "SD-SD-PROD-117-MUS-FreeSize",
+        "size": "Free Size",
+        "colourName": "Mustard Yellow",
+        "colourHex": "#FFDB58",
+        "stock": 15,
+        "price": 765,
+        "originalPrice": 1071
+      }
+    ],
+    "tags": [
+      "classic leather strap chronograph",
+      "accessories",
+      "watches",
+      "analog",
+      "hrx",
+      "fashion",
+      "trending"
+    ],
+    "badge": "Express",
+    "newArrival": false,
+    "trending": true,
+    "featured": false,
+    "expressDelivery": true,
+    "estimatedDeliveryMinutes": 60,
+    "returnWindowDays": 7,
+    "exchangeAvailable": true,
+    "vendorId": "v-urban-style",
+    "commissionPercent": 12,
+    "sponsored": false,
+    "active": true,
+    "createdAt": "2026-07-01T00:00:00Z",
+    "updatedAt": "2026-08-01T00:00:00Z"
+  },
+  {
+    "id": "sd-prod-118",
+    "slug": "smart-fitness-tracker-watch-sd-prod-118",
+    "name": "Smart Fitness Tracker Watch",
+    "brand": "StyleDash Studio",
+    "department": "accessories",
+    "category": "Watches",
+    "subcategory": "Analog",
+    "collection": "Summer Essentials 2026",
+    "shortDescription": "Premium quality smart fitness tracker watch crafted for comfort and style.",
+    "description": "Elevate your daily fashion with this Smart Fitness Tracker Watch. Features premium fabric construction, tailored fit, and durable craftsmanship ideal for everyday wear.",
+    "material": "100% Premium Combed Cotton",
+    "fit": "Regular Fit",
+    "pattern": "Solid / Textured",
+    "occasion": [
+      "Casual",
+      "Everyday",
+      "Party"
+    ],
+    "careInstructions": [
+      "Machine wash cold",
+      "Do not bleach",
+      "Tumble dry low",
+      "Warm iron if needed"
+    ],
+    "price": 802,
+    "originalPrice": 1122,
+    "discount": 28,
+    "images": [
+      "https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&w=800&q=80",
+      "https://images.unsplash.com/photo-1521572267360-ee0c2909d518?auto=format&fit=crop&w=800&q=80"
+    ],
+    "thumbnail": "https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&w=800&q=80",
+    "rating": 4.9,
+    "reviewCount": 119,
+    "reviews": [
+      {
+        "id": "rev-sd-prod-118-1",
+        "userName": "Aman Sharma",
+        "rating": 5,
+        "title": "Great quality and fast delivery!",
+        "comment": "Delivered in Neemuch within 45 minutes! Quality is top notch.",
+        "createdAt": "2026-07-28",
+        "verifiedPurchase": true
+      },
+      {
+        "id": "rev-sd-prod-118-2",
+        "userName": "Priya Verma",
+        "rating": 4,
+        "title": "Nice fit and comfortable material",
+        "comment": "The fabric is very soft. True to size.",
+        "createdAt": "2026-07-29",
+        "verifiedPurchase": true
+      }
+    ],
+    "variants": [
+      {
+        "id": "sd-prod-118-var-1",
+        "sku": "SD-SD-PROD-118-MUS-FreeSize",
+        "size": "Free Size",
+        "colourName": "Mustard Yellow",
+        "colourHex": "#FFDB58",
+        "stock": 15,
+        "price": 802,
+        "originalPrice": 1122
+      },
+      {
+        "id": "sd-prod-118-var-2",
+        "sku": "SD-SD-PROD-118-BLA-FreeSize",
+        "size": "Free Size",
+        "colourName": "Black",
+        "colourHex": "#000000",
+        "stock": 15,
+        "price": 802,
+        "originalPrice": 1122
+      }
+    ],
+    "tags": [
+      "smart fitness tracker watch",
+      "accessories",
+      "watches",
+      "analog",
+      "styledash studio",
+      "fashion",
+      "trending"
+    ],
+    "badge": "New",
+    "newArrival": false,
+    "trending": false,
+    "featured": false,
+    "expressDelivery": true,
+    "estimatedDeliveryMinutes": 60,
+    "returnWindowDays": 7,
+    "exchangeAvailable": true,
+    "vendorId": "v-ethnic-vibe",
+    "commissionPercent": 12,
+    "sponsored": true,
+    "active": true,
+    "createdAt": "2026-07-01T00:00:00Z",
+    "updatedAt": "2026-08-01T00:00:00Z"
+  },
+  {
+    "id": "sd-prod-119",
+    "slug": "rose-gold-dial-fashion-watch-sd-prod-119",
+    "name": "Rose Gold Dial Fashion Watch",
+    "brand": "Anouk",
+    "department": "accessories",
+    "category": "Watches",
+    "subcategory": "Analog",
+    "collection": "Summer Essentials 2026",
+    "shortDescription": "Premium quality rose gold dial fashion watch crafted for comfort and style.",
+    "description": "Elevate your daily fashion with this Rose Gold Dial Fashion Watch. Features premium fabric construction, tailored fit, and durable craftsmanship ideal for everyday wear.",
+    "material": "100% Premium Combed Cotton",
+    "fit": "Regular Fit",
+    "pattern": "Solid / Textured",
+    "occasion": [
+      "Casual",
+      "Everyday",
+      "Party"
+    ],
+    "careInstructions": [
+      "Machine wash cold",
+      "Do not bleach",
+      "Tumble dry low",
+      "Warm iron if needed"
+    ],
+    "price": 839,
+    "originalPrice": 1174,
+    "discount": 28,
+    "images": [
+      "https://images.unsplash.com/photo-1521572267360-ee0c2909d518?auto=format&fit=crop&w=800&q=80",
+      "https://images.unsplash.com/photo-1503342217505-b0a15ec3261c?auto=format&fit=crop&w=800&q=80"
+    ],
+    "thumbnail": "https://images.unsplash.com/photo-1521572267360-ee0c2909d518?auto=format&fit=crop&w=800&q=80",
+    "rating": 3.8,
+    "reviewCount": 132,
+    "reviews": [
+      {
+        "id": "rev-sd-prod-119-1",
+        "userName": "Aman Sharma",
+        "rating": 5,
+        "title": "Great quality and fast delivery!",
+        "comment": "Delivered in Neemuch within 45 minutes! Quality is top notch.",
+        "createdAt": "2026-07-28",
+        "verifiedPurchase": true
+      },
+      {
+        "id": "rev-sd-prod-119-2",
+        "userName": "Priya Verma",
+        "rating": 4,
+        "title": "Nice fit and comfortable material",
+        "comment": "The fabric is very soft. True to size.",
+        "createdAt": "2026-07-29",
+        "verifiedPurchase": true
+      }
+    ],
+    "variants": [
+      {
+        "id": "sd-prod-119-var-1",
+        "sku": "SD-SD-PROD-119-BLA-FreeSize",
+        "size": "Free Size",
+        "colourName": "Black",
+        "colourHex": "#000000",
+        "stock": 15,
+        "price": 839,
+        "originalPrice": 1174
+      },
+      {
+        "id": "sd-prod-119-var-2",
+        "sku": "SD-SD-PROD-119-WHI-FreeSize",
+        "size": "Free Size",
+        "colourName": "White",
+        "colourHex": "#FFFFFF",
+        "stock": 15,
+        "price": 839,
+        "originalPrice": 1174
+      }
+    ],
+    "tags": [
+      "rose gold dial fashion watch",
+      "accessories",
+      "watches",
+      "analog",
+      "anouk",
+      "fashion",
+      "trending"
+    ],
+    "badge": "Trending",
+    "newArrival": true,
+    "trending": true,
+    "featured": true,
+    "expressDelivery": true,
+    "estimatedDeliveryMinutes": 60,
+    "returnWindowDays": 7,
+    "exchangeAvailable": true,
+    "vendorId": "v-urban-style",
+    "commissionPercent": 12,
+    "sponsored": false,
+    "active": true,
+    "createdAt": "2026-07-01T00:00:00Z",
+    "updatedAt": "2026-08-01T00:00:00Z"
+  },
+  {
+    "id": "sd-prod-120",
+    "slug": "vintage-square-dial-watch-sd-prod-120",
+    "name": "Vintage Square Dial Watch",
+    "brand": "Mast & Harbour",
+    "department": "accessories",
+    "category": "Watches",
+    "subcategory": "Analog",
+    "collection": "Summer Essentials 2026",
+    "shortDescription": "Premium quality vintage square dial watch crafted for comfort and style.",
+    "description": "Elevate your daily fashion with this Vintage Square Dial Watch. Features premium fabric construction, tailored fit, and durable craftsmanship ideal for everyday wear.",
+    "material": "100% Premium Combed Cotton",
+    "fit": "Regular Fit",
+    "pattern": "Solid / Textured",
+    "occasion": [
+      "Casual",
+      "Everyday",
+      "Party"
+    ],
+    "careInstructions": [
+      "Machine wash cold",
+      "Do not bleach",
+      "Tumble dry low",
+      "Warm iron if needed"
+    ],
+    "price": 876,
+    "originalPrice": 1226,
+    "discount": 28,
+    "images": [
+      "https://images.unsplash.com/photo-1503342217505-b0a15ec3261c?auto=format&fit=crop&w=800&q=80",
+      "https://images.unsplash.com/photo-1576995853123-5a10305d93c0?auto=format&fit=crop&w=800&q=80"
+    ],
+    "thumbnail": "https://images.unsplash.com/photo-1503342217505-b0a15ec3261c?auto=format&fit=crop&w=800&q=80",
+    "rating": 3.9,
+    "reviewCount": 145,
+    "reviews": [
+      {
+        "id": "rev-sd-prod-120-1",
+        "userName": "Aman Sharma",
+        "rating": 5,
+        "title": "Great quality and fast delivery!",
+        "comment": "Delivered in Neemuch within 45 minutes! Quality is top notch.",
+        "createdAt": "2026-07-28",
+        "verifiedPurchase": true
+      },
+      {
+        "id": "rev-sd-prod-120-2",
+        "userName": "Priya Verma",
+        "rating": 4,
+        "title": "Nice fit and comfortable material",
+        "comment": "The fabric is very soft. True to size.",
+        "createdAt": "2026-07-29",
+        "verifiedPurchase": true
+      }
+    ],
+    "variants": [
+      {
+        "id": "sd-prod-120-var-1",
+        "sku": "SD-SD-PROD-120-WHI-FreeSize",
+        "size": "Free Size",
+        "colourName": "White",
+        "colourHex": "#FFFFFF",
+        "stock": 15,
+        "price": 876,
+        "originalPrice": 1226
+      },
+      {
+        "id": "sd-prod-120-var-2",
+        "sku": "SD-SD-PROD-120-NAV-FreeSize",
+        "size": "Free Size",
+        "colourName": "Navy Blue",
+        "colourHex": "#000080",
+        "stock": 15,
+        "price": 876,
+        "originalPrice": 1226
+      }
+    ],
+    "tags": [
+      "vintage square dial watch",
+      "accessories",
+      "watches",
+      "analog",
+      "mast & harbour",
+      "fashion",
+      "trending"
+    ],
+    "badge": "New",
+    "newArrival": false,
+    "trending": false,
+    "featured": false,
+    "expressDelivery": true,
+    "estimatedDeliveryMinutes": 60,
+    "returnWindowDays": 7,
+    "exchangeAvailable": true,
+    "vendorId": "v-ethnic-vibe",
+    "commissionPercent": 12,
+    "sponsored": false,
+    "active": true,
+    "createdAt": "2026-07-01T00:00:00Z",
+    "updatedAt": "2026-08-01T00:00:00Z"
+  },
+  {
+    "id": "sd-prod-121",
+    "slug": "polarized-uv400-wayfarer-sunglasses-sd-prod-121",
+    "name": "Polarized UV400 Wayfarer Sunglasses",
+    "brand": "Highlander",
+    "department": "accessories",
+    "category": "Caps, Belts & Sunglasses",
+    "subcategory": "Sunglasses",
+    "collection": "Summer Essentials 2026",
+    "shortDescription": "Premium quality polarized uv400 wayfarer sunglasses crafted for comfort and style.",
+    "description": "Elevate your daily fashion with this Polarized UV400 Wayfarer Sunglasses. Features premium fabric construction, tailored fit, and durable craftsmanship ideal for everyday wear.",
+    "material": "100% Premium Combed Cotton",
+    "fit": "Regular Fit",
+    "pattern": "Solid / Textured",
+    "occasion": [
+      "Casual",
+      "Everyday",
+      "Party"
+    ],
+    "careInstructions": [
+      "Machine wash cold",
+      "Do not bleach",
+      "Tumble dry low",
+      "Warm iron if needed"
+    ],
+    "price": 913,
+    "originalPrice": 1278,
+    "discount": 28,
+    "images": [
+      "https://images.unsplash.com/photo-1576995853123-5a10305d93c0?auto=format&fit=crop&w=800&q=80",
+      "https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?auto=format&fit=crop&w=800&q=80"
+    ],
+    "thumbnail": "https://images.unsplash.com/photo-1576995853123-5a10305d93c0?auto=format&fit=crop&w=800&q=80",
+    "rating": 4.0,
+    "reviewCount": 158,
+    "reviews": [
+      {
+        "id": "rev-sd-prod-121-1",
+        "userName": "Aman Sharma",
+        "rating": 5,
+        "title": "Great quality and fast delivery!",
+        "comment": "Delivered in Neemuch within 45 minutes! Quality is top notch.",
+        "createdAt": "2026-07-28",
+        "verifiedPurchase": true
+      },
+      {
+        "id": "rev-sd-prod-121-2",
+        "userName": "Priya Verma",
+        "rating": 4,
+        "title": "Nice fit and comfortable material",
+        "comment": "The fabric is very soft. True to size.",
+        "createdAt": "2026-07-29",
+        "verifiedPurchase": true
+      }
+    ],
+    "variants": [
+      {
+        "id": "sd-prod-121-var-1",
+        "sku": "SD-SD-PROD-121-NAV-FreeSize",
+        "size": "Free Size",
+        "colourName": "Navy Blue",
+        "colourHex": "#000080",
+        "stock": 15,
+        "price": 913,
+        "originalPrice": 1278
+      },
+      {
+        "id": "sd-prod-121-var-2",
+        "sku": "SD-SD-PROD-121-OLI-FreeSize",
+        "size": "Free Size",
+        "colourName": "Olive Green",
+        "colourHex": "#556B2F",
+        "stock": 15,
+        "price": 913,
+        "originalPrice": 1278
+      }
+    ],
+    "tags": [
+      "polarized uv400 wayfarer sunglasses",
+      "accessories",
+      "caps, belts & sunglasses",
+      "sunglasses",
+      "highlander",
+      "fashion",
+      "trending"
+    ],
+    "badge": "Express",
+    "newArrival": false,
+    "trending": true,
+    "featured": false,
+    "expressDelivery": true,
+    "estimatedDeliveryMinutes": 60,
+    "returnWindowDays": 7,
+    "exchangeAvailable": true,
+    "vendorId": "v-urban-style",
+    "commissionPercent": 12,
+    "sponsored": false,
+    "active": true,
+    "createdAt": "2026-07-01T00:00:00Z",
+    "updatedAt": "2026-08-01T00:00:00Z"
+  },
+  {
+    "id": "sd-prod-122",
+    "slug": "reversible-leather-dress-belt-sd-prod-122",
+    "name": "Reversible Leather Dress Belt",
+    "brand": "Bawree",
+    "department": "accessories",
+    "category": "Caps, Belts & Sunglasses",
+    "subcategory": "Sunglasses",
+    "collection": "Summer Essentials 2026",
+    "shortDescription": "Premium quality reversible leather dress belt crafted for comfort and style.",
+    "description": "Elevate your daily fashion with this Reversible Leather Dress Belt. Features premium fabric construction, tailored fit, and durable craftsmanship ideal for everyday wear.",
+    "material": "100% Premium Combed Cotton",
+    "fit": "Regular Fit",
+    "pattern": "Solid / Textured",
+    "occasion": [
+      "Casual",
+      "Everyday",
+      "Party"
+    ],
+    "careInstructions": [
+      "Machine wash cold",
+      "Do not bleach",
+      "Tumble dry low",
+      "Warm iron if needed"
+    ],
+    "price": 950,
+    "originalPrice": 1330,
+    "discount": 28,
+    "images": [
+      "https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?auto=format&fit=crop&w=800&q=80",
+      "https://images.unsplash.com/photo-1529374255404-311a2a4f1fd9?auto=format&fit=crop&w=800&q=80"
+    ],
+    "thumbnail": "https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?auto=format&fit=crop&w=800&q=80",
+    "rating": 4.1,
+    "reviewCount": 171,
+    "reviews": [
+      {
+        "id": "rev-sd-prod-122-1",
+        "userName": "Aman Sharma",
+        "rating": 5,
+        "title": "Great quality and fast delivery!",
+        "comment": "Delivered in Neemuch within 45 minutes! Quality is top notch.",
+        "createdAt": "2026-07-28",
+        "verifiedPurchase": true
+      },
+      {
+        "id": "rev-sd-prod-122-2",
+        "userName": "Priya Verma",
+        "rating": 4,
+        "title": "Nice fit and comfortable material",
+        "comment": "The fabric is very soft. True to size.",
+        "createdAt": "2026-07-29",
+        "verifiedPurchase": true
+      }
+    ],
+    "variants": [
+      {
+        "id": "sd-prod-122-var-1",
+        "sku": "SD-SD-PROD-122-OLI-FreeSize",
+        "size": "Free Size",
+        "colourName": "Olive Green",
+        "colourHex": "#556B2F",
+        "stock": 15,
+        "price": 950,
+        "originalPrice": 1330
+      },
+      {
+        "id": "sd-prod-122-var-2",
+        "sku": "SD-SD-PROD-122-CRI-FreeSize",
+        "size": "Free Size",
+        "colourName": "Crimson Red",
+        "colourHex": "#DC143C",
+        "stock": 15,
+        "price": 950,
+        "originalPrice": 1330
+      }
+    ],
+    "tags": [
+      "reversible leather dress belt",
+      "accessories",
+      "caps, belts & sunglasses",
+      "sunglasses",
+      "bawree",
+      "fashion",
+      "trending"
+    ],
+    "badge": "Trending",
+    "newArrival": true,
+    "trending": false,
+    "featured": false,
+    "expressDelivery": true,
+    "estimatedDeliveryMinutes": 60,
+    "returnWindowDays": 7,
+    "exchangeAvailable": true,
+    "vendorId": "v-ethnic-vibe",
+    "commissionPercent": 12,
+    "sponsored": false,
+    "active": true,
+    "createdAt": "2026-07-01T00:00:00Z",
+    "updatedAt": "2026-08-01T00:00:00Z"
+  },
+  {
+    "id": "sd-prod-123",
+    "slug": "cotton-baseball-cap-with-embroidery-sd-prod-123",
+    "name": "Cotton Baseball Cap with Embroidery",
+    "brand": "Snitch",
+    "department": "accessories",
+    "category": "Caps, Belts & Sunglasses",
+    "subcategory": "Sunglasses",
+    "collection": "Summer Essentials 2026",
+    "shortDescription": "Premium quality cotton baseball cap with embroidery crafted for comfort and style.",
+    "description": "Elevate your daily fashion with this Cotton Baseball Cap with Embroidery. Features premium fabric construction, tailored fit, and durable craftsmanship ideal for everyday wear.",
+    "material": "100% Premium Combed Cotton",
+    "fit": "Regular Fit",
+    "pattern": "Solid / Textured",
+    "occasion": [
+      "Casual",
+      "Everyday",
+      "Party"
+    ],
+    "careInstructions": [
+      "Machine wash cold",
+      "Do not bleach",
+      "Tumble dry low",
+      "Warm iron if needed"
+    ],
+    "price": 987,
+    "originalPrice": 1381,
+    "discount": 28,
+    "images": [
+      "https://images.unsplash.com/photo-1529374255404-311a2a4f1fd9?auto=format&fit=crop&w=800&q=80",
+      "https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&w=800&q=80"
+    ],
+    "thumbnail": "https://images.unsplash.com/photo-1529374255404-311a2a4f1fd9?auto=format&fit=crop&w=800&q=80",
+    "rating": 4.2,
+    "reviewCount": 184,
+    "reviews": [
+      {
+        "id": "rev-sd-prod-123-1",
+        "userName": "Aman Sharma",
+        "rating": 5,
+        "title": "Great quality and fast delivery!",
+        "comment": "Delivered in Neemuch within 45 minutes! Quality is top notch.",
+        "createdAt": "2026-07-28",
+        "verifiedPurchase": true
+      },
+      {
+        "id": "rev-sd-prod-123-2",
+        "userName": "Priya Verma",
+        "rating": 4,
+        "title": "Nice fit and comfortable material",
+        "comment": "The fabric is very soft. True to size.",
+        "createdAt": "2026-07-29",
+        "verifiedPurchase": true
+      }
+    ],
+    "variants": [
+      {
+        "id": "sd-prod-123-var-1",
+        "sku": "SD-SD-PROD-123-CRI-FreeSize",
+        "size": "Free Size",
+        "colourName": "Crimson Red",
+        "colourHex": "#DC143C",
+        "stock": 15,
+        "price": 987,
+        "originalPrice": 1381
+      },
+      {
+        "id": "sd-prod-123-var-2",
+        "sku": "SD-SD-PROD-123-BEI-FreeSize",
+        "size": "Free Size",
+        "colourName": "Beige",
+        "colourHex": "#F5F5DC",
+        "stock": 15,
+        "price": 987,
+        "originalPrice": 1381
+      }
+    ],
+    "tags": [
+      "cotton baseball cap with embroidery",
+      "accessories",
+      "caps, belts & sunglasses",
+      "sunglasses",
+      "snitch",
+      "fashion",
+      "trending"
+    ],
+    "badge": "Express",
+    "newArrival": false,
+    "trending": true,
+    "featured": true,
+    "expressDelivery": true,
+    "estimatedDeliveryMinutes": 60,
+    "returnWindowDays": 7,
+    "exchangeAvailable": true,
+    "vendorId": "v-urban-style",
+    "commissionPercent": 12,
+    "sponsored": false,
+    "active": true,
+    "createdAt": "2026-07-01T00:00:00Z",
+    "updatedAt": "2026-08-01T00:00:00Z"
+  },
+  {
+    "id": "sd-prod-124",
+    "slug": "retro-aviator-metal-sunglasses-sd-prod-124",
+    "name": "Retro Aviator Metal Sunglasses",
+    "brand": "Wrong",
+    "department": "accessories",
+    "category": "Caps, Belts & Sunglasses",
+    "subcategory": "Sunglasses",
+    "collection": "Summer Essentials 2026",
+    "shortDescription": "Premium quality retro aviator metal sunglasses crafted for comfort and style.",
+    "description": "Elevate your daily fashion with this Retro Aviator Metal Sunglasses. Features premium fabric construction, tailored fit, and durable craftsmanship ideal for everyday wear.",
+    "material": "100% Premium Combed Cotton",
+    "fit": "Regular Fit",
+    "pattern": "Solid / Textured",
+    "occasion": [
+      "Casual",
+      "Everyday",
+      "Party"
+    ],
+    "careInstructions": [
+      "Machine wash cold",
+      "Do not bleach",
+      "Tumble dry low",
+      "Warm iron if needed"
+    ],
+    "price": 1024,
+    "originalPrice": 1433,
+    "discount": 28,
+    "images": [
+      "https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&w=800&q=80",
+      "https://images.unsplash.com/photo-1521572267360-ee0c2909d518?auto=format&fit=crop&w=800&q=80"
+    ],
+    "thumbnail": "https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&w=800&q=80",
+    "rating": 4.3,
+    "reviewCount": 17,
+    "reviews": [
+      {
+        "id": "rev-sd-prod-124-1",
+        "userName": "Aman Sharma",
+        "rating": 5,
+        "title": "Great quality and fast delivery!",
+        "comment": "Delivered in Neemuch within 45 minutes! Quality is top notch.",
+        "createdAt": "2026-07-28",
+        "verifiedPurchase": true
+      },
+      {
+        "id": "rev-sd-prod-124-2",
+        "userName": "Priya Verma",
+        "rating": 4,
+        "title": "Nice fit and comfortable material",
+        "comment": "The fabric is very soft. True to size.",
+        "createdAt": "2026-07-29",
+        "verifiedPurchase": true
+      }
+    ],
+    "variants": [
+      {
+        "id": "sd-prod-124-var-1",
+        "sku": "SD-SD-PROD-124-BEI-FreeSize",
+        "size": "Free Size",
+        "colourName": "Beige",
+        "colourHex": "#F5F5DC",
+        "stock": 15,
+        "price": 1024,
+        "originalPrice": 1433
+      },
+      {
+        "id": "sd-prod-124-var-2",
+        "sku": "SD-SD-PROD-124-CHA-FreeSize",
+        "size": "Free Size",
+        "colourName": "Charcoal Gray",
+        "colourHex": "#36454F",
+        "stock": 15,
+        "price": 1024,
+        "originalPrice": 1433
+      }
+    ],
+    "tags": [
+      "retro aviator metal sunglasses",
+      "accessories",
+      "caps, belts & sunglasses",
+      "sunglasses",
+      "wrong",
+      "fashion",
+      "trending"
+    ],
+    "badge": "New",
+    "newArrival": false,
+    "trending": false,
+    "featured": false,
+    "expressDelivery": true,
+    "estimatedDeliveryMinutes": 60,
+    "returnWindowDays": 7,
+    "exchangeAvailable": true,
+    "vendorId": "v-ethnic-vibe",
+    "commissionPercent": 12,
+    "sponsored": false,
+    "active": true,
+    "createdAt": "2026-07-01T00:00:00Z",
+    "updatedAt": "2026-08-01T00:00:00Z"
+  },
+  {
+    "id": "sd-prod-125",
+    "slug": "woven-elastic-stretch-belt-sd-prod-125",
+    "name": "Woven Elastic Stretch Belt",
+    "brand": "Roadster",
+    "department": "accessories",
+    "category": "Caps, Belts & Sunglasses",
+    "subcategory": "Sunglasses",
+    "collection": "Summer Essentials 2026",
+    "shortDescription": "Premium quality woven elastic stretch belt crafted for comfort and style.",
+    "description": "Elevate your daily fashion with this Woven Elastic Stretch Belt. Features premium fabric construction, tailored fit, and durable craftsmanship ideal for everyday wear.",
+    "material": "100% Premium Combed Cotton",
+    "fit": "Regular Fit",
+    "pattern": "Solid / Textured",
+    "occasion": [
+      "Casual",
+      "Everyday",
+      "Party"
+    ],
+    "careInstructions": [
+      "Machine wash cold",
+      "Do not bleach",
+      "Tumble dry low",
+      "Warm iron if needed"
+    ],
+    "price": 1061,
+    "originalPrice": 1485,
+    "discount": 28,
+    "images": [
+      "https://images.unsplash.com/photo-1521572267360-ee0c2909d518?auto=format&fit=crop&w=800&q=80",
+      "https://images.unsplash.com/photo-1503342217505-b0a15ec3261c?auto=format&fit=crop&w=800&q=80"
+    ],
+    "thumbnail": "https://images.unsplash.com/photo-1521572267360-ee0c2909d518?auto=format&fit=crop&w=800&q=80",
+    "rating": 4.4,
+    "reviewCount": 30,
+    "reviews": [
+      {
+        "id": "rev-sd-prod-125-1",
+        "userName": "Aman Sharma",
+        "rating": 5,
+        "title": "Great quality and fast delivery!",
+        "comment": "Delivered in Neemuch within 45 minutes! Quality is top notch.",
+        "createdAt": "2026-07-28",
+        "verifiedPurchase": true
+      },
+      {
+        "id": "rev-sd-prod-125-2",
+        "userName": "Priya Verma",
+        "rating": 4,
+        "title": "Nice fit and comfortable material",
+        "comment": "The fabric is very soft. True to size.",
+        "createdAt": "2026-07-29",
+        "verifiedPurchase": true
+      }
+    ],
+    "variants": [
+      {
+        "id": "sd-prod-125-var-1",
+        "sku": "SD-SD-PROD-125-CHA-FreeSize",
+        "size": "Free Size",
+        "colourName": "Charcoal Gray",
+        "colourHex": "#36454F",
+        "stock": 15,
+        "price": 1061,
+        "originalPrice": 1485
+      },
+      {
+        "id": "sd-prod-125-var-2",
+        "sku": "SD-SD-PROD-125-MUS-FreeSize",
+        "size": "Free Size",
+        "colourName": "Mustard Yellow",
+        "colourHex": "#FFDB58",
+        "stock": 15,
+        "price": 1061,
+        "originalPrice": 1485
+      }
+    ],
+    "tags": [
+      "woven elastic stretch belt",
+      "accessories",
+      "caps, belts & sunglasses",
+      "sunglasses",
+      "roadster",
+      "fashion",
+      "trending"
+    ],
+    "badge": "Trending",
+    "newArrival": true,
+    "trending": true,
+    "featured": false,
+    "expressDelivery": true,
+    "estimatedDeliveryMinutes": 60,
+    "returnWindowDays": 7,
+    "exchangeAvailable": true,
+    "vendorId": "v-urban-style",
+    "commissionPercent": 12,
+    "sponsored": true,
+    "active": true,
+    "createdAt": "2026-07-01T00:00:00Z",
+    "updatedAt": "2026-08-01T00:00:00Z"
+  }
+];

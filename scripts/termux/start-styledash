@@ -1,0 +1,44 @@
+#!/data/data/com.termux/files/usr/bin/bash
+# Starts exactly one localhost-only StyleDash SPA server.
+set -u
+
+APP_DIR="$HOME/server"
+RUN_DIR="$HOME/run"
+LOG_DIR="$HOME/logs"
+PID_FILE="$RUN_DIR/styledash.pid"
+LOG_FILE="$LOG_DIR/styledash.log"
+
+mkdir -p "$RUN_DIR" "$LOG_DIR"
+
+trim_log() {
+  [ -f "$1" ] && [ "$(wc -l < "$1")" -gt 2000 ] && tail -n 1500 "$1" > "$1.trim" && mv "$1.trim" "$1"
+}
+
+healthy() {
+  curl -fsS --max-time 5 http://127.0.0.1:8080/ >/dev/null
+}
+
+if [ -s "$PID_FILE" ]; then
+  pid="$(cat "$PID_FILE")"
+  if kill -0 "$pid" 2>/dev/null && healthy; then
+    exit 0
+  fi
+  if kill -0 "$pid" 2>/dev/null && tr '\0' ' ' < "/proc/$pid/cmdline" 2>/dev/null | grep -Fq "$APP_DIR/serve.py"; then
+    kill "$pid" 2>/dev/null || true
+    sleep 2
+  fi
+  rm -f "$PID_FILE"
+fi
+
+trim_log "$LOG_FILE"
+nohup python3 "$APP_DIR/serve.py" --bind 127.0.0.1 --port 8080 --directory "$APP_DIR" >> "$LOG_FILE" 2>&1 &
+pid="$!"
+printf '%s\n' "$pid" > "$PID_FILE"
+
+for _ in $(seq 1 10); do
+  healthy && exit 0
+  sleep 1
+done
+
+echo "$(date -Iseconds) StyleDash did not become healthy; see $LOG_FILE" >> "$LOG_FILE"
+exit 1

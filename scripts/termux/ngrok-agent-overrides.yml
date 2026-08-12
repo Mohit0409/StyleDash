@@ -1,0 +1,13 @@
+version: 3
+
+agent:
+  # Android's loopback resolver is not reachable from the official static agent.
+  dns_resolver_ips:
+    - 1.1.1.1
+    - 8.8.8.8
+  # The Linux agent cannot reach Android's system resolver for its CRL fetch.
+  # TLS certificate-chain validation remains enabled.
+  crl_noverify: true
+  console_ui: false
+  update_check: false
+  inspect_db_size: 1048576

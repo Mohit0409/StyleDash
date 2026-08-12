@@ -3,24 +3,21 @@
     "public": "dist",
     "ignore": ["firebase.json", "**/.*", "**/node_modules/**"],
     "rewrites": [
-      {
-        "source": "**",
-        "destination": "/index.html"
-      }
+      { "source": "**", "destination": "/index.html" }
     ],
     "headers": [
       {
         "source": "**/*.@(js|css)",
-        "headers": [
-          { "key": "Cache-Control", "value": "max-age=31536000" }
-        ]
+        "headers": [{ "key": "Cache-Control", "value": "public,max-age=31536000,immutable" }]
       },
       {
         "source": "**/*.@(jpg|jpeg|png|gif|webp|svg|ico)",
-        "headers": [
-          { "key": "Cache-Control", "value": "max-age=86400" }
-        ]
+        "headers": [{ "key": "Cache-Control", "value": "public,max-age=86400" }]
       }
     ]
+  },
+  "firestore": {
+    "rules": "firestore.rules",
+    "indexes": "firestore.indexes.json"
   }
 }

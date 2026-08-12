@@ -1,73 +1,103 @@
-import React from 'react'
-import { Link } from 'react-router-dom'
-import { MapPin, Phone, Mail, Instagram, Twitter, Facebook } from 'lucide-react'
+import React from 'react';
+import { Link } from 'react-router-dom';
+import { ShieldCheck, Truck, RefreshCw, Zap, Heart } from 'lucide-react';
+import { CONFIG } from '../config';
 
-const Footer: React.FC = () => (
-  <footer className="bg-gray-900 text-gray-300 mt-16">
-    <div className="max-w-7xl mx-auto px-4 py-12 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-8">
-      {/* Brand */}
-      <div>
-        <div className="flex items-center gap-2 mb-3">
-          <div className="w-8 h-8 bg-brand-yellow rounded-xl flex items-center justify-center font-black text-brand-dark text-sm">NB</div>
-          <span className="font-extrabold text-lg text-white">Neemuch<span className="text-brand-yellow">Blink</span></span>
+export const Footer: React.FC = () => {
+  return (
+    <footer className="bg-neutral-950 text-neutral-300 border-t border-neutral-800 pt-12 pb-8 mt-20">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+
+        {/* Trust Badges */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-6 pb-12 border-b border-neutral-800 text-center">
+          <div className="flex flex-col items-center gap-2">
+            <div className="p-3 bg-neutral-900 rounded-full text-lime-400">
+              <Zap className="w-6 h-6 fill-lime-400" />
+            </div>
+            <h4 className="font-bold text-white text-sm">60-Minute Delivery</h4>
+            <p className="text-xs text-neutral-400">Hyperlocal fashion dispatch in {CONFIG.SERVICE_CITY}</p>
+          </div>
+          <div className="flex flex-col items-center gap-2">
+            <div className="p-3 bg-neutral-900 rounded-full text-lime-400">
+              <RefreshCw className="w-6 h-6" />
+            </div>
+            <h4 className="font-bold text-white text-sm">7-Day Easy Exchange</h4>
+            <p className="text-xs text-neutral-400">Hassle-free size swaps at your doorstep</p>
+          </div>
+          <div className="flex flex-col items-center gap-2">
+            <div className="p-3 bg-neutral-900 rounded-full text-lime-400">
+              <ShieldCheck className="w-6 h-6" />
+            </div>
+            <h4 className="font-bold text-white text-sm">100% Quality Checked</h4>
+            <p className="text-xs text-neutral-400">Curated from top verified local stores</p>
+          </div>
+          <div className="flex flex-col items-center gap-2">
+            <div className="p-3 bg-neutral-900 rounded-full text-lime-400">
+              <Truck className="w-6 h-6" />
+            </div>
+            <h4 className="font-bold text-white text-sm">Free Shipping</h4>
+            <p className="text-xs text-neutral-400">On all orders above ₹{CONFIG.FREE_DELIVERY_THRESHOLD}</p>
+          </div>
         </div>
-        <p className="text-sm text-gray-400 leading-relaxed">Everything you need, delivered fast. Fresh groceries and daily essentials in 10–20 minutes.</p>
-        <div className="flex gap-3 mt-4">
-          <a href="#" className="w-8 h-8 bg-gray-800 rounded-full flex items-center justify-center hover:bg-brand-yellow hover:text-brand-dark transition-colors"><Instagram size={14} /></a>
-          <a href="#" className="w-8 h-8 bg-gray-800 rounded-full flex items-center justify-center hover:bg-brand-yellow hover:text-brand-dark transition-colors"><Twitter size={14} /></a>
-          <a href="#" className="w-8 h-8 bg-gray-800 rounded-full flex items-center justify-center hover:bg-brand-yellow hover:text-brand-dark transition-colors"><Facebook size={14} /></a>
+
+        {/* Footer Nav Links */}
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-8 py-10">
+          <div className="col-span-2">
+            <div className="flex items-center gap-2 mb-3">
+              <div className="w-8 h-8 bg-lime-400 text-neutral-950 font-black rounded-lg flex items-center justify-center text-lg">
+                SD
+              </div>
+              <span className="font-extrabold text-xl text-white">Style<span className="text-lime-400">Dash</span></span>
+            </div>
+            <p className="text-xs text-neutral-400 mb-4 max-w-sm">
+              StyleDash is Neemuch's premier clothing quick-commerce platform delivering trending street style, ethnic wear, activewear, and footwear right to your door in 60 minutes.
+            </p>
+            <p className="text-xs text-neutral-500">
+              Service Area: {CONFIG.SERVICE_CITY}, MP ({CONFIG.DEFAULT_PINCODE})
+            </p>
+          </div>
+
+          <div>
+            <h5 className="font-bold text-white text-sm mb-3">Shop Departments</h5>
+            <ul className="space-y-2 text-xs">
+              <li><Link to="/products?dept=men" className="hover:text-lime-400">Men's Fashion</Link></li>
+              <li><Link to="/products?dept=women" className="hover:text-lime-400">Women's Clothing</Link></li>
+              <li><Link to="/products?dept=kids" className="hover:text-lime-400">Kids Wear</Link></li>
+              <li><Link to="/products?dept=footwear" className="hover:text-lime-400">Footwear Spotlight</Link></li>
+              <li><Link to="/products?dept=accessories" className="hover:text-lime-400">Accessories & Bags</Link></li>
+            </ul>
+          </div>
+
+          <div>
+            <h5 className="font-bold text-white text-sm mb-3">Customer Service</h5>
+            <ul className="space-y-2 text-xs">
+              <li><Link to="/help" className="hover:text-lime-400">Help & Support</Link></li>
+              <li><Link to="/returns" className="hover:text-lime-400">Returns & Size Exchange</Link></li>
+              <li><Link to="/privacy" className="hover:text-lime-400">Privacy Policy</Link></li>
+              <li><Link to="/terms" className="hover:text-lime-400">Terms of Service</Link></li>
+              <li><Link to="/referrals" className="hover:text-lime-400">Refer & Earn ₹100</Link></li>
+            </ul>
+          </div>
+
+          <div>
+            <h5 className="font-bold text-white text-sm mb-3">Account & Admin</h5>
+            <ul className="space-y-2 text-xs">
+              <li><Link to="/profile" className="hover:text-lime-400">My Profile</Link></li>
+              <li><Link to="/orders" className="hover:text-lime-400">Order History</Link></li>
+              <li><Link to="/wishlist" className="hover:text-lime-400">Saved Wishlist</Link></li>
+              <li><Link to="/admin" className="hover:text-lime-400 text-lime-400 font-semibold">Admin Dashboard</Link></li>
+            </ul>
+          </div>
+        </div>
+
+        {/* Bottom copyright */}
+        <div className="pt-6 border-t border-neutral-900 flex flex-col md:flex-row items-center justify-between text-xs text-neutral-500 gap-4">
+          <p>© 2026 StyleDash Commerce. All rights reserved.</p>
+          <p className="flex items-center gap-1">
+            Crafted for <span className="text-white font-medium">Neemuch Fashion</span>
+          </p>
         </div>
       </div>
-
-      {/* Quick Links */}
-      <div>
-        <h4 className="font-bold text-white mb-3">Quick Links</h4>
-        <ul className="space-y-2 text-sm">
-          {[['/', 'Home'], ['/categories', 'Categories'], ['/products', 'All Products'], ['/orders', 'My Orders'], ['/profile', 'Profile']].map(([to, label]) => (
-            <li key={to}><Link to={to} className="hover:text-brand-yellow transition-colors">{label}</Link></li>
-          ))}
-        </ul>
-      </div>
-
-      {/* Categories */}
-      <div>
-        <h4 className="font-bold text-white mb-3">Categories</h4>
-        <ul className="space-y-2 text-sm">
-          {['Vegetables', 'Fruits', 'Dairy', 'Snacks', 'Beverages'].map(c => (
-            <li key={c}>
-              <Link to={`/products?category=${c.toLowerCase()}`} className="hover:text-brand-yellow transition-colors">{c}</Link>
-            </li>
-          ))}
-        </ul>
-      </div>
-
-      {/* Contact */}
-      <div>
-        <h4 className="font-bold text-white mb-3">Contact</h4>
-        <ul className="space-y-3 text-sm">
-          <li className="flex items-start gap-2">
-            <MapPin size={14} className="text-brand-yellow mt-0.5 flex-shrink-0" />
-            <span>Neemuch, Madhya Pradesh, India</span>
-          </li>
-          <li className="flex items-center gap-2">
-            <Phone size={14} className="text-brand-yellow flex-shrink-0" />
-            <a href="tel:+919000000000" className="hover:text-brand-yellow transition-colors">+91 90000 00000</a>
-          </li>
-          <li className="flex items-center gap-2">
-            <Mail size={14} className="text-brand-yellow flex-shrink-0" />
-            <a href="mailto:support@neemuchblink.in" className="hover:text-brand-yellow transition-colors">support@neemuchblink.in</a>
-          </li>
-        </ul>
-        <div className="mt-4 p-3 bg-gray-800 rounded-xl">
-          <p className="text-xs text-brand-yellow font-bold">⚡ Delivery Time</p>
-          <p className="text-sm font-semibold text-white mt-0.5">10–20 Minutes</p>
-        </div>
-      </div>
-    </div>
-    <div className="border-t border-gray-800 py-4">
-      <p className="text-center text-xs text-gray-500">© {new Date().getFullYear()} Neemuch Blink. All rights reserved. Made with ❤️ in Neemuch, MP.</p>
-    </div>
-  </footer>
-)
-
-export default Footer
+    </footer>
+  );
+};
