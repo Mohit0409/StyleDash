@@ -162,6 +162,9 @@ export interface Order {
   statusHistory: OrderStatusHistory[];
   createdAt: string;
   updatedAt: string;
+  razorpayOrderId?: string;
+  razorpayPaymentId?: string;
+  paymentVerifiedAt?: string;
 }
 
 export interface AdSlot {
@@ -193,11 +196,12 @@ export interface UserProfile {
   name: string;
   email: string;
   phone?: string;
-  role: 'customer' | 'admin' | 'vendor';
-  addresses: Address[];
-  referralCode: string;
-  walletBalance: number;
-  createdAt: string;
+  role: 'customer';
+  addresses?: Address[];
+  referralCode?: string;
+  walletBalance?: number;
+  createdAt?: string;
+  emailVerified?: boolean;
 }
 
 export interface ServiceArea {

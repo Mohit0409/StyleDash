@@ -1,77 +1,51 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useEffect, useState } from 'react';
 import { UserProfile } from '../types';
-import { userRepository } from '../repositories/userRepository';
+import { authApi } from '../services/authApi';
+import { ApiError, clearCsrfToken } from '../services/apiClient';
 
 interface AuthContextType {
   user: UserProfile | null;
   loading: boolean;
-  login: (email: string, pass: string) => Promise<boolean>;
-  register: (name: string, email: string, pass: string) => Promise<boolean>;
-  logout: () => void;
-  updateProfile: (profile: Partial<UserProfile>) => Promise<void>;
+  error: string;
+  login: (email: string, password: string) => Promise<boolean>;
+  register: (name: string, email: string, password: string, phone?: string) => Promise<boolean>;
+  logout: () => Promise<void>;
+  refresh: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<UserProfile | null>(null);
-  const [loading, setLoading] = useState<boolean>(true);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
 
-  useEffect(() => {
-    userRepository.getUserProfile('guest-user-id').then(profile => {
-      setUser(profile);
-      setLoading(false);
-    });
-  }, []);
-
-  const login = async (email: string): Promise<boolean> => {
-    setLoading(true);
-    const profile = await userRepository.getUserProfile('user-id');
-    if (profile) {
-      profile.email = email;
-      setUser(profile);
-      setLoading(false);
-      return true;
-    }
-    setLoading(false);
-    return false;
+  const refresh = async () => {
+    try { setUser(await authApi.me()); }
+    catch { clearCsrfToken(); setUser(null); }
   };
 
-  const register = async (name: string, email: string): Promise<boolean> => {
-    setLoading(true);
-    const newProfile: UserProfile = {
-      uid: `usr-${Date.now()}`,
-      name,
-      email,
-      role: 'customer',
-      addresses: [],
-      referralCode: `SD${Math.floor(1000 + Math.random() * 9000)}`,
-      walletBalance: 100,
-      createdAt: new Date().toISOString()
-    };
-    await userRepository.saveUserProfile(newProfile);
-    setUser(newProfile);
-    setLoading(false);
-    return true;
+  useEffect(() => { refresh().finally(() => setLoading(false)); }, []);
+
+  const login = async (email: string, password: string) => {
+    setLoading(true); setError('');
+    try { setUser((await authApi.login(email, password)).user); return true; }
+    catch (cause) { setError(cause instanceof ApiError ? cause.message : 'Login failed.'); return false; }
+    finally { setLoading(false); }
   };
 
-  const logout = () => {
-    setUser(null);
+  const register = async (name: string, email: string, password: string, phone?: string) => {
+    setLoading(true); setError('');
+    try { setUser((await authApi.register(name, email, password, phone)).user); return true; }
+    catch (cause) { setError(cause instanceof ApiError ? cause.message : 'Registration failed.'); return false; }
+    finally { setLoading(false); }
   };
 
-  const updateProfile = async (updates: Partial<UserProfile>) => {
-    if (user) {
-      const updated = { ...user, ...updates };
-      setUser(updated);
-      await userRepository.saveUserProfile(updated);
-    }
+  const logout = async () => {
+    try { await authApi.logout(); } finally { setUser(null); clearCsrfToken(); }
   };
 
-  return (
-    <AuthContext.Provider value={{ user, loading, login, register, logout, updateProfile }}>
-      {children}
-    </AuthContext.Provider>
-  );
+  return <AuthContext.Provider value={{ user, loading, error, login, register, logout, refresh }}>{children}</AuthContext.Provider>;
 };
 
 export const useAuth = () => {

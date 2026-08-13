@@ -85,7 +85,6 @@ export const Footer: React.FC = () => {
               <li><Link to="/profile" className="hover:text-lime-400">My Profile</Link></li>
               <li><Link to="/orders" className="hover:text-lime-400">Order History</Link></li>
               <li><Link to="/wishlist" className="hover:text-lime-400">Saved Wishlist</Link></li>
-              <li><Link to="/admin" className="hover:text-lime-400 text-lime-400 font-semibold">Admin Dashboard</Link></li>
             </ul>
           </div>
         </div>

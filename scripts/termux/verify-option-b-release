@@ -1,0 +1,58 @@
+#!/data/data/com.termux/files/usr/bin/bash
+set -eu
+
+local_url="http://127.0.0.1:8080"
+public_url="$(cat "$HOME/run/styledash-public-url")"
+response="$PREFIX/tmp/styledash-option-b-response.json"
+
+"$HOME/bin/backup-styledash-data"
+printf 'local_health='
+curl -fsS "$local_url/api/health"
+printf '\npublic_health='
+curl -fsS --max-time 20 -H 'ngrok-skip-browser-warning: styledash-verify' "$public_url/api/health"
+
+status="$(curl -sS -o "$response" -w '%{http_code}' -H 'ngrok-skip-browser-warning: styledash-verify' "$public_url/api/auth/me")"
+test "$status" = 401
+grep -Fq authentication_required "$response"
+printf '\nunauthenticated_me=%s\n' "$status"
+
+status="$(curl -sS -o /dev/null -w '%{http_code}' -H 'ngrok-skip-browser-warning: styledash-verify' "$public_url/styledash.db")"
+test "$status" = 404
+printf 'database_public=%s\n' "$status"
+
+for path in /admin /admin/ /api/admin/orders /secrets.env /.env /database.db /backups/ /logs/; do
+  status="$(curl -sS -o /dev/null -w '%{http_code}' -H 'ngrok-skip-browser-warning: styledash-verify' "$public_url$path")"
+  test "$status" = 404
+  printf 'public_denied=%s %s\n' "$status" "$path"
+done
+
+curl -fsS --max-time 3 -H 'Host: 127.0.0.1:8081' http://127.0.0.1:8081/ | grep -Fq 'StyleDash Local Administration'
+echo 'local_admin_ui=ok'
+admin_pid="$(cat "$HOME/run/styledash-admin.pid")"
+tr '\0' ' ' < "/proc/$admin_pid/cmdline" | grep -Fq -- '--bind 127.0.0.1 --port 8081'
+if curl -fsS --max-time 2 -H 'Host: 127.0.0.1:8081' http://192.168.1.7:8081/ >/dev/null 2>&1; then
+  echo 'Admin listener is reachable through the LAN address' >&2
+  exit 1
+fi
+echo 'admin_listener=loopback-only'
+
+sha256sum "$HOME/.local/share/styledash/runtime/orders.json"
+stat -c 'db_mode=%a db_size=%s' "$HOME/.local/share/styledash/styledash.db"
+python3 - "$HOME/.local/share/styledash/styledash.db" <<'PY'
+import sqlite3, sys
+db = sqlite3.connect(sys.argv[1])
+users = db.execute("SELECT COUNT(*) FROM users").fetchone()[0]
+admins = db.execute("SELECT COUNT(*) FROM admin_users").fetchone()[0]
+integrity = db.execute("PRAGMA integrity_check").fetchone()[0]
+db.close()
+print(f"customer_users={users},local_admins={admins}")
+print(f"integrity={integrity}")
+raise SystemExit(0 if integrity == "ok" else 1)
+PY
+
+grep -R -Fq '/login' "$HOME/server/assets"
+if grep -R -Fq '/api/admin' "$HOME/server/assets"; then
+  echo 'Public frontend contains an administrator API reference' >&2
+  exit 1
+fi
+echo 'frontend_auth_routes=ok'

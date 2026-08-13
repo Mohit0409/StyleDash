@@ -1,0 +1,27 @@
+#!/data/data/com.termux/files/usr/bin/bash
+set -eu
+
+check_process() {
+  name="$1"; pid_file="$2"; marker="$3"
+  pid="$(cat "$pid_file")"
+  kill -0 "$pid"
+  command="$(tr '\0' ' ' < "/proc/$pid/cmdline")"
+  printf '%s=%s\n' "$name" "$command"
+  printf '%s' "$command" | grep -Fq "$marker"
+}
+
+check_process public "$HOME/run/styledash.pid" "$HOME/server/serve.py"
+check_process admin "$HOME/run/styledash-admin.pid" "$HOME/admin/serve.py --bind 127.0.0.1 --port 8081"
+check_process ngrok "$HOME/run/styledash-ngrok.pid" 'ngrok http http://127.0.0.1:8080'
+
+test "$(pgrep -f "$HOME/server/serve.py" | wc -l)" -eq 1
+test "$(pgrep -f "$HOME/admin/serve.py" | wc -l)" -eq 1
+test "$(pgrep -f 'ngrok http http://127.0.0.1:8080' | wc -l)" -eq 1
+echo 'managed_process_counts=one-each'
+printf 'ngrok_url='; cat "$HOME/run/styledash-public-url"
+if curl -fsS --max-time 2 http://192.168.1.7:8081/ >/dev/null 2>&1; then
+  echo 'admin_lan=reachable' >&2; exit 1
+fi
+echo 'admin_lan=unreachable'
+sha256sum "$HOME/.local/share/styledash/runtime/orders.json"
+stat -c 'secrets_mode=%a' "$HOME/.config/styledash/secrets.env"

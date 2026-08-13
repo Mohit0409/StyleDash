@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { Product, CartItem, Coupon } from '../types';
-import { trackEvent } from '../firebase/analytics';
+import { trackEvent } from '../services/analytics';
 import { CONFIG } from '../config';
 
 interface CartContextType {

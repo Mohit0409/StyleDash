@@ -3,15 +3,20 @@ set -eu
 
 mkdir -p "$HOME/logs" "$HOME/run"
 "$HOME/bin/start-styledash"
+"$HOME/bin/start-styledash-admin" || echo "$(date -Iseconds) local admin service failed to start" >> "$HOME/logs/styledash-health.log"
 
 for _ in $(seq 1 30); do
-  curl -fsS --max-time 3 http://127.0.0.1:8080/ >/dev/null && break
+  curl -fsS --max-time 3 http://127.0.0.1:8080/api/health >/dev/null && break
   sleep 2
 done
 
-if ! curl -fsS --max-time 3 http://127.0.0.1:8080/ >/dev/null; then
+if ! curl -fsS --max-time 3 http://127.0.0.1:8080/api/health >/dev/null; then
   echo "$(date -Iseconds) StyleDash failed to become healthy; ngrok was not started" >> "$HOME/logs/styledash-health.log"
   exit 1
+fi
+
+if ! curl -fsS --max-time 3 -H 'Host: 127.0.0.1:8081' http://127.0.0.1:8081/ >/dev/null; then
+  echo "$(date -Iseconds) local admin service unhealthy; public service remains available" >> "$HOME/logs/styledash-health.log"
 fi
 
 "$HOME/bin/start-styledash-ngrok" || echo "$(date -Iseconds) ngrok is not established yet; watchdog will retry" >> "$HOME/logs/styledash-health.log"

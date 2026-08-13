@@ -8,6 +8,7 @@ LOG_FILE="$LOG_DIR/styledash-health.log"
 NGROK_PID_FILE="$HOME/run/styledash-ngrok.pid"
 URL_FILE="$HOME/run/styledash-public-url"
 EXPECTED_CMD='ngrok http http://127.0.0.1:8080'
+LAST_BACKUP_FILE="$HOME/run/styledash-last-backup-date"
 mkdir -p "$HOME/run" "$LOG_DIR"
 
 if [ -s "$PID_FILE" ] && kill -0 "$(cat "$PID_FILE")" 2>/dev/null; then
@@ -33,9 +34,25 @@ public_failures=0
 public_counter=0
 
 while true; do
-  if ! curl -fsS --max-time 5 http://127.0.0.1:8080/ >/dev/null; then
+  if ! curl -fsS --max-time 5 http://127.0.0.1:8080/api/health >/dev/null; then
     echo "$(date -Iseconds) local site unhealthy; restarting" >> "$LOG_FILE"
     "$HOME/bin/start-styledash" || true
+  fi
+
+  if ! curl -fsS --max-time 3 -H 'Host: 127.0.0.1:8081' http://127.0.0.1:8081/ >/dev/null; then
+    echo "$(date -Iseconds) local admin service unhealthy; restarting it independently" >> "$LOG_FILE"
+    "$HOME/bin/start-styledash-admin" || true
+  fi
+
+  backup_date="$(date -u +%F)"
+  previous_backup_date=''
+  if [ -s "$LAST_BACKUP_FILE" ]; then previous_backup_date="$(cat "$LAST_BACKUP_FILE")"; fi
+  if [ "$previous_backup_date" != "$backup_date" ]; then
+    if "$HOME/bin/backup-styledash-data" >> "$LOG_FILE" 2>&1; then
+      printf '%s\n' "$backup_date" > "$LAST_BACKUP_FILE"
+    else
+      echo "$(date -Iseconds) private data backup failed; watchdog will retry" >> "$LOG_FILE"
+    fi
   fi
 
   url=''

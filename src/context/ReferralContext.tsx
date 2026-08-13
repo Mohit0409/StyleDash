@@ -11,8 +11,8 @@ const ReferralContext = createContext<ReferralContextType | undefined>(undefined
 
 export const ReferralProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { user } = useAuth();
-  const referralCode = user ? user.referralCode : 'STYLE100';
-  const walletBalance = user ? user.walletBalance : 100;
+  const referralCode = user?.referralCode || '';
+  const walletBalance = user?.walletBalance || 0;
 
   const shareReferral = () => {
     const text = `Join StyleDash and get ₹100 off your first fashion order! Use code ${referralCode}`;

@@ -14,7 +14,7 @@ source "$PREFIX/etc/profile.d/start-services.sh"
 sv up sshd || true
 
 for _ in $(seq 1 30); do
-  curl -fsS --max-time 3 http://127.0.0.1:8080/ >/dev/null && break
+  curl -fsS --max-time 3 http://127.0.0.1:8080/api/health >/dev/null && break
   "$HOME/bin/start-styledash" || true
   sleep 1
 done

@@ -5,6 +5,7 @@ import { useCart } from '../context/CartContext';
 import { useWishlist } from '../context/WishlistContext';
 import { useTheme } from '../context/ThemeContext';
 import { CONFIG } from '../config';
+import { useAuth } from '../context/AuthContext';
 
 export const Header: React.FC<{ onOpenCart: () => void; onOpenLocation: () => void }> = ({
   onOpenCart,
@@ -15,6 +16,7 @@ export const Header: React.FC<{ onOpenCart: () => void; onOpenLocation: () => vo
   const { wishlistIds } = useWishlist();
   const { isDark, toggleTheme } = useTheme();
   const [searchQuery, setSearchQuery] = useState('');
+  const { user } = useAuth();
 
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -150,9 +152,6 @@ export const Header: React.FC<{ onOpenCart: () => void; onOpenLocation: () => vo
           <span className="text-neutral-300 dark:text-neutral-700">|</span>
           <Link to="/partner" className="text-emerald-600 dark:text-emerald-400 font-extrabold hover:underline whitespace-nowrap flex items-center gap-1">
             <PlusCircle className="w-3.5 h-3.5" /> LIST YOUR SHOP
-          </Link>
-          <Link to="/admin" className="ml-auto text-neutral-400 hover:text-neutral-700 dark:hover:text-white font-normal text-[11px]">
-            Admin Portal
           </Link>
         </nav>
       </div>

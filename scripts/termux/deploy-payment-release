@@ -1,0 +1,93 @@
+#!/data/data/com.termux/files/usr/bin/bash
+# Deploy a previously extracted StyleDash payment release from a Termux staging directory.
+set -eu
+
+if [ "$#" -ne 1 ] || [ ! -d "$1/dist" ]; then
+  echo "usage: deploy-payment-release STAGING_DIRECTORY" >&2
+  exit 2
+fi
+
+STAGE="$1"
+BACKUP_ROOT="$HOME/backups"
+mkdir -p "$BACKUP_ROOT"
+BACKUP="$(mktemp -d "$BACKUP_ROOT/styledash-pre-payment.XXXXXX")"
+
+cp -a "$HOME/server" "$BACKUP/server"
+if [ -d "$HOME/admin" ]; then cp -a "$HOME/admin" "$BACKUP/admin"; fi
+mkdir -p "$BACKUP/bin" "$BACKUP/boot"
+cp -a \
+  "$HOME/bin/start-styledash" \
+  "$HOME/bin/start-styledash-stack" \
+  "$HOME/bin/styledash-health" \
+  "$BACKUP/bin/"
+for optional in start-styledash-admin styledash-create-admin audit-styledash-network; do
+  if [ -f "$HOME/bin/$optional" ]; then cp -a "$HOME/bin/$optional" "$BACKUP/bin/"; fi
+done
+cp -a "$HOME/.termux/boot/start-styledash" "$BACKUP/boot/"
+
+if [ -d "$HOME/server/assets" ]; then rm -rf -- "$HOME/server/assets"; fi
+cp -a "$STAGE/dist/." "$HOME/server/"
+install -m 755 "$STAGE/scripts/termux-spa-server.py" "$HOME/server/serve.py"
+install -m 600 "$STAGE/scripts/styledash_security.py" "$HOME/server/styledash_security.py"
+mkdir -p "$HOME/admin/admin" "$HOME/admin/tools"
+chmod 700 "$HOME/admin" "$HOME/admin/admin" "$HOME/admin/tools"
+install -m 600 "$STAGE/scripts/termux-admin-server.py" "$HOME/admin/serve.py"
+install -m 600 "$STAGE/scripts/styledash_admin.py" "$HOME/admin/styledash_admin.py"
+install -m 600 "$STAGE/scripts/styledash_security.py" "$HOME/admin/styledash_security.py"
+install -m 600 "$STAGE/server/admin/index.html" "$HOME/admin/admin/index.html"
+install -m 600 "$STAGE/server/admin/admin.css" "$HOME/admin/admin/admin.css"
+install -m 600 "$STAGE/server/admin/admin.js" "$HOME/admin/admin/admin.js"
+install -m 700 "$STAGE/server/tools/create_admin.py" "$HOME/admin/tools/create_admin.py"
+rm -f -- "$HOME/server/tools/set_admin.py" "$HOME/server/tools/setup_admin_totp.py"
+
+mkdir -p "$HOME/.local/share/styledash/runtime"
+chmod 700 "$HOME/.local/share/styledash" "$HOME/.local/share/styledash/runtime"
+install -m 644 "$STAGE/server/payment-data/catalog.json" "$HOME/.local/share/styledash/catalog.json"
+install -m 644 "$STAGE/server/payment-data/settings.json" "$HOME/.local/share/styledash/settings.json"
+
+install -m 755 "$STAGE/scripts/termux/start-styledash" "$HOME/bin/start-styledash"
+install -m 755 "$STAGE/scripts/termux/start-styledash-admin" "$HOME/bin/start-styledash-admin"
+install -m 755 "$STAGE/scripts/termux/start-styledash-stack" "$HOME/bin/start-styledash-stack"
+install -m 755 "$STAGE/scripts/termux/styledash-health" "$HOME/bin/styledash-health"
+install -m 755 "$STAGE/scripts/termux/normalize-razorpay-secrets" "$HOME/bin/normalize-razorpay-secrets"
+install -m 755 "$STAGE/scripts/termux/backup-styledash-data" "$HOME/bin/backup-styledash-data"
+install -m 755 "$STAGE/scripts/termux/verify-option-b-release" "$HOME/bin/verify-option-b-release"
+install -m 755 "$STAGE/scripts/termux/deploy-payment-release" "$HOME/bin/deploy-payment-release"
+install -m 755 "$STAGE/scripts/termux/styledash-create-admin" "$HOME/bin/styledash-create-admin"
+install -m 755 "$STAGE/scripts/termux/audit-styledash-network" "$HOME/bin/audit-styledash-network"
+install -m 755 "$STAGE/scripts/termux/verify-styledash-processes" "$HOME/bin/verify-styledash-processes"
+install -m 755 "$STAGE/scripts/termux/boot-start-styledash" "$HOME/.termux/boot/start-styledash"
+
+if [ -s "$HOME/run/styledash.pid" ]; then
+  pid="$(cat "$HOME/run/styledash.pid")"
+  if kill -0 "$pid" 2>/dev/null && \
+     tr '\0' ' ' < "/proc/$pid/cmdline" 2>/dev/null | grep -Fq "$HOME/server/serve.py"; then
+    kill "$pid"
+    for _ in $(seq 1 20); do
+      kill -0 "$pid" 2>/dev/null || break
+      sleep 0.25
+    done
+  fi
+fi
+
+if [ -s "$HOME/run/styledash-admin.pid" ]; then
+  admin_pid="$(cat "$HOME/run/styledash-admin.pid")"
+  if kill -0 "$admin_pid" 2>/dev/null && \
+     tr '\0' ' ' < "/proc/$admin_pid/cmdline" 2>/dev/null | grep -Fq "$HOME/admin/serve.py"; then
+    kill "$admin_pid"
+  fi
+fi
+
+"$HOME/bin/start-styledash"
+"$HOME/bin/start-styledash-admin"
+python3 -c 'import razorpay; print("razorpay_sdk=ok")'
+printf 'backup=%s\n' "$BACKUP"
+printf 'health='
+curl -fsS http://127.0.0.1:8080/api/health
+printf '\nfrontend='
+if curl -fsS http://127.0.0.1:8080/ | grep -Fq checkout.razorpay.com; then
+  echo razorpay-script-present
+else
+  echo razorpay-script-missing
+  exit 1
+fi

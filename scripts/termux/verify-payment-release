@@ -1,0 +1,80 @@
+#!/data/data/com.termux/files/usr/bin/bash
+set -eu
+
+LOCAL_URL="http://127.0.0.1:8080"
+PUBLIC_URL="$(cat "$HOME/run/styledash-public-url")"
+RESPONSE_FILE="$PREFIX/tmp/styledash-payment-response.json"
+PAYLOAD_FILE="$PREFIX/tmp/styledash-payment-request.json"
+
+printf '%s' '{"items":[],"paymentMethod":"upi"}' > "$PAYLOAD_FILE"
+
+printf 'local_health='
+curl -fsS --max-time 5 "$LOCAL_URL/api/health"
+
+for pid_file in "$HOME/run/styledash.pid" "$HOME/run/styledash-ngrok.pid"; do
+  pid="$(cat "$pid_file")"
+  kill -0 "$pid"
+done
+printf '\nmanaged_processes=ok'
+
+printf '\npublic_health='
+curl -fsS --max-time 15 -H 'ngrok-skip-browser-warning: styledash-verify' "$PUBLIC_URL/api/health"
+
+printf '\nspa_fallback='
+curl -fsS --max-time 15 -H 'ngrok-skip-browser-warning: styledash-verify' "$PUBLIC_URL/checkout" |
+  grep -Fq 'checkout.razorpay.com' && echo ok
+
+printf 'route_fallbacks='
+for route in \
+  / /products /product/pure-cotton-oversized-graphic-tee-sd-prod-001 \
+  /categories /stores /store/style-hub-neemuch /partner /wishlist /checkout \
+  /orders /profile /referrals /help /returns /privacy /terms; do
+  curl -fsS --max-time 15 -H 'ngrok-skip-browser-warning: styledash-verify' "$PUBLIC_URL$route" |
+    grep -Fq '<div id="root"></div>'
+done
+echo ok
+
+printf 'security_headers='
+headers="$(curl -fsSI --max-time 15 -H 'ngrok-skip-browser-warning: styledash-verify' "$PUBLIC_URL/api/health")"
+printf '%s' "$headers" | grep -Fiq 'x-content-type-options: nosniff'
+printf '%s' "$headers" | grep -Fiq 'content-security-policy:'
+echo ok
+
+status="$(curl -sS --max-time 5 -o "$RESPONSE_FILE" -w '%{http_code}' \
+  -H 'Content-Type: application/json' \
+  -H 'Idempotency-Key: verify-no-secrets' \
+  --data-binary "@$PAYLOAD_FILE" \
+  "$LOCAL_URL/api/create-order")"
+printf 'unauthenticated_checkout=%s ' "$status"
+cat "$RESPONSE_FILE"
+printf '\n'
+
+test "$status" = 401
+grep -Fq 'authentication_required' "$RESPONSE_FILE"
+
+if [ "${1:-}" = "--cod" ]; then
+  echo 'Authenticated COD verification must use an isolated test account; this legacy unauthenticated mode is disabled.' >&2
+  exit 2
+  : <<'LEGACY_DISABLED'
+  printf '%s' '{"items":[{"productId":"sd-prod-001","variantId":"sd-prod-001-var-2","quantity":1}],"address":{"name":"StyleDash Deployment Test","phone":"9999999999","street":"123 Test Street","city":"Neemuch","pincode":"458441"},"userId":"deployment-test","deliveryMethod":"express","couponCode":null,"walletAmount":0,"paymentMethod":"cod"}' > "$PAYLOAD_FILE"
+  status="$(curl -sS --max-time 10 -o "$RESPONSE_FILE" -w '%{http_code}' \
+    -H 'Content-Type: application/json' \
+    -H 'Idempotency-Key: deployment-cod-20260813' \
+    --data-binary "@$PAYLOAD_FILE" \
+    "$LOCAL_URL/api/place-cod-order")"
+  test "$status" = 201
+  grep -Fq '"paymentMethod":"cod"' "$RESPONSE_FILE"
+  grep -Fq '"paymentStatus":"pending"' "$RESPONSE_FILE"
+  printf 'cod_first=%s\n' "$(cat "$RESPONSE_FILE")"
+
+  status="$(curl -sS --max-time 10 -o "$RESPONSE_FILE" -w '%{http_code}' \
+    -H 'Content-Type: application/json' \
+    -H 'Idempotency-Key: deployment-cod-20260813' \
+    --data-binary "@$PAYLOAD_FILE" \
+    "$LOCAL_URL/api/place-cod-order")"
+  test "$status" = 201
+  grep -Fq '"idempotent":true' "$RESPONSE_FILE"
+  printf 'cod_duplicate=%s\n' "$(cat "$RESPONSE_FILE")"
+fi
+LEGACY_DISABLED
+fi

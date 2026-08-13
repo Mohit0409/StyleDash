@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>StyleDash Local Administration</title>
+  <link rel="stylesheet" href="/admin.css" />
+</head>
+<body>
+  <main class="shell">
+    <section id="login-view" class="auth-card">
+      <div class="brand"><span>SD</span><div><strong>StyleDash</strong><small>Local administration</small></div></div>
+      <h1>Private sign in</h1>
+      <p>This service is available only through the Termux SSH tunnel.</p>
+      <form id="password-form">
+        <label>Username or email<input id="username" required maxlength="254" autocomplete="username" /></label>
+        <label>Password<input id="password" required type="password" minlength="12" maxlength="256" autocomplete="current-password" /></label>
+        <button type="submit">Continue</button>
+      </form>
+      <form id="totp-form" hidden>
+        <label>Authenticator or recovery code<input id="totp" required maxlength="12" autocomplete="one-time-code" /></label>
+        <button type="submit">Verify and sign in</button>
+      </form>
+      <p id="auth-error" class="error" role="alert"></p>
+    </section>
+
+    <section id="app-view" hidden>
+      <header><div class="brand"><span>SD</span><div><strong>StyleDash Admin</strong><small id="admin-name"></small></div></div><button id="logout" class="secondary">Sign out</button></header>
+      <nav id="tabs">
+        <button data-tab="orders" class="active">Orders</button><button data-tab="vendors">Vendors</button>
+        <button data-tab="inventory">Inventory</button><button data-tab="customers">Customers</button>
+        <button data-tab="system">System</button><button data-tab="audit">Audit</button>
+      </nav>
+      <p id="app-error" class="error" role="alert"></p>
+      <form id="search-form" class="toolbar"><input id="search" maxlength="100" placeholder="Search this section" /><button type="submit">Search</button></form>
+      <section id="content" class="panel" aria-live="polite"></section>
+    </section>
+  </main>
+  <script src="/admin.js" defer></script>
+</body>
+</html>

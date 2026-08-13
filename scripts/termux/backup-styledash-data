@@ -1,0 +1,34 @@
+#!/data/data/com.termux/files/usr/bin/bash
+set -eu
+DATA_ROOT="$HOME/.local/share/styledash"
+BACKUP_ROOT="$DATA_ROOT/backups"
+DB="$DATA_ROOT/styledash.db"
+STATE="$DATA_ROOT/runtime/orders.json"
+mkdir -p "$BACKUP_ROOT"
+chmod 700 "$BACKUP_ROOT"
+stamp="$(date -u +%Y%m%dT%H%M%SZ)"
+target="$BACKUP_ROOT/$stamp"
+mkdir -p "$target"; chmod 700 "$target"
+if [ -f "$DB" ]; then
+  python3 - "$DB" "$target/styledash.db" <<'PY'
+import sqlite3, sys
+source=sqlite3.connect(sys.argv[1]); target=sqlite3.connect(sys.argv[2]); source.backup(target); target.close(); source.close()
+check=sqlite3.connect(sys.argv[2]); integrity=check.execute("PRAGMA integrity_check").fetchone()[0]; check.close()
+if integrity != "ok": raise SystemExit("SQLite backup integrity check failed")
+PY
+  chmod 600 "$target/styledash.db"
+fi
+if [ -f "$STATE" ]; then cp -p "$STATE" "$target/orders.json"; chmod 600 "$target/orders.json"; fi
+python3 - "$BACKUP_ROOT" <<'PY'
+from pathlib import Path
+import re, shutil, sys
+root = Path(sys.argv[1]).resolve()
+pattern = re.compile(r"^\d{8}T\d{6}Z$")
+backups = sorted((path for path in root.iterdir() if path.is_dir() and pattern.fullmatch(path.name)), reverse=True)
+for path in backups[14:]:
+    resolved = path.resolve()
+    if resolved.parent != root:
+        raise SystemExit("Refusing unsafe backup retention target")
+    shutil.rmtree(resolved)
+PY
+echo "Private StyleDash backup completed: $stamp"
