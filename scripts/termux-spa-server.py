@@ -237,6 +237,14 @@ def _clean_string(value: Any, field: str, minimum: int, maximum: int) -> str:
     return cleaned
 
 
+def _is_six_ascii_digits(value: Any) -> bool:
+    return (
+        isinstance(value, str)
+        and len(value) == 6
+        and all("0" <= character <= "9" for character in value)
+    )
+
+
 class PaymentService:
     def __init__(
         self,
@@ -287,19 +295,16 @@ class PaymentService:
         return result
 
     def is_serviceable_pincode(self, pincode: str) -> bool:
-        return len(pincode) == 6 and pincode.isdigit() and pincode in self.supported_pincodes
+        return _is_six_ascii_digits(pincode) and pincode in self.supported_pincodes
 
     def check_serviceability(self, pincode: Any) -> dict[str, Any]:
-        if not isinstance(pincode, str):
-            raise ApiError(HTTPStatus.BAD_REQUEST, "A 6-digit pincode is required.", "invalid_pincode")
-        cleaned = pincode.strip()
-        if len(cleaned) != 6 or not cleaned.isdigit():
+        if not _is_six_ascii_digits(pincode):
             raise ApiError(HTTPStatus.BAD_REQUEST, "A valid 6-digit pincode is required.", "invalid_pincode")
-        if not self.is_serviceable_pincode(cleaned):
-            return {"success": True, "pincode": cleaned, "serviceable": False}
+        if not self.is_serviceable_pincode(pincode):
+            return {"success": True, "pincode": pincode, "serviceable": False}
         return {
             "success": True,
-            "pincode": cleaned,
+            "pincode": pincode,
             "serviceable": True,
             "city": "Neemuch",
             "state": "Madhya Pradesh",
@@ -314,8 +319,8 @@ class PaymentService:
         address = payload.get("address")
         if not isinstance(address, dict):
             raise ApiError(HTTPStatus.UNPROCESSABLE_ENTITY, "Delivery address is required.", "invalid_customer")
-        pincode = _clean_string(address.get("pincode"), "pincode", 6, 6)
-        if not self.is_serviceable_pincode(pincode):
+        pincode = address.get("pincode")
+        if not _is_six_ascii_digits(pincode) or not self.is_serviceable_pincode(pincode):
             raise ApiError(
                 HTTPStatus.UNPROCESSABLE_ENTITY,
                 "Delivery is not available for this pincode.",

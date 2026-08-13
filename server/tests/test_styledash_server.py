@@ -9,6 +9,7 @@ import tempfile
 import threading
 import unittest
 import urllib.error
+import urllib.parse
 import urllib.request
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
@@ -233,11 +234,35 @@ class PaymentServiceTests(unittest.TestCase):
         self.assert_api_error("unsupported_pincode", lambda: self.service.calculate_order(self.payload(address=address)))
 
     def test_serviceability_rejects_malformed_pincodes_safely(self) -> None:
-        for pincode in ("", "1", "45844", "4584411", "abcdef", "45844a", "45 8441"):
+        malformed = (
+            "", "1", "45844", "4584411", "abcdef", "45844a", "45 8441", "+458441", "458-441",
+            " 458441", "458441 ", "458\t441", "458441\t", "458441\n", "458441\r",
+            "４５８４４１", "45844١", "४५८४४१",
+        )
+        for pincode in malformed:
             self.assert_api_error(
                 "invalid_pincode",
                 lambda pincode=pincode: self.service.check_serviceability(pincode),
             )
+
+    def test_checkout_rejects_noncanonical_pincodes_without_mutation(self) -> None:
+        malformed = (
+            "", "1", "45844", "4584411", "abcdef", "45844a", "45 8441", "+458441", "458-441",
+            " 458441", "458441 ", "458\t441", "458441\t", "458441\n", "458441\r",
+            "４５８４４１", "45844١", "४५८४४१",
+        )
+        for pincode in malformed:
+            state_before = json.loads(json.dumps(self.service.store.state))
+            gateway_calls_before = list(self.gateway.calls)
+            address = dict(self.payload()["address"], pincode=pincode)
+            self.assert_api_error(
+                "unsupported_pincode",
+                lambda address=address: self.service.create_razorpay_order(
+                    self.payload(address=address), "invalid-pincode-001"
+                ),
+            )
+            self.assertEqual(self.service.store.state, state_before)
+            self.assertEqual(self.gateway.calls, gateway_calls_before)
 
     def test_supported_pincode_environment_override_drives_public_check_and_checkout(self) -> None:
         previous = os.environ.get("STYLEDASH_SUPPORTED_PINCODES")
@@ -698,10 +723,17 @@ class HttpApiTests(unittest.TestCase):
         self.assertEqual(status, 200)
         self.assertEqual(unsupported, {"success": True, "pincode": "458440", "serviceable": False})
 
-        status, malformed, _headers = self.get_json("/api/serviceability?pincode=45%208441")
-        self.assertEqual(status, 400)
-        self.assertEqual(malformed["code"], "invalid_pincode")
-        self.assertNotIn("traceback", json.dumps(malformed).lower())
+        malformed_pincodes = (
+            "", "1", "45844", "4584411", "abcdef", "45844a", "45 8441", "+458441", "458-441",
+            " 458441", "458441 ", "458\t441", "458441\t", "458441\n", "458441\r",
+            "４５８４４１", "45844١", "४५८४४१",
+        )
+        for pincode in malformed_pincodes:
+            encoded = urllib.parse.quote(pincode, safe="")
+            status, malformed, _headers = self.get_json(f"/api/serviceability?pincode={encoded}")
+            self.assertEqual(status, 400, pincode)
+            self.assertEqual(malformed["code"], "invalid_pincode", pincode)
+            self.assertNotIn("traceback", json.dumps(malformed).lower(), pincode)
 
         status, _body, _headers = self.post_json("/api/serviceability?pincode=458441", {})
         self.assertEqual(status, 404)
