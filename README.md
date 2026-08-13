@@ -5,6 +5,7 @@ StyleDash is a production-quality, hyperlocal clothing quick-commerce web applic
 ## Features
 
 - **Hyperlocal 60-Min Delivery**: Pincode serviceability verification for Neemuch (`458441`).
+- **Authoritative Serviceability API**: `/api/serviceability?pincode=<six digits>` checks delivery availability from the same backend configuration used by checkout.
 - **Complete Fashion Catalogue**: Over 125 clothing, footwear, and accessory products across Men, Women, Kids, and Accessories.
 - **Variant-Aware Cart**: Tracks size, colour, SKU, and stock per line item (`productId:variantId`).
 - **Product Detail & Size Guide**: Interactive image gallery, colour swatches, size selector, and department measurement charts.

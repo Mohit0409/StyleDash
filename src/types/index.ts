@@ -204,9 +204,13 @@ export interface UserProfile {
 
 export interface ServiceArea {
   pincode: string;
-  city: string;
-  state: string;
+  city?: string;
+  state?: string;
   serviceable: boolean;
-  expressAvailable: boolean;
-  estimatedDeliveryMinutes: number;
+  expressAvailable?: boolean;
+  estimatedDeliveryMinutes?: number;
+}
+
+export interface ServiceabilityApiResponse extends ServiceArea {
+  success: true;
 }

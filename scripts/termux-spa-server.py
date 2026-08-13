@@ -20,7 +20,7 @@ from http import HTTPStatus
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Any, Callable
-from urllib.parse import urlsplit
+from urllib.parse import parse_qs, urlsplit
 
 try:
     import fcntl
@@ -286,6 +286,27 @@ class PaymentService:
             result["database"] = "ok" if self.security.health() else "error"
         return result
 
+    def is_serviceable_pincode(self, pincode: str) -> bool:
+        return len(pincode) == 6 and pincode.isdigit() and pincode in self.supported_pincodes
+
+    def check_serviceability(self, pincode: Any) -> dict[str, Any]:
+        if not isinstance(pincode, str):
+            raise ApiError(HTTPStatus.BAD_REQUEST, "A 6-digit pincode is required.", "invalid_pincode")
+        cleaned = pincode.strip()
+        if len(cleaned) != 6 or not cleaned.isdigit():
+            raise ApiError(HTTPStatus.BAD_REQUEST, "A valid 6-digit pincode is required.", "invalid_pincode")
+        if not self.is_serviceable_pincode(cleaned):
+            return {"success": True, "pincode": cleaned, "serviceable": False}
+        return {
+            "success": True,
+            "pincode": cleaned,
+            "serviceable": True,
+            "city": "Neemuch",
+            "state": "Madhya Pradesh",
+            "expressAvailable": True,
+            "estimatedDeliveryMinutes": 60,
+        }
+
     def _inventory(self, state: dict[str, Any], variant: dict[str, Any]) -> int:
         return int(state["inventory"].get(variant["id"], variant["stock"]))
 
@@ -294,7 +315,7 @@ class PaymentService:
         if not isinstance(address, dict):
             raise ApiError(HTTPStatus.UNPROCESSABLE_ENTITY, "Delivery address is required.", "invalid_customer")
         pincode = _clean_string(address.get("pincode"), "pincode", 6, 6)
-        if not pincode.isdigit() or pincode not in self.supported_pincodes:
+        if not self.is_serviceable_pincode(pincode):
             raise ApiError(
                 HTTPStatus.UNPROCESSABLE_ENTITY,
                 "Delivery is not available for this pincode.",
@@ -1044,13 +1065,21 @@ class StyleDashRequestHandler(SimpleHTTPRequestHandler):
             raise ApiError(HTTPStatus.TOO_MANY_REQUESTS, "Too many requests. Please wait and try again.", "rate_limited")
 
     def do_GET(self) -> None:  # noqa: N802 - stdlib override name
-        path = urlsplit(self.path).path
+        parsed = urlsplit(self.path)
+        path = parsed.path
         try:
             if self._sensitive_path(path):
                 self._json_response(HTTPStatus.NOT_FOUND, {"success": False, "error": "Not found.", "code": "not_found"})
                 return
             if path == "/api/health":
                 self._json_response(HTTPStatus.OK, self.payment_service.health())
+                return
+            if path == "/api/serviceability":
+                self._rate_limit(path, 60)
+                query = parse_qs(parsed.query, keep_blank_values=True)
+                pincode_values = query.get("pincode", [])
+                pincode = pincode_values[0] if len(pincode_values) == 1 else None
+                self._json_response(HTTPStatus.OK, self.payment_service.check_serviceability(pincode))
                 return
             if path == "/api/auth/me":
                 raw = self._session_token()
@@ -1076,6 +1105,8 @@ class StyleDashRequestHandler(SimpleHTTPRequestHandler):
                 self._json_response(HTTPStatus.NOT_FOUND, {"success": False, "error": "API endpoint not found.", "code": "not_found"})
                 return
             super().do_GET()
+        except ApiError as error:
+            self._error_response(error)
         except SecurityError as error:
             self._security_error(error)
 

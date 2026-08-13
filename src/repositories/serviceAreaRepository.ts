@@ -1,16 +1,17 @@
-import { ServiceArea } from '../types';
+import { apiFetch } from '../services/apiClient';
+import { ServiceArea, ServiceabilityApiResponse } from '../types';
 
 export const serviceAreaRepository = {
-  async checkPincode(pincode: string): Promise<ServiceArea> {
-    const supportedPincodes = ['458441', '458442', '458001', '458002'];
-    const isServiceable = supportedPincodes.includes(pincode) || pincode.startsWith('458');
-    return {
-      pincode,
-      city: 'Neemuch',
-      state: 'Madhya Pradesh',
-      serviceable: isServiceable,
-      expressAvailable: isServiceable,
-      estimatedDeliveryMinutes: 60
-    };
+  async checkPincode(pincode: string, fetcher: typeof fetch = fetch): Promise<ServiceArea> {
+    const normalized = pincode.trim();
+    if (!/^\d{6}$/.test(normalized)) {
+      return { pincode: normalized, serviceable: false };
+    }
+    const response = await apiFetch<ServiceabilityApiResponse>(
+      `/api/serviceability?pincode=${encodeURIComponent(normalized)}`,
+      {},
+      fetcher,
+    );
+    return response;
   }
 };

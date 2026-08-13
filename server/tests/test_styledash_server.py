@@ -218,6 +218,70 @@ class PaymentServiceTests(unittest.TestCase):
         address = dict(self.payload()["address"], pincode="458440")
         self.assert_api_error("unsupported_pincode", lambda: self.service.calculate_order(self.payload(address=address)))
 
+    def test_serviceability_uses_same_authority_as_checkout(self) -> None:
+        supported = self.service.check_serviceability("458441")
+        unsupported = self.service.check_serviceability("458440")
+
+        self.assertTrue(supported["serviceable"])
+        self.assertEqual(supported["city"], "Neemuch")
+        self.assertFalse(unsupported["serviceable"])
+        self.assertNotIn("supportedPincodes", json.dumps(supported))
+        self.assertNotIn("458442", json.dumps(supported))
+
+        self.service.calculate_order(self.payload())
+        address = dict(self.payload()["address"], pincode="458440")
+        self.assert_api_error("unsupported_pincode", lambda: self.service.calculate_order(self.payload(address=address)))
+
+    def test_serviceability_rejects_malformed_pincodes_safely(self) -> None:
+        for pincode in ("", "1", "45844", "4584411", "abcdef", "45844a", "45 8441"):
+            self.assert_api_error(
+                "invalid_pincode",
+                lambda pincode=pincode: self.service.check_serviceability(pincode),
+            )
+
+    def test_supported_pincode_environment_override_drives_public_check_and_checkout(self) -> None:
+        previous = os.environ.get("STYLEDASH_SUPPORTED_PINCODES")
+        os.environ["STYLEDASH_SUPPORTED_PINCODES"] = "111111,222222"
+        try:
+            overridden = SERVER.PaymentService(
+                ROOT / "server" / "payment-data" / "catalog.json",
+                ROOT / "server" / "payment-data" / "settings.json",
+                self.data_directory,
+                key_id="rzp_test_placeholder",
+                key_secret="test_secret_placeholder",
+                webhook_secret="webhook_secret_placeholder",
+                mode="test",
+                gateway=self.gateway,
+            )
+        finally:
+            if previous is None:
+                os.environ.pop("STYLEDASH_SUPPORTED_PINCODES", None)
+            else:
+                os.environ["STYLEDASH_SUPPORTED_PINCODES"] = previous
+
+        self.assertTrue(overridden.check_serviceability("111111")["serviceable"])
+        self.assertFalse(overridden.check_serviceability("458441")["serviceable"])
+        overridden.calculate_order(self.payload(address=dict(self.payload()["address"], pincode="111111")))
+        self.assert_api_error(
+            "unsupported_pincode",
+            lambda: overridden.calculate_order(self.payload()),
+        )
+
+    def test_unsupported_checkout_has_no_business_mutation(self) -> None:
+        state_before = json.loads(json.dumps(self.service.store.state))
+        gateway_calls_before = list(self.gateway.calls)
+        address = dict(self.payload()["address"], pincode="458440")
+
+        self.assert_api_error(
+            "unsupported_pincode",
+            lambda: self.service.create_razorpay_order(
+                self.payload(address=address), "unsupported-pincode-001"
+            ),
+        )
+
+        self.assertEqual(self.service.store.state, state_before)
+        self.assertEqual(self.gateway.calls, gateway_calls_before)
+
     def test_verifies_signature_and_decrements_inventory_once(self) -> None:
         created = self.service.create_razorpay_order(self.payload(), "checkout-test-003")
         payment_id = "pay_test_001"
@@ -611,6 +675,41 @@ class HttpApiTests(unittest.TestCase):
             return status, body, response_headers
         with response:
             return response.status, json.load(response), response.headers
+
+    def get_json(self, path: str):
+        try:
+            response = urllib.request.urlopen(f"{self.base_url}{path}")
+        except urllib.error.HTTPError as error:
+            body = json.loads(error.read()); status = error.code; response_headers = error.headers; error.close()
+            return status, body, response_headers
+        with response:
+            return response.status, json.load(response), response.headers
+
+    def test_public_serviceability_endpoint_is_read_only_and_safe(self) -> None:
+        state_before = json.loads(json.dumps(self.service.store.state))
+
+        status, supported, _headers = self.get_json("/api/serviceability?pincode=458441")
+        self.assertEqual(status, 200)
+        self.assertEqual(supported["serviceable"], True)
+        self.assertEqual(supported["city"], "Neemuch")
+        self.assertEqual(supported["estimatedDeliveryMinutes"], 60)
+
+        status, unsupported, _headers = self.get_json("/api/serviceability?pincode=458440")
+        self.assertEqual(status, 200)
+        self.assertEqual(unsupported, {"success": True, "pincode": "458440", "serviceable": False})
+
+        status, malformed, _headers = self.get_json("/api/serviceability?pincode=45%208441")
+        self.assertEqual(status, 400)
+        self.assertEqual(malformed["code"], "invalid_pincode")
+        self.assertNotIn("traceback", json.dumps(malformed).lower())
+
+        status, _body, _headers = self.post_json("/api/serviceability?pincode=458441", {})
+        self.assertEqual(status, 404)
+        self.assertEqual(self.service.store.state, state_before)
+
+        serialized = json.dumps(supported) + json.dumps(unsupported)
+        self.assertNotIn("supportedPincodes", serialized)
+        self.assertNotIn("458442", serialized)
 
     def test_auth_cookie_csrf_public_admin_absent_and_server_user_ownership(self) -> None:
         status, registered, headers = self.post_json("/api/auth/register", {
