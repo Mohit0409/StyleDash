@@ -16,3 +16,6 @@ export const canAddVariantToCart = async (variantId: string, fetcher: typeof fet
     return false;
   }
 };
+
+export const canIncreaseCartQuantity = (variantId: string, fetcher: typeof fetch = fetch): Promise<boolean> =>
+  canAddVariantToCart(variantId, fetcher);

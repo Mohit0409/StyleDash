@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { productRepository } from '../repositories/productRepository';
-import { canAddVariantToCart, inventoryRepository } from '../repositories/inventoryRepository';
+import { canAddVariantToCart, canIncreaseCartQuantity, inventoryRepository } from '../repositories/inventoryRepository';
 
 const response = (availability: unknown, status = 200) => new Response(JSON.stringify({ success: true, availability }), {
   status,
@@ -45,5 +45,15 @@ describe('authoritative inventory repository', () => {
 
     await expect(canAddVariantToCart('sd-prod-001-var-2', unavailable)).resolves.toBe(false);
     await expect(canAddVariantToCart('sd-prod-001-var-2', offline)).resolves.toBe(false);
+  });
+
+  it('prevents cart quantity increases for unavailable variants or an unavailable server', async () => {
+    const unavailable = vi.fn<typeof fetch>(async () => response([
+      { productId: 'sd-prod-001', variantId: 'sd-prod-001-var-2', available: false },
+    ]));
+    const offline = vi.fn<typeof fetch>().mockRejectedValue(new TypeError('offline'));
+
+    await expect(canIncreaseCartQuantity('sd-prod-001-var-2', unavailable)).resolves.toBe(false);
+    await expect(canIncreaseCartQuantity('sd-prod-001-var-2', offline)).resolves.toBe(false);
   });
 });

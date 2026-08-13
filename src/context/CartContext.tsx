@@ -2,13 +2,13 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 import { Product, CartItem, Coupon } from '../types';
 import { trackEvent } from '../services/analytics';
 import { calculateCartTotals } from './cartTotals';
-import { canAddVariantToCart } from '../repositories/inventoryRepository';
+import { canAddVariantToCart, canIncreaseCartQuantity } from '../repositories/inventoryRepository';
 
 interface CartContextType {
   items: CartItem[];
   addItem: (product: Product, variantId: string, quantity?: number) => Promise<boolean>;
   removeItem: (lineId: string) => void;
-  updateQuantity: (lineId: string, quantity: number) => void;
+  updateQuantity: (lineId: string, quantity: number) => Promise<void>;
   clearCart: () => void;
   appliedCoupon: Coupon | null;
   applyCoupon: (coupon: Coupon) => void;
@@ -105,17 +105,19 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
     });
   };
 
-  const updateQuantity = (lineId: string, quantity: number) => {
+  const updateQuantity = async (lineId: string, quantity: number): Promise<void> => {
     if (quantity <= 0) {
       removeItem(lineId);
       return;
     }
+    const currentItem = items.find(item => item.lineId === lineId);
+    if (!currentItem) return;
+    if (quantity > currentItem.quantity && !await canIncreaseCartQuantity(currentItem.variantId)) return;
+
     setItems(prev => {
       return prev.map(item => {
         if (item.lineId === lineId) {
-          const variant = item.product.variants.find(v => v.id === item.variantId);
-          const maxStock = variant ? variant.stock : item.quantity;
-          return { ...item, quantity: Math.min(quantity, maxStock) };
+          return { ...item, quantity };
         }
         return item;
       });
