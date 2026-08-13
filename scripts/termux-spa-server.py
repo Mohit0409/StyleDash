@@ -315,6 +315,29 @@ class PaymentService:
     def _inventory(self, state: dict[str, Any], variant: dict[str, Any]) -> int:
         return int(state["inventory"].get(variant["id"], variant["stock"]))
 
+    def public_inventory_availability(self, variant_id: Any = None) -> dict[str, Any]:
+        """Return only customer-safe, current availability for active catalog variants."""
+        if variant_id is not None and (
+            not isinstance(variant_id, str) or not variant_id or len(variant_id) > 128
+        ):
+            raise ApiError(HTTPStatus.BAD_REQUEST, "Invalid product option.", "invalid_variant")
+
+        availability: list[dict[str, Any]] = []
+        with self.store.lock:
+            state = self.store.state
+            for product in self.products.values():
+                if not product.get("active"):
+                    continue
+                for variant in product["variants"]:
+                    if variant_id is not None and variant["id"] != variant_id:
+                        continue
+                    availability.append({
+                        "productId": product["id"],
+                        "variantId": variant["id"],
+                        "available": self._inventory(state, variant) > 0,
+                    })
+        return {"success": True, "availability": availability}
+
     def _validate_address(self, payload: dict[str, Any]) -> dict[str, str]:
         address = payload.get("address")
         if not isinstance(address, dict):
@@ -1085,6 +1108,15 @@ class StyleDashRequestHandler(SimpleHTTPRequestHandler):
                 pincode_values = query.get("pincode", [])
                 pincode = pincode_values[0] if len(pincode_values) == 1 else None
                 self._json_response(HTTPStatus.OK, self.payment_service.check_serviceability(pincode))
+                return
+            if path == "/api/inventory/availability":
+                self._rate_limit(path, 60)
+                query = parse_qs(parsed.query, keep_blank_values=True)
+                variant_values = query.get("variantId", [])
+                variant_id = variant_values[0] if len(variant_values) == 1 else None
+                if len(variant_values) > 1:
+                    raise ApiError(HTTPStatus.BAD_REQUEST, "Invalid product option.", "invalid_variant")
+                self._json_response(HTTPStatus.OK, self.payment_service.public_inventory_availability(variant_id))
                 return
             if path == "/api/auth/me":
                 raw = self._session_token()

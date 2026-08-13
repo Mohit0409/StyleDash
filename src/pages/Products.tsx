@@ -47,7 +47,7 @@ export const Products: React.FC = () => {
   const filteredProducts = products.filter(p => {
     if (department !== 'all' && p.department !== department) return false;
     if (brand !== 'all' && p.brand !== brand) return false;
-    if (size !== 'all' && !p.variants.some(v => v.size === size && v.stock > 0)) return false;
+    if (size !== 'all' && !p.variants.some(v => v.size === size && v.available === true)) return false;
     if (p.price > maxPrice) return false;
 
     if (searchQuery) {

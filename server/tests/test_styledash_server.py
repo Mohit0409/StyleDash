@@ -219,6 +219,39 @@ class PaymentServiceTests(unittest.TestCase):
         address = dict(self.payload()["address"], pincode="458440")
         self.assert_api_error("unsupported_pincode", lambda: self.service.calculate_order(self.payload(address=address)))
 
+    def test_public_inventory_availability_is_safe_fresh_and_read_only(self) -> None:
+        state_before = json.loads(json.dumps(self.service.store.state))
+        first = self.service.public_inventory_availability("sd-prod-001-var-2")
+        self.assertEqual(first, {"success": True, "availability": [{
+            "productId": "sd-prod-001", "variantId": "sd-prod-001-var-2", "available": True,
+        }]})
+        self.assertEqual(self.service.store.state, state_before)
+        self.assertNotIn("stock", json.dumps(first))
+        self.assertNotIn("price", json.dumps(first))
+        self.assertNotIn("sku", json.dumps(first))
+
+        with self.service.store.lock:
+            self.service.store.state["inventory"]["sd-prod-001-var-2"] = 0
+            self.service.store.save()
+        changed = self.service.public_inventory_availability("sd-prod-001-var-2")
+        self.assertFalse(changed["availability"][0]["available"])
+
+        state_after_stock_change = json.loads(json.dumps(self.service.store.state))
+        self.assert_api_error("insufficient_stock", lambda: self.service.create_razorpay_order(
+            self.payload(), "inventory-insufficient-stock-001",
+        ))
+        self.assertEqual(self.service.store.state, state_after_stock_change)
+        self.assertEqual(self.gateway.calls, [])
+
+    def test_public_inventory_availability_rejects_invalid_variant_safely(self) -> None:
+        state_before = json.loads(json.dumps(self.service.store.state))
+        for variant_id in ("", 42, "x" * 129):
+            self.assert_api_error(
+                "invalid_variant",
+                lambda variant_id=variant_id: self.service.public_inventory_availability(variant_id),
+            )
+        self.assertEqual(self.service.store.state, state_before)
+
     def test_serviceability_uses_same_authority_as_checkout(self) -> None:
         supported = self.service.check_serviceability("458441")
         unsupported = self.service.check_serviceability("458440")
@@ -742,6 +775,30 @@ class HttpApiTests(unittest.TestCase):
         serialized = json.dumps(supported) + json.dumps(unsupported)
         self.assertNotIn("supportedPincodes", serialized)
         self.assertNotIn("458442", serialized)
+
+    def test_public_inventory_endpoint_is_read_only_safe_and_current(self) -> None:
+        state_before = json.loads(json.dumps(self.service.store.state))
+        status, payload, _headers = self.get_json("/api/inventory/availability?variantId=sd-prod-001-var-2")
+        self.assertEqual(status, 200)
+        self.assertEqual(payload, {"success": True, "availability": [{
+            "productId": "sd-prod-001", "variantId": "sd-prod-001-var-2", "available": True,
+        }]})
+        self.assertEqual(self.service.store.state, state_before)
+        self.assertNotIn("stock", json.dumps(payload))
+        self.assertNotIn("price", json.dumps(payload))
+        self.assertNotIn("sku", json.dumps(payload))
+
+        with self.service.store.lock:
+            self.service.store.state["inventory"]["sd-prod-001-var-2"] = 0
+            self.service.store.save()
+        status, changed, _headers = self.get_json("/api/inventory/availability?variantId=sd-prod-001-var-2")
+        self.assertEqual(status, 200)
+        self.assertFalse(changed["availability"][0]["available"])
+
+        status, invalid, _headers = self.get_json("/api/inventory/availability?variantId=&variantId=duplicate")
+        self.assertEqual((status, invalid["code"]), (400, "invalid_variant"))
+        status, _body, _headers = self.post_json("/api/inventory/availability", {})
+        self.assertEqual(status, 404)
 
     def test_auth_cookie_csrf_public_admin_absent_and_server_user_ownership(self) -> None:
         status, registered, headers = self.post_json("/api/auth/register", {

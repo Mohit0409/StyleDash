@@ -7,6 +7,8 @@ export interface ProductVariant {
   colourName: string;
   colourHex?: string;
   stock: number;
+  /** Customer-facing availability is refreshed from the server; static stock is not authoritative. */
+  available?: boolean;
   price?: number;
   originalPrice?: number;
   images?: string[];
@@ -213,4 +215,15 @@ export interface ServiceArea {
 
 export interface ServiceabilityApiResponse extends ServiceArea {
   success: true;
+}
+
+export interface InventoryAvailability {
+  productId: string;
+  variantId: string;
+  available: boolean;
+}
+
+export interface InventoryAvailabilityResponse {
+  success: true;
+  availability: InventoryAvailability[];
 }

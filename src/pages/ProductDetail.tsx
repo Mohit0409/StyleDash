@@ -36,7 +36,7 @@ export const ProductDetail: React.FC = () => {
         setProduct(p);
         setSelectedImage(p.images[0] || p.thumbnail);
         if (p.variants.length > 0) {
-          const firstInStock = p.variants.find(v => v.stock > 0) || p.variants[0];
+          const firstInStock = p.variants.find(v => v.available === true) || p.variants[0];
           setSelectedSize(firstInStock.size);
           setSelectedColour(firstInStock.colourName);
         }
@@ -71,22 +71,23 @@ export const ProductDetail: React.FC = () => {
 
   const isWishlisted = isInWishlist(product.id);
 
-  const handleAddToCart = () => {
+  const handleAddToCart = async () => {
     if (!selectedVariant) {
       showToast('Please select a valid size and colour', 'error');
-      return;
+      return false;
     }
-    const success = addItem(product, selectedVariant.id, quantity);
+    const success = await addItem(product, selectedVariant.id, quantity);
     if (success) {
       showToast(`Added ${product.name} (${selectedSize}, ${selectedColour}) to cart!`, 'success');
+      return true;
     } else {
       showToast('Selected variant is out of stock', 'error');
+      return false;
     }
   };
 
-  const handleBuyNow = () => {
-    handleAddToCart();
-    navigate('/checkout');
+  const handleBuyNow = async () => {
+    if (await handleAddToCart()) navigate('/checkout');
   };
 
   return (
@@ -181,9 +182,9 @@ export const ProductDetail: React.FC = () => {
           {/* Stock Status Badge */}
           {selectedVariant && (
             <div className="text-xs font-bold">
-              {selectedVariant.stock > 0 ? (
+              {selectedVariant.available === true ? (
                 <span className="text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
-                  <CheckCircle className="w-4 h-4" /> In Stock ({selectedVariant.stock} left in Neemuch store)
+                  <CheckCircle className="w-4 h-4" /> In stock in Neemuch
                 </span>
               ) : (
                 <span className="text-rose-600 dark:text-rose-400">Out of Stock for this variant</span>
@@ -195,7 +196,7 @@ export const ProductDetail: React.FC = () => {
           <div className="flex gap-4 pt-4">
             <button
               onClick={handleAddToCart}
-              disabled={!selectedVariant || selectedVariant.stock <= 0}
+              disabled={!selectedVariant || selectedVariant.available !== true}
               className="flex-1 py-4 bg-neutral-950 dark:bg-lime-400 text-white dark:text-neutral-950 font-black text-sm rounded-2xl shadow-xl hover:bg-neutral-800 dark:hover:bg-lime-300 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
             >
               <ShoppingBag className="w-4 h-4" /> Add to StyleCart
@@ -203,7 +204,7 @@ export const ProductDetail: React.FC = () => {
 
             <button
               onClick={handleBuyNow}
-              disabled={!selectedVariant || selectedVariant.stock <= 0}
+              disabled={!selectedVariant || selectedVariant.available !== true}
               className="px-8 py-4 bg-lime-400 text-neutral-950 font-black text-sm rounded-2xl shadow-xl hover:bg-lime-300 transition-all disabled:opacity-50"
             >
               Buy Now

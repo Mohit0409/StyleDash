@@ -2,10 +2,11 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 import { Product, CartItem, Coupon } from '../types';
 import { trackEvent } from '../services/analytics';
 import { calculateCartTotals } from './cartTotals';
+import { canAddVariantToCart } from '../repositories/inventoryRepository';
 
 interface CartContextType {
   items: CartItem[];
-  addItem: (product: Product, variantId: string, quantity?: number) => boolean;
+  addItem: (product: Product, variantId: string, quantity?: number) => Promise<boolean>;
   removeItem: (lineId: string) => void;
   updateQuantity: (lineId: string, quantity: number) => void;
   clearCart: () => void;
@@ -43,13 +44,11 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
     localStorage.setItem(LOCAL_CART_KEY, JSON.stringify(items));
   }, [items]);
 
-  const addItem = (product: Product, variantId: string, quantity = 1): boolean => {
+  const addItem = async (product: Product, variantId: string, quantity = 1): Promise<boolean> => {
     const variant = product.variants.find(v => v.id === variantId);
     if (!variant) return false;
 
-    if (variant.stock <= 0) {
-      return false;
-    }
+    if (!await canAddVariantToCart(variantId)) return false;
 
     const lineId = `${product.id}:${variantId}`;
 
@@ -57,7 +56,7 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const existingIdx = prev.findIndex(item => item.lineId === lineId);
       if (existingIdx >= 0) {
         const existing = prev[existingIdx];
-        const newQty = Math.min(existing.quantity + quantity, variant.stock);
+        const newQty = existing.quantity + quantity;
         const updated = [...prev];
         updated[existingIdx] = { ...existing, quantity: newQty };
         return updated;
@@ -71,7 +70,7 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
           selectedSize: variant.size,
           selectedColour: variant.colourName,
           sku: variant.sku,
-          quantity: Math.min(quantity, variant.stock),
+          quantity,
           unitPrice
         };
         return [...prev, newItem];

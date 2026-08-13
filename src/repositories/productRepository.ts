@@ -1,5 +1,6 @@
 import { Product } from '../types';
 import { PRODUCTS } from '../data/products';
+import { inventoryRepository } from './inventoryRepository';
 
 const launchStore = {
   vendorId: 'v-urban-style',
@@ -14,9 +15,29 @@ const normalizeStoreMetadata = (product: Product): Product => ({
   storeSlug: product.storeSlug || launchStore.storeSlug,
 });
 
+const withServerAvailability = async (products: Product[]): Promise<Product[]> => {
+  try {
+    const { availability } = await inventoryRepository.getAvailability();
+    const byVariantId = new Map(availability.map(item => [item.variantId, item.available]));
+    return products.map(product => ({
+      ...product,
+      variants: product.variants.map(variant => ({
+        ...variant,
+        available: byVariantId.get(variant.id) === true,
+      })),
+    }));
+  } catch {
+    // Do not claim stock when the authoritative server cannot be reached.
+    return products.map(product => ({
+      ...product,
+      variants: product.variants.map(variant => ({ ...variant, available: false })),
+    }));
+  }
+};
+
 export const productRepository = {
   async getAllProducts(): Promise<Product[]> {
-    return PRODUCTS.map(normalizeStoreMetadata);
+    return withServerAvailability(PRODUCTS.map(normalizeStoreMetadata));
   },
 
   async getProductBySlug(slug: string): Promise<Product | null> {
