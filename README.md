@@ -10,7 +10,7 @@ StyleDash is a production-quality, hyperlocal clothing quick-commerce web applic
 - **Product Detail & Size Guide**: Interactive image gallery, colour swatches, size selector, and department measurement charts.
 - **Filters & URL Sync**: Filter by department, brand, size, price, and sorting with shareable URL parameters.
 - **Order Tracking & Admin Portal**: Live order status timeline (`placed`, `confirmed`, `packed`, `out_for_delivery`, `delivered`) and admin dashboard.
-- **Monetization & Referrals**: Vendor commission tracking, sponsored placements, and referral rewards (Give ₹100, Get ₹100).
+- **Marketplace Monetization**: Vendor commission tracking and sponsored placements. Referral and wallet rewards are not currently offered.
 - **Firebase & Local Demo Mode**: Works out of the box in Local/Demo mode without Firebase credentials.
 
 ## Local Setup

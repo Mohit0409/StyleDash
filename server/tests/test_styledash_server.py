@@ -68,7 +68,6 @@ class PaymentServiceTests(unittest.TestCase):
             "userId": "test-user",
             "deliveryMethod": "express",
             "couponCode": None,
-            "walletAmount": 0,
             "paymentMethod": "upi",
         }
         payload.update(overrides)
@@ -181,6 +180,36 @@ class PaymentServiceTests(unittest.TestCase):
             self.assert_api_error("invalid_quantity", lambda quantity=quantity: self.service.calculate_order(self.payload(
                 items=[{"productId": "sd-prod-001", "variantId": "sd-prod-001-var-2", "quantity": quantity}],
             )))
+
+    def test_rejects_forged_wallet_without_business_mutation(self) -> None:
+        state_before = json.loads(json.dumps(self.service.store.state))
+        gateway_calls_before = list(self.gateway.calls)
+
+        self.assert_api_error(
+            "wallet_unavailable",
+            lambda: self.service.create_razorpay_order(
+                self.payload(walletAmount=100), "forged-wallet-online-001"
+            ),
+        )
+        self.assert_api_error(
+            "wallet_unavailable",
+            lambda: self.service.place_cod_order(
+                self.payload(walletAmount=100, paymentMethod="cod"), "forged-wallet-cod-001"
+            ),
+        )
+
+        self.assertEqual(self.service.store.state, state_before)
+        self.assertEqual(self.gateway.calls, gateway_calls_before)
+
+    def test_historical_zero_wallet_order_remains_publicly_readable(self) -> None:
+        historical = {
+            "id": "SD-HISTORICAL-WALLET-ZERO",
+            "userId": "test-user",
+            "walletAmount": 0,
+            "paymentStatus": "paid",
+        }
+
+        self.assertEqual(self.service._public_order(historical), historical)
 
     def test_rejects_insufficient_stock_and_unsupported_pincode(self) -> None:
         self.assert_api_error("insufficient_stock", lambda: self.service.calculate_order(self.payload(

@@ -5,7 +5,6 @@ import { AuthProvider } from './context/AuthContext';
 import { CartProvider } from './context/CartContext';
 import { WishlistProvider } from './context/WishlistContext';
 import { ToastProvider } from './context/ToastContext';
-import { ReferralProvider } from './context/ReferralContext';
 import { MainLayout } from './layouts/MainLayout';
 import { ProtectedRoute } from './components/ProtectedRoute';
 
@@ -21,7 +20,6 @@ const Checkout = lazy(() => import('./pages/Checkout').then(m => ({ default: m.C
 const OrderSuccess = lazy(() => import('./pages/OrderSuccess').then(m => ({ default: m.OrderSuccess })));
 const Orders = lazy(() => import('./pages/Orders').then(m => ({ default: m.Orders })));
 const Profile = lazy(() => import('./pages/Profile').then(m => ({ default: m.Profile })));
-const Referrals = lazy(() => import('./pages/Referrals').then(m => ({ default: m.Referrals })));
 const NotFound = lazy(() => import('./pages/NotFound').then(m => ({ default: m.NotFound })));
 const Help = lazy(() => import('./pages/Help').then(m => ({ default: m.Help })));
 const Returns = lazy(() => import('./pages/Returns').then(m => ({ default: m.Returns })));
@@ -37,38 +35,35 @@ export const App: React.FC = () => {
           <CartProvider>
             <WishlistProvider>
               <ToastProvider>
-                <ReferralProvider>
-                  <Suspense fallback={
-                    <div className="h-screen w-full flex items-center justify-center text-sm font-bold text-neutral-500">
-                      Loading StyleDash...
-                    </div>
-                  }>
-                    <Routes>
-                      <Route element={<MainLayout />}>
-                        <Route index element={<Home />} />
-                        <Route path="products" element={<Products />} />
-                        <Route path="product/:slug" element={<ProductDetail />} />
-                        <Route path="categories" element={<Categories />} />
-                        <Route path="stores" element={<Stores />} />
-                        <Route path="store/:slug" element={<StoreDetail />} />
-                        <Route path="partner" element={<ProtectedRoute><VendorOnboarding /></ProtectedRoute>} />
-                        <Route path="wishlist" element={<Wishlist />} />
-                        <Route path="login" element={<AuthPage mode="login" />} />
-                        <Route path="register" element={<AuthPage mode="register" />} />
-                        <Route path="checkout" element={<ProtectedRoute><Checkout /></ProtectedRoute>} />
-                        <Route path="order-success/:orderId" element={<ProtectedRoute><OrderSuccess /></ProtectedRoute>} />
-                        <Route path="orders" element={<ProtectedRoute><Orders /></ProtectedRoute>} />
-                        <Route path="profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
-                        <Route path="referrals" element={<ProtectedRoute><Referrals /></ProtectedRoute>} />
-                        <Route path="help" element={<Help />} />
-                        <Route path="returns" element={<Returns />} />
-                        <Route path="privacy" element={<Privacy />} />
-                        <Route path="terms" element={<Terms />} />
-                        <Route path="*" element={<NotFound />} />
-                      </Route>
-                    </Routes>
-                  </Suspense>
-                </ReferralProvider>
+                <Suspense fallback={
+                  <div className="h-screen w-full flex items-center justify-center text-sm font-bold text-neutral-500">
+                    Loading StyleDash...
+                  </div>
+                }>
+                  <Routes>
+                    <Route element={<MainLayout />}>
+                      <Route index element={<Home />} />
+                      <Route path="products" element={<Products />} />
+                      <Route path="product/:slug" element={<ProductDetail />} />
+                      <Route path="categories" element={<Categories />} />
+                      <Route path="stores" element={<Stores />} />
+                      <Route path="store/:slug" element={<StoreDetail />} />
+                      <Route path="partner" element={<ProtectedRoute><VendorOnboarding /></ProtectedRoute>} />
+                      <Route path="wishlist" element={<Wishlist />} />
+                      <Route path="login" element={<AuthPage mode="login" />} />
+                      <Route path="register" element={<AuthPage mode="register" />} />
+                      <Route path="checkout" element={<ProtectedRoute><Checkout /></ProtectedRoute>} />
+                      <Route path="order-success/:orderId" element={<ProtectedRoute><OrderSuccess /></ProtectedRoute>} />
+                      <Route path="orders" element={<ProtectedRoute><Orders /></ProtectedRoute>} />
+                      <Route path="profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
+                      <Route path="help" element={<Help />} />
+                      <Route path="returns" element={<Returns />} />
+                      <Route path="privacy" element={<Privacy />} />
+                      <Route path="terms" element={<Terms />} />
+                      <Route path="*" element={<NotFound />} />
+                    </Route>
+                  </Routes>
+                </Suspense>
               </ToastProvider>
             </WishlistProvider>
           </CartProvider>

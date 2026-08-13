@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { ArrowRight, Zap, Flame, Sparkles, Tag, ShieldCheck, RefreshCcw, Star, ChevronRight } from 'lucide-react';
+import { ArrowRight, Zap, Sparkles, ChevronRight } from 'lucide-react';
 import { SEO } from '../components/SEO';
 import { ProductCard } from '../components/ProductCard';
 import { Product } from '../types';
@@ -196,22 +196,6 @@ export const Home: React.FC = () => {
           </div>
         </section>
 
-        {/* Referral Invite Banner */}
-        <section className="bg-neutral-950 text-white rounded-3xl p-8 lg:p-12 relative overflow-hidden flex flex-col md:flex-row items-center justify-between gap-6 shadow-2xl">
-          <div className="space-y-3 z-10 max-w-xl">
-            <span className="text-xs font-black text-lime-400 uppercase tracking-widest">Referral Reward</span>
-            <h3 className="text-2xl sm:text-3xl font-black">Give ₹100, Get ₹100 Off</h3>
-            <p className="text-xs sm:text-sm text-neutral-400">
-              Invite your friends in Neemuch to StyleDash. When they place their first fashion order, both of you get ₹100 credit in your StyleWallet!
-            </p>
-          </div>
-          <Link
-            to="/referrals"
-            className="z-10 px-8 py-3.5 bg-lime-400 text-neutral-950 font-black text-xs uppercase tracking-wider rounded-xl hover:bg-lime-300 transition-colors whitespace-nowrap"
-          >
-            Invite Friends Now
-          </Link>
-        </section>
       </div>
     </div>
   );

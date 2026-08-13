@@ -198,8 +198,6 @@ export interface UserProfile {
   phone?: string;
   role: 'customer';
   addresses?: Address[];
-  referralCode?: string;
-  walletBalance?: number;
   createdAt?: string;
   emailVerified?: boolean;
 }

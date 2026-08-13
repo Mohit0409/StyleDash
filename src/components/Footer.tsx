@@ -75,7 +75,6 @@ export const Footer: React.FC = () => {
               <li><Link to="/returns" className="hover:text-lime-400">Returns & Size Exchange</Link></li>
               <li><Link to="/privacy" className="hover:text-lime-400">Privacy Policy</Link></li>
               <li><Link to="/terms" className="hover:text-lime-400">Terms of Service</Link></li>
-              <li><Link to="/referrals" className="hover:text-lime-400">Refer & Earn ₹100</Link></li>
             </ul>
           </div>
 

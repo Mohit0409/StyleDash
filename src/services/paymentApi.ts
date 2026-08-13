@@ -19,7 +19,6 @@ export interface CheckoutIntent {
   address: CheckoutAddressInput;
   deliveryMethod: 'express' | 'standard';
   couponCode: string | null;
-  walletAmount: number;
   paymentMethod: 'cod' | 'upi' | 'card';
 }
 
@@ -45,7 +44,7 @@ export interface ServerOrder {
   paymentStatus: 'pending' | 'paid' | 'failed';
   subtotal: number;
   discount: number;
-  walletAmount: number;
+  walletAmount: number; // Retained for historical persisted-order compatibility.
   deliveryFee: number;
   taxes: number;
   grandTotal: number;

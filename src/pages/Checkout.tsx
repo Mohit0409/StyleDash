@@ -29,7 +29,6 @@ export const Checkout: React.FC = () => {
     clearCart,
     deliveryMethod,
     appliedCoupon,
-    walletDiscount,
   } = useCart();
   const { user } = useAuth();
   const { showToast } = useToast();
@@ -70,7 +69,6 @@ export const Checkout: React.FC = () => {
       address: { name, phone, street, city, pincode },
       deliveryMethod,
       couponCode: appliedCoupon?.code || null,
-      walletAmount: walletDiscount,
       paymentMethod,
     };
 

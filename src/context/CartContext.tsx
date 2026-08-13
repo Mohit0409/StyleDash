@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { Product, CartItem, Coupon } from '../types';
 import { trackEvent } from '../services/analytics';
-import { CONFIG } from '../config';
+import { calculateCartTotals } from './cartTotals';
 
 interface CartContextType {
   items: CartItem[];
@@ -12,8 +12,6 @@ interface CartContextType {
   appliedCoupon: Coupon | null;
   applyCoupon: (coupon: Coupon) => void;
   removeCoupon: () => void;
-  walletDiscount: number;
-  applyWalletCredit: (amount: number) => void;
   subtotal: number;
   discountTotal: number;
   couponDiscount: number;
@@ -39,7 +37,6 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
   });
 
   const [appliedCoupon, setAppliedCoupon] = useState<Coupon | null>(null);
-  const [walletDiscount, setWalletDiscount] = useState<number>(0);
   const [deliveryMethod, setDeliveryMethod] = useState<'express' | 'standard'>('express');
 
   useEffect(() => {
@@ -129,7 +126,6 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const clearCart = () => {
     setItems([]);
     setAppliedCoupon(null);
-    setWalletDiscount(0);
     localStorage.removeItem(LOCAL_CART_KEY);
   };
 
@@ -142,32 +138,13 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setAppliedCoupon(null);
   };
 
-  const applyWalletCredit = (amount: number) => {
-    setWalletDiscount(amount);
-  };
-
   const subtotal = items.reduce((acc, item) => acc + item.unitPrice * item.quantity, 0);
   const totalItemsCount = items.reduce((acc, item) => acc + item.quantity, 0);
-
-  let couponDiscount = 0;
-  if (appliedCoupon && subtotal >= appliedCoupon.minOrderValue) {
-    if (appliedCoupon.discountType === 'fixed') {
-      couponDiscount = appliedCoupon.value;
-    } else {
-      couponDiscount = (subtotal * appliedCoupon.value) / 100;
-      if (appliedCoupon.maxDiscount) {
-        couponDiscount = Math.min(couponDiscount, appliedCoupon.maxDiscount);
-      }
-    }
-  }
-
-  const isFreeDelivery = subtotal >= CONFIG.FREE_DELIVERY_THRESHOLD;
-  const baseDeliveryFee = deliveryMethod === 'express' ? CONFIG.EXPRESS_DELIVERY_FEE : CONFIG.STANDARD_DELIVERY_FEE;
-  const deliveryFee = isFreeDelivery ? 0 : baseDeliveryFee;
-
-  const taxes = Math.round((subtotal - couponDiscount) * CONFIG.TAX_RATE);
-  const discountTotal = couponDiscount + walletDiscount;
-  const grandTotal = Math.max(0, subtotal - discountTotal + deliveryFee + taxes);
+  const { couponDiscount, discountTotal, deliveryFee, taxes, grandTotal } = calculateCartTotals({
+    subtotal,
+    appliedCoupon,
+    deliveryMethod,
+  });
 
   return (
     <CartContext.Provider value={{
@@ -179,8 +156,6 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
       appliedCoupon,
       applyCoupon,
       removeCoupon,
-      walletDiscount,
-      applyWalletCredit,
       subtotal,
       discountTotal,
       couponDiscount,

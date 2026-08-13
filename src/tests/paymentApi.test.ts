@@ -22,7 +22,6 @@ const intent: CheckoutIntent = {
   },
   deliveryMethod: 'express',
   couponCode: null,
-  walletAmount: 0,
   paymentMethod: 'upi',
 };
 
@@ -57,6 +56,7 @@ describe('payment API', () => {
     expect(sent).toEqual(intent);
     expect(sent).not.toHaveProperty('amount');
     expect(sent).not.toHaveProperty('grandTotal');
+    expect(sent).not.toHaveProperty('walletAmount');
     expect(sent.items[0]).not.toHaveProperty('unitPrice');
   });
 
