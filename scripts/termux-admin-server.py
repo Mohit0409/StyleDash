@@ -67,6 +67,14 @@ class AdminApplication:
                 orders = [order for order in orders if needle in str(order.get("id", "")).casefold()]
             return [dict(order) for order in sorted(orders, key=lambda item: item.get("createdAt", ""), reverse=True)[:250]]
 
+    def payment_alerts(self) -> list[dict[str, Any]]:
+        with self.payments.store.lock:
+            alerts = self.payments.store.state["operationalAlerts"].values()
+            return [
+                dict(alert)
+                for alert in sorted(alerts, key=lambda item: item.get("recordedAt", ""), reverse=True)[:250]
+            ]
+
     def get_order(self, order_id: str) -> dict[str, Any]:
         with self.payments.store.lock:
             order = self.payments.store.state["orders"].get(order_id)
@@ -258,6 +266,8 @@ class AdminHandler(BaseHTTPRequestHandler):
             if path == "/api/admin/orders":
                 self._admin(); query = self._query().get("q", [""])[0]
                 self._json(200, {"success": True, "orders": self.application.list_orders(query)}); return
+            if path == "/api/admin/payment-alerts":
+                self._admin(); self._json(200, {"success": True, "alerts": self.application.payment_alerts()}); return
             if path.startswith("/api/admin/orders/"):
                 self._admin(); order_id = unquote(path.removeprefix("/api/admin/orders/"))
                 self._json(200, {"success": True, "order": self.application.get_order(order_id)}); return

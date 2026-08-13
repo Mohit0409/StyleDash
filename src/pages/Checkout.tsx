@@ -87,6 +87,12 @@ export const Checkout: React.FC = () => {
           paymentMethod,
         );
         const result = await verifyPayment(payment, createdOrder.styleDashOrderId);
+        if (result.pending) {
+          clearCart();
+          showToast('Payment authorized and awaiting capture. Track the pending order in your account.', 'info');
+          navigate('/orders');
+          return;
+        }
         confirmedOrder = result.order;
       }
 
@@ -160,7 +166,7 @@ export const Checkout: React.FC = () => {
               ))}
             </div>
             {paymentMethod !== 'cod' && (
-              <p className="flex gap-2 text-[11px] text-neutral-500"><ShieldCheck className="w-4 h-4 shrink-0 text-lime-600" /> Your payment is completed in Razorpay Checkout. StyleDash confirms the order only after server-side signature verification.</p>
+              <p className="flex gap-2 text-[11px] text-neutral-500"><ShieldCheck className="w-4 h-4 shrink-0 text-lime-600" /> Your payment is completed in Razorpay Checkout. StyleDash confirms fulfillment only after server-side signature and captured-payment verification.</p>
             )}
           </div>
         </div>

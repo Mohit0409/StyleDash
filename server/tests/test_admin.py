@@ -92,7 +92,16 @@ class AdminStoreTests(unittest.TestCase):
         app = ADMIN_SERVER.AdminApplication(self.database, self.key, ROOT / "server/payment-data/catalog.json", ROOT / "server/payment-data/settings.json", self.root / "data")
         with app.payments.store.lock:
             app.payments.store.state["orders"]["ORDER-ADMIN"] = {"id": "ORDER-ADMIN", "userId": user["id"], "status": "placed", "paymentStatus": "paid", "createdAt": "2026-08-13T00:00:00+00:00"}
+            app.payments.store.state["operationalAlerts"]["refund.failed:rfnd_admin_test"] = {
+                "id": "refund.failed:rfnd_admin_test", "type": "refund.failed",
+                "entityId": "rfnd_admin_test", "razorpayPaymentId": "pay_admin_test",
+                "styleDashOrderId": "ORDER-ADMIN", "status": "open",
+                "recordedAt": "2026-08-13T00:00:00+00:00",
+            }
             app.payments.store.save()
+        alerts = app.payment_alerts()
+        self.assertEqual(len(alerts), 1)
+        self.assertEqual(alerts[0]["styleDashOrderId"], "ORDER-ADMIN")
         order = app.update_order_status(self.admin["id"], "ORDER-ADMIN", "confirmed")
         self.assertEqual(order["status"], "confirmed")
         self.assert_error("invalid_transition", lambda: app.update_order_status(self.admin["id"], "ORDER-ADMIN", "delivered"))
@@ -158,6 +167,8 @@ class AdminHttpTests(unittest.TestCase):
         self.assertEqual(status, 200); csrf = body["csrfToken"]
         status, body, _headers = self.request("/api/admin/me")
         self.assertEqual(status, 200)
+        status, body, _headers = self.request("/api/admin/payment-alerts")
+        self.assertEqual(status, 200); self.assertEqual(body["alerts"], [])
         status, body, _headers = self.request("/api/admin/logout", {}, method="POST")
         self.assertEqual((status, body["code"]), (403, "admin_csrf_failed"))
         status, body, _headers = self.request("/api/admin/logout", {}, headers={"X-CSRF-Token": csrf}, method="POST")

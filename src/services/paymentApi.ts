@@ -162,7 +162,7 @@ export function verifyPayment(
   response: RazorpaySuccessResponse,
   styleDashOrderId: string,
   fetcher?: typeof fetch,
-): Promise<{ success: true; idempotent: boolean; order: ServerOrder }> {
+): Promise<{ success: true; pending?: boolean; idempotent: boolean; order: ServerOrder }> {
   return postJson('/api/verify-payment', { ...response, styleDashOrderId }, undefined, fetcher);
 }
 

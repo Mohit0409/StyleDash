@@ -85,6 +85,23 @@ class RazorpayGateway:
                 "payment_service_unavailable",
             ) from None
 
+    def fetch_payment(self, payment_id: str) -> dict[str, Any]:
+        try:
+            return self.client.payment.fetch(payment_id)
+        except Exception as exc:  # Razorpay SDK exceptions expose status_code.
+            status = int(getattr(exc, "status_code", 500) or 500)
+            if status in (HTTPStatus.UNAUTHORIZED, HTTPStatus.FORBIDDEN):
+                raise ApiError(
+                    HTTPStatus.UNAUTHORIZED,
+                    "Payment service authentication failed.",
+                    "payment_auth_failed",
+                ) from None
+            raise ApiError(
+                HTTPStatus.BAD_GATEWAY,
+                "The payment service is temporarily unavailable.",
+                "payment_service_unavailable",
+            ) from None
+
 
 class StateFileLock:
     """Thread lock plus Termux process lock; reloads state after acquisition."""
@@ -142,7 +159,14 @@ class JsonStateStore:
         self.lock = StateFileLock(self)
 
     def _load(self) -> dict[str, Any]:
-        default = {"orders": {}, "inventory": {}, "idempotency": {}, "processedPayments": {}}
+        default = {
+            "orders": {},
+            "inventory": {},
+            "idempotency": {},
+            "processedPayments": {},
+            "processedWebhookEvents": {},
+            "operationalAlerts": {},
+        }
         if not self.path.exists():
             return default
         try:
@@ -541,6 +565,21 @@ class PaymentService:
             None,
         )
 
+    def _find_order_by_payment_id(self, payment_id: str) -> dict[str, Any] | None:
+        order_id = self.store.state["processedPayments"].get(payment_id)
+        if order_id:
+            order = self.store.state["orders"].get(order_id)
+            if order is not None:
+                return order
+        return next(
+            (
+                order
+                for order in self.store.state["orders"].values()
+                if order.get("razorpayPaymentId") == payment_id
+            ),
+            None,
+        )
+
     def _finalize_payment(
         self,
         style_order_id: str,
@@ -619,12 +658,62 @@ class PaymentService:
             ).hexdigest()
             if not hmac.compare_digest(expected, payload["razorpay_signature"]):
                 raise ApiError(HTTPStatus.BAD_REQUEST, "Payment verification failed.", "signature_mismatch")
+
+            expected_amount = order["amount"]
+            expected_currency = order["currency"]
+
+        if self.gateway is None or not hasattr(self.gateway, "fetch_payment"):
+            raise ApiError(
+                HTTPStatus.SERVICE_UNAVAILABLE,
+                "Payment capture verification is unavailable.",
+                "payments_not_configured",
+            )
+        payment = self.gateway.fetch_payment(payment_id)
+        if not isinstance(payment, dict):
+            raise ApiError(HTTPStatus.BAD_GATEWAY, "Invalid response from payment service.", "invalid_payment_response")
+        if payment.get("order_id") != payload["razorpay_order_id"]:
+            raise ApiError(HTTPStatus.BAD_REQUEST, "Payment does not match this order.", "order_mismatch")
+        amount = payment.get("amount")
+        currency = payment.get("currency")
+        if isinstance(amount, bool) or amount != expected_amount:
+            raise ApiError(HTTPStatus.BAD_REQUEST, "Payment amount does not match this order.", "amount_mismatch")
+        if currency != expected_currency:
+            raise ApiError(HTTPStatus.BAD_REQUEST, "Payment currency does not match this order.", "currency_mismatch")
+
+        status = payment.get("status")
+        if status == "authorized":
+            return self._record_authorized_payment(style_order_id, payment_id)
+        if status != "captured":
+            raise ApiError(
+                HTTPStatus.CONFLICT,
+                "Payment has not been captured. The order remains pending.",
+                "payment_not_captured",
+            )
         return self._finalize_payment(
             style_order_id,
             payload["razorpay_order_id"],
             payment_id,
             source="browser callback",
+            amount=amount,
+            currency=currency,
         )
+
+    def _record_authorized_payment(self, style_order_id: str, payment_id: str) -> dict[str, Any]:
+        """Record authorization without treating it as captured or fulfilling inventory."""
+        with self.store.lock:
+            order = self.store.state["orders"].get(style_order_id)
+            if order is None:
+                raise ApiError(HTTPStatus.NOT_FOUND, "Order not found.", "order_not_found")
+            if order.get("paymentStatus") == "paid":
+                return {"success": True, "pending": False, "idempotent": True, "order": self._public_order(order)}
+            previous = order.get("lastAuthorizedPayment")
+            if isinstance(previous, dict) and previous.get("razorpayPaymentId") == payment_id:
+                return {"success": True, "pending": True, "idempotent": True, "order": self._public_order(order)}
+            now = datetime.now(timezone.utc).isoformat()
+            order["lastAuthorizedPayment"] = {"razorpayPaymentId": payment_id, "recordedAt": now}
+            order["updatedAt"] = now
+            self.store.save()
+            return {"success": True, "pending": True, "idempotent": False, "order": self._public_order(order)}
 
     @staticmethod
     def _webhook_entity(payload: dict[str, Any], name: str) -> dict[str, Any]:
@@ -653,7 +742,70 @@ class PaymentService:
             self.store.save()
             return True
 
-    def process_webhook(self, raw_body: bytes, signature: str | None) -> dict[str, Any]:
+    @staticmethod
+    def _safe_webhook_event_id(event_id: str | None) -> str | None:
+        if not isinstance(event_id, str):
+            return None
+        cleaned = event_id.strip()
+        if not cleaned or len(cleaned) > 200 or any(ord(character) < 32 for character in cleaned):
+            return None
+        return cleaned
+
+    def _record_operational_alert(
+        self,
+        event: str,
+        entity_id: str,
+        payment_id: str,
+        razorpay_order_id: str | None,
+        event_id: str | None,
+    ) -> dict[str, Any]:
+        """Persist a minimal private-admin alert without mutating fulfillment state."""
+        alert_id = f"{event}:{entity_id}"
+        safe_event_id = self._safe_webhook_event_id(event_id)
+        with self.store.lock:
+            state = self.store.state
+            event_key = safe_event_id or alert_id
+            previous_alert_id = state["processedWebhookEvents"].get(event_key)
+            if previous_alert_id:
+                return {"duplicate": True, "alert": state["operationalAlerts"].get(previous_alert_id)}
+            existing = state["operationalAlerts"].get(alert_id)
+            if existing is not None:
+                state["processedWebhookEvents"][event_key] = alert_id
+                self.store.save()
+                return {"duplicate": True, "alert": existing}
+
+            order = self._find_order_by_payment_id(payment_id)
+            if order is None and razorpay_order_id:
+                order = self._find_order_by_razorpay_id(razorpay_order_id)
+            now = datetime.now(timezone.utc).isoformat()
+            alert = {
+                "id": alert_id,
+                "type": event,
+                "entityId": entity_id,
+                "razorpayPaymentId": payment_id,
+                "styleDashOrderId": order.get("id") if order else None,
+                "status": "open",
+                "recordedAt": now,
+            }
+            state["operationalAlerts"][alert_id] = alert
+            state["processedWebhookEvents"][event_key] = alert_id
+            if order is not None:
+                order["requiresAdminAttention"] = True
+                if event == "refund.failed":
+                    order["refundFailureAttention"] = True
+                else:
+                    order["paymentDisputed"] = True
+                    order["paymentDisputeId"] = entity_id
+                order["updatedAt"] = now
+            self.store.save()
+            return {"duplicate": False, "alert": alert}
+
+    def process_webhook(
+        self,
+        raw_body: bytes,
+        signature: str | None,
+        event_id: str | None = None,
+    ) -> dict[str, Any]:
         if not signature:
             raise ApiError(HTTPStatus.BAD_REQUEST, "Missing webhook signature.", "missing_webhook_signature")
         if not self.webhook_secret:
@@ -669,6 +821,38 @@ class PaymentService:
             raise ApiError(HTTPStatus.BAD_REQUEST, "Malformed webhook request.", "malformed_request")
 
         event = payload["event"]
+        if event == "payment.authorized":
+            print("Razorpay webhook event=payment.authorized result=observed-not-fulfilled", flush=True)
+            return {"success": True}
+        if event in ("refund.failed", "payment.dispute.created"):
+            entity_name = "refund" if event == "refund.failed" else "dispute"
+            entity = self._webhook_entity(payload, entity_name)
+            payment = self._webhook_entity(payload, "payment")
+            entity_id = entity.get("id")
+            payment_id = entity.get("payment_id") or payment.get("id")
+            payment_entity_id = payment.get("id")
+            if not isinstance(entity_id, str) or not entity_id:
+                raise ApiError(HTTPStatus.BAD_REQUEST, "Webhook is missing alert information.", "malformed_webhook")
+            if not isinstance(payment_id, str) or not payment_id:
+                raise ApiError(HTTPStatus.BAD_REQUEST, "Webhook is missing payment information.", "malformed_webhook")
+            if payment_entity_id and payment_entity_id != payment_id:
+                raise ApiError(HTTPStatus.BAD_REQUEST, "Webhook payment information does not match.", "malformed_webhook")
+            razorpay_order_id = payment.get("order_id")
+            if not isinstance(razorpay_order_id, str):
+                razorpay_order_id = None
+            recorded = self._record_operational_alert(
+                event, entity_id, payment_id, razorpay_order_id, event_id
+            )
+            alert = recorded["alert"] or {}
+            print(
+                f"Razorpay webhook event={event} styleOrderId={alert.get('styleDashOrderId') or '-'} "
+                f"entityId={entity_id} result={'duplicate' if recorded['duplicate'] else 'alerted'}",
+                flush=True,
+            )
+            response = {"success": True}
+            if recorded["duplicate"]:
+                response["duplicate"] = True
+            return response
         if event not in ("payment.captured", "payment.failed", "order.paid"):
             print(f"Razorpay webhook event={event} result=ignored", flush=True)
             return {"success": True}
@@ -932,7 +1116,9 @@ class StyleDashRequestHandler(SimpleHTTPRequestHandler):
             if path == "/api/webhooks/razorpay":
                 self._rate_limit(path, 120)
                 result = self.payment_service.process_webhook(
-                    self._read_raw_body(), self.headers.get("X-Razorpay-Signature")
+                    self._read_raw_body(),
+                    self.headers.get("X-Razorpay-Signature"),
+                    self.headers.get("X-Razorpay-Event-Id"),
                 )
                 self._json_response(HTTPStatus.OK, result)
                 return

@@ -58,6 +58,26 @@ separate backup-and-reconciliation-gated operation.
 Razorpay Test and Live credentials are isolated. Keep `RAZORPAY_MODE=test` until
 all manual customer/admin/reboot gates pass; deployment never enables Live Mode.
 
+## Razorpay Live-readiness policy
+
+StyleDash fulfills online orders only after Razorpay reports a captured payment:
+the browser callback verifies its signature and then fetches the payment from
+Razorpay, while `payment.captured` and `order.paid` webhooks use the same
+exactly-once finalizer. An `authorized` payment remains pending and never changes
+inventory or marks an order paid.
+
+Use Razorpay Dashboard **Automatic Capture** for all payments authorised within
+3 days. With that policy, late-authorised payments are either auto-captured and
+later finalized by `payment.captured`/`order.paid`, or auto-refunded by Razorpay;
+`payment.authorized` is therefore not a fulfillment dependency.
+
+The Live webhook URL must be the public HTTPS `/api/webhooks/razorpay` endpoint
+and subscribe to `payment.captured`, `payment.failed`, `order.paid`,
+`refund.failed`, and `payment.dispute.created`. Refund failures and newly created
+disputes create persistent, idempotent alerts visible only in the private admin
+service. They never change inventory, refund automatically, or rewrite a paid
+order's successful payment history.
+
 ## Verification
 
 ```bash

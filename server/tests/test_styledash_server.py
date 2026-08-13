@@ -26,10 +26,14 @@ SPEC.loader.exec_module(SERVER)
 class FakeGateway:
     def __init__(self) -> None:
         self.calls: list[dict] = []
+        self.payments: dict[str, dict] = {}
 
     def create_order(self, payload: dict) -> dict:
         self.calls.append(payload)
         return {"id": f"order_test_{len(self.calls):03d}"}
+
+    def fetch_payment(self, payment_id: str) -> dict:
+        return dict(self.payments[payment_id])
 
 
 class PaymentServiceTests(unittest.TestCase):
@@ -78,7 +82,14 @@ class PaymentServiceTests(unittest.TestCase):
     def create_payment(self, key: str, **payload_overrides):
         return self.service.create_razorpay_order(self.payload(**payload_overrides), key)
 
-    def browser_verification(self, created: dict, payment_id: str) -> dict:
+    def browser_verification(self, created: dict, payment_id: str, status: str = "captured") -> dict:
+        self.gateway.payments[payment_id] = {
+            "id": payment_id,
+            "order_id": created["razorpayOrderId"],
+            "amount": created["amount"],
+            "currency": created["currency"],
+            "status": status,
+        }
         signature = hmac.new(
             b"test_secret_placeholder",
             f"{created['razorpayOrderId']}|{payment_id}".encode(),
@@ -108,6 +119,31 @@ class PaymentServiceTests(unittest.TestCase):
                 "currency": created["currency"],
                 "status": "paid",
             }}
+        return json.dumps(payload, separators=(",", ":")).encode()
+
+    def operational_webhook_body(
+        self,
+        created: dict,
+        payment_id: str,
+        event: str,
+        entity_id: str,
+    ) -> bytes:
+        entity_name = "refund" if event == "refund.failed" else "dispute"
+        payload = {
+            "event": event,
+            "payload": {
+                "payment": {"entity": {
+                    "id": payment_id,
+                    "order_id": created["razorpayOrderId"],
+                    "status": "captured",
+                }},
+                entity_name: {"entity": {
+                    "id": entity_id,
+                    "payment_id": payment_id,
+                    "status": "failed" if event == "refund.failed" else "open",
+                }},
+            },
+        }
         return json.dumps(payload, separators=(",", ":")).encode()
 
     def deliver(self, body: bytes) -> dict:
@@ -156,17 +192,7 @@ class PaymentServiceTests(unittest.TestCase):
     def test_verifies_signature_and_decrements_inventory_once(self) -> None:
         created = self.service.create_razorpay_order(self.payload(), "checkout-test-003")
         payment_id = "pay_test_001"
-        signature = hmac.new(
-            b"test_secret_placeholder",
-            f"{created['razorpayOrderId']}|{payment_id}".encode(),
-            hashlib.sha256,
-        ).hexdigest()
-        verification = {
-            "styleDashOrderId": created["styleDashOrderId"],
-            "razorpay_order_id": created["razorpayOrderId"],
-            "razorpay_payment_id": payment_id,
-            "razorpay_signature": signature,
-        }
+        verification = self.browser_verification(created, payment_id)
 
         first = self.service.verify_payment(verification)
         stock_after_first = self.service.store.state["inventory"]["sd-prod-001-var-2"]
@@ -177,6 +203,35 @@ class PaymentServiceTests(unittest.TestCase):
         self.assertEqual(stock_after_first, 13)
         self.assertTrue(second["idempotent"])
         self.assertEqual(self.service.store.state["inventory"]["sd-prod-001-var-2"], 13)
+
+    def test_authorized_browser_payment_remains_pending_until_captured_webhook(self) -> None:
+        created = self.create_payment("authorized-browser-001")
+        payment_id = "pay_authorized_001"
+        verification = self.browser_verification(created, payment_id, status="authorized")
+
+        first = self.service.verify_payment(verification)
+        second = self.service.verify_payment(verification)
+        order = self.service.store.state["orders"][created["styleDashOrderId"]]
+        self.assertTrue(first["pending"])
+        self.assertTrue(second["pending"])
+        self.assertTrue(second["idempotent"])
+        self.assertEqual(order["paymentStatus"], "pending")
+        self.assertNotIn("sd-prod-001-var-2", self.service.store.state["inventory"])
+        self.assertNotIn(payment_id, self.service.store.state["processedPayments"])
+
+        captured = self.deliver(self.webhook_body(created, payment_id))
+        self.assertEqual(captured, {"success": True})
+        order = self.service.store.state["orders"][created["styleDashOrderId"]]
+        self.assertEqual(order["paymentStatus"], "paid")
+        self.assertEqual(self.service.store.state["inventory"]["sd-prod-001-var-2"], 13)
+
+    def test_browser_verification_rejects_non_captured_gateway_state(self) -> None:
+        created = self.create_payment("not-captured-browser-001")
+        verification = self.browser_verification(created, "pay_failed_fetch", status="failed")
+        self.assert_api_error("payment_not_captured", lambda: self.service.verify_payment(verification))
+        order = self.service.store.state["orders"][created["styleDashOrderId"]]
+        self.assertEqual(order["paymentStatus"], "pending")
+        self.assertNotIn("sd-prod-001-var-2", self.service.store.state["inventory"])
 
     def test_rejects_invalid_signature_and_missing_fields(self) -> None:
         created = self.service.create_razorpay_order(self.payload(), "checkout-test-004")
@@ -263,6 +318,81 @@ class PaymentServiceTests(unittest.TestCase):
         order = self.service.store.state["orders"][created["styleDashOrderId"]]
         self.assertEqual(order["paymentStatus"], "paid")
         self.assertEqual(self.service.store.state["inventory"]["sd-prod-001-var-2"], 13)
+
+    def test_refund_failed_records_one_private_alert_without_business_mutation(self) -> None:
+        created = self.create_payment("refund-failed-001")
+        payment_id = "pay_refund_failed_001"
+        self.deliver(self.webhook_body(created, payment_id))
+        order = self.service.store.state["orders"][created["styleDashOrderId"]]
+        inventory_before = dict(self.service.store.state["inventory"])
+        history_before = list(order["statusHistory"])
+        body = self.operational_webhook_body(created, payment_id, "refund.failed", "rfnd_failed_001")
+        signature = hmac.new(b"webhook_secret_placeholder", body, hashlib.sha256).hexdigest()
+
+        first = self.service.process_webhook(body, signature, "event-refund-001")
+        retry = self.service.process_webhook(body, signature, "event-refund-001")
+        redelivery = self.service.process_webhook(body, signature, "event-refund-redelivery")
+        order = self.service.store.state["orders"][created["styleDashOrderId"]]
+
+        self.assertEqual(first, {"success": True})
+        self.assertTrue(retry["duplicate"])
+        self.assertTrue(redelivery["duplicate"])
+        self.assertEqual(len(self.service.store.state["operationalAlerts"]), 1)
+        self.assertTrue(order["requiresAdminAttention"])
+        self.assertTrue(order["refundFailureAttention"])
+        self.assertEqual(order["paymentStatus"], "paid")
+        self.assertEqual(order["statusHistory"], history_before)
+        self.assertEqual(self.service.store.state["inventory"], inventory_before)
+
+    def test_payment_dispute_created_flags_paid_order_without_refund_or_inventory_change(self) -> None:
+        created = self.create_payment("payment-dispute-001")
+        payment_id = "pay_dispute_001"
+        self.deliver(self.webhook_body(created, payment_id))
+        order = self.service.store.state["orders"][created["styleDashOrderId"]]
+        inventory_before = dict(self.service.store.state["inventory"])
+        history_before = list(order["statusHistory"])
+        body = self.operational_webhook_body(
+            created, payment_id, "payment.dispute.created", "disp_created_001"
+        )
+        signature = hmac.new(b"webhook_secret_placeholder", body, hashlib.sha256).hexdigest()
+
+        first = self.service.process_webhook(body, signature, "event-dispute-001")
+        retry = self.service.process_webhook(body, signature, "event-dispute-001")
+        order = self.service.store.state["orders"][created["styleDashOrderId"]]
+
+        self.assertEqual(first, {"success": True})
+        self.assertTrue(retry["duplicate"])
+        self.assertTrue(order["requiresAdminAttention"])
+        self.assertTrue(order["paymentDisputed"])
+        self.assertEqual(order["paymentDisputeId"], "disp_created_001")
+        self.assertEqual(order["paymentStatus"], "paid")
+        self.assertEqual(order["statusHistory"], history_before)
+        self.assertEqual(self.service.store.state["inventory"], inventory_before)
+
+    def test_operational_alert_for_unknown_payment_is_preserved_for_admin_review(self) -> None:
+        created = self.create_payment("unknown-refund-alert-001")
+        webhook = json.loads(self.operational_webhook_body(
+            created, "pay_not_in_styledash", "refund.failed", "rfnd_unknown_001"
+        ))
+        webhook["payload"]["payment"]["entity"]["order_id"] = "order_not_in_styledash"
+        body = json.dumps(webhook, separators=(",", ":")).encode()
+        signature = hmac.new(b"webhook_secret_placeholder", body, hashlib.sha256).hexdigest()
+        self.assertEqual(
+            self.service.process_webhook(body, signature, "event-refund-unknown"),
+            {"success": True},
+        )
+        alert = self.service.store.state["operationalAlerts"]["refund.failed:rfnd_unknown_001"]
+        self.assertIsNone(alert["styleDashOrderId"])
+
+    def test_payment_authorized_webhook_never_fulfills(self) -> None:
+        created = self.create_payment("authorized-webhook-001")
+        body = self.webhook_body(
+            created, "pay_authorized_webhook", "payment.authorized", status="authorized"
+        )
+        self.assertEqual(self.deliver(body), {"success": True})
+        order = self.service.store.state["orders"][created["styleDashOrderId"]]
+        self.assertEqual(order["paymentStatus"], "pending")
+        self.assertNotIn("sd-prod-001-var-2", self.service.store.state["inventory"])
 
     def test_unknown_signed_event_is_ignored(self) -> None:
         body = b'{"event":"refund.processed","payload":{}}'
@@ -377,10 +507,12 @@ class HttpApiTests(unittest.TestCase):
         self.assertEqual(payload["code"], "malformed_request")
         self.assertNotIn("traceback", json.dumps(payload).lower())
 
-    def post_webhook(self, body: bytes, signature: str | None = None):
+    def post_webhook(self, body: bytes, signature: str | None = None, event_id: str | None = None):
         headers = {"Content-Type": "application/json"}
         if signature is not None:
             headers["X-Razorpay-Signature"] = signature
+        if event_id is not None:
+            headers["X-Razorpay-Event-Id"] = event_id
         request = urllib.request.Request(
             f"{self.base_url}/api/webhooks/razorpay",
             data=body,
@@ -412,6 +544,24 @@ class HttpApiTests(unittest.TestCase):
         status, payload = self.post_webhook(body, signature)
         self.assertEqual(status, 200)
         self.assertEqual(payload, {"success": True})
+
+    def test_event_id_header_makes_operational_webhook_http_route_idempotent(self) -> None:
+        body = json.dumps({
+            "event": "refund.failed",
+            "payload": {
+                "payment": {"entity": {"id": "pay_http_alert", "order_id": "order_http_alert"}},
+                "refund": {"entity": {
+                    "id": "rfnd_http_alert", "payment_id": "pay_http_alert", "status": "failed",
+                }},
+            },
+        }, separators=(",", ":")).encode()
+        signature = hmac.new(b"webhook_secret_placeholder", body, hashlib.sha256).hexdigest()
+        first_status, first = self.post_webhook(body, signature, "event-http-alert")
+        second_status, second = self.post_webhook(body, signature, "event-http-alert")
+        self.assertEqual((first_status, first), (200, {"success": True}))
+        self.assertEqual(second_status, 200)
+        self.assertTrue(second["duplicate"])
+        self.assertEqual(len(self.service.store.state["operationalAlerts"]), 1)
 
     def test_signed_malformed_json_returns_400(self) -> None:
         body = b"{not-json"
