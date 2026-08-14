@@ -5,17 +5,55 @@ set -u
 APP_DIR="$HOME/server"
 RUN_DIR="$HOME/run"
 LOG_DIR="$HOME/logs"
+PRIVATE_DIR="$HOME/.config/styledash"
+SECRET_FILE="$PRIVATE_DIR/secrets.env"
+DATA_ROOT="$HOME/.local/share/styledash"
 PID_FILE="$RUN_DIR/styledash.pid"
 LOG_FILE="$LOG_DIR/styledash.log"
 
-mkdir -p "$RUN_DIR" "$LOG_DIR"
+mkdir -p "$RUN_DIR" "$LOG_DIR" "$PRIVATE_DIR" "$DATA_ROOT/runtime"
+chmod 700 "$PRIVATE_DIR" "$DATA_ROOT" "$DATA_ROOT/runtime"
+
+if [ -f "$SECRET_FILE" ]; then
+  chmod 600 "$SECRET_FILE"
+  set -a
+  # shellcheck disable=SC1090 -- this is the private, operator-managed file.
+  . "$SECRET_FILE"
+  set +a
+fi
+
+if [ -z "${STYLEDASH_TOTP_ENCRYPTION_KEY:-}" ]; then
+  echo "$(date -Iseconds) missing TOTP encryption key; refusing to start" >> "$LOG_FILE"
+  exit 1
+fi
+
+RAZORPAY_MODE="${RAZORPAY_MODE:-test}"
+case "$RAZORPAY_MODE" in
+  test) RAZORPAY_KEY_ID_CHECK="${RAZORPAY_TEST_KEY_ID:-}"; RAZORPAY_KEY_SECRET_CHECK="${RAZORPAY_TEST_KEY_SECRET:-}" ;;
+  live) RAZORPAY_KEY_ID_CHECK="${RAZORPAY_LIVE_KEY_ID:-}"; RAZORPAY_KEY_SECRET_CHECK="${RAZORPAY_LIVE_KEY_SECRET:-}" ;;
+  *) echo "$(date -Iseconds) invalid Razorpay mode; refusing to start" >> "$LOG_FILE"; exit 1 ;;
+esac
+
+if { [ -n "$RAZORPAY_KEY_ID_CHECK" ] && [ -z "$RAZORPAY_KEY_SECRET_CHECK" ]; } || \
+   { [ -z "$RAZORPAY_KEY_ID_CHECK" ] && [ -n "$RAZORPAY_KEY_SECRET_CHECK" ]; }; then
+  echo "$(date -Iseconds) incomplete Razorpay configuration for selected mode; refusing to start" >> "$LOG_FILE"
+  exit 1
+fi
+unset RAZORPAY_KEY_ID_CHECK RAZORPAY_KEY_SECRET_CHECK
+
+export STYLEDASH_CATALOG_PATH="$DATA_ROOT/catalog.json"
+export STYLEDASH_SETTINGS_PATH="$DATA_ROOT/settings.json"
+export STYLEDASH_DATA_DIR="$DATA_ROOT/runtime"
+export STYLEDASH_DATABASE_PATH="$DATA_ROOT/styledash.db"
+export STYLEDASH_PUBLIC_ORIGIN="${STYLEDASH_PUBLIC_ORIGIN:-https://display-landslide-gigahertz.ngrok-free.dev}"
+export STYLEDASH_TRUST_LOOPBACK_PROXY=1
 
 trim_log() {
   [ -f "$1" ] && [ "$(wc -l < "$1")" -gt 2000 ] && tail -n 1500 "$1" > "$1.trim" && mv "$1.trim" "$1"
 }
 
 healthy() {
-  curl -fsS --max-time 5 http://127.0.0.1:8080/ >/dev/null
+  curl -fsS --max-time 5 http://127.0.0.1:8080/api/health >/dev/null
 }
 
 if [ -s "$PID_FILE" ]; then

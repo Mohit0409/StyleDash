@@ -1,0 +1,35 @@
+#!/data/data/com.termux/files/usr/bin/bash
+set -eu
+
+PAYLOAD_FILE="$PREFIX/tmp/styledash-razorpay-config-request.json"
+RESPONSE_FILE="$PREFIX/tmp/styledash-razorpay-config-response.json"
+
+printf '%s' '{"items":[{"productId":"sd-prod-001","variantId":"sd-prod-001-var-2","quantity":1}],"address":{"name":"StyleDash Payment Test","phone":"9999999999","street":"123 Test Street","city":"Neemuch","pincode":"458441"},"userId":"razorpay-config-test","deliveryMethod":"express","couponCode":null,"walletAmount":0,"paymentMethod":"card"}' > "$PAYLOAD_FILE"
+
+status="$(curl -sS --max-time 30 -o "$RESPONSE_FILE" -w '%{http_code}' \
+  -H 'Content-Type: application/json' \
+  -H 'Idempotency-Key: razorpay-config-20260813' \
+  --data-binary "@$PAYLOAD_FILE" \
+  http://127.0.0.1:8080/api/create-order)"
+
+python3 - "$status" "$RESPONSE_FILE" <<'PY'
+import json
+import sys
+from pathlib import Path
+
+status = int(sys.argv[1])
+payload = json.loads(Path(sys.argv[2]).read_text(encoding="utf-8"))
+if status != 201 or not payload.get("success"):
+    raise SystemExit(f"Razorpay order creation failed safely: HTTP {status}, code={payload.get('code', 'unknown')}")
+if not str(payload.get("razorpayOrderId", "")).startswith("order_"):
+    raise SystemExit("Razorpay did not return a valid Test order ID.")
+if not str(payload.get("keyId", "")).startswith("rzp_test_"):
+    raise SystemExit("The server did not return a Test Mode Key ID.")
+print(
+    "Razorpay Test order creation passed: "
+    f"amount={payload['amount']} paise, currency={payload['currency']}, "
+    f"StyleDash order={payload['styleDashOrderId']}"
+)
+PY
+
+rm -f "$PAYLOAD_FILE" "$RESPONSE_FILE"

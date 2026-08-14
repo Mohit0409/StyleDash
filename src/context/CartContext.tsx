@@ -1,19 +1,18 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { Product, CartItem, Coupon } from '../types';
-import { trackEvent } from '../firebase/analytics';
-import { CONFIG } from '../config';
+import { trackEvent } from '../services/analytics';
+import { calculateCartTotals } from './cartTotals';
+import { canAddVariantToCart, canIncreaseCartQuantity } from '../repositories/inventoryRepository';
 
 interface CartContextType {
   items: CartItem[];
-  addItem: (product: Product, variantId: string, quantity?: number) => boolean;
+  addItem: (product: Product, variantId: string, quantity?: number) => Promise<boolean>;
   removeItem: (lineId: string) => void;
-  updateQuantity: (lineId: string, quantity: number) => void;
+  updateQuantity: (lineId: string, quantity: number) => Promise<void>;
   clearCart: () => void;
   appliedCoupon: Coupon | null;
   applyCoupon: (coupon: Coupon) => void;
   removeCoupon: () => void;
-  walletDiscount: number;
-  applyWalletCredit: (amount: number) => void;
   subtotal: number;
   discountTotal: number;
   couponDiscount: number;
@@ -39,20 +38,17 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
   });
 
   const [appliedCoupon, setAppliedCoupon] = useState<Coupon | null>(null);
-  const [walletDiscount, setWalletDiscount] = useState<number>(0);
   const [deliveryMethod, setDeliveryMethod] = useState<'express' | 'standard'>('express');
 
   useEffect(() => {
     localStorage.setItem(LOCAL_CART_KEY, JSON.stringify(items));
   }, [items]);
 
-  const addItem = (product: Product, variantId: string, quantity = 1): boolean => {
+  const addItem = async (product: Product, variantId: string, quantity = 1): Promise<boolean> => {
     const variant = product.variants.find(v => v.id === variantId);
     if (!variant) return false;
 
-    if (variant.stock <= 0) {
-      return false;
-    }
+    if (!await canAddVariantToCart(variantId)) return false;
 
     const lineId = `${product.id}:${variantId}`;
 
@@ -60,7 +56,7 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const existingIdx = prev.findIndex(item => item.lineId === lineId);
       if (existingIdx >= 0) {
         const existing = prev[existingIdx];
-        const newQty = Math.min(existing.quantity + quantity, variant.stock);
+        const newQty = existing.quantity + quantity;
         const updated = [...prev];
         updated[existingIdx] = { ...existing, quantity: newQty };
         return updated;
@@ -74,7 +70,7 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
           selectedSize: variant.size,
           selectedColour: variant.colourName,
           sku: variant.sku,
-          quantity: Math.min(quantity, variant.stock),
+          quantity,
           unitPrice
         };
         return [...prev, newItem];
@@ -109,17 +105,19 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
     });
   };
 
-  const updateQuantity = (lineId: string, quantity: number) => {
+  const updateQuantity = async (lineId: string, quantity: number): Promise<void> => {
     if (quantity <= 0) {
       removeItem(lineId);
       return;
     }
+    const currentItem = items.find(item => item.lineId === lineId);
+    if (!currentItem) return;
+    if (quantity > currentItem.quantity && !await canIncreaseCartQuantity(currentItem.variantId)) return;
+
     setItems(prev => {
       return prev.map(item => {
         if (item.lineId === lineId) {
-          const variant = item.product.variants.find(v => v.id === item.variantId);
-          const maxStock = variant ? variant.stock : item.quantity;
-          return { ...item, quantity: Math.min(quantity, maxStock) };
+          return { ...item, quantity };
         }
         return item;
       });
@@ -129,7 +127,6 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const clearCart = () => {
     setItems([]);
     setAppliedCoupon(null);
-    setWalletDiscount(0);
     localStorage.removeItem(LOCAL_CART_KEY);
   };
 
@@ -142,32 +139,13 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setAppliedCoupon(null);
   };
 
-  const applyWalletCredit = (amount: number) => {
-    setWalletDiscount(amount);
-  };
-
   const subtotal = items.reduce((acc, item) => acc + item.unitPrice * item.quantity, 0);
   const totalItemsCount = items.reduce((acc, item) => acc + item.quantity, 0);
-
-  let couponDiscount = 0;
-  if (appliedCoupon && subtotal >= appliedCoupon.minOrderValue) {
-    if (appliedCoupon.discountType === 'fixed') {
-      couponDiscount = appliedCoupon.value;
-    } else {
-      couponDiscount = (subtotal * appliedCoupon.value) / 100;
-      if (appliedCoupon.maxDiscount) {
-        couponDiscount = Math.min(couponDiscount, appliedCoupon.maxDiscount);
-      }
-    }
-  }
-
-  const isFreeDelivery = subtotal >= CONFIG.FREE_DELIVERY_THRESHOLD;
-  const baseDeliveryFee = deliveryMethod === 'express' ? CONFIG.EXPRESS_DELIVERY_FEE : CONFIG.STANDARD_DELIVERY_FEE;
-  const deliveryFee = isFreeDelivery ? 0 : baseDeliveryFee;
-
-  const taxes = Math.round((subtotal - couponDiscount) * CONFIG.TAX_RATE);
-  const discountTotal = couponDiscount + walletDiscount;
-  const grandTotal = Math.max(0, subtotal - discountTotal + deliveryFee + taxes);
+  const { couponDiscount, discountTotal, deliveryFee, taxes, grandTotal } = calculateCartTotals({
+    subtotal,
+    appliedCoupon,
+    deliveryMethod,
+  });
 
   return (
     <CartContext.Provider value={{
@@ -179,8 +157,6 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
       appliedCoupon,
       applyCoupon,
       removeCoupon,
-      walletDiscount,
-      applyWalletCredit,
       subtotal,
       discountTotal,
       couponDiscount,

@@ -1,0 +1,5 @@
+razorpay==2.0.1
+argon2-cffi==25.1.0
+pyotp==2.10.0
+# On Termux install cryptography with: pkg install python-cryptography
+cryptography==50.0.0

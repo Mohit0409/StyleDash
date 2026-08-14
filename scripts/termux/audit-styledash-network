@@ -1,0 +1,19 @@
+#!/data/data/com.termux/files/usr/bin/bash
+set -u
+printf 'authorized_keys='
+if [ -s "$HOME/.ssh/authorized_keys" ]; then echo present; else echo missing; fi
+stat -c 'mode=%a path=%n' "$HOME/.ssh" "$HOME/.ssh/authorized_keys" 2>/dev/null || true
+echo 'managed_listener_commands:'
+for pid_file in "$HOME/run/styledash.pid" "$HOME/run/styledash-admin.pid"; do
+  if [ -s "$pid_file" ]; then pid="$(cat "$pid_file")"; tr '\0' ' ' < "/proc/$pid/cmdline" 2>/dev/null || true; echo; fi
+done
+echo 'explicit_sshd_settings:'
+grep -E '^[[:space:]]*(PasswordAuthentication|PubkeyAuthentication|PermitRootLogin|ListenAddress|Port)[[:space:]]' "$PREFIX/etc/ssh/sshd_config" 2>/dev/null || true
+echo 'effective_sshd_settings:'
+sshd -T 2>/dev/null | grep -Ei '^(passwordauthentication|pubkeyauthentication|permitrootlogin|port) ' || true
+printf 'ngrok_command='
+if [ -s "$HOME/run/styledash-ngrok.pid" ]; then
+  pid="$(cat "$HOME/run/styledash-ngrok.pid")"
+  tr '\0' ' ' < "/proc/$pid/cmdline" 2>/dev/null || true
+fi
+echo

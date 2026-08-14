@@ -34,14 +34,18 @@ export const VariantSelector: React.FC<VariantSelectorProps> = ({
           {colours.map(cName => {
             const variantForColour = product.variants.find(v => v.colourName === cName);
             const isSelected = selectedColour === cName;
+            const isOutOfStock = !product.variants.some(v => v.colourName === cName && v.available === true);
 
             return (
               <button
                 key={cName}
+                disabled={isOutOfStock}
                 onClick={() => onSelectColour(cName)}
                 className={`px-3 py-2 rounded-xl text-xs font-bold border transition-all flex items-center gap-2 ${
                   isSelected
                     ? 'border-neutral-950 dark:border-lime-400 bg-neutral-950 dark:bg-lime-400 text-white dark:text-neutral-950 shadow-md scale-105'
+                    : isOutOfStock
+                    ? 'opacity-40 border-neutral-200 dark:border-neutral-800 bg-neutral-100 dark:bg-neutral-900 text-neutral-400 cursor-not-allowed line-through'
                     : 'border-neutral-300 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-800 text-neutral-800 dark:text-neutral-200 hover:border-neutral-400'
                 }`}
               >
@@ -80,7 +84,7 @@ export const VariantSelector: React.FC<VariantSelectorProps> = ({
             const variantForSize = product.variants.find(
               v => v.size === sz && (!selectedColour || v.colourName === selectedColour)
             );
-            const isOutOfStock = !variantForSize || variantForSize.stock <= 0;
+            const isOutOfStock = !variantForSize || variantForSize.available !== true;
             const isSelected = selectedSize === sz;
 
             return (

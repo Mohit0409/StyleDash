@@ -7,6 +7,8 @@ export interface ProductVariant {
   colourName: string;
   colourHex?: string;
   stock: number;
+  /** Customer-facing availability is refreshed from the server; static stock is not authoritative. */
+  available?: boolean;
   price?: number;
   originalPrice?: number;
   images?: string[];
@@ -162,6 +164,9 @@ export interface Order {
   statusHistory: OrderStatusHistory[];
   createdAt: string;
   updatedAt: string;
+  razorpayOrderId?: string;
+  razorpayPaymentId?: string;
+  paymentVerifiedAt?: string;
 }
 
 export interface AdSlot {
@@ -193,18 +198,32 @@ export interface UserProfile {
   name: string;
   email: string;
   phone?: string;
-  role: 'customer' | 'admin' | 'vendor';
-  addresses: Address[];
-  referralCode: string;
-  walletBalance: number;
-  createdAt: string;
+  role: 'customer';
+  addresses?: Address[];
+  createdAt?: string;
+  emailVerified?: boolean;
 }
 
 export interface ServiceArea {
   pincode: string;
-  city: string;
-  state: string;
+  city?: string;
+  state?: string;
   serviceable: boolean;
-  expressAvailable: boolean;
-  estimatedDeliveryMinutes: number;
+  expressAvailable?: boolean;
+  estimatedDeliveryMinutes?: number;
+}
+
+export interface ServiceabilityApiResponse extends ServiceArea {
+  success: true;
+}
+
+export interface InventoryAvailability {
+  productId: string;
+  variantId: string;
+  available: boolean;
+}
+
+export interface InventoryAvailabilityResponse {
+  success: true;
+  availability: InventoryAvailability[];
 }

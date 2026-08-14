@@ -1,0 +1,48 @@
+#!/data/data/com.termux/files/usr/bin/bash
+set -eu
+
+python3 - <<'PY'
+import json
+import urllib.error
+import urllib.request
+from pathlib import Path
+
+state_path = Path.home() / ".local/share/styledash/runtime/orders.json"
+state = json.loads(state_path.read_text(encoding="utf-8"))
+order = next(
+    value for value in reversed(list(state["orders"].values()))
+    if value.get("userId") == "razorpay-config-test"
+)
+variant_id = order["items"][0]["variantId"]
+inventory_before = state["inventory"].get(variant_id)
+
+payload = json.dumps({
+    "styleDashOrderId": order["id"],
+    "razorpay_order_id": order["razorpayOrderId"],
+    "razorpay_payment_id": "pay_invalid_runtime_test",
+    "razorpay_signature": "invalid_runtime_signature",
+}).encode("utf-8")
+request = urllib.request.Request(
+    "http://127.0.0.1:8080/api/verify-payment",
+    data=payload,
+    headers={"Content-Type": "application/json"},
+    method="POST",
+)
+try:
+    urllib.request.urlopen(request, timeout=10)
+except urllib.error.HTTPError as error:
+    response = json.loads(error.read())
+    error.close()
+    if error.code != 400 or response.get("code") != "signature_mismatch":
+        raise SystemExit(f"Unexpected verification response: HTTP {error.code}, code={response.get('code')}")
+else:
+    raise SystemExit("Invalid payment signature was incorrectly accepted.")
+
+updated = json.loads(state_path.read_text(encoding="utf-8"))
+updated_order = updated["orders"][order["id"]]
+if updated_order["paymentStatus"] != "pending":
+    raise SystemExit("Invalid signature changed the payment state.")
+if updated["inventory"].get(variant_id) != inventory_before:
+    raise SystemExit("Invalid signature changed inventory.")
+print("Live invalid-signature test passed: HTTP 400, order pending, inventory unchanged.")
+PY

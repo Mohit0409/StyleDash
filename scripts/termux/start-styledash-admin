@@ -1,0 +1,51 @@
+#!/data/data/com.termux/files/usr/bin/bash
+set -u
+
+APP_DIR="$HOME/admin"
+RUN_DIR="$HOME/run"
+LOG_DIR="$HOME/logs"
+SECRET_FILE="$HOME/.config/styledash/secrets.env"
+DATA_ROOT="$HOME/.local/share/styledash"
+PID_FILE="$RUN_DIR/styledash-admin.pid"
+LOG_FILE="$LOG_DIR/styledash-admin.log"
+
+mkdir -p "$RUN_DIR" "$LOG_DIR" "$DATA_ROOT/runtime"
+chmod 700 "$DATA_ROOT" "$DATA_ROOT/runtime" "$APP_DIR"
+if [ ! -f "$SECRET_FILE" ]; then
+  echo "$(date -Iseconds) private environment missing; admin service refused" >> "$LOG_FILE"
+  exit 1
+fi
+chmod 600 "$SECRET_FILE"
+set -a
+# shellcheck disable=SC1090
+. "$SECRET_FILE"
+set +a
+if [ -z "${STYLEDASH_TOTP_ENCRYPTION_KEY:-}" ]; then
+  echo "$(date -Iseconds) TOTP encryption key missing; admin service refused" >> "$LOG_FILE"
+  exit 1
+fi
+
+export STYLEDASH_CATALOG_PATH="$DATA_ROOT/catalog.json"
+export STYLEDASH_SETTINGS_PATH="$DATA_ROOT/settings.json"
+export STYLEDASH_DATA_DIR="$DATA_ROOT/runtime"
+export STYLEDASH_DATABASE_PATH="$DATA_ROOT/styledash.db"
+
+healthy() { curl -fsS --max-time 3 -H 'Host: 127.0.0.1:8081' http://127.0.0.1:8081/ >/dev/null; }
+managed() {
+  [ -n "${1:-}" ] && kill -0 "$1" 2>/dev/null &&
+    tr '\0' ' ' < "/proc/$1/cmdline" 2>/dev/null | grep -Fq "$APP_DIR/serve.py"
+}
+
+pid=''
+if [ -s "$PID_FILE" ]; then pid="$(cat "$PID_FILE")"; fi
+if managed "$pid" && healthy; then exit 0; fi
+if managed "$pid"; then kill "$pid" 2>/dev/null || true; sleep 1; fi
+rm -f "$PID_FILE"
+
+[ -f "$LOG_FILE" ] && [ "$(wc -l < "$LOG_FILE")" -gt 1500 ] && tail -n 1000 "$LOG_FILE" > "$LOG_FILE.trim" && mv "$LOG_FILE.trim" "$LOG_FILE"
+nohup python3 "$APP_DIR/serve.py" --bind 127.0.0.1 --port 8081 --assets "$APP_DIR/admin" >> "$LOG_FILE" 2>&1 &
+pid="$!"
+printf '%s\n' "$pid" > "$PID_FILE"
+for _ in $(seq 1 12); do healthy && exit 0; kill -0 "$pid" 2>/dev/null || break; sleep 1; done
+echo "$(date -Iseconds) local administrator service failed to become healthy" >> "$LOG_FILE"
+exit 1

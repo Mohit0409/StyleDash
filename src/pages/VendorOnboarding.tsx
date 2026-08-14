@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Store, CheckCircle2, ArrowRight } from 'lucide-react';
 import { SEO } from '../components/SEO';
-import { vendorRepository } from '../repositories/vendorRepository';
+import { vendorApplicationApi } from '../services/businessApi';
 import { useToast } from '../context/ToastContext';
 import { CONFIG } from '../config';
 
@@ -19,14 +19,15 @@ export const VendorOnboarding: React.FC = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    await vendorRepository.registerNewStore({
+    await vendorApplicationApi.submit({
       storeName,
       ownerName,
       email,
       phone,
       category,
       address,
-      description
+      description,
+      pincode: CONFIG.DEFAULT_PINCODE,
     });
     setSubmitted(true);
     showToast('Application submitted! Our Neemuch team will contact you shortly.', 'success');
