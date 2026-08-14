@@ -26,6 +26,8 @@ const Returns = lazy(() => import('./pages/Returns').then(m => ({ default: m.Ret
 const Privacy = lazy(() => import('./pages/Privacy').then(m => ({ default: m.Privacy })));
 const Terms = lazy(() => import('./pages/Terms').then(m => ({ default: m.Terms })));
 const AuthPage = lazy(() => import('./pages/AuthPage').then(m => ({ default: m.AuthPage })));
+const ForgotPassword = lazy(() => import('./pages/PasswordRecovery').then(m => ({ default: m.ForgotPassword })));
+const ResetPassword = lazy(() => import('./pages/PasswordRecovery').then(m => ({ default: m.ResetPassword })));
 
 export const App: React.FC = () => {
   return (
@@ -52,6 +54,8 @@ export const App: React.FC = () => {
                       <Route path="wishlist" element={<Wishlist />} />
                       <Route path="login" element={<AuthPage mode="login" />} />
                       <Route path="register" element={<AuthPage mode="register" />} />
+                      <Route path="forgot-password" element={<ForgotPassword />} />
+                      <Route path="reset-password" element={<ResetPassword />} />
                       <Route path="checkout" element={<ProtectedRoute><Checkout /></ProtectedRoute>} />
                       <Route path="order-success/:orderId" element={<ProtectedRoute><OrderSuccess /></ProtectedRoute>} />
                       <Route path="orders" element={<ProtectedRoute><Orders /></ProtectedRoute>} />

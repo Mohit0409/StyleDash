@@ -880,6 +880,8 @@ class HttpApiTests(unittest.TestCase):
         self.assertEqual(status, 200)
         status, unknown, _headers = self.post_json("/api/auth/password-reset/request", {"email": "unknown@example.test"})
         self.assertEqual((status, unknown), (200, known))
+        status, invalid_email, _headers = self.post_json("/api/auth/password-reset/request", {"email": "not an email"})
+        self.assertEqual((status, invalid_email), (200, known))
         self.assertEqual(len(self.reset_deliveries), 1)
         token = self.reset_deliveries[0][1]
         self.assertNotIn(token, json.dumps(known))
@@ -893,10 +895,32 @@ class HttpApiTests(unittest.TestCase):
         self.assertNotIn(token, json.dumps(confirmed))
         self.assertEqual(self.post_json("/api/auth/login", {"email": "recovery@example.test", "password": "new recovery password 456"})[0], 200)
 
-        for _ in range(3):
+        for _ in range(2):
             self.post_json("/api/auth/password-reset/request", {"email": "unknown@example.test"})
         status, limited, _headers = self.post_json("/api/auth/password-reset/request", {"email": "unknown@example.test"})
         self.assertEqual((status, limited["code"]), (429, "rate_limited"))
+
+    def test_password_reset_rate_limits_hashed_email_across_distinct_client_ips(self) -> None:
+        previous = os.environ.get("STYLEDASH_TRUST_LOOPBACK_PROXY")
+        os.environ["STYLEDASH_TRUST_LOOPBACK_PROXY"] = "1"
+        try:
+            payload = {"email": "rate-limit@example.test"}
+            for suffix in range(1, 4):
+                status, body, _headers = self.post_json(
+                    "/api/auth/password-reset/request", payload,
+                    {"X-Forwarded-For": f"198.51.100.{suffix}"},
+                )
+                self.assertEqual((status, body), (200, {"success": True, "message": "If an account exists, reset instructions will be sent shortly."}))
+            status, limited, _headers = self.post_json(
+                "/api/auth/password-reset/request", payload,
+                {"X-Forwarded-For": "198.51.100.4"},
+            )
+            self.assertEqual((status, limited["code"]), (429, "rate_limited"))
+        finally:
+            if previous is None:
+                os.environ.pop("STYLEDASH_TRUST_LOOPBACK_PROXY", None)
+            else:
+                os.environ["STYLEDASH_TRUST_LOOPBACK_PROXY"] = previous
 
 
 if __name__ == "__main__":

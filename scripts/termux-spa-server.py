@@ -28,9 +28,9 @@ except ImportError:  # Windows test environment; Termux provides fcntl.
     fcntl = None
 
 try:
-    from styledash_security import COOKIE_NAME, SecurityError, SecurityStore
+    from styledash_security import COOKIE_NAME, SecurityError, SecurityStore, normalize_email, token_hash
 except ModuleNotFoundError:  # Repository test import path.
-    from scripts.styledash_security import COOKIE_NAME, SecurityError, SecurityStore
+    from scripts.styledash_security import COOKIE_NAME, SecurityError, SecurityStore, normalize_email, token_hash
 
 try:
     from styledash_mail import SmtpPasswordResetSender
@@ -1097,6 +1097,17 @@ class StyleDashRequestHandler(SimpleHTTPRequestHandler):
         if not self.rate_limiter.allow(self._client_key(route), limit):
             raise ApiError(HTTPStatus.TOO_MANY_REQUESTS, "Too many requests. Please wait and try again.", "rate_limited")
 
+    def _password_reset_rate_limit(self, payload: dict[str, Any]) -> None:
+        """Apply IP and non-plaintext normalized-email limits without disclosure."""
+        self._rate_limit("/api/auth/password-reset/request", 5)
+        try:
+            email = normalize_email(payload.get("email"))
+        except SecurityError:
+            return
+        account_key = f"password-reset-email:{token_hash(email)}"
+        if not self.rate_limiter.allow(account_key, 3):
+            raise ApiError(HTTPStatus.TOO_MANY_REQUESTS, "Too many requests. Please wait and try again.", "rate_limited")
+
     def do_GET(self) -> None:  # noqa: N802 - stdlib override name
         parsed = urlsplit(self.path)
         path = parsed.path
@@ -1214,8 +1225,9 @@ class StyleDashRequestHandler(SimpleHTTPRequestHandler):
                 self._json_response(HTTPStatus.OK, {"success": True, "user": user, "csrfToken": csrf}, headers={"Set-Cookie": self._security().cookie(raw)})
                 return
             if path == "/api/auth/password-reset/request":
-                self._rate_limit(path, 5)
-                self._security().request_password_reset(self._read_json())
+                payload = self._read_json()
+                self._password_reset_rate_limit(payload)
+                self._security().request_password_reset(payload)
                 self._json_response(HTTPStatus.OK, {"success": True, "message": "If an account exists, reset instructions will be sent shortly."})
                 return
             if path == "/api/auth/password-reset/confirm":
@@ -1345,6 +1357,7 @@ def create_server(
         pass
 
     BoundStyleDashRequestHandler.payment_service = payment_service
+    BoundStyleDashRequestHandler.rate_limiter = RateLimiter()
     handler = partial(BoundStyleDashRequestHandler, directory=str(directory))
     return ThreadingHTTPServer((bind, port), handler)
 

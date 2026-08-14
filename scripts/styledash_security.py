@@ -393,14 +393,17 @@ class SecurityStore:
         with self.connect() as db:
             db.execute("BEGIN IMMEDIATE")
             reset = db.execute(
-                """SELECT r.id,r.user_id FROM password_reset_tokens r
+                """SELECT r.id,r.user_id,u.is_active,u.role FROM password_reset_tokens r
                    JOIN users u ON u.id=r.user_id
-                   WHERE r.token_hash=? AND r.used_at IS NULL AND r.expires_at>?
-                     AND u.is_active=1 AND u.role='customer'""",
+                   WHERE r.token_hash=? AND r.used_at IS NULL AND r.expires_at>?""",
                 (token_hash(raw_token), now_value),
             ).fetchone()
-            if reset is None:
-                db.rollback()
+            if reset is None or not reset["is_active"] or reset["role"] != "customer":
+                if reset is not None:
+                    db.execute("UPDATE password_reset_tokens SET used_at=? WHERE id=? AND used_at IS NULL", (now_value, reset["id"]))
+                    db.commit()
+                else:
+                    db.rollback()
                 raise SecurityError(400, "This password reset link is invalid or has expired.", "invalid_reset_token")
             consumed = db.execute(
                 "UPDATE password_reset_tokens SET used_at=? WHERE id=? AND used_at IS NULL",

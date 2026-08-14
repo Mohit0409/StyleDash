@@ -5,6 +5,7 @@ import json
 import sqlite3
 import tempfile
 import unittest
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 from cryptography.fernet import Fernet
@@ -123,16 +124,21 @@ class SecurityStoreTests(unittest.TestCase):
         reset_store.request_password_reset({"email": user["email"]})
         self.assertEqual(len(deliveries), 1)
         token = deliveries[0][1]
+        self.assert_security_error("weak_password", lambda: reset_store.confirm_password_reset({"token": token, "newPassword": "short"}))
+        reset_store.request_password_reset({"email": user["email"]})
+        replacement = deliveries[-1][1]
+        self.assert_security_error("invalid_reset_token", lambda: reset_store.confirm_password_reset({"token": token, "newPassword": "new long password 456"}))
         with reset_store.connect() as db:
-            row = db.execute("SELECT token_hash,expires_at,used_at FROM password_reset_tokens").fetchone()
-            self.assertEqual(row["token_hash"], SECURITY.token_hash(token))
-            self.assertNotEqual(row["token_hash"], token)
+            row = db.execute("SELECT token_hash,expires_at,used_at FROM password_reset_tokens WHERE token_hash=?", (SECURITY.token_hash(replacement),)).fetchone()
+            self.assertEqual(row["token_hash"], SECURITY.token_hash(replacement))
+            self.assertNotEqual(row["token_hash"], replacement)
             self.assertIsNone(row["used_at"])
 
-        reset_store.confirm_password_reset({"token": token, "newPassword": "new long password 456"})
+        reset_store.confirm_password_reset({"token": replacement, "newPassword": "new long password 456"})
         self.assert_security_error("authentication_required", lambda: reset_store.authenticate(first))
         self.assert_security_error("authentication_required", lambda: reset_store.authenticate(second))
-        self.assert_security_error("invalid_reset_token", lambda: reset_store.confirm_password_reset({"token": token, "newPassword": "another long password 789"}))
+        self.assert_security_error("invalid_credentials", lambda: reset_store.login({"email": user["email"], "password": "long test password 123"}, "old-password"))
+        self.assert_security_error("invalid_reset_token", lambda: reset_store.confirm_password_reset({"token": replacement, "newPassword": "another long password 789"}))
         _user, fresh, _csrf = reset_store.login({"email": user["email"], "password": "new long password 456"}, "fresh-client")
         reset_store.authenticate(fresh)
 
@@ -141,6 +147,58 @@ class SecurityStoreTests(unittest.TestCase):
         with reset_store.connect() as db:
             db.execute("UPDATE password_reset_tokens SET expires_at='2000-01-01T00:00:00+00:00' WHERE token_hash=?", (SECURITY.token_hash(expired),))
         self.assert_security_error("invalid_reset_token", lambda: reset_store.confirm_password_reset({"token": expired, "newPassword": "another long password 789"}))
+
+    def test_password_reset_concurrent_reuse_allows_only_one_confirmation(self):
+        deliveries = []
+        reset_store = SECURITY.SecurityStore(
+            Path(self.temporary.name) / "concurrent-reset.db", Fernet.generate_key().decode(),
+            password_reset_sender=lambda email, token: deliveries.append((email, token)),
+        )
+        user, _raw, _csrf = reset_store.register({
+            "name": "Reset Customer", "email": "concurrent-reset@example.test",
+            "password": "long test password 123", "phone": "9999999999",
+        })
+        reset_store.request_password_reset({"email": user["email"]})
+        token = deliveries[0][1]
+
+        def confirm_once() -> str:
+            try:
+                reset_store.confirm_password_reset({"token": token, "newPassword": "new long password 456"})
+                return "success"
+            except SECURITY.SecurityError as error:
+                return error.code
+
+        with ThreadPoolExecutor(max_workers=2) as pool:
+            results = list(pool.map(lambda _value: confirm_once(), range(2)))
+        self.assertEqual(results.count("success"), 1)
+        self.assertEqual(results.count("invalid_reset_token"), 1)
+
+    def test_disabled_customer_cannot_receive_or_use_reset_token(self):
+        deliveries = []
+        reset_store = SECURITY.SecurityStore(
+            Path(self.temporary.name) / "disabled-reset.db", Fernet.generate_key().decode(),
+            password_reset_sender=lambda email, token: deliveries.append((email, token)),
+        )
+        user, _raw, _csrf = reset_store.register({
+            "name": "Reset Customer", "email": "disabled-reset@example.test",
+            "password": "long test password 123", "phone": "9999999999",
+        })
+        with reset_store.connect() as db:
+            db.execute("UPDATE users SET is_active=0 WHERE id=?", (user["id"],))
+        reset_store.request_password_reset({"email": user["email"]})
+        self.assertEqual(deliveries, [])
+        with reset_store.connect() as db:
+            self.assertEqual(db.execute("SELECT COUNT(*) FROM password_reset_tokens").fetchone()[0], 0)
+
+        with reset_store.connect() as db:
+            db.execute("UPDATE users SET is_active=1 WHERE id=?", (user["id"],))
+        reset_store.request_password_reset({"email": user["email"]})
+        token = deliveries[0][1]
+        with reset_store.connect() as db:
+            db.execute("UPDATE users SET is_active=0 WHERE id=?", (user["id"],))
+        self.assert_security_error("invalid_reset_token", lambda: reset_store.confirm_password_reset({"token": token, "newPassword": "new long password 456"}))
+        with reset_store.connect() as db:
+            self.assertIsNotNone(db.execute("SELECT used_at FROM password_reset_tokens WHERE token_hash=?", (SECURITY.token_hash(token),)).fetchone()["used_at"])
 
     def test_password_reset_is_enumeration_safe_without_delivery(self):
         self.registration()

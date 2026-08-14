@@ -7,6 +7,11 @@ interface AuthResponse {
   csrfToken: string;
 }
 
+interface PasswordResetRequestResponse {
+  success: true;
+  message: string;
+}
+
 const accept = (response: AuthResponse) => {
   setCsrfToken(response.csrfToken);
   return response;
@@ -30,5 +35,11 @@ export const authApi = {
   async changePassword(currentPassword: string, newPassword: string): Promise<void> {
     const response = await apiJson<{ success: true; csrfToken: string }>('/api/auth/change-password', 'POST', { currentPassword, newPassword });
     setCsrfToken(response.csrfToken);
+  },
+  async requestPasswordReset(email: string): Promise<PasswordResetRequestResponse> {
+    return apiJson<PasswordResetRequestResponse>('/api/auth/password-reset/request', 'POST', { email });
+  },
+  async confirmPasswordReset(token: string, newPassword: string): Promise<void> {
+    await apiJson<{ success: true }>('/api/auth/password-reset/confirm', 'POST', { token, newPassword });
   },
 };
