@@ -10,8 +10,12 @@
     "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
     "preview": "vite preview",
     "typecheck": "tsc -b",
-    "test": "vitest run",
-    "test:e2e": "vitest run src/tests/paymentApi.test.ts"
+    "test": "vitest run src/tests",
+    "test:e2e": "npm run build:e2e && playwright test",
+    "build:e2e": "tsc -b && vite build",
+    "test:e2e:desktop": "npm run build:e2e && playwright test --project=desktop-chromium",
+    "test:e2e:mobile": "npm run build:e2e && playwright test --project=mobile-chromium",
+    "test:payment-api": "vitest run src/tests/paymentApi.test.ts"
   },
   "dependencies": {
     "clsx": "^2.1.1",
@@ -23,6 +27,7 @@
     "tailwind-merge": "^2.5.2"
   },
   "devDependencies": {
+    "@playwright/test": "^1.62.1",
     "@types/node": "^22.5.0",
     "@types/react": "^18.3.3",
     "@types/react-dom": "^18.3.0",
