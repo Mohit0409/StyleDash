@@ -94,7 +94,7 @@ later finalized by `payment.captured`/`order.paid`, or auto-refunded by Razorpay
 
 The Live webhook URL must be the public HTTPS `/api/webhooks/razorpay` endpoint
 and subscribe to `payment.captured`, `payment.failed`, `order.paid`,
-`refund.failed`, and `payment.dispute.created`. Refund failures and newly created
+`refund.processed`, `refund.failed`, and `payment.dispute.created`. Refund failures and newly created
 disputes create persistent, idempotent alerts visible only in the private admin
 service. They never change inventory, refund automatically, or rewrite a paid
 order's successful payment history.

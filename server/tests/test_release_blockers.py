@@ -287,6 +287,14 @@ class DeploymentAndTaxTests(unittest.TestCase):
         text = (ROOT / "scripts/termux/deploy-payment-release").read_text(encoding="utf-8")
         self.assertLess(text.index("PRAGMA integrity_check"), text.index('bash "$BACKUP_SCRIPT"'))
         self.assertLess(text.index('bash "$BACKUP_SCRIPT"'), text.index('if [ -d "$HOME/server/assets" ]'))
+        self.assertIn(
+            'install -m 600 "$STAGE/scripts/styledash_mail.py" "$HOME/server/styledash_mail.py"',
+            text,
+        )
+
+    def test_refund_processed_is_documented_for_live_webhook(self):
+        readme = (ROOT / "server/README.md").read_text(encoding="utf-8")
+        self.assertIn("`refund.processed`", readme)
     def test_choice_a(self):
         settings = json.loads((ROOT / "server/payment-data/settings.json").read_text(encoding="utf-8"))
         self.assertEqual(settings["taxRate"], 0.05)
