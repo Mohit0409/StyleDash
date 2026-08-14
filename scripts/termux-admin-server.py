@@ -82,37 +82,129 @@ class AdminApplication:
                 raise SecurityError(404, "Order not found.", "order_not_found")
             return dict(order)
 
+    def _resolve_order_alerts(
+        self,
+        state: dict[str, Any],
+        order: dict[str, Any],
+        alert_types: set[str],
+        now: str,
+    ) -> None:
+        order_id = order.get("id")
+        for alert in state.get("operationalAlerts", {}).values():
+            if (
+                isinstance(alert, dict)
+                and alert.get("styleDashOrderId") == order_id
+                and alert.get("status") == "open"
+                and alert.get("type") in alert_types
+            ):
+                alert["status"] = "resolved"
+                alert["resolvedAt"] = now
+        order["requiresAdminAttention"] = any(
+            isinstance(alert, dict)
+            and alert.get("styleDashOrderId") == order_id
+            and alert.get("status") == "open"
+            for alert in state.get("operationalAlerts", {}).values()
+        )
+
     def update_order_status(self, admin_id: str, order_id: str, requested: Any) -> dict[str, Any]:
         transitions = {
+            "payment_pending": {"cancelled"},
+            "payment_review_required": {"placed", "cancelled"},
             "placed": {"confirmed", "cancelled"},
             "confirmed": {"preparing", "packed", "cancelled"},
             "preparing": {"out_for_delivery", "cancelled"},
-            "packed": {"out_for_delivery", "cancelled"},
+            "packed": {"out_for_delivery"},
             "out_for_delivery": {"delivered"},
-            "delivered": set(), "cancelled": set(),
+            "delivered": set(),
+            "cancelled": set(),
         }
         if not isinstance(requested, str):
             raise SecurityError(400, "Invalid order status.", "invalid_status")
         with self.payments.store.lock:
-            order = self.payments.store.state["orders"].get(order_id)
+            state = self.payments.store.state
+            order = state["orders"].get(order_id)
             if order is None:
                 raise SecurityError(404, "Order not found.", "order_not_found")
             if order.get("fulfillmentRequired") is False:
-                raise SecurityError(
-                    409,
-                    "This payment validation order requires no fulfillment.",
-                    "no_fulfillment_order",
-                )
+                raise SecurityError(409, "This payment validation order requires no fulfillment.", "no_fulfillment_order")
             current = order.get("status", "placed")
             if requested not in transitions.get(current, set()):
                 raise SecurityError(409, "Invalid order status transition.", "invalid_transition")
             now = iso(utc_now())
-            order["status"] = requested
-            order["updatedAt"] = now
-            order.setdefault("statusHistory", []).append({"status": requested, "timestamp": now, "note": "Updated by local administrator"})
+            inventory_released = False
+
+            if (
+                order.get("paymentStatus") == "refunded"
+                and requested != "cancelled"
+            ):
+                raise SecurityError(
+                    409,
+                    "A fully refunded order cannot continue fulfillment.",
+                    "refunded_order",
+                )
+
+            if current == "payment_review_required" and requested == "placed":
+                if order.get("paymentStatus") != "paid":
+                    raise SecurityError(409, "The payment state must be reconciled before fulfillment.", "payment_state_unresolved")
+                try:
+                    self.payments._decrement_inventory(state, order.get("items", []))
+                except Exception as error:
+                    if getattr(error, "code", None) == "stock_changed":
+                        raise SecurityError(409, "Stock is still unavailable for this paid order.", "stock_changed") from None
+                    raise
+                order["inventoryCommitted"] = True
+                order.pop("inventoryShortfall", None)
+                order["status"] = "placed"
+                order["updatedAt"] = now
+                order.setdefault("statusHistory", []).append({"status": "placed", "timestamp": now, "note": "Paid order stock confirmed by local administrator"})
+                self._resolve_order_alerts(state, order, {"inventory_shortfall_after_capture"}, now)
+
+            elif requested == "cancelled":
+                online = order.get("paymentMethod") in ("upi", "card")
+                if online and order.get("paymentStatus") != "refunded":
+                    raise SecurityError(
+                        409,
+                        "A captured online payment must be fully refunded in Razorpay and confirmed by the signed refund.processed webhook before cancellation.",
+                        "refund_required",
+                    )
+                try:
+                    inventory_released = self.payments._release_inventory(state, order)
+                except Exception as error:
+                    if getattr(error, "code", None) == "inventory_release_failed":
+                        raise SecurityError(409, "Inventory could not be released safely.", "inventory_release_failed") from None
+                    raise
+                order["status"] = "cancelled"
+                order["updatedAt"] = now
+                order.setdefault("statusHistory", []).append({
+                    "status": "cancelled",
+                    "timestamp": now,
+                    "note": "Cancelled after verified Razorpay refund" if online else "Cash on Delivery order cancelled",
+                })
+                self._resolve_order_alerts(
+                    state,
+                    order,
+                    {
+                        "inventory_shortfall_after_capture",
+                        "refund.processed",
+                        "refund.processed_review",
+                    },
+                    now,
+                )
+            else:
+                order["status"] = requested
+                order["updatedAt"] = now
+                order.setdefault("statusHistory", []).append({"status": requested, "timestamp": now, "note": "Updated by local administrator"})
+
             self.payments.store.save()
             result = dict(order)
-        self.identity.record_action(admin_id, "order_status", "order", order_id, "success", {"from": current, "to": requested})
+        self.identity.record_action(
+            admin_id,
+            "order_status",
+            "order",
+            order_id,
+            "success",
+            {"from": current, "to": requested, "inventoryReleased": inventory_released},
+        )
         return result
 
     def inventory(self, query: str = "", low_only: bool = False) -> list[dict[str, Any]]:

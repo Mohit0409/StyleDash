@@ -8,6 +8,40 @@ if [ "$#" -ne 1 ] || [ ! -d "$1/dist" ]; then
 fi
 
 STAGE="$1"
+DATA_ROOT="$HOME/.local/share/styledash"
+LIVE_DB="$DATA_ROOT/styledash.db"
+LIVE_STATE="$DATA_ROOT/runtime/orders.json"
+BACKUP_SCRIPT="$STAGE/scripts/termux/backup-styledash-data"
+
+if [ -f "$LIVE_DB" ]; then
+  python3 - "$LIVE_DB" <<'PY'
+import sqlite3, sys
+connection = sqlite3.connect(sys.argv[1])
+try:
+    result = connection.execute("PRAGMA integrity_check").fetchone()[0]
+finally:
+    connection.close()
+if result != "ok":
+    raise SystemExit("Live SQLite integrity check failed; deployment aborted")
+PY
+fi
+
+if [ -f "$LIVE_STATE" ]; then
+  python3 - "$LIVE_STATE" <<'PY'
+import json, sys
+with open(sys.argv[1], "r", encoding="utf-8") as handle:
+    state = json.load(handle)
+if not isinstance(state, dict):
+    raise SystemExit("Live payment state is not a JSON object; deployment aborted")
+PY
+fi
+
+if [ ! -f "$BACKUP_SCRIPT" ]; then
+  echo "release is missing backup-styledash-data; deployment aborted" >&2
+  exit 1
+fi
+bash "$BACKUP_SCRIPT"
+
 BACKUP_ROOT="$HOME/backups"
 mkdir -p "$BACKUP_ROOT"
 BACKUP="$(mktemp -d "$BACKUP_ROOT/styledash-pre-payment.XXXXXX")"

@@ -180,6 +180,7 @@ class JsonStateStore:
             "inventory": {},
             "idempotency": {},
             "processedPayments": {},
+            "processedRefunds": {},
             "processedWebhookEvents": {},
             "operationalAlerts": {},
         }
@@ -567,6 +568,7 @@ class PaymentService:
             "deliveryMethod", "estimatedDelivery", "status", "statusHistory", "createdAt",
             "updatedAt", "razorpayOrderId", "razorpayPaymentId", "paymentVerifiedAt",
             "isPaymentTestOrder", "fulfillmentRequired", "adminLabels", "inventoryCommitted",
+            "inventoryReleasedAt", "refundId", "refundAmount", "refundCurrency", "refundProcessedAt",
         )
         return {key: order[key] for key in allowed if key in order}
 
@@ -780,22 +782,87 @@ class PaymentService:
             self.store.save()
             return self._create_response(order)
 
-    def _decrement_inventory(self, state: dict[str, Any], items: list[dict[str, Any]]) -> None:
+    def _try_decrement_inventory(
+        self,
+        state: dict[str, Any],
+        items: list[dict[str, Any]],
+    ) -> bool:
+        """Commit all requested inventory or none of it."""
         checked: list[tuple[str, int, int]] = []
         for item in items:
-            product = self.products[item["productId"]]
-            variant = next(entry for entry in product["variants"] if entry["id"] == item["variantId"])
-            remaining = self._inventory(state, variant)
-            quantity = int(item["quantity"])
-            if remaining < quantity:
-                raise ApiError(
-                    HTTPStatus.CONFLICT,
-                    "Stock changed while the order was being processed. Contact support before retrying payment.",
-                    "stock_changed",
-                )
+            if not isinstance(item, dict):
+                return False
+            product = self.products.get(item.get("productId"))
+            if not isinstance(product, dict):
+                return False
+            variant = next(
+                (
+                    entry
+                    for entry in product.get("variants", [])
+                    if entry.get("id") == item.get("variantId")
+                ),
+                None,
+            )
+            if not isinstance(variant, dict):
+                return False
+            try:
+                remaining = self._inventory(state, variant)
+                quantity = int(item.get("quantity", 0))
+            except (KeyError, TypeError, ValueError):
+                return False
+            if quantity <= 0 or remaining < quantity:
+                return False
             checked.append((variant["id"], remaining, quantity))
         for variant_id, remaining, quantity in checked:
             state["inventory"][variant_id] = remaining - quantity
+        return True
+
+    def _decrement_inventory(
+        self,
+        state: dict[str, Any],
+        items: list[dict[str, Any]],
+    ) -> None:
+        if not self._try_decrement_inventory(state, items):
+            raise ApiError(
+                HTTPStatus.CONFLICT,
+                "Stock changed while the order was being processed. Contact support before retrying.",
+                "stock_changed",
+            )
+
+    def _release_inventory(
+        self,
+        state: dict[str, Any],
+        order: dict[str, Any],
+    ) -> bool:
+        """Release committed inventory exactly once."""
+        committed = order.get("inventoryCommitted")
+        if committed is None:
+            # Historical COD orders always decremented stock at placement.
+            # Do not infer committed inventory for online orders: a signed
+            # refund can arrive even when this server missed the capture event.
+            committed = order.get("paymentMethod") == "cod"
+        if committed is not True:
+            return False
+
+        restored: list[tuple[str, int, int]] = []
+        for item in order.get("items", []):
+            product = self.products.get(item.get("productId"))
+            if not isinstance(product, dict):
+                raise ApiError(HTTPStatus.CONFLICT, "Inventory could not be released safely.", "inventory_release_failed")
+            variant = next(
+                (entry for entry in product.get("variants", []) if entry.get("id") == item.get("variantId")),
+                None,
+            )
+            quantity = int(item.get("quantity", 0))
+            if variant is None or quantity <= 0:
+                raise ApiError(HTTPStatus.CONFLICT, "Inventory could not be released safely.", "inventory_release_failed")
+            restored.append((variant["id"], self._inventory(state, variant), quantity))
+
+        for variant_id, current, quantity in restored:
+            state["inventory"][variant_id] = current + quantity
+        order["inventoryCommitted"] = False
+        order["inventoryReleasedAt"] = datetime.now(timezone.utc).isoformat()
+        return True
 
     def _find_order_by_razorpay_id(self, razorpay_order_id: str) -> dict[str, Any] | None:
         return next(
@@ -832,7 +899,7 @@ class PaymentService:
         amount: Any | None = None,
         currency: Any | None = None,
     ) -> dict[str, Any]:
-        """Atomically mark a verified payment paid and commit inventory once."""
+        """Persist captured financial truth before fulfillment decisions."""
         with self.store.lock:
             state = self.store.state
             order = state["orders"].get(style_order_id)
@@ -848,7 +915,7 @@ class PaymentService:
             processed_order_id = state["processedPayments"].get(payment_id)
             if processed_order_id and processed_order_id != style_order_id:
                 raise ApiError(HTTPStatus.CONFLICT, "This payment is already associated with another order.", "duplicate_payment")
-            if order.get("paymentStatus") == "paid":
+            if order.get("paymentStatus") in ("paid", "refunded"):
                 if order.get("razorpayPaymentId") == payment_id:
                     if payment_id not in state["processedPayments"]:
                         state["processedPayments"][payment_id] = style_order_id
@@ -857,31 +924,50 @@ class PaymentService:
                 raise ApiError(HTTPStatus.CONFLICT, "This order already has a verified payment.", "duplicate_payment")
 
             payment_test_order = order.get("isPaymentTestOrder") is True
+            inventory_committed = False
             if not payment_test_order:
-                self._decrement_inventory(state, order["items"])
+                inventory_committed = (
+                    order.get("inventoryCommitted") is True
+                    or self._try_decrement_inventory(state, order["items"])
+                )
+
             now = datetime.now(timezone.utc).isoformat()
-            order.update(
-                {
-                    "paymentStatus": "paid",
-                    "status": "payment_test_completed" if payment_test_order else "placed",
+            if payment_test_order:
+                next_status = "payment_test_completed"
+                note = f"TEST payment verified by {source}; no fulfillment required"
+            elif inventory_committed:
+                next_status = "placed"
+                note = f"Razorpay payment verified by {source}"
+            else:
+                next_status = "payment_review_required"
+                note = f"Razorpay payment verified by {source}; stock confirmation required; do not request another payment"
+
+            order.update({
+                "paymentStatus": "paid",
+                "status": next_status,
+                "razorpayPaymentId": payment_id,
+                "paymentVerifiedAt": now,
+                "paymentVerificationSource": source,
+                "inventoryCommitted": False if payment_test_order else inventory_committed,
+                "updatedAt": now,
+            })
+            if not payment_test_order and not inventory_committed:
+                order["inventoryShortfall"] = True
+                order["requiresAdminAttention"] = True
+                alert_id = f"inventory_shortfall_after_capture:{style_order_id}"
+                state["operationalAlerts"].setdefault(alert_id, {
+                    "id": alert_id,
+                    "type": "inventory_shortfall_after_capture",
+                    "entityId": style_order_id,
                     "razorpayPaymentId": payment_id,
-                    "paymentVerifiedAt": now,
-                    "paymentVerificationSource": source,
-                    "inventoryCommitted": not payment_test_order,
-                    "updatedAt": now,
-                }
-            )
-            order["statusHistory"].append(
-                {
-                    "status": "payment_test_completed" if payment_test_order else "placed",
-                    "timestamp": now,
-                    "note": (
-                        f"TEST payment verified by {source}; no fulfillment required"
-                        if payment_test_order
-                        else f"Razorpay payment verified by {source}"
-                    ),
-                }
-            )
+                    "styleDashOrderId": style_order_id,
+                    "status": "open",
+                    "recordedAt": now,
+                })
+            else:
+                order.pop("inventoryShortfall", None)
+
+            order.setdefault("statusHistory", []).append({"status": next_status, "timestamp": now, "note": note})
             state["processedPayments"][payment_id] = style_order_id
             self.store.save()
             return {"success": True, "idempotent": False, "duplicate": False, "order": self._public_order(order)}
@@ -1045,12 +1131,137 @@ class PaymentService:
                 order["requiresAdminAttention"] = True
                 if event == "refund.failed":
                     order["refundFailureAttention"] = True
-                else:
+                elif event == "payment.dispute.created":
                     order["paymentDisputed"] = True
                     order["paymentDisputeId"] = entity_id
                 order["updatedAt"] = now
             self.store.save()
             return {"duplicate": False, "alert": alert}
+
+    def _record_refund_processed(
+        self,
+        refund: dict[str, Any],
+        payment: dict[str, Any],
+        event_id: str | None,
+    ) -> dict[str, Any]:
+        """Persist signed processed-refund truth without automatic restocking."""
+        refund_id = refund.get("id")
+        payment_id = refund.get("payment_id")
+        amount = refund.get("amount")
+        currency = refund.get("currency")
+        if not isinstance(refund_id, str) or not refund_id:
+            raise ApiError(HTTPStatus.BAD_REQUEST, "Webhook is missing refund information.", "malformed_webhook")
+        if not isinstance(payment_id, str) or not payment_id:
+            raise ApiError(HTTPStatus.BAD_REQUEST, "Webhook is missing payment information.", "malformed_webhook")
+        if payment.get("id") and payment.get("id") != payment_id:
+            raise ApiError(HTTPStatus.BAD_REQUEST, "Webhook payment information does not match.", "malformed_webhook")
+        if refund.get("status") != "processed":
+            raise ApiError(HTTPStatus.BAD_REQUEST, "Webhook refund state is invalid.", "malformed_webhook")
+        if isinstance(amount, bool) or not isinstance(amount, int) or amount <= 0:
+            raise ApiError(HTTPStatus.BAD_REQUEST, "Webhook refund amount is invalid.", "malformed_webhook")
+        if not isinstance(currency, str) or not currency:
+            raise ApiError(HTTPStatus.BAD_REQUEST, "Webhook refund currency is invalid.", "malformed_webhook")
+
+        razorpay_order_id = payment.get("order_id") if isinstance(payment.get("order_id"), str) else None
+        safe_event_id = self._safe_webhook_event_id(event_id)
+        with self.store.lock:
+            state = self.store.state
+            existing = state["processedRefunds"].get(refund_id)
+            if isinstance(existing, dict):
+                order_id = existing.get("styleDashOrderId")
+                order = state["orders"].get(order_id) if order_id else None
+                return {"duplicate": True, "fullRefund": existing.get("fullRefund") is True, "order": self._public_order(order) if order else None}
+
+            order = self._find_order_by_payment_id(payment_id)
+            if order is None and razorpay_order_id:
+                order = self._find_order_by_razorpay_id(razorpay_order_id)
+            relation_matches = order is not None
+            if order is not None:
+                if order.get("razorpayPaymentId") and order.get("razorpayPaymentId") != payment_id:
+                    relation_matches = False
+                if razorpay_order_id and order.get("razorpayOrderId") and order.get("razorpayOrderId") != razorpay_order_id:
+                    relation_matches = False
+            payment_amount = payment.get("amount")
+            payment_currency = payment.get("currency")
+            cumulative_refunded = payment.get("amount_refunded")
+            if isinstance(cumulative_refunded, bool) or not isinstance(
+                cumulative_refunded,
+                int,
+            ):
+                cumulative_refunded = None
+
+            if order is not None:
+                if (
+                    payment_amount is not None
+                    and (
+                        isinstance(payment_amount, bool)
+                        or not isinstance(payment_amount, int)
+                        or payment_amount != order.get("amount")
+                    )
+                ):
+                    relation_matches = False
+                if (
+                    payment_currency is not None
+                    and payment_currency != order.get("currency")
+                ):
+                    relation_matches = False
+
+            full_refund = bool(
+                relation_matches
+                and order is not None
+                and currency == order.get("currency")
+                and (
+                    amount == order.get("amount")
+                    or cumulative_refunded == order.get("amount")
+                )
+            )
+
+            now = datetime.now(timezone.utc).isoformat()
+            style_order_id = order.get("id") if order else None
+            alert_type = "refund.processed" if full_refund else "refund.processed_review"
+            alert_id = f"{alert_type}:{refund_id}"
+            state["operationalAlerts"][alert_id] = {
+                "id": alert_id,
+                "type": alert_type,
+                "entityId": refund_id,
+                "razorpayPaymentId": payment_id,
+                "styleDashOrderId": style_order_id,
+                "status": "open",
+                "recordedAt": now,
+                "refundAmount": amount,
+                "refundCurrency": currency,
+            }
+            state["processedRefunds"][refund_id] = {
+                "styleDashOrderId": style_order_id,
+                "razorpayPaymentId": payment_id,
+                "amount": amount,
+                "currency": currency,
+                "fullRefund": full_refund,
+                "recordedAt": now,
+            }
+            if safe_event_id:
+                state["processedWebhookEvents"][safe_event_id] = alert_id
+            if order is not None:
+                order["requiresAdminAttention"] = True
+                order["updatedAt"] = now
+                if full_refund:
+                    order["paymentStatus"] = "refunded"
+                    order["razorpayPaymentId"] = payment_id
+                    order["refundId"] = refund_id
+                    # paymentStatus=refunded means the entire trusted order
+                    # amount has been reconciled, even when several partial
+                    # refunds made up that total.
+                    order["refundAmount"] = order.get("amount")
+                    order["refundCurrency"] = currency
+                    order["refundProcessedAt"] = now
+                    state["processedPayments"].setdefault(payment_id, order["id"])
+                    order.setdefault("statusHistory", []).append({
+                        "status": order.get("status", "payment_pending"),
+                        "timestamp": now,
+                        "note": "Razorpay confirmed a full refund; fulfillment state awaits administrator reconciliation",
+                    })
+            self.store.save()
+            return {"duplicate": False, "fullRefund": full_refund, "order": self._public_order(order) if order else None}
 
     def process_webhook(
         self,
@@ -1073,6 +1284,22 @@ class PaymentService:
             raise ApiError(HTTPStatus.BAD_REQUEST, "Malformed webhook request.", "malformed_request")
 
         event = payload["event"]
+        if event == "refund.processed":
+            refund = self._webhook_entity(payload, "refund")
+            payment = self._webhook_entity(payload, "payment")
+            result = self._record_refund_processed(refund, payment, event_id)
+            order = result.get("order") or {}
+            print(
+                f"Razorpay webhook event={event} styleOrderId={order.get('id') or '-'} "
+                f"refundId={refund.get('id') or '-'} result={'duplicate' if result['duplicate'] else 'recorded'}",
+                flush=True,
+            )
+            response = {"success": True}
+            if result["duplicate"]:
+                response["duplicate"] = True
+            if not result["fullRefund"]:
+                response["reviewRequired"] = True
+            return response
         if event == "payment.authorized":
             print("Razorpay webhook event=payment.authorized result=observed-not-fulfilled", flush=True)
             return {"success": True}
@@ -1180,6 +1407,7 @@ class PaymentService:
                 "paymentMethod": "cod",
                 "paymentStatus": "pending",
                 "status": "placed",
+                "inventoryCommitted": True,
                 "estimatedDelivery": "60 minutes",
                 "statusHistory": [{"status": "placed", "timestamp": now, "note": "Cash on Delivery order placed"}],
                 "createdAt": now,

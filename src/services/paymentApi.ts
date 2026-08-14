@@ -41,7 +41,7 @@ export interface ServerOrder {
   items: TrustedOrderItem[];
   address: CheckoutAddressInput & { id: string; state: string };
   paymentMethod: 'cod' | 'upi' | 'card';
-  paymentStatus: 'pending' | 'paid' | 'failed';
+  paymentStatus: 'pending' | 'paid' | 'failed' | 'refunded';
   subtotal: number;
   discount: number;
   walletAmount: number; // Retained for historical persisted-order compatibility.
@@ -50,8 +50,8 @@ export interface ServerOrder {
   grandTotal: number;
   deliveryMethod: 'express' | 'standard' | 'none';
   estimatedDelivery: string;
-  status: 'placed' | 'payment_pending' | 'payment_test_completed';
-  statusHistory: Array<{ status: 'placed' | 'payment_pending' | 'payment_test_completed'; timestamp: string; note?: string }>;
+  status: string;
+  statusHistory: Array<{ status: string; timestamp: string; note?: string }>;
   createdAt: string;
   updatedAt: string;
   razorpayOrderId?: string;
@@ -61,6 +61,11 @@ export interface ServerOrder {
   fulfillmentRequired?: boolean;
   adminLabels?: string[];
   inventoryCommitted?: boolean;
+  inventoryReleasedAt?: string;
+  refundId?: string;
+  refundAmount?: number;
+  refundCurrency?: string;
+  refundProcessedAt?: string;
 }
 
 export interface CreatePaymentOrderResponse {

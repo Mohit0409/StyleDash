@@ -91,6 +91,12 @@ export const Checkout: React.FC = () => {
           navigate('/orders');
           return;
         }
+        if (result.order.status === 'payment_review_required') {
+          clearCart();
+          showToast('Payment received. Stock confirmation is required. Do not pay again; check Your Orders.', 'info');
+          navigate('/orders');
+          return;
+        }
         confirmedOrder = result.order;
       }
 

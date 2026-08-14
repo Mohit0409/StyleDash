@@ -550,21 +550,27 @@ class PaymentServiceTests(unittest.TestCase):
         self.assertNotIn("sd-prod-001-var-2", self.service.store.state["inventory"])
 
     def test_unknown_signed_event_is_ignored(self) -> None:
-        body = b'{"event":"refund.processed","payload":{}}'
+        body = b'{"event":"subscription.charged","payload":{}}'
         self.assertEqual(self.deliver(body), {"success": True})
 
-    def test_negative_inventory_is_prevented(self) -> None:
+    def test_captured_payment_stock_shortfall_records_paid_review_state(self) -> None:
         created = self.create_payment("negative-stock-001")
+        payment_id = "pay_no_stock"
         with self.service.store.lock:
             self.service.store.state["inventory"]["sd-prod-001-var-2"] = 1
             self.service.store.save()
-        self.assert_api_error("stock_changed", lambda: self.deliver(
-            self.webhook_body(created, "pay_no_stock")
-        ))
+        first = self.deliver(self.webhook_body(created, payment_id))
+        self.assertEqual(first, {"success": True})
+        order = self.service.store.state["orders"][created["styleDashOrderId"]]
+        self.assertEqual(order["paymentStatus"], "paid")
+        self.assertEqual(order["status"], "payment_review_required")
+        self.assertFalse(order["inventoryCommitted"])
+        self.assertTrue(order["requiresAdminAttention"])
         self.assertEqual(self.service.store.state["inventory"]["sd-prod-001-var-2"], 1)
-        self.assertEqual(
-            self.service.store.state["orders"][created["styleDashOrderId"]]["paymentStatus"], "pending"
-        )
+        self.assertEqual(self.service.store.state["processedPayments"][payment_id], created["styleDashOrderId"])
+        duplicate = self.deliver(self.webhook_body(created, payment_id))
+        self.assertTrue(duplicate["duplicate"])
+        self.assertEqual(self.service.store.state["inventory"]["sd-prod-001-var-2"], 1)
 
     def test_concurrent_browser_and_webhook_finalize_once(self) -> None:
         created = self.create_payment("concurrent-finalize-001")
@@ -995,7 +1001,7 @@ class HttpApiTests(unittest.TestCase):
         self.assertEqual(payload["code"], "webhook_signature_mismatch")
 
     def test_valid_signature_and_unknown_event_return_200(self) -> None:
-        body = b'{"event":"refund.processed","payload":{}}'
+        body = b'{"event":"subscription.charged","payload":{}}'
         signature = hmac.new(b"webhook_secret_placeholder", body, hashlib.sha256).hexdigest()
         status, payload = self.post_webhook(body, signature)
         self.assertEqual(status, 200)

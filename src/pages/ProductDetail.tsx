@@ -164,7 +164,7 @@ export const ProductDetail: React.FC = () => {
                 </span>
               </>
             )}
-            <span className="text-[10px] text-neutral-400 ml-auto">Inclusive of all GST taxes</span>
+            <span className="text-[10px] text-neutral-400 ml-auto">GST calculated at checkout</span>
           </div>
 
           {/* Variant Selector */}
