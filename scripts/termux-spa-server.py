@@ -57,6 +57,15 @@ SECURITY_POLICY = (
     "form-action 'self' https://api.razorpay.com https://*.razorpay.com"
 )
 ACCESS_LOG_TOKEN_PATTERN = re.compile(r"([?&](?:token|reset_token)=)[^&#\s]*", re.IGNORECASE)
+PAYMENT_TEST_PRODUCT_ID = "styledash-payment-test-item"
+PAYMENT_TEST_PRODUCT_SLUG = "styledash-payment-test-item"
+PAYMENT_TEST_ROUTE = f"/payment-test/{PAYMENT_TEST_PRODUCT_SLUG}"
+PAYMENT_TEST_PRODUCT_NAME = "StyleDash Payment Test Item"
+PAYMENT_TEST_VARIANT_ID = "styledash-payment-test-item-validation"
+PAYMENT_TEST_PRICE_RUPEES = 10
+PAYMENT_TEST_AMOUNT_PAISE = 1000
+PAYMENT_TEST_CURRENCY = "INR"
+PAYMENT_TEST_ADMIN_LABELS = ["TEST", "NO FULFILLMENT REQUIRED"]
 
 
 class ApiError(Exception):
@@ -265,6 +274,8 @@ class PaymentService:
         mode: str | None = None,
         gateway: Any | None = None,
         security_store: SecurityStore | None = None,
+        payment_test_enabled: bool | None = None,
+        payment_test_allowed_emails: set[str] | None = None,
     ) -> None:
         catalog = json.loads(catalog_path.read_text(encoding="utf-8"))
         settings = json.loads(settings_path.read_text(encoding="utf-8"))
@@ -295,6 +306,21 @@ class PaymentService:
         else:
             self.supported_pincodes = set(settings["supportedPincodes"])
 
+        self.payment_test_enabled = (
+            payment_test_enabled
+            if payment_test_enabled is not None
+            else os.environ.get("STYLEDASH_ENABLE_TEST_PRODUCT", "").strip().casefold() == "true"
+        )
+        if payment_test_allowed_emails is None:
+            configured_emails = os.environ.get("STYLEDASH_TEST_PRODUCT_ALLOWED_EMAILS", "")
+            candidates = {item.strip() for item in configured_emails.split(",") if item.strip()}
+        else:
+            candidates = payment_test_allowed_emails
+        try:
+            self.payment_test_allowed_emails = {normalize_email(item) for item in candidates}
+        except SecurityError:
+            raise RuntimeError("STYLEDASH_TEST_PRODUCT_ALLOWED_EMAILS contains an invalid email address") from None
+
     def health(self) -> dict[str, str]:
         result = {"status": "ok", "service": "StyleDash", "paymentMode": self.mode}
         if self.security is not None:
@@ -317,6 +343,31 @@ class PaymentService:
             "state": "Madhya Pradesh",
             "expressAvailable": True,
             "estimatedDeliveryMinutes": 60,
+        }
+
+    def can_access_payment_test_product(self, email: Any) -> bool:
+        if not self.payment_test_enabled:
+            return False
+        try:
+            normalized = normalize_email(email)
+        except SecurityError:
+            return False
+        return normalized in self.payment_test_allowed_emails
+
+    def payment_test_product(self, email: Any) -> dict[str, Any]:
+        if not self.can_access_payment_test_product(email):
+            raise ApiError(HTTPStatus.NOT_FOUND, "Not found.", "not_found")
+        return {
+            "success": True,
+            "product": {
+                "id": PAYMENT_TEST_PRODUCT_ID,
+                "slug": PAYMENT_TEST_PRODUCT_SLUG,
+                "name": PAYMENT_TEST_PRODUCT_NAME,
+                "price": PAYMENT_TEST_PRICE_RUPEES,
+                "amount": PAYMENT_TEST_AMOUNT_PAISE,
+                "currency": PAYMENT_TEST_CURRENCY,
+                "fulfillmentRequired": False,
+            },
         }
 
     def _inventory(self, state: dict[str, Any], variant: dict[str, Any]) -> int:
@@ -511,6 +562,7 @@ class PaymentService:
             "subtotal", "discount", "walletAmount", "deliveryFee", "taxes", "grandTotal",
             "deliveryMethod", "estimatedDelivery", "status", "statusHistory", "createdAt",
             "updatedAt", "razorpayOrderId", "razorpayPaymentId", "paymentVerifiedAt",
+            "isPaymentTestOrder", "fulfillmentRequired", "adminLabels", "inventoryCommitted",
         )
         return {key: order[key] for key in allowed if key in order}
 
@@ -594,6 +646,136 @@ class PaymentService:
             self.store.save()
             return self._create_response(order)
 
+    def create_payment_test_order(
+        self,
+        user: dict[str, Any],
+        payload: dict[str, Any],
+        idempotency_value: str | None,
+    ) -> dict[str, Any]:
+        """Create an owner-authorized, exact-value Razorpay validation order."""
+        if not self.can_access_payment_test_product(user.get("email")):
+            raise ApiError(HTTPStatus.NOT_FOUND, "Not found.", "not_found")
+        user_id = str(user.get("id") or "")[:128]
+        if not user_id:
+            raise ApiError(HTTPStatus.NOT_FOUND, "Not found.", "not_found")
+        if set(payload) - {"paymentMethod"}:
+            raise ApiError(
+                HTTPStatus.UNPROCESSABLE_ENTITY,
+                "Unsupported payment-test field.",
+                "invalid_payment_test_request",
+            )
+        payment_method = payload.get("paymentMethod")
+        if payment_method not in ("upi", "card"):
+            raise ApiError(
+                HTTPStatus.UNPROCESSABLE_ENTITY,
+                "Razorpay is required for this validation item.",
+                "invalid_payment_method",
+            )
+        if self.settings.get("currency") != PAYMENT_TEST_CURRENCY:
+            raise ApiError(
+                HTTPStatus.SERVICE_UNAVAILABLE,
+                "The payment validation item is unavailable.",
+                "payment_test_configuration_error",
+            )
+        if not self.key_id or not self.key_secret or self.gateway is None:
+            raise ApiError(
+                HTTPStatus.SERVICE_UNAVAILABLE,
+                "Online payments are temporarily unavailable.",
+                "payments_not_configured",
+            )
+        if not self.key_id.startswith(f"rzp_{self.mode}_"):
+            raise ApiError(
+                HTTPStatus.SERVICE_UNAVAILABLE,
+                "Payment configuration does not match the selected mode.",
+                "payment_mode_mismatch",
+            )
+
+        idempotency_key = self._idempotency_key(idempotency_value)
+        stored_idempotency_key = (
+            f"payment-test:{user_id}:{idempotency_key}" if idempotency_key else None
+        )
+        with self.store.lock:
+            if stored_idempotency_key:
+                existing_id = self.store.state["idempotency"].get(stored_idempotency_key)
+                if existing_id:
+                    existing = self.store.state["orders"].get(existing_id)
+                    if existing and existing.get("isPaymentTestOrder") is True:
+                        return self._create_response(existing)
+
+            style_order_id = self._new_order_id()
+            receipt = style_order_id
+            gateway_order = self.gateway.create_order({
+                "amount": PAYMENT_TEST_AMOUNT_PAISE,
+                "currency": PAYMENT_TEST_CURRENCY,
+                "receipt": receipt,
+                "notes": {
+                    "styleDashOrderId": style_order_id,
+                    "purpose": "payment_validation",
+                    "fulfillmentRequired": "false",
+                },
+            })
+            razorpay_order_id = gateway_order.get("id")
+            if not isinstance(razorpay_order_id, str) or not razorpay_order_id.startswith("order_"):
+                raise ApiError(HTTPStatus.BAD_GATEWAY, "Invalid response from payment service.", "invalid_payment_response")
+
+            now = datetime.now(timezone.utc).isoformat()
+            order = {
+                "id": style_order_id,
+                "receipt": receipt,
+                "razorpayOrderId": razorpay_order_id,
+                "userId": user_id,
+                "items": [{
+                    "productId": PAYMENT_TEST_PRODUCT_ID,
+                    "productName": PAYMENT_TEST_PRODUCT_NAME,
+                    "productSlug": PAYMENT_TEST_PRODUCT_SLUG,
+                    "variantId": PAYMENT_TEST_VARIANT_ID,
+                    "sku": "PAYMENT-VALIDATION-ONLY",
+                    "size": "N/A",
+                    "colourName": "N/A",
+                    "quantity": 1,
+                    "unitPrice": PAYMENT_TEST_PRICE_RUPEES,
+                    "lineTotal": PAYMENT_TEST_PRICE_RUPEES,
+                }],
+                "address": {
+                    "id": "payment-test-no-fulfillment",
+                    "name": "Payment validation only",
+                    "phone": "",
+                    "street": "No fulfillment required",
+                    "city": "",
+                    "state": "",
+                    "pincode": "",
+                },
+                "paymentMethod": payment_method,
+                "paymentStatus": "pending",
+                "subtotal": PAYMENT_TEST_PRICE_RUPEES,
+                "discount": 0,
+                "walletAmount": 0,
+                "deliveryFee": 0,
+                "taxes": 0,
+                "grandTotal": PAYMENT_TEST_PRICE_RUPEES,
+                "amount": PAYMENT_TEST_AMOUNT_PAISE,
+                "currency": PAYMENT_TEST_CURRENCY,
+                "deliveryMethod": "none",
+                "estimatedDelivery": "No fulfillment required",
+                "status": "payment_pending",
+                "statusHistory": [{
+                    "status": "payment_pending",
+                    "timestamp": now,
+                    "note": "TEST payment awaiting captured-state verification; no fulfillment required",
+                }],
+                "isPaymentTestOrder": True,
+                "fulfillmentRequired": False,
+                "adminLabels": list(PAYMENT_TEST_ADMIN_LABELS),
+                "inventoryCommitted": False,
+                "createdAt": now,
+                "updatedAt": now,
+            }
+            self.store.state["orders"][style_order_id] = order
+            if stored_idempotency_key:
+                self.store.state["idempotency"][stored_idempotency_key] = style_order_id
+            self.store.save()
+            return self._create_response(order)
+
     def _decrement_inventory(self, state: dict[str, Any], items: list[dict[str, Any]]) -> None:
         checked: list[tuple[str, int, int]] = []
         for item in items:
@@ -670,21 +852,31 @@ class PaymentService:
                     return {"success": True, "idempotent": True, "duplicate": True, "order": self._public_order(order)}
                 raise ApiError(HTTPStatus.CONFLICT, "This order already has a verified payment.", "duplicate_payment")
 
-            self._decrement_inventory(state, order["items"])
+            payment_test_order = order.get("isPaymentTestOrder") is True
+            if not payment_test_order:
+                self._decrement_inventory(state, order["items"])
             now = datetime.now(timezone.utc).isoformat()
             order.update(
                 {
                     "paymentStatus": "paid",
-                    "status": "placed",
+                    "status": "payment_test_completed" if payment_test_order else "placed",
                     "razorpayPaymentId": payment_id,
                     "paymentVerifiedAt": now,
                     "paymentVerificationSource": source,
-                    "inventoryCommitted": True,
+                    "inventoryCommitted": not payment_test_order,
                     "updatedAt": now,
                 }
             )
             order["statusHistory"].append(
-                {"status": "placed", "timestamp": now, "note": f"Razorpay payment verified by {source}"}
+                {
+                    "status": "payment_test_completed" if payment_test_order else "placed",
+                    "timestamp": now,
+                    "note": (
+                        f"TEST payment verified by {source}; no fulfillment required"
+                        if payment_test_order
+                        else f"Razorpay payment verified by {source}"
+                    ),
+                }
             )
             state["processedPayments"][payment_id] = style_order_id
             self.store.save()
@@ -1047,6 +1239,15 @@ class StyleDashRequestHandler(SimpleHTTPRequestHandler):
     def _current_user(self) -> tuple[dict[str, Any], Any]:
         return self._security().authenticate(self._session_token())
 
+    def _payment_test_user(self) -> dict[str, Any]:
+        try:
+            user, _session = self._current_user()
+        except SecurityError:
+            raise ApiError(HTTPStatus.NOT_FOUND, "Not found.", "not_found") from None
+        if not self.payment_service.can_access_payment_test_product(user.get("email")):
+            raise ApiError(HTTPStatus.NOT_FOUND, "Not found.", "not_found")
+        return user
+
     def _csrf(self) -> None:
         origin = self.headers.get("Origin")
         expected_origin = os.environ.get("STYLEDASH_PUBLIC_ORIGIN", "").rstrip("/")
@@ -1117,6 +1318,13 @@ class StyleDashRequestHandler(SimpleHTTPRequestHandler):
             if self._sensitive_path(path):
                 self._json_response(HTTPStatus.NOT_FOUND, {"success": False, "error": "Not found.", "code": "not_found"})
                 return
+            if path == "/payment-test" or path.startswith("/payment-test/"):
+                if path != PAYMENT_TEST_ROUTE:
+                    raise ApiError(HTTPStatus.NOT_FOUND, "Not found.", "not_found")
+                self._rate_limit(path, 30)
+                self._payment_test_user()
+                super().do_GET()
+                return
             if path == "/api/health":
                 self._json_response(HTTPStatus.OK, self.payment_service.health())
                 return
@@ -1135,6 +1343,11 @@ class StyleDashRequestHandler(SimpleHTTPRequestHandler):
                 if len(variant_values) > 1:
                     raise ApiError(HTTPStatus.BAD_REQUEST, "Invalid product option.", "invalid_variant")
                 self._json_response(HTTPStatus.OK, self.payment_service.public_inventory_availability(variant_id))
+                return
+            if path == f"/api/payment-test-product/{PAYMENT_TEST_PRODUCT_SLUG}":
+                self._rate_limit(path, 30)
+                user = self._payment_test_user()
+                self._json_response(HTTPStatus.OK, self.payment_service.payment_test_product(user.get("email")))
                 return
             if path == "/api/auth/me":
                 raw = self._session_token()
@@ -1170,6 +1383,17 @@ class StyleDashRequestHandler(SimpleHTTPRequestHandler):
         if self._sensitive_path(path):
             self._json_response(HTTPStatus.NOT_FOUND, {"success": False, "error": "Not found.", "code": "not_found"}, head_only=True)
             return
+        if path == "/payment-test" or path.startswith("/payment-test/"):
+            if path != PAYMENT_TEST_ROUTE:
+                self._json_response(HTTPStatus.NOT_FOUND, {"success": False, "error": "Not found.", "code": "not_found"}, head_only=True)
+                return
+            try:
+                self._payment_test_user()
+            except (ApiError, SecurityError):
+                self._json_response(HTTPStatus.NOT_FOUND, {"success": False, "error": "Not found.", "code": "not_found"}, head_only=True)
+                return
+            super().do_HEAD()
+            return
         if path == "/api/health":
             self._json_response(HTTPStatus.OK, self.payment_service.health(), head_only=True)
             return
@@ -1189,6 +1413,17 @@ class StyleDashRequestHandler(SimpleHTTPRequestHandler):
                 _user, payload = self._auth_payload(self._read_json())
                 result = self.payment_service.create_razorpay_order(
                     payload, self.headers.get("Idempotency-Key")
+                )
+                self._json_response(HTTPStatus.CREATED, result)
+                return
+            if path == f"/api/payment-test-product/{PAYMENT_TEST_PRODUCT_SLUG}/create-order":
+                self._rate_limit(path, 5)
+                user = self._payment_test_user()
+                self._csrf()
+                result = self.payment_service.create_payment_test_order(
+                    user,
+                    self._read_json(),
+                    self.headers.get("Idempotency-Key"),
                 )
                 self._json_response(HTTPStatus.CREATED, result)
                 return

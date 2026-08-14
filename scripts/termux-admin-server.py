@@ -97,6 +97,12 @@ class AdminApplication:
             order = self.payments.store.state["orders"].get(order_id)
             if order is None:
                 raise SecurityError(404, "Order not found.", "order_not_found")
+            if order.get("fulfillmentRequired") is False:
+                raise SecurityError(
+                    409,
+                    "This payment validation order requires no fulfillment.",
+                    "no_fulfillment_order",
+                )
             current = order.get("status", "placed")
             if requested not in transitions.get(current, set()):
                 raise SecurityError(409, "Invalid order status transition.", "invalid_transition")

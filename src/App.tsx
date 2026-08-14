@@ -28,6 +28,7 @@ const Terms = lazy(() => import('./pages/Terms').then(m => ({ default: m.Terms }
 const AuthPage = lazy(() => import('./pages/AuthPage').then(m => ({ default: m.AuthPage })));
 const ForgotPassword = lazy(() => import('./pages/PasswordRecovery').then(m => ({ default: m.ForgotPassword })));
 const ResetPassword = lazy(() => import('./pages/PasswordRecovery').then(m => ({ default: m.ResetPassword })));
+const PaymentTestProduct = lazy(() => import('./pages/PaymentTestProduct').then(m => ({ default: m.PaymentTestProduct })));
 
 export const App: React.FC = () => {
   return (
@@ -56,6 +57,7 @@ export const App: React.FC = () => {
                       <Route path="register" element={<AuthPage mode="register" />} />
                       <Route path="forgot-password" element={<ForgotPassword />} />
                       <Route path="reset-password" element={<ResetPassword />} />
+                      <Route path="payment-test/styledash-payment-test-item" element={<PaymentTestProduct />} />
                       <Route path="checkout" element={<ProtectedRoute><Checkout /></ProtectedRoute>} />
                       <Route path="order-success/:orderId" element={<ProtectedRoute><OrderSuccess /></ProtectedRoute>} />
                       <Route path="orders" element={<ProtectedRoute><Orders /></ProtectedRoute>} />

@@ -114,6 +114,41 @@ class AdminStoreTests(unittest.TestCase):
         actions = {row["action"] for row in self.store.audit()}
         self.assertTrue({"order_status", "inventory_adjustment", "vendor_approved", "customer_disabled"}.issubset(actions))
 
+    def test_payment_test_order_is_prominently_labelled_and_cannot_enter_fulfillment(self):
+        app = ADMIN_SERVER.AdminApplication(
+            self.database, self.key,
+            ROOT / "server/payment-data/catalog.json", ROOT / "server/payment-data/settings.json",
+            self.root / "data",
+        )
+        with app.payments.store.lock:
+            app.payments.store.state["orders"]["ORDER-PAYMENT-TEST"] = {
+                "id": "ORDER-PAYMENT-TEST",
+                "userId": "usr_payment_test_owner",
+                "status": "payment_test_completed",
+                "paymentStatus": "paid",
+                "isPaymentTestOrder": True,
+                "fulfillmentRequired": False,
+                "adminLabels": ["TEST", "NO FULFILLMENT REQUIRED"],
+                "createdAt": "2026-08-14T00:00:00+00:00",
+            }
+            app.payments.store.save()
+
+        listed = app.list_orders("ORDER-PAYMENT-TEST")
+        self.assertEqual(len(listed), 1)
+        self.assertEqual(listed[0]["adminLabels"], ["TEST", "NO FULFILLMENT REQUIRED"])
+        self.assertFalse(listed[0]["fulfillmentRequired"])
+        self.assert_error(
+            "no_fulfillment_order",
+            lambda: app.update_order_status(self.admin["id"], "ORDER-PAYMENT-TEST", "confirmed"),
+        )
+        unchanged = app.get_order("ORDER-PAYMENT-TEST")
+        self.assertEqual(unchanged["status"], "payment_test_completed")
+
+        admin_ui = (ROOT / "server/admin/admin.js").read_text(encoding="utf-8")
+        self.assertIn("NO FULFILLMENT REQUIRED", admin_ui)
+        self.assertIn("Do not pack, dispatch, deliver, or adjust fashion inventory.", admin_ui)
+        self.assertIn("paymentTest?", admin_ui)
+
 
 class AdminHttpTests(unittest.TestCase):
     def setUp(self):

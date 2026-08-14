@@ -24,6 +24,8 @@ RAZORPAY_LIVE_KEY_ID=rzp_live_replace_only_when_ready
 RAZORPAY_LIVE_KEY_SECRET=replace_only_when_ready
 RAZORPAY_LIVE_WEBHOOK_SECRET=replace_with_the_existing_live_webhook_secret
 STYLEDASH_TOTP_ENCRYPTION_KEY=generate_privately_on_the_phone
+STYLEDASH_ENABLE_TEST_PRODUCT=false
+STYLEDASH_TEST_PRODUCT_ALLOWED_EMAILS=owner-account@example.invalid
 ```
 
 Never use a `VITE_*` variable for credentials. Only a Razorpay key ID is
@@ -54,10 +56,21 @@ separate backup-and-reconciliation-gated operation.
 - `GET /api/orders`, `GET /api/orders/:id`
 - `POST /api/vendor-applications`
 - `POST /api/create-order`, `POST /api/verify-payment`, `POST /api/place-cod-order`
+- owner-session only: `GET /api/payment-test-product/styledash-payment-test-item`
+- owner-session only: `POST /api/payment-test-product/styledash-payment-test-item/create-order`
 - `POST /api/webhooks/razorpay`
 
 Razorpay Test and Live credentials are isolated. Keep `RAZORPAY_MODE=test` until
 all manual customer/admin/reboot gates pass; deployment never enables Live Mode.
+
+The temporary ₹10 payment-validation item is disabled unless
+`STYLEDASH_ENABLE_TEST_PRODUCT=true`. Access is authorized exclusively from the
+normalized authenticated-session email against the comma-separated private
+`STYLEDASH_TEST_PRODUCT_ALLOWED_EMAILS` value. Do not use a `VITE_*` variable,
+URL query, browser storage, or request-body email for this authorization. The
+item is intentionally absent from the catalogue and has no COD, coupons,
+wallet credit, tax, delivery charge, fashion inventory, or fulfillment. Turning
+the flag off blocks new validation orders while preserving payment history.
 
 ## Razorpay Live-readiness policy
 

@@ -48,15 +48,19 @@ export interface ServerOrder {
   deliveryFee: number;
   taxes: number;
   grandTotal: number;
-  deliveryMethod: 'express' | 'standard';
+  deliveryMethod: 'express' | 'standard' | 'none';
   estimatedDelivery: string;
-  status: 'placed';
-  statusHistory: Array<{ status: 'placed'; timestamp: string; note?: string }>;
+  status: 'placed' | 'payment_pending' | 'payment_test_completed';
+  statusHistory: Array<{ status: 'placed' | 'payment_pending' | 'payment_test_completed'; timestamp: string; note?: string }>;
   createdAt: string;
   updatedAt: string;
   razorpayOrderId?: string;
   razorpayPaymentId?: string;
   paymentVerifiedAt?: string;
+  isPaymentTestOrder?: boolean;
+  fulfillmentRequired?: boolean;
+  adminLabels?: string[];
+  inventoryCommitted?: boolean;
 }
 
 export interface CreatePaymentOrderResponse {

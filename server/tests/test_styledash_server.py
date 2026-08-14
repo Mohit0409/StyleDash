@@ -16,6 +16,7 @@ import urllib.request
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import redirect_stderr
 from pathlib import Path
+from unittest.mock import patch
 
 from cryptography.fernet import Fernet
 
@@ -597,6 +598,279 @@ class PaymentServiceTests(unittest.TestCase):
         self.assertEqual(restarted.store.state["inventory"]["sd-prod-001-var-2"], 13)
 
 
+class PaymentTestProductTests(unittest.TestCase):
+    def setUp(self) -> None:
+        self.temporary = tempfile.TemporaryDirectory()
+        self.data_directory = Path(self.temporary.name)
+        self.gateway = FakeGateway()
+        self.allowed_user = {
+            "id": "usr_payment_test_owner",
+            "email": "Owner.Payment.Test@Example.Test",
+            "name": "Payment Test Owner",
+        }
+        self.service = SERVER.PaymentService(
+            ROOT / "server" / "payment-data" / "catalog.json",
+            ROOT / "server" / "payment-data" / "settings.json",
+            self.data_directory,
+            key_id="rzp_live_placeholder",
+            key_secret="live_secret_placeholder",
+            webhook_secret="live_webhook_placeholder",
+            mode="live",
+            gateway=self.gateway,
+            payment_test_enabled=True,
+            payment_test_allowed_emails={"owner.payment.test@example.test"},
+        )
+
+    def tearDown(self) -> None:
+        self.temporary.cleanup()
+
+    def assert_api_error(self, code: str, callback) -> None:
+        with self.assertRaises(SERVER.ApiError) as caught:
+            callback()
+        self.assertEqual(caught.exception.code, code)
+
+    def create(self, key: str = "payment-test-create-001", method: str = "upi") -> dict:
+        return self.service.create_payment_test_order(
+            self.allowed_user, {"paymentMethod": method}, key
+        )
+
+    def browser_verification(self, created: dict, payment_id: str, status: str = "captured") -> dict:
+        self.gateway.payments[payment_id] = {
+            "id": payment_id,
+            "order_id": created["razorpayOrderId"],
+            "amount": created["amount"],
+            "currency": created["currency"],
+            "status": status,
+        }
+        signature = hmac.new(
+            b"live_secret_placeholder",
+            f"{created['razorpayOrderId']}|{payment_id}".encode(),
+            hashlib.sha256,
+        ).hexdigest()
+        return {
+            "styleDashOrderId": created["styleDashOrderId"],
+            "razorpay_order_id": created["razorpayOrderId"],
+            "razorpay_payment_id": payment_id,
+            "razorpay_signature": signature,
+        }
+
+    @staticmethod
+    def webhook_body(created: dict, payment_id: str, **overrides) -> bytes:
+        payment = {
+            "id": payment_id,
+            "order_id": created["razorpayOrderId"],
+            "amount": created["amount"],
+            "currency": created["currency"],
+            "status": "captured",
+        }
+        payment.update(overrides)
+        return json.dumps({
+            "event": "payment.captured",
+            "payload": {"payment": {"entity": payment}},
+        }, separators=(",", ":")).encode()
+
+    def deliver(self, body: bytes, service=None) -> dict:
+        signature = hmac.new(b"live_webhook_placeholder", body, hashlib.sha256).hexdigest()
+        return (service or self.service).process_webhook(body, signature)
+
+    def test_flag_and_normalized_session_email_gate_metadata(self) -> None:
+        metadata = self.service.payment_test_product("  OWNER.PAYMENT.TEST@example.test ")
+        self.assertEqual(metadata, {"success": True, "product": {
+            "id": "styledash-payment-test-item",
+            "slug": "styledash-payment-test-item",
+            "name": "StyleDash Payment Test Item",
+            "price": 10,
+            "amount": 1000,
+            "currency": "INR",
+            "fulfillmentRequired": False,
+        }})
+        self.assert_api_error("not_found", lambda: self.service.payment_test_product(None))
+        self.assert_api_error("not_found", lambda: self.service.payment_test_product("attacker@example.test"))
+
+        disabled = SERVER.PaymentService(
+            ROOT / "server" / "payment-data" / "catalog.json",
+            ROOT / "server" / "payment-data" / "settings.json",
+            self.data_directory / "disabled",
+            key_id="rzp_live_placeholder", key_secret="live_secret_placeholder",
+            webhook_secret="live_webhook_placeholder", mode="live", gateway=FakeGateway(),
+            payment_test_enabled=False,
+            payment_test_allowed_emails={"owner.payment.test@example.test"},
+        )
+        self.assert_api_error("not_found", lambda: disabled.payment_test_product(self.allowed_user["email"]))
+
+    def test_private_environment_flag_and_allowlist_are_applied_case_insensitively(self) -> None:
+        with patch.dict(os.environ, {
+            "STYLEDASH_ENABLE_TEST_PRODUCT": "TrUe",
+            "STYLEDASH_TEST_PRODUCT_ALLOWED_EMAILS": "First.Owner@Example.Test, second.owner@example.test",
+        }):
+            configured = SERVER.PaymentService(
+                ROOT / "server" / "payment-data" / "catalog.json",
+                ROOT / "server" / "payment-data" / "settings.json",
+                self.data_directory / "configured",
+                key_id="rzp_live_placeholder", key_secret="live_secret_placeholder",
+                webhook_secret="live_webhook_placeholder", mode="live", gateway=FakeGateway(),
+            )
+        self.assertTrue(configured.can_access_payment_test_product("FIRST.OWNER@example.test"))
+        self.assertTrue(configured.can_access_payment_test_product("second.owner@EXAMPLE.TEST"))
+        self.assertFalse(configured.can_access_payment_test_product("unlisted@example.test"))
+
+    def test_exact_live_razorpay_order_has_no_delivery_tax_discount_wallet_or_inventory(self) -> None:
+        inventory_before = dict(self.service.store.state["inventory"])
+        created = self.create()
+        self.assertEqual((created["amount"], created["currency"]), (1000, "INR"))
+        self.assertEqual(created["trustedTotals"], {
+            "subtotal": 10, "discount": 0, "deliveryFee": 0, "taxes": 0, "grandTotal": 10,
+        })
+        self.assertEqual(self.gateway.calls, [{
+            "amount": 1000,
+            "currency": "INR",
+            "receipt": created["receipt"],
+            "notes": {
+                "styleDashOrderId": created["styleDashOrderId"],
+                "purpose": "payment_validation",
+                "fulfillmentRequired": "false",
+            },
+        }])
+        order = self.service.store.state["orders"][created["styleDashOrderId"]]
+        self.assertEqual(order["items"][0]["productName"], "StyleDash Payment Test Item")
+        self.assertEqual(order["deliveryMethod"], "none")
+        self.assertEqual(order["adminLabels"], ["TEST", "NO FULFILLMENT REQUIRED"])
+        self.assertFalse(order["fulfillmentRequired"])
+        self.assertFalse(order["inventoryCommitted"])
+        self.assertEqual(self.service.store.state["inventory"], inventory_before)
+
+    def test_idempotency_is_scoped_to_the_authenticated_allowed_account(self) -> None:
+        second_user = {
+            "id": "usr_second_payment_test_owner",
+            "email": "second.payment.owner@example.test",
+        }
+        self.service.payment_test_allowed_emails.add("second.payment.owner@example.test")
+        first = self.create("payment-test-shared-idempotency")
+        second = self.service.create_payment_test_order(
+            second_user, {"paymentMethod": "upi"}, "payment-test-shared-idempotency"
+        )
+        self.assertNotEqual(first["styleDashOrderId"], second["styleDashOrderId"])
+        self.assertEqual(len(self.gateway.calls), 2)
+        self.assertEqual(
+            self.service.store.state["orders"][second["styleDashOrderId"]]["userId"],
+            second_user["id"],
+        )
+
+    def test_unauthorized_forged_email_cod_coupon_wallet_and_totals_fail_without_mutation(self) -> None:
+        state_before = json.loads(json.dumps(self.service.store.state))
+        attacker = {"id": "usr_attacker", "email": "attacker@example.test"}
+        self.assert_api_error(
+            "not_found",
+            lambda: self.service.create_payment_test_order(
+                attacker,
+                {"paymentMethod": "upi", "email": self.allowed_user["email"]},
+                "payment-test-forged-email",
+            ),
+        )
+        for payload in (
+            {"paymentMethod": "cod"},
+            {"paymentMethod": "upi", "email": self.allowed_user["email"]},
+            {"paymentMethod": "upi", "couponCode": "FORGED"},
+            {"paymentMethod": "upi", "walletAmount": 10},
+            {"paymentMethod": "upi", "amount": 1},
+            {"paymentMethod": "upi", "deliveryFee": -100, "taxes": -100},
+        ):
+            expected = "invalid_payment_method" if payload == {"paymentMethod": "cod"} else "invalid_payment_test_request"
+            self.assert_api_error(
+                expected,
+                lambda candidate=payload: self.service.create_payment_test_order(
+                    self.allowed_user, candidate, "payment-test-rejected-input"
+                ),
+            )
+        self.assertEqual(self.service.store.state, state_before)
+        self.assertEqual(self.gateway.calls, [])
+
+    def test_authorized_payment_remains_pending_until_capture_and_never_touches_inventory(self) -> None:
+        created = self.create("payment-test-authorized")
+        inventory_before = dict(self.service.store.state["inventory"])
+        authorized = self.service.verify_payment(
+            self.browser_verification(created, "pay_payment_test_authorized", "authorized")
+        )
+        self.assertTrue(authorized["pending"])
+        pending = self.service.store.state["orders"][created["styleDashOrderId"]]
+        self.assertEqual((pending["paymentStatus"], pending["status"]), ("pending", "payment_pending"))
+        self.assertEqual(self.service.store.state["inventory"], inventory_before)
+
+        captured = self.deliver(self.webhook_body(created, "pay_payment_test_authorized"))
+        self.assertEqual(captured, {"success": True})
+        paid = self.service.store.state["orders"][created["styleDashOrderId"]]
+        self.assertEqual((paid["paymentStatus"], paid["status"]), ("paid", "payment_test_completed"))
+        self.assertFalse(paid["inventoryCommitted"])
+        self.assertIn("no fulfillment required", paid["statusHistory"][-1]["note"].lower())
+        self.assertEqual(self.service.store.state["inventory"], inventory_before)
+
+    def test_invalid_callback_and_webhook_fail_without_business_mutation(self) -> None:
+        created = self.create("payment-test-invalid")
+        inventory_before = dict(self.service.store.state["inventory"])
+        invalid = self.browser_verification(created, "pay_payment_test_invalid")
+        invalid["razorpay_signature"] = "invalid"
+        self.assert_api_error("signature_mismatch", lambda: self.service.verify_payment(invalid))
+
+        body = self.webhook_body(created, "pay_payment_test_invalid")
+        self.assert_api_error(
+            "webhook_signature_mismatch",
+            lambda: self.service.process_webhook(body, "invalid"),
+        )
+        self.assert_api_error(
+            "amount_mismatch",
+            lambda: self.deliver(self.webhook_body(created, "pay_payment_test_invalid", amount=999)),
+        )
+        order = self.service.store.state["orders"][created["styleDashOrderId"]]
+        self.assertEqual((order["paymentStatus"], order["status"]), ("pending", "payment_pending"))
+        self.assertEqual(self.service.store.state["inventory"], inventory_before)
+
+    def test_concurrent_duplicates_and_restart_finalize_exactly_once_without_inventory(self) -> None:
+        with ThreadPoolExecutor(max_workers=8) as executor:
+            created_results = list(executor.map(
+                lambda _index: self.create("payment-test-concurrent-create"),
+                range(8),
+            ))
+        self.assertEqual(len({item["styleDashOrderId"] for item in created_results}), 1)
+        self.assertEqual(len(self.gateway.calls), 1)
+        created = created_results[0]
+        callback = self.browser_verification(created, "pay_payment_test_concurrent")
+        body = self.webhook_body(created, "pay_payment_test_concurrent")
+        inventory_before = dict(self.service.store.state["inventory"])
+
+        with ThreadPoolExecutor(max_workers=2) as executor:
+            futures = [
+                executor.submit(self.service.verify_payment, callback),
+                executor.submit(self.deliver, body),
+            ]
+            for future in futures:
+                future.result()
+
+        order = self.service.store.state["orders"][created["styleDashOrderId"]]
+        self.assertEqual((order["paymentStatus"], order["status"]), ("paid", "payment_test_completed"))
+        self.assertEqual(len(self.service.store.state["processedPayments"]), 1)
+        self.assertEqual(self.service.store.state["inventory"], inventory_before)
+
+        restarted = SERVER.PaymentService(
+            ROOT / "server" / "payment-data" / "catalog.json",
+            ROOT / "server" / "payment-data" / "settings.json",
+            self.data_directory,
+            key_id="rzp_live_placeholder", key_secret="live_secret_placeholder",
+            webhook_secret="live_webhook_placeholder", mode="live", gateway=self.gateway,
+            payment_test_enabled=False,
+            payment_test_allowed_emails={"owner.payment.test@example.test"},
+        )
+        self.assertTrue(self.deliver(body, restarted)["duplicate"])
+        restarted_order = restarted.store.state["orders"][created["styleDashOrderId"]]
+        self.assertEqual((restarted_order["paymentStatus"], restarted_order["status"]), ("paid", "payment_test_completed"))
+        self.assertEqual(restarted.store.state["inventory"], inventory_before)
+        self.assert_api_error(
+            "not_found",
+            lambda: restarted.create_payment_test_order(
+                self.allowed_user, {"paymentMethod": "upi"}, "payment-test-disabled-new"
+            ),
+        )
+
+
 class HttpApiTests(unittest.TestCase):
     def setUp(self) -> None:
         self.temporary = tempfile.TemporaryDirectory()
@@ -609,6 +883,7 @@ class HttpApiTests(unittest.TestCase):
             root / "styledash.db", Fernet.generate_key().decode(),
             password_reset_sender=lambda email, token: self.reset_deliveries.append((email, token)),
         )
+        self.gateway = FakeGateway()
         service = SERVER.PaymentService(
             ROOT / "server" / "payment-data" / "catalog.json",
             ROOT / "server" / "payment-data" / "settings.json",
@@ -617,8 +892,10 @@ class HttpApiTests(unittest.TestCase):
             key_secret="test_secret_placeholder",
             webhook_secret="webhook_secret_placeholder",
             mode="test",
-            gateway=FakeGateway(),
+            gateway=self.gateway,
             security_store=security_store,
+            payment_test_enabled=True,
+            payment_test_allowed_emails={"http-payment-owner@example.test"},
         )
         self.previous_origin = os.environ.get("STYLEDASH_PUBLIC_ORIGIN")
         os.environ["STYLEDASH_PUBLIC_ORIGIN"] = "https://styledash.test"
@@ -743,9 +1020,10 @@ class HttpApiTests(unittest.TestCase):
         with response:
             return response.status, json.load(response), response.headers
 
-    def get_json(self, path: str):
+    def get_json(self, path: str, headers: dict | None = None):
         try:
-            response = urllib.request.urlopen(f"{self.base_url}{path}")
+            request = urllib.request.Request(f"{self.base_url}{path}", headers=headers or {})
+            response = urllib.request.urlopen(request)
         except urllib.error.HTTPError as error:
             body = json.loads(error.read()); status = error.code; response_headers = error.headers; error.close()
             return status, body, response_headers
@@ -873,6 +1151,141 @@ class HttpApiTests(unittest.TestCase):
         with self.assertRaises(urllib.error.HTTPError) as caught:
             urllib.request.urlopen(oversized)
         self.assertEqual(caught.exception.code, 413); caught.exception.close()
+
+    def test_payment_test_http_authorizes_session_only_and_preserves_paid_history_when_disabled(self) -> None:
+        endpoint = "/api/payment-test-product/styledash-payment-test-item"
+        controlled_route = "/payment-test/styledash-payment-test-item"
+        route_status, route_hidden, _headers = self.get_json(controlled_route)
+        self.assertEqual((route_status, route_hidden["code"]), (404, "not_found"))
+        status, anonymous, _headers = self.get_json(
+            f"{endpoint}?email=http-payment-owner%40example.test"
+        )
+        self.assertEqual((status, anonymous["code"]), (404, "not_found"))
+
+        status, attacker, attacker_headers = self.post_json("/api/auth/register", {
+            "name": "HTTP Attacker", "email": "http-attacker@example.test",
+            "password": "long attacker password 123", "phone": "9999999999",
+        })
+        self.assertEqual(status, 201)
+        attacker_cookie = attacker_headers["Set-Cookie"].split(";", 1)[0]
+        attacker_auth = {
+            "Cookie": attacker_cookie,
+            "X-CSRF-Token": attacker["csrfToken"],
+            "Origin": "https://styledash.test",
+            "Idempotency-Key": "payment-test-http-forged",
+        }
+        status, hidden, _headers = self.get_json(
+            f"{endpoint}?email=http-payment-owner%40example.test",
+            {"Cookie": attacker_cookie},
+        )
+        self.assertEqual((status, hidden["code"]), (404, "not_found"))
+        route_status, route_hidden, _headers = self.get_json(
+            controlled_route, {"Cookie": attacker_cookie}
+        )
+        self.assertEqual((route_status, route_hidden["code"]), (404, "not_found"))
+        status, forged, _headers = self.post_json(
+            f"{endpoint}/create-order",
+            {"paymentMethod": "upi", "email": "http-payment-owner@example.test"},
+            attacker_auth,
+        )
+        self.assertEqual((status, forged["code"]), (404, "not_found"))
+
+        status, owner, owner_headers = self.post_json("/api/auth/register", {
+            "name": "HTTP Payment Owner", "email": "HTTP-PAYMENT-OWNER@EXAMPLE.TEST",
+            "password": "long payment owner password 123", "phone": "9999999999",
+        })
+        self.assertEqual(status, 201)
+        owner_cookie = owner_headers["Set-Cookie"].split(";", 1)[0]
+        owner_headers_base = {
+            "Cookie": owner_cookie,
+            "Origin": "https://styledash.test",
+            "Idempotency-Key": "payment-test-http-owner",
+        }
+        status, metadata, _headers = self.get_json(endpoint, {"Cookie": owner_cookie})
+        self.assertEqual(status, 200)
+        self.assertEqual((metadata["product"]["amount"], metadata["product"]["currency"]), (1000, "INR"))
+        self.assertNotIn("allowed", json.dumps(metadata).lower())
+        route_request = urllib.request.Request(
+            f"{self.base_url}{controlled_route}", headers={"Cookie": owner_cookie}
+        )
+        with urllib.request.urlopen(route_request) as route_response:
+            self.assertEqual(route_response.status, 200)
+            self.assertIn("StyleDash", route_response.read().decode())
+        route_status, route_hidden, _headers = self.get_json(
+            f"{controlled_route}/", {"Cookie": owner_cookie}
+        )
+        self.assertEqual((route_status, route_hidden["code"]), (404, "not_found"))
+
+        status, csrf_failure, _headers = self.post_json(
+            f"{endpoint}/create-order", {"paymentMethod": "upi"}, owner_headers_base
+        )
+        self.assertEqual((status, csrf_failure["code"]), (403, "csrf_failed"))
+        owner_auth = {**owner_headers_base, "X-CSRF-Token": owner["csrfToken"]}
+        status, created, _headers = self.post_json(
+            f"{endpoint}/create-order", {"paymentMethod": "upi"}, owner_auth
+        )
+        self.assertEqual(status, 201)
+        self.assertEqual((created["amount"], created["currency"]), (1000, "INR"))
+
+        ordinary_payload = {
+            "items": [{
+                "productId": "styledash-payment-test-item",
+                "variantId": "styledash-payment-test-item-validation",
+                "quantity": 1,
+            }],
+            "address": {
+                "name": "HTTP Payment Owner", "phone": "9999999999",
+                "street": "123 Test Street", "city": "Neemuch", "pincode": "458441",
+            },
+            "deliveryMethod": "express", "paymentMethod": "cod", "couponCode": None,
+        }
+        status, ordinary_cod, _headers = self.post_json(
+            "/api/place-cod-order", ordinary_payload,
+            {**owner_auth, "Idempotency-Key": "payment-test-http-cod"},
+        )
+        self.assertEqual((status, ordinary_cod["code"]), (422, "invalid_product"))
+
+        payment_id = "pay_payment_test_http_captured"
+        self.gateway.payments[payment_id] = {
+            "id": payment_id,
+            "order_id": created["razorpayOrderId"],
+            "amount": 1000,
+            "currency": "INR",
+            "status": "captured",
+        }
+        signature = hmac.new(
+            b"test_secret_placeholder",
+            f"{created['razorpayOrderId']}|{payment_id}".encode(),
+            hashlib.sha256,
+        ).hexdigest()
+        status, verified, _headers = self.post_json("/api/verify-payment", {
+            "styleDashOrderId": created["styleDashOrderId"],
+            "razorpay_order_id": created["razorpayOrderId"],
+            "razorpay_payment_id": payment_id,
+            "razorpay_signature": signature,
+        }, owner_auth)
+        self.assertEqual(status, 200)
+        self.assertEqual((verified["order"]["paymentStatus"], verified["order"]["status"]), ("paid", "payment_test_completed"))
+        self.assertFalse(verified["order"]["inventoryCommitted"])
+
+        self.service.payment_test_enabled = False
+        status, disabled, _headers = self.get_json(endpoint, {"Cookie": owner_cookie})
+        self.assertEqual((status, disabled["code"]), (404, "not_found"))
+        route_status, route_hidden, _headers = self.get_json(
+            controlled_route, {"Cookie": owner_cookie}
+        )
+        self.assertEqual((route_status, route_hidden["code"]), (404, "not_found"))
+        status, disabled_create, _headers = self.post_json(
+            f"{endpoint}/create-order", {"paymentMethod": "upi"},
+            {**owner_auth, "Idempotency-Key": "payment-test-http-disabled"},
+        )
+        self.assertEqual((status, disabled_create["code"]), (404, "not_found"))
+        status, historical, _headers = self.get_json(
+            f"/api/orders/{created['styleDashOrderId']}", {"Cookie": owner_cookie}
+        )
+        self.assertEqual(status, 200)
+        self.assertEqual(historical["order"]["adminLabels"], ["TEST", "NO FULFILLMENT REQUIRED"])
+        self.assertEqual(historical["order"]["paymentStatus"], "paid")
 
     def test_password_reset_http_is_generic_rate_limited_and_never_returns_tokens(self) -> None:
         registered_payload = {
