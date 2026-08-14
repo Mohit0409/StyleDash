@@ -10,7 +10,7 @@ import secrets
 import sqlite3
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 
 from argon2 import PasswordHasher, Type
 from argon2.exceptions import InvalidHashError, VerifyMismatchError
@@ -23,6 +23,7 @@ PASSWORD_MIN = 12
 PASSWORD_MAX = 256
 CUSTOMER_ABSOLUTE_HOURS = 24 * 7
 CUSTOMER_IDLE_HOURS = 24
+PASSWORD_RESET_MINUTES = 30
 
 
 class SecurityError(Exception):
@@ -73,7 +74,13 @@ def clean_text(value: Any, label: str, minimum: int, maximum: int) -> str:
 class SecurityStore:
     """SQLite-backed users, sessions, profiles, vendors, and audit records."""
 
-    def __init__(self, path: Path, encryption_key: str) -> None:
+    def __init__(
+        self,
+        path: Path,
+        encryption_key: str,
+        *,
+        password_reset_sender: Callable[[str, str], None] | None = None,
+    ) -> None:
         self.path = path
         self.path.parent.mkdir(parents=True, exist_ok=True)
         self.passwords = PasswordHasher(type=Type.ID)
@@ -82,6 +89,9 @@ class SecurityStore:
         except Exception as exc:
             raise RuntimeError("Invalid STYLEDASH_TOTP_ENCRYPTION_KEY") from exc
         self.csrf_key = hashlib.sha256(encryption_key.encode("ascii")).digest()
+        # Delivery is deliberately injected.  The public server has no SMTP
+        # implementation until an approved provider integration is reviewed.
+        self.password_reset_sender = password_reset_sender
         self._migrate()
 
     def connect(self) -> sqlite3.Connection:
@@ -157,6 +167,20 @@ class SecurityStore:
             )
             db.execute(
                 "INSERT OR IGNORE INTO schema_migrations(version,applied_at) VALUES(1,?)",
+                (iso(utc_now()),),
+            )
+            db.executescript(
+                """
+                CREATE TABLE IF NOT EXISTS password_reset_tokens(
+                  id TEXT PRIMARY KEY, user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                  token_hash TEXT NOT NULL UNIQUE, created_at TEXT NOT NULL, expires_at TEXT NOT NULL, used_at TEXT
+                );
+                CREATE INDEX IF NOT EXISTS password_reset_tokens_lookup_idx
+                  ON password_reset_tokens(token_hash, used_at, expires_at);
+                """
+            )
+            db.execute(
+                "INSERT OR IGNORE INTO schema_migrations(version,applied_at) VALUES(2,?)",
                 (iso(utc_now()),),
             )
         self._secure_files()
@@ -307,6 +331,91 @@ class SecurityStore:
             new_raw, csrf = self._new_session(db, refreshed)
             db.commit()
         return new_raw, csrf
+
+    def request_password_reset(self, payload: dict[str, Any]) -> None:
+        """Create a reset token only when a trusted delivery boundary exists.
+
+        Callers always return the same public response for known and unknown
+        accounts.  Raw tokens exist only in this stack frame and the injected
+        sender; SQLite stores a SHA-256 hash exclusively.
+        """
+        try:
+            email = normalize_email(payload.get("email"))
+        except SecurityError:
+            return
+        if self.password_reset_sender is None:
+            return
+        raw_token: str | None = None
+        with self.connect() as db:
+            user = db.execute(
+                "SELECT id,email FROM users WHERE email=? AND is_active=1 AND role='customer'",
+                (email,),
+            ).fetchone()
+            if user is None:
+                return
+            now = utc_now()
+            now_value = iso(now)
+            raw_token = secrets.token_urlsafe(48)
+            db.execute("BEGIN IMMEDIATE")
+            db.execute(
+                "UPDATE password_reset_tokens SET used_at=? WHERE user_id=? AND used_at IS NULL",
+                (now_value, user["id"]),
+            )
+            db.execute(
+                "INSERT INTO password_reset_tokens(id,user_id,token_hash,created_at,expires_at) VALUES(?,?,?,?,?)",
+                (
+                    "reset_" + secrets.token_hex(16), user["id"], token_hash(raw_token), now_value,
+                    iso(now + timedelta(minutes=PASSWORD_RESET_MINUTES)),
+                ),
+            )
+            db.commit()
+        try:
+            self.password_reset_sender(email, raw_token)
+        except Exception:
+            # Never reveal delivery configuration or account existence to the
+            # requester. A future approved sender may add private retry logic.
+            pass
+        self._secure_files()
+
+    def confirm_password_reset(self, payload: dict[str, Any]) -> None:
+        raw_token = payload.get("token")
+        new_password = payload.get("newPassword")
+        if not isinstance(new_password, str) or not PASSWORD_MIN <= len(new_password) <= PASSWORD_MAX:
+            raise SecurityError(400, f"Password must be {PASSWORD_MIN}–{PASSWORD_MAX} characters.", "weak_password")
+        if not isinstance(raw_token, str) or not 32 <= len(raw_token) <= 256:
+            raise SecurityError(400, "This password reset link is invalid or has expired.", "invalid_reset_token")
+        now = utc_now()
+        now_value = iso(now)
+        with self.connect() as db:
+            db.execute("BEGIN IMMEDIATE")
+            reset = db.execute(
+                """SELECT r.id,r.user_id FROM password_reset_tokens r
+                   JOIN users u ON u.id=r.user_id
+                   WHERE r.token_hash=? AND r.used_at IS NULL AND r.expires_at>?
+                     AND u.is_active=1 AND u.role='customer'""",
+                (token_hash(raw_token), now_value),
+            ).fetchone()
+            if reset is None:
+                db.rollback()
+                raise SecurityError(400, "This password reset link is invalid or has expired.", "invalid_reset_token")
+            consumed = db.execute(
+                "UPDATE password_reset_tokens SET used_at=? WHERE id=? AND used_at IS NULL",
+                (now_value, reset["id"]),
+            )
+            if consumed.rowcount != 1:
+                db.rollback()
+                raise SecurityError(400, "This password reset link is invalid or has expired.", "invalid_reset_token")
+            db.execute(
+                "UPDATE password_reset_tokens SET used_at=? WHERE user_id=? AND used_at IS NULL",
+                (now_value, reset["user_id"]),
+            )
+            db.execute(
+                "UPDATE users SET password_hash=?,password_changed_at=?,updated_at=? WHERE id=?",
+                (self.passwords.hash(new_password), now_value, now_value, reset["user_id"]),
+            )
+            db.execute("UPDATE sessions SET revoked_at=? WHERE user_id=? AND revoked_at IS NULL", (now_value, reset["user_id"]))
+            db.commit()
+        self._secure_files()
 
     def list_orders(self, payment_store: Any, user_id: str) -> list[dict[str, Any]]:
         with payment_store.lock:

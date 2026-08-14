@@ -601,6 +601,11 @@ class HttpApiTests(unittest.TestCase):
         web_root = root / "web"
         web_root.mkdir()
         (web_root / "index.html").write_text("<!doctype html><title>StyleDash</title>", encoding="utf-8")
+        self.reset_deliveries = []
+        security_store = SERVER.SecurityStore(
+            root / "styledash.db", Fernet.generate_key().decode(),
+            password_reset_sender=lambda email, token: self.reset_deliveries.append((email, token)),
+        )
         service = SERVER.PaymentService(
             ROOT / "server" / "payment-data" / "catalog.json",
             ROOT / "server" / "payment-data" / "settings.json",
@@ -610,7 +615,7 @@ class HttpApiTests(unittest.TestCase):
             webhook_secret="webhook_secret_placeholder",
             mode="test",
             gateway=FakeGateway(),
-            security_store=SERVER.SecurityStore(root / "styledash.db", Fernet.generate_key().decode()),
+            security_store=security_store,
         )
         self.previous_origin = os.environ.get("STYLEDASH_PUBLIC_ORIGIN")
         os.environ["STYLEDASH_PUBLIC_ORIGIN"] = "https://styledash.test"
@@ -864,6 +869,34 @@ class HttpApiTests(unittest.TestCase):
         with self.assertRaises(urllib.error.HTTPError) as caught:
             urllib.request.urlopen(oversized)
         self.assertEqual(caught.exception.code, 413); caught.exception.close()
+
+    def test_password_reset_http_is_generic_rate_limited_and_never_returns_tokens(self) -> None:
+        registered_payload = {
+            "name": "Recovery Customer", "email": "recovery@example.test",
+            "password": "long recovery password 123", "phone": "9999999999",
+        }
+        self.assertEqual(self.post_json("/api/auth/register", registered_payload)[0], 201)
+        status, known, _headers = self.post_json("/api/auth/password-reset/request", {"email": "recovery@example.test"})
+        self.assertEqual(status, 200)
+        status, unknown, _headers = self.post_json("/api/auth/password-reset/request", {"email": "unknown@example.test"})
+        self.assertEqual((status, unknown), (200, known))
+        self.assertEqual(len(self.reset_deliveries), 1)
+        token = self.reset_deliveries[0][1]
+        self.assertNotIn(token, json.dumps(known))
+        with self.service.security.connect() as db:
+            self.assertIsNone(db.execute("SELECT 1 FROM password_reset_tokens WHERE token_hash=?", (token,)).fetchone())
+
+        status, invalid, _headers = self.post_json("/api/auth/password-reset/confirm", {"token": "not-a-real-token", "newPassword": "new recovery password 456"})
+        self.assertEqual((status, invalid["code"]), (400, "invalid_reset_token"))
+        status, confirmed, _headers = self.post_json("/api/auth/password-reset/confirm", {"token": token, "newPassword": "new recovery password 456"})
+        self.assertEqual(status, 200)
+        self.assertNotIn(token, json.dumps(confirmed))
+        self.assertEqual(self.post_json("/api/auth/login", {"email": "recovery@example.test", "password": "new recovery password 456"})[0], 200)
+
+        for _ in range(3):
+            self.post_json("/api/auth/password-reset/request", {"email": "unknown@example.test"})
+        status, limited, _headers = self.post_json("/api/auth/password-reset/request", {"email": "unknown@example.test"})
+        self.assertEqual((status, limited["code"]), (429, "rate_limited"))
 
 
 if __name__ == "__main__":

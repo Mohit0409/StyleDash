@@ -49,6 +49,7 @@ separate backup-and-reconciliation-gated operation.
 - `GET /api/health`
 - `POST /api/auth/register`, `POST /api/auth/login`, `GET /api/auth/me`
 - `POST /api/auth/logout`, `POST /api/auth/change-password`
+- `POST /api/auth/password-reset/request`, `POST /api/auth/password-reset/confirm`
 - `GET /api/profile`, `PATCH /api/profile`
 - `GET /api/orders`, `GET /api/orders/:id`
 - `POST /api/vendor-applications`
@@ -86,6 +87,15 @@ python3 -m unittest discover -s server/tests -v
 ~/bin/verify-option-b-release
 ```
 
-Customer self-service password recovery is deferred until an approved SMTP or
-transactional-email configuration exists. Reset tokens already have a private,
-hashed, expiring, single-use schema and must never be returned to public clients.
+Password recovery stores only a token hash, expires tokens after 30 minutes,
+invalidates prior unused tokens, and revokes all customer sessions on success.
+The request endpoint always returns the same response for known and unknown
+accounts. SMTP delivery is intentionally not implemented in this release.
+
+Before enabling an approved delivery integration, configure its values only in
+`~/.config/styledash/secrets.env` (mode `600`):
+`STYLEDASH_SMTP_HOST`, `STYLEDASH_SMTP_PORT`, `STYLEDASH_SMTP_USERNAME`,
+`STYLEDASH_SMTP_PASSWORD`, `STYLEDASH_PASSWORD_RESET_FROM`, and
+`STYLEDASH_PASSWORD_RESET_URL`. Do not add these to browser variables, source,
+or logs. A reviewed server-side sender implementation is still required before
+these names have any runtime effect.

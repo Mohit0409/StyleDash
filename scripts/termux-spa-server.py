@@ -1208,6 +1208,16 @@ class StyleDashRequestHandler(SimpleHTTPRequestHandler):
                 user, raw, csrf = self._security().login(self._read_json(), self._client_key("login"))
                 self._json_response(HTTPStatus.OK, {"success": True, "user": user, "csrfToken": csrf}, headers={"Set-Cookie": self._security().cookie(raw)})
                 return
+            if path == "/api/auth/password-reset/request":
+                self._rate_limit(path, 5)
+                self._security().request_password_reset(self._read_json())
+                self._json_response(HTTPStatus.OK, {"success": True, "message": "If an account exists, reset instructions will be sent when recovery delivery is configured."})
+                return
+            if path == "/api/auth/password-reset/confirm":
+                self._rate_limit(path, 10)
+                self._security().confirm_password_reset(self._read_json())
+                self._json_response(HTTPStatus.OK, {"success": True, "message": "Your password has been reset. Please sign in."})
+                return
             if path == "/api/auth/logout":
                 self._current_user()
                 self._csrf()

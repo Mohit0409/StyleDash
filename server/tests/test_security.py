@@ -109,6 +109,47 @@ class SecurityStoreTests(unittest.TestCase):
         self.store.authenticate(refreshed)
         self.store.verify_csrf(refreshed, refreshed_csrf)
 
+    def test_password_reset_hash_expiry_single_use_and_session_revocation(self):
+        deliveries = []
+        reset_store = SECURITY.SecurityStore(
+            Path(self.temporary.name) / "reset.db", Fernet.generate_key().decode(),
+            password_reset_sender=lambda email, token: deliveries.append((email, token)),
+        )
+        user, first, _csrf = reset_store.register({
+            "name": "Reset Customer", "email": "reset@example.test",
+            "password": "long test password 123", "phone": "9999999999",
+        })
+        _user, second, _csrf = reset_store.login({"email": user["email"], "password": "long test password 123"}, "reset-client")
+        reset_store.request_password_reset({"email": user["email"]})
+        self.assertEqual(len(deliveries), 1)
+        token = deliveries[0][1]
+        with reset_store.connect() as db:
+            row = db.execute("SELECT token_hash,expires_at,used_at FROM password_reset_tokens").fetchone()
+            self.assertEqual(row["token_hash"], SECURITY.token_hash(token))
+            self.assertNotEqual(row["token_hash"], token)
+            self.assertIsNone(row["used_at"])
+
+        reset_store.confirm_password_reset({"token": token, "newPassword": "new long password 456"})
+        self.assert_security_error("authentication_required", lambda: reset_store.authenticate(first))
+        self.assert_security_error("authentication_required", lambda: reset_store.authenticate(second))
+        self.assert_security_error("invalid_reset_token", lambda: reset_store.confirm_password_reset({"token": token, "newPassword": "another long password 789"}))
+        _user, fresh, _csrf = reset_store.login({"email": user["email"], "password": "new long password 456"}, "fresh-client")
+        reset_store.authenticate(fresh)
+
+        reset_store.request_password_reset({"email": user["email"]})
+        expired = deliveries[-1][1]
+        with reset_store.connect() as db:
+            db.execute("UPDATE password_reset_tokens SET expires_at='2000-01-01T00:00:00+00:00' WHERE token_hash=?", (SECURITY.token_hash(expired),))
+        self.assert_security_error("invalid_reset_token", lambda: reset_store.confirm_password_reset({"token": expired, "newPassword": "another long password 789"}))
+
+    def test_password_reset_is_enumeration_safe_without_delivery(self):
+        self.registration()
+        self.store.request_password_reset({"email": "customer-a@example.test"})
+        self.store.request_password_reset({"email": "unknown@example.test"})
+        self.store.request_password_reset({"email": "not an email"})
+        with self.store.connect() as db:
+            self.assertEqual(db.execute("SELECT COUNT(*) FROM password_reset_tokens").fetchone()[0], 0)
+
     def test_expired_session_is_rejected_and_revoked(self):
         _user, raw, _csrf = self.registration()
         with self.store.connect() as db:
@@ -159,7 +200,7 @@ class SecurityStoreTests(unittest.TestCase):
             self.assertEqual(db.execute("PRAGMA foreign_keys").fetchone()[0], 1)
             self.assertEqual(db.execute("PRAGMA journal_mode").fetchone()[0], "wal")
             self.assertEqual(db.execute("PRAGMA integrity_check").fetchone()[0], "ok")
-            self.assertEqual(db.execute("SELECT MAX(version) FROM schema_migrations").fetchone()[0], 1)
+            self.assertEqual(db.execute("SELECT MAX(version) FROM schema_migrations").fetchone()[0], 2)
             backup_path = Path(self.temporary.name) / "backup.db"
             backup = sqlite3.connect(backup_path)
             db.backup(backup)
