@@ -291,6 +291,10 @@ class DeploymentAndTaxTests(unittest.TestCase):
             'install -m 600 "$STAGE/scripts/styledash_mail.py" "$HOME/server/styledash_mail.py"',
             text,
         )
+        self.assertIn(
+            'install -m 600 "$STAGE/scripts/styledash_mail.py" "$HOME/admin/styledash_mail.py"',
+            text,
+        )
 
     def test_refund_processed_is_documented_for_live_webhook(self):
         readme = (ROOT / "server/README.md").read_text(encoding="utf-8")
