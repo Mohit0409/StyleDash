@@ -45,7 +45,7 @@ export const Footer: React.FC = () => {
             </div>
             <h4 className="font-bold text-white text-sm">Free Shipping</h4>
             <p className="text-xs text-neutral-400">
-              On eligible orders above â‚¹{CONFIG.FREE_DELIVERY_THRESHOLD}
+              On eligible orders above INR {CONFIG.FREE_DELIVERY_THRESHOLD}
             </p>
           </div>
         </div>
@@ -69,7 +69,7 @@ export const Footer: React.FC = () => {
               Service Area: {CONFIG.SERVICE_CITY}, MP ({CONFIG.DEFAULT_PINCODE})
             </p>
             <p className="text-xs text-neutral-500">
-              Support: {CONFIG.LEGAL.SUPPORT_PHONE} Â· {CONFIG.LEGAL.SUPPORT_EMAIL}
+              Support: {CONFIG.LEGAL.SUPPORT_PHONE} | {CONFIG.LEGAL.SUPPORT_EMAIL}
             </p>
           </div>
 
@@ -107,7 +107,7 @@ export const Footer: React.FC = () => {
         {/* Bottom copyright */}
         <div className="pt-6 border-t border-neutral-900 flex flex-col md:flex-row items-center justify-between text-xs text-neutral-500 gap-4">
           <p>
-            Â© 2026 StyleDash. Operated by {CONFIG.LEGAL.PROPRIETOR_NAME}. All rights reserved.
+            Copyright 2026 StyleDash. Operated by {CONFIG.LEGAL.PROPRIETOR_NAME}. All rights reserved.
           </p>
           <p>
             {CONFIG.LEGAL.ADDRESS}

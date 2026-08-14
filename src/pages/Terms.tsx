@@ -93,7 +93,7 @@ export const Terms = () => (
       <p>Operator: {CONFIG.LEGAL.PROPRIETOR_NAME}</p>
       <p>Grievance officer: {CONFIG.LEGAL.GRIEVANCE_OFFICER}</p>
       <p>
-        Email: {CONFIG.LEGAL.SUPPORT_EMAIL} Â· Phone: {CONFIG.LEGAL.SUPPORT_PHONE}
+        Email: {CONFIG.LEGAL.SUPPORT_EMAIL} | Phone: {CONFIG.LEGAL.SUPPORT_PHONE}
       </p>
       <p>Support hours: {CONFIG.LEGAL.SUPPORT_HOURS}</p>
     </section>

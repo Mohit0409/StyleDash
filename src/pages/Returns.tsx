@@ -49,9 +49,9 @@ export const Returns = () => (
     <section className="space-y-2">
       <h2 className="font-black">Pickup and exchange charges</h2>
       <p className="text-sm text-neutral-600">
-        A customer-choice return pickup may carry a â‚¹
+        A customer-choice return pickup may carry an INR 
         {CONFIG.LEGAL.RETURN_PICKUP_FEE} pickup charge. A size exchange may
-        carry a â‚¹{CONFIG.LEGAL.EXCHANGE_PICKUP_FEE} pickup/exchange charge.
+        carry an INR {CONFIG.LEGAL.EXCHANGE_PICKUP_FEE} pickup/exchange charge.
         These charges are waived when StyleDash confirms that the item was
         wrong, damaged, defective, or not as ordered.
       </p>
