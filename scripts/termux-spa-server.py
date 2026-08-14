@@ -8,6 +8,7 @@ import hashlib
 import hmac
 import json
 import os
+import re
 import secrets
 import threading
 import time
@@ -33,9 +34,9 @@ except ModuleNotFoundError:  # Repository test import path.
     from scripts.styledash_security import COOKIE_NAME, SecurityError, SecurityStore, normalize_email, token_hash
 
 try:
-    from styledash_mail import SmtpPasswordResetSender
+    from styledash_mail import PasswordResetDeliveryQueue, SmtpPasswordResetSender
 except ModuleNotFoundError:  # Repository test import path.
-    from scripts.styledash_mail import SmtpPasswordResetSender
+    from scripts.styledash_mail import PasswordResetDeliveryQueue, SmtpPasswordResetSender
 
 try:
     import razorpay
@@ -55,6 +56,7 @@ SECURITY_POLICY = (
     "frame-src https://api.razorpay.com https://checkout.razorpay.com https://*.razorpay.com; "
     "form-action 'self' https://api.razorpay.com https://*.razorpay.com"
 )
+ACCESS_LOG_TOKEN_PATTERN = re.compile(r"([?&](?:token|reset_token)=)[^&#\s]*", re.IGNORECASE)
 
 
 class ApiError(Exception):
@@ -1315,9 +1317,10 @@ class StyleDashRequestHandler(SimpleHTTPRequestHandler):
         )
 
     def log_message(self, format: str, *args: Any) -> None:
-        # The standard access log contains method/path/status only; request bodies
-        # and environment configuration are never logged.
-        super().log_message(format, *args)
+        # Request bodies and environment configuration are never logged. Redact
+        # token-shaped query parameters as defense in depth for stale/manual URLs.
+        redacted = tuple(ACCESS_LOG_TOKEN_PATTERN.sub(r"\1[redacted]", str(value)) for value in args)
+        super().log_message(format, *redacted)
 
 
 def _default_payment_file(filename: str) -> Path:
@@ -1339,6 +1342,7 @@ def create_server(
     *,
     service: PaymentService | None = None,
 ) -> ThreadingHTTPServer:
+    delivery_queue: PasswordResetDeliveryQueue | None = None
     if service is None:
         encryption_key = os.environ.get("STYLEDASH_TOTP_ENCRYPTION_KEY", "").strip()
         if not encryption_key:
@@ -1347,7 +1351,12 @@ def create_server(
             os.environ.get("STYLEDASH_DATABASE_PATH", str(data_directory.parent / "styledash.db"))
         ).resolve()
         mailer = SmtpPasswordResetSender.from_environment()
-        security_store = SecurityStore(database_path, encryption_key, password_reset_sender=mailer)
+        delivery_queue = PasswordResetDeliveryQueue(mailer) if mailer is not None else None
+        security_store = SecurityStore(
+            database_path,
+            encryption_key,
+            password_reset_dispatcher=delivery_queue.dispatch if delivery_queue is not None else None,
+        )
         payment_service = PaymentService(
             catalog_path, settings_path, data_directory, security_store=security_store
         )
@@ -1359,7 +1368,16 @@ def create_server(
     BoundStyleDashRequestHandler.payment_service = payment_service
     BoundStyleDashRequestHandler.rate_limiter = RateLimiter()
     handler = partial(BoundStyleDashRequestHandler, directory=str(directory))
-    return ThreadingHTTPServer((bind, port), handler)
+    server = ThreadingHTTPServer((bind, port), handler)
+    if service is None and delivery_queue is not None:
+        original_server_close = server.server_close
+
+        def close_server() -> None:
+            delivery_queue.close()
+            original_server_close()
+
+        server.server_close = close_server  # type: ignore[method-assign]
+    return server
 
 
 def main() -> None:
@@ -1391,7 +1409,10 @@ def main() -> None:
         Path(args.data_directory).resolve(),
     )
     print(f"Serving StyleDash at http://{args.bind}:{args.port}", flush=True)
-    server.serve_forever()
+    try:
+        server.serve_forever()
+    finally:
+        server.server_close()
 
 
 if __name__ == "__main__":

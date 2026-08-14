@@ -47,10 +47,11 @@ describe('password recovery routes', () => {
     expect(auth).toContain('Forgot password?');
   });
 
-  it('keeps reset tokens out of browser storage and removes query text after intake', () => {
+  it('keeps reset tokens out of browser storage and removes fragment text after intake', () => {
     const recovery = readFileSync(resolve('src/pages/PasswordRecovery.tsx'), 'utf8');
-    expect(recovery).toContain("new URLSearchParams(location.search).get('token')");
+    expect(recovery).toContain("new URLSearchParams(location.hash.slice(1)).get('token')");
     expect(recovery).toContain("navigate('/reset-password', { replace: true })");
+    expect(recovery).not.toContain('location.search');
     expect(recovery).not.toMatch(/localStorage|sessionStorage|console\./);
     expect(recovery).toContain('minLength={12}');
     expect(recovery).toContain('maxLength={256}');

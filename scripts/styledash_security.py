@@ -24,6 +24,7 @@ PASSWORD_MAX = 256
 CUSTOMER_ABSOLUTE_HOURS = 24 * 7
 CUSTOMER_IDLE_HOURS = 24
 PASSWORD_RESET_MINUTES = 30
+PasswordResetDispatcher = Callable[[str, str, Callable[[], None]], None]
 
 
 class SecurityError(Exception):
@@ -80,6 +81,7 @@ class SecurityStore:
         encryption_key: str,
         *,
         password_reset_sender: Callable[[str, str], None] | None = None,
+        password_reset_dispatcher: PasswordResetDispatcher | None = None,
     ) -> None:
         self.path = path
         self.path.parent.mkdir(parents=True, exist_ok=True)
@@ -92,6 +94,7 @@ class SecurityStore:
         # Delivery is deliberately injected so the token lifecycle remains
         # testable independently from the private SMTP implementation.
         self.password_reset_sender = password_reset_sender
+        self.password_reset_dispatcher = password_reset_dispatcher
         self._migrate()
 
     def connect(self) -> sqlite3.Connection:
@@ -343,7 +346,7 @@ class SecurityStore:
             email = normalize_email(payload.get("email"))
         except SecurityError:
             return
-        if self.password_reset_sender is None:
+        if self.password_reset_sender is None and self.password_reset_dispatcher is None:
             return
         raw_token: str | None = None
         reset_id: str | None = None
@@ -371,14 +374,23 @@ class SecurityStore:
                 ),
             )
             db.commit()
-        try:
-            self.password_reset_sender(email, raw_token)
-        except Exception:
+        assert raw_token is not None and reset_id is not None
+
+        def invalidate_delivery_failure() -> None:
             # Do not leave a usable token behind when delivery fails. The
             # public response remains generic and no token/configuration is
             # logged or exposed.
             with self.connect() as db:
                 db.execute("UPDATE password_reset_tokens SET used_at=? WHERE id=? AND used_at IS NULL", (iso(utc_now()), reset_id))
+
+        try:
+            if self.password_reset_dispatcher is not None:
+                self.password_reset_dispatcher(email, raw_token, invalidate_delivery_failure)
+            else:
+                assert self.password_reset_sender is not None
+                self.password_reset_sender(email, raw_token)
+        except Exception:
+            invalidate_delivery_failure()
         self._secure_files()
 
     def confirm_password_reset(self, payload: dict[str, Any]) -> None:

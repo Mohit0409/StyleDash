@@ -40,7 +40,7 @@ export const ForgotPassword: React.FC = () => {
 export const ResetPassword: React.FC = () => {
   const location = useLocation();
   const navigate = useNavigate();
-  const [token] = useState(() => new URLSearchParams(location.search).get('token') || '');
+  const [token] = useState(() => new URLSearchParams(location.hash.slice(1)).get('token') || '');
   const [password, setPassword] = useState('');
   const [confirmation, setConfirmation] = useState('');
   const [error, setError] = useState('');
@@ -48,8 +48,8 @@ export const ResetPassword: React.FC = () => {
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
-    if (location.search) navigate('/reset-password', { replace: true });
-  }, [location.search, navigate]);
+    if (location.hash) navigate('/reset-password', { replace: true });
+  }, [location.hash, navigate]);
 
   const submit = async (event: React.FormEvent) => {
     event.preventDefault();

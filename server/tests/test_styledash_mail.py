@@ -4,6 +4,7 @@ import importlib.util
 import unittest
 from email.message import EmailMessage
 from pathlib import Path
+from urllib.parse import parse_qs, urlsplit
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -87,7 +88,10 @@ class SmtpPasswordResetSenderTests(unittest.TestCase):
         self.assertNotIn(token, message["To"])
         self.assertNotIn(token, message["Subject"])
         self.assertIn(token, message.get_content())
-        self.assertIn("source=email&token=", message.get_content())
+        link = next(line.removeprefix("Reset your password: ") for line in message.get_content().splitlines() if line.startswith("Reset your password: "))
+        parsed = urlsplit(link)
+        self.assertEqual(parsed.query, "source=email")
+        self.assertEqual(parse_qs(parsed.fragment), {"token": [token]})
 
     def test_sender_rejects_insecure_or_header_injection_configuration(self) -> None:
         insecure = self.configuration()
@@ -98,6 +102,19 @@ class SmtpPasswordResetSenderTests(unittest.TestCase):
         injected["STYLEDASH_PASSWORD_RESET_FROM"] = "mailer@example.test\r\nBcc: victim@example.test"
         with self.assertRaises(MAIL.SmtpConfigurationError):
             MAIL.SmtpPasswordResetSender.from_environment(injected)
+
+    def test_delivery_queue_is_bounded_and_drains_for_deterministic_shutdown(self) -> None:
+        deliveries = []
+        failures = []
+        delivery_queue = MAIL.PasswordResetDeliveryQueue(
+            lambda email, token: deliveries.append((email, token)), max_pending=1
+        )
+        delivery_queue.dispatch("customer@example.test", "first-test-token", lambda: failures.append("first"))
+        delivery_queue.close()
+        self.assertEqual(deliveries, [("customer@example.test", "first-test-token")])
+        self.assertEqual(failures, [])
+        with self.assertRaises(RuntimeError):
+            delivery_queue.dispatch("customer@example.test", "after-close-token", lambda: failures.append("after-close"))
 
 
 if __name__ == "__main__":

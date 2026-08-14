@@ -57,6 +57,8 @@ Losing `STYLEDASH_TOTP_ENCRYPTION_KEY` makes existing encrypted administrator
 TOTP secrets unusable and invalidates CSRF derivation; it is not included in
 data backups, so keep a separate protected recovery copy.
 
-Customer self-service password-reset email is not enabled because no approved
-SMTP/provider configuration exists. This remains a launch limitation requiring
-a documented support decision; do not return reset tokens to browsers.
+Customer self-service password recovery is implemented but activates only when
+complete SMTP configuration is present in the private runtime file
+`~/.config/styledash/secrets.env`. This source tree does not confirm deployed
+configuration or successful provider delivery. Do not return reset tokens to
+browsers; delivery links carry the raw token only in the URL fragment.

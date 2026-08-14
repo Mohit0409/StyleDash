@@ -3,15 +3,18 @@ from __future__ import annotations
 import hashlib
 import hmac
 import importlib.util
+import io
 import json
 import os
 import tempfile
 import threading
+import time
 import unittest
 import urllib.error
 import urllib.parse
 import urllib.request
 from concurrent.futures import ThreadPoolExecutor
+from contextlib import redirect_stderr
 from pathlib import Path
 
 from cryptography.fernet import Fernet
@@ -646,6 +649,7 @@ class HttpApiTests(unittest.TestCase):
             payload = json.load(response)
             self.assertEqual(payload, {"status": "ok", "service": "StyleDash", "paymentMode": "test", "database": "ok"})
             self.assertEqual(response.headers["X-Content-Type-Options"], "nosniff")
+            self.assertEqual(response.headers["Referrer-Policy"], "strict-origin-when-cross-origin")
             self.assertIn("checkout.razorpay.com", response.headers["Content-Security-Policy"])
 
     def test_malformed_json_returns_safe_400(self) -> None:
@@ -921,6 +925,44 @@ class HttpApiTests(unittest.TestCase):
                 os.environ.pop("STYLEDASH_TRUST_LOOPBACK_PROXY", None)
             else:
                 os.environ["STYLEDASH_TRUST_LOOPBACK_PROXY"] = previous
+
+    def test_password_reset_tokens_do_not_reach_or_leak_through_access_logs(self) -> None:
+        marker = "TESTER_RESET_TOKEN_MUST_NOT_BE_LOGGED_1234567890"
+        captured = io.StringIO()
+        with redirect_stderr(captured):
+            with urllib.request.urlopen(f"{self.base_url}/reset-password#{marker}") as response:
+                self.assertEqual(response.status, 200)
+            with urllib.request.urlopen(f"{self.base_url}/reset-password?token={marker}") as response:
+                self.assertEqual(response.status, 200)
+        logs = captured.getvalue()
+        self.assertIn('GET /reset-password HTTP/1.1', logs)
+        self.assertNotIn(marker, logs)
+        self.assertIn('token=[redacted]', logs)
+
+    def test_password_reset_response_is_not_delayed_by_smtp_delivery(self) -> None:
+        def delayed_sender(_email, _token) -> None:
+            time.sleep(0.3)
+
+        delivery_queue = SERVER.PasswordResetDeliveryQueue(delayed_sender, max_pending=8)
+        self.service.security.password_reset_sender = None
+        self.service.security.password_reset_dispatcher = delivery_queue.dispatch
+        try:
+            registered = {
+                "name": "Timing Customer", "email": "timing@example.test",
+                "password": "long timing password 123", "phone": "9999999999",
+            }
+            self.assertEqual(self.post_json("/api/auth/register", registered)[0], 201)
+            started = time.perf_counter()
+            known_status, known, _headers = self.post_json("/api/auth/password-reset/request", {"email": "timing@example.test"})
+            known_elapsed = time.perf_counter() - started
+            started = time.perf_counter()
+            unknown_status, unknown, _headers = self.post_json("/api/auth/password-reset/request", {"email": "timing-unknown@example.test"})
+            unknown_elapsed = time.perf_counter() - started
+            self.assertEqual((known_status, known), (unknown_status, unknown))
+            self.assertLess(known_elapsed, 0.2)
+            self.assertLess(abs(known_elapsed - unknown_elapsed), 0.15)
+        finally:
+            delivery_queue.close()
 
 
 if __name__ == "__main__":
