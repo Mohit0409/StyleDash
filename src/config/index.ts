@@ -9,4 +9,22 @@ export const CONFIG = {
   STANDARD_DELIVERY_FEE: 49,
   EXPRESS_DELIVERY_FEE: 79,
   TAX_RATE: 0.05, // 5% GST
+
+  // Current operating details for the limited-area launch.
+  // Keep these centralized so the proprietor/grievance contacts can be changed once.
+  LEGAL: {
+    PROPRIETOR_NAME: 'Mohit Jangd',
+    GRIEVANCE_OFFICER: 'Swapnil',
+    ADDRESS: 'Alkaloid Colony, Neemuch, Madhya Pradesh 458441, India',
+    SUPPORT_EMAIL: 'styledashsupport@gmail.com',
+    SUPPORT_PHONE: '+91 8963942394',
+    SUPPORT_HOURS: '9:00 AMâ€“9:00 PM IST',
+    RETURN_SUPPORT_HOURS: '9:00 AMâ€“1:00 PM IST',
+    POLICY_EFFECTIVE_DATE: '14 August 2026',
+    EXCHANGE_WINDOW_DAYS: 7,
+    ISSUE_REPORT_WINDOW_DAYS: 2,
+    RETURN_PICKUP_FEE: 50,
+    EXCHANGE_PICKUP_FEE: 50,
+    REFUND_TIMELINE_DAYS: 7,
+  },
 };

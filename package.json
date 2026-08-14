@@ -10,7 +10,7 @@
     "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
     "preview": "vite preview",
     "typecheck": "tsc -b",
-    "test": "vitest run src/tests",
+    "test": "vitest run --dir src/tests",
     "test:e2e": "npm run build:e2e && playwright test",
     "build:e2e": "tsc -b && vite build",
     "test:e2e:desktop": "npm run build:e2e && playwright test --project=desktop-chromium",

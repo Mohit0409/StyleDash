@@ -1,4 +1,4 @@
-﻿import { spawn } from 'node:child_process';
+import { spawn } from 'node:child_process';
 import crypto from 'node:crypto';
 import {
   existsSync,
@@ -24,22 +24,19 @@ if (!existsSync(path.join(distDirectory, 'index.html'))) {
 rmSync(runtimeDirectory, { recursive: true, force: true });
 mkdirSync(paymentDataDirectory, { recursive: true });
 
-const windowsVenvPython = path.resolve(
-  root,
-  '..',
-  '..',
-  '.venv',
-  'Scripts',
-  'python.exe',
+const windowsVenvCandidates = [
+  path.resolve(root, '.venv', 'Scripts', 'python.exe'),
+  path.resolve(root, '..', '..', '.venv', 'Scripts', 'python.exe'),
+];
+
+const windowsVenvPython = windowsVenvCandidates.find(candidate =>
+  existsSync(candidate),
 );
 
 const python =
   process.env.STYLEDASH_E2E_PYTHON ||
-  (existsSync(windowsVenvPython)
-    ? windowsVenvPython
-    : process.platform === 'win32'
-      ? 'python'
-      : 'python3');
+  windowsVenvPython ||
+  (process.platform === 'win32' ? 'python' : 'python3');
 
 const fernetKey = crypto
   .randomBytes(32)
