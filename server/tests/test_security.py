@@ -51,14 +51,24 @@ class SecurityStoreTests(unittest.TestCase):
     def test_registration_argon2_unique_email_and_no_role_escalation(self):
         user, raw, csrf = self.registration()
         self.assertEqual(user["role"], "customer")
+        self.assertFalse(user["emailVerified"])
         self.assertTrue(raw and csrf)
         with self.store.connect() as db:
-            row = db.execute("SELECT password_hash FROM users WHERE id=?", (user["id"],)).fetchone()
-            self.assertTrue(row[0].startswith("$argon2id$"))
-            self.assertNotIn("long test password", row[0])
+            row = db.execute(
+                "SELECT password_hash,email_verified,email_verified_at FROM users WHERE id=?",
+                (user["id"],),
+            ).fetchone()
+            self.assertTrue(row["password_hash"].startswith("$argon2id$"))
+            self.assertNotIn("long test password", row["password_hash"])
+            self.assertEqual(row["email_verified"], 0)
+            self.assertIsNone(row["email_verified_at"])
         self.assert_security_error("email_exists", self.registration)
         self.assert_security_error("invalid_registration", lambda: self.store.register({
             "name": "Attacker", "email": "attacker@example.test", "password": "long test password 123", "role": "admin"
+        }))
+        self.assert_security_error("invalid_registration", lambda: self.store.register({
+            "name": "Attacker", "email": "verified-attacker@example.test",
+            "password": "long test password 123", "emailVerified": True,
         }))
 
     def test_password_policy_and_sql_injection_input(self):
@@ -71,8 +81,10 @@ class SecurityStoreTests(unittest.TestCase):
         user, first_raw, _csrf = self.registration()
         self.store.revoke(first_raw)
         logged_in, raw, csrf = self.store.login({
-            "email": user["email"], "password": "long test password 123"
+            "email": user["email"], "password": "long test password 123",
+            "emailVerified": True, "email_verified_at": "2099-01-01T00:00:00+00:00",
         }, "client-a")
+        self.assertFalse(logged_in["emailVerified"])
         cookie = self.store.cookie(raw)
         for flag in ("__Host-styledash_session=", "HttpOnly", "Secure", "SameSite=Lax", "Path=/"):
             self.assertIn(flag, cookie)
@@ -107,7 +119,8 @@ class SecurityStoreTests(unittest.TestCase):
         self.store.verify_csrf(first, csrf)
         refreshed, refreshed_csrf = self.store.change_password(first, {"currentPassword": "long test password 123", "newPassword": "new long password 456"})
         self.assert_security_error("authentication_required", lambda: self.store.authenticate(second))
-        self.store.authenticate(refreshed)
+        refreshed_user, _session = self.store.authenticate(refreshed)
+        self.assertFalse(refreshed_user["emailVerified"])
         self.store.verify_csrf(refreshed, refreshed_csrf)
 
     def test_password_reset_hash_expiry_single_use_and_session_revocation(self):
@@ -121,6 +134,7 @@ class SecurityStoreTests(unittest.TestCase):
             "password": "long test password 123", "phone": "9999999999",
         })
         _user, second, _csrf = reset_store.login({"email": user["email"], "password": "long test password 123"}, "reset-client")
+        self.assertFalse(user["emailVerified"])
         reset_store.request_password_reset({"email": user["email"]})
         self.assertEqual(len(deliveries), 1)
         token = deliveries[0][1]
@@ -135,12 +149,23 @@ class SecurityStoreTests(unittest.TestCase):
             self.assertIsNone(row["used_at"])
 
         reset_store.confirm_password_reset({"token": replacement, "newPassword": "new long password 456"})
+        with reset_store.connect() as db:
+            verification = db.execute(
+                "SELECT email_verified,email_verified_at FROM users WHERE id=?", (user["id"],)
+            ).fetchone()
+            self.assertEqual(verification["email_verified"], 1)
+            self.assertIsNotNone(verification["email_verified_at"])
         self.assert_security_error("authentication_required", lambda: reset_store.authenticate(first))
         self.assert_security_error("authentication_required", lambda: reset_store.authenticate(second))
         self.assert_security_error("invalid_credentials", lambda: reset_store.login({"email": user["email"], "password": "long test password 123"}, "old-password"))
         self.assert_security_error("invalid_reset_token", lambda: reset_store.confirm_password_reset({"token": replacement, "newPassword": "another long password 789"}))
-        _user, fresh, _csrf = reset_store.login({"email": user["email"], "password": "new long password 456"}, "fresh-client")
-        reset_store.authenticate(fresh)
+        fresh_user, fresh, _csrf = reset_store.login({
+            "email": user["email"], "password": "new long password 456",
+            "emailVerified": False,
+        }, "fresh-client")
+        self.assertTrue(fresh_user["emailVerified"])
+        authenticated, _session = reset_store.authenticate(fresh)
+        self.assertTrue(authenticated["emailVerified"])
 
         reset_store.request_password_reset({"email": user["email"]})
         expired = deliveries[-1][1]
@@ -199,6 +224,9 @@ class SecurityStoreTests(unittest.TestCase):
         self.assert_security_error("invalid_reset_token", lambda: reset_store.confirm_password_reset({"token": token, "newPassword": "new long password 456"}))
         with reset_store.connect() as db:
             self.assertIsNotNone(db.execute("SELECT used_at FROM password_reset_tokens WHERE token_hash=?", (SECURITY.token_hash(token),)).fetchone()["used_at"])
+            self.assertIsNone(db.execute(
+                "SELECT email_verified_at FROM users WHERE id=?", (user["id"],)
+            ).fetchone()["email_verified_at"])
 
     def test_password_reset_is_enumeration_safe_without_delivery(self):
         self.registration()
@@ -225,6 +253,9 @@ class SecurityStoreTests(unittest.TestCase):
             stored = db.execute("SELECT token_hash,used_at FROM password_reset_tokens").fetchone()
             self.assertIsNotNone(stored["token_hash"])
             self.assertIsNotNone(stored["used_at"])
+            self.assertIsNone(db.execute(
+                "SELECT email_verified_at FROM users WHERE id=?", (user["id"],)
+            ).fetchone()["email_verified_at"])
 
     def test_expired_session_is_rejected_and_revoked(self):
         _user, raw, _csrf = self.registration()
@@ -263,6 +294,9 @@ class SecurityStoreTests(unittest.TestCase):
         self.assertEqual(profile["name"], "Updated Customer")
         self.assertEqual(profile["addresses"][0]["street"], "123 Test Street")
         self.assert_security_error("invalid_profile", lambda: self.store.update_profile(user["id"], {"role": "admin"}))
+        self.assert_security_error("invalid_profile", lambda: self.store.update_profile(
+            user["id"], {"emailVerified": True, "email_verified_at": "2099-01-01T00:00:00+00:00"}
+        ))
 
     def test_customer_web_login_rejects_non_customer_role(self):
         user, raw, _csrf = self.registration()
@@ -276,7 +310,7 @@ class SecurityStoreTests(unittest.TestCase):
             self.assertEqual(db.execute("PRAGMA foreign_keys").fetchone()[0], 1)
             self.assertEqual(db.execute("PRAGMA journal_mode").fetchone()[0], "wal")
             self.assertEqual(db.execute("PRAGMA integrity_check").fetchone()[0], "ok")
-            self.assertEqual(db.execute("SELECT MAX(version) FROM schema_migrations").fetchone()[0], 2)
+            self.assertEqual(db.execute("SELECT MAX(version) FROM schema_migrations").fetchone()[0], 3)
             backup_path = Path(self.temporary.name) / "backup.db"
             backup = sqlite3.connect(backup_path)
             db.backup(backup)
@@ -284,6 +318,55 @@ class SecurityStoreTests(unittest.TestCase):
         restored = sqlite3.connect(backup_path)
         self.assertEqual(restored.execute("PRAGMA integrity_check").fetchone()[0], "ok")
         restored.close()
+
+    def test_email_verification_timestamp_migration_is_forward_safe_and_idempotent(self):
+        legacy_path = Path(self.temporary.name) / "legacy-email-verification.db"
+        legacy = sqlite3.connect(legacy_path)
+        legacy.executescript(
+            """
+            CREATE TABLE schema_migrations(version INTEGER PRIMARY KEY, applied_at TEXT NOT NULL);
+            CREATE TABLE users(
+              id TEXT PRIMARY KEY, email TEXT NOT NULL UNIQUE, password_hash TEXT NOT NULL,
+              name TEXT NOT NULL, phone TEXT, role TEXT NOT NULL DEFAULT 'customer',
+              is_active INTEGER NOT NULL DEFAULT 1, email_verified INTEGER NOT NULL DEFAULT 0,
+              created_at TEXT NOT NULL, updated_at TEXT NOT NULL, password_changed_at TEXT NOT NULL
+            );
+            INSERT INTO schema_migrations(version,applied_at) VALUES(1,'2026-01-01T00:00:00+00:00');
+            INSERT INTO schema_migrations(version,applied_at) VALUES(2,'2026-01-01T00:00:00+00:00');
+            INSERT INTO users(
+              id,email,password_hash,name,phone,role,is_active,email_verified,
+              created_at,updated_at,password_changed_at
+            ) VALUES(
+              'usr_legacy','legacy-owner@example.test','legacy-hash','Legacy Owner',NULL,
+              'customer',1,1,'2026-01-01T00:00:00+00:00',
+              '2026-01-01T00:00:00+00:00','2026-01-01T00:00:00+00:00'
+            );
+            """
+        )
+        legacy.commit()
+        legacy.close()
+
+        key = Fernet.generate_key().decode()
+        migrated = SECURITY.SecurityStore(legacy_path, key)
+        with migrated.connect() as db:
+            columns = {row["name"] for row in db.execute("PRAGMA table_info(users)")}
+            self.assertIn("email_verified_at", columns)
+            row = db.execute(
+                "SELECT email,email_verified,email_verified_at FROM users WHERE id='usr_legacy'"
+            ).fetchone()
+            self.assertEqual((row["email"], row["email_verified"]), ("legacy-owner@example.test", 1))
+            self.assertIsNone(row["email_verified_at"])
+            self.assertEqual(db.execute("SELECT MAX(version) FROM schema_migrations").fetchone()[0], 3)
+            self.assertEqual(db.execute("PRAGMA integrity_check").fetchone()[0], "ok")
+        self.assertFalse(migrated.profile("usr_legacy")["emailVerified"])
+
+        reopened = SECURITY.SecurityStore(legacy_path, key)
+        with reopened.connect() as db:
+            self.assertEqual(
+                db.execute("SELECT COUNT(*) FROM schema_migrations WHERE version=3").fetchone()[0],
+                1,
+            )
+            self.assertEqual(db.execute("PRAGMA integrity_check").fetchone()[0], "ok")
 
 
 if __name__ == "__main__":

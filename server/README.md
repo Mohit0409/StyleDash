@@ -56,8 +56,8 @@ separate backup-and-reconciliation-gated operation.
 - `GET /api/orders`, `GET /api/orders/:id`
 - `POST /api/vendor-applications`
 - `POST /api/create-order`, `POST /api/verify-payment`, `POST /api/place-cod-order`
-- owner-session only: `GET /api/payment-test-product/styledash-payment-test-item`
-- owner-session only: `POST /api/payment-test-product/styledash-payment-test-item/create-order`
+- mailbox-verified owner session only: `GET /api/payment-test-product/styledash-payment-test-item`
+- mailbox-verified owner session only: `POST /api/payment-test-product/styledash-payment-test-item/create-order`
 - `POST /api/webhooks/razorpay`
 
 Razorpay Test and Live credentials are isolated. Keep `RAZORPAY_MODE=test` until
@@ -66,11 +66,18 @@ all manual customer/admin/reboot gates pass; deployment never enables Live Mode.
 The temporary ₹10 payment-validation item is disabled unless
 `STYLEDASH_ENABLE_TEST_PRODUCT=true`. Access is authorized exclusively from the
 normalized authenticated-session email against the comma-separated private
-`STYLEDASH_TEST_PRODUCT_ALLOWED_EMAILS` value. Do not use a `VITE_*` variable,
-URL query, browser storage, or request-body email for this authorization. The
-item is intentionally absent from the catalogue and has no COD, coupons,
-wallet credit, tax, delivery charge, fashion inventory, or fulfillment. Turning
-the flag off blocks new validation orders while preserving payment history.
+`STYLEDASH_TEST_PRODUCT_ALLOWED_EMAILS` value **and** a server-stored
+`email_verified_at` mailbox-possession proof. Registration and ordinary login do
+not establish that proof, and legacy `email_verified` values are deliberately
+not trusted. An existing owner establishes proof by requesting a password reset,
+using the one-time token delivered to that mailbox, completing the reset, and
+signing in again after the old sessions are revoked. The public reset-request
+response remains generic. Do not use a `VITE_*` variable, URL query, browser
+storage, request-body email, or request-body verification field for this
+authorization. The item is intentionally absent from the catalogue and has no
+COD, coupons, wallet credit, tax, delivery charge, fashion inventory, or
+fulfillment. Turning the flag off blocks new validation orders while preserving
+payment history.
 
 ## Razorpay Live-readiness policy
 
@@ -103,7 +110,10 @@ python3 -m unittest discover -s server/tests -v
 Password recovery stores only a token hash, expires tokens after 30 minutes,
 invalidates prior unused tokens, and revokes all customer sessions on success.
 The request endpoint always returns the same response for known and unknown
-accounts. Delivery failure invalidates the newly created token.
+accounts. Delivery failure invalidates the newly created token. A successfully
+consumed emailed reset token also records the durable mailbox-possession time
+used by the controlled payment-validation gate; changing a password from an
+existing session does not establish mailbox verification.
 
 Password-reset SMTP configuration belongs only in
 `~/.config/styledash/secrets.env` (mode `600`):

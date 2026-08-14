@@ -345,17 +345,21 @@ class PaymentService:
             "estimatedDeliveryMinutes": 60,
         }
 
-    def can_access_payment_test_product(self, email: Any) -> bool:
-        if not self.payment_test_enabled:
+    def can_access_payment_test_product(self, user: Any) -> bool:
+        if (
+            not self.payment_test_enabled
+            or not isinstance(user, dict)
+            or user.get("emailVerified") is not True
+        ):
             return False
         try:
-            normalized = normalize_email(email)
+            normalized = normalize_email(user.get("email"))
         except SecurityError:
             return False
         return normalized in self.payment_test_allowed_emails
 
-    def payment_test_product(self, email: Any) -> dict[str, Any]:
-        if not self.can_access_payment_test_product(email):
+    def payment_test_product(self, user: Any) -> dict[str, Any]:
+        if not self.can_access_payment_test_product(user):
             raise ApiError(HTTPStatus.NOT_FOUND, "Not found.", "not_found")
         return {
             "success": True,
@@ -653,7 +657,7 @@ class PaymentService:
         idempotency_value: str | None,
     ) -> dict[str, Any]:
         """Create an owner-authorized, exact-value Razorpay validation order."""
-        if not self.can_access_payment_test_product(user.get("email")):
+        if not self.can_access_payment_test_product(user):
             raise ApiError(HTTPStatus.NOT_FOUND, "Not found.", "not_found")
         user_id = str(user.get("id") or "")[:128]
         if not user_id:
@@ -1244,7 +1248,7 @@ class StyleDashRequestHandler(SimpleHTTPRequestHandler):
             user, _session = self._current_user()
         except SecurityError:
             raise ApiError(HTTPStatus.NOT_FOUND, "Not found.", "not_found") from None
-        if not self.payment_service.can_access_payment_test_product(user.get("email")):
+        if not self.payment_service.can_access_payment_test_product(user):
             raise ApiError(HTTPStatus.NOT_FOUND, "Not found.", "not_found")
         return user
 
@@ -1347,7 +1351,7 @@ class StyleDashRequestHandler(SimpleHTTPRequestHandler):
             if path == f"/api/payment-test-product/{PAYMENT_TEST_PRODUCT_SLUG}":
                 self._rate_limit(path, 30)
                 user = self._payment_test_user()
-                self._json_response(HTTPStatus.OK, self.payment_service.payment_test_product(user.get("email")))
+                self._json_response(HTTPStatus.OK, self.payment_service.payment_test_product(user))
                 return
             if path == "/api/auth/me":
                 raw = self._session_token()

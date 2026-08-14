@@ -607,6 +607,7 @@ class PaymentTestProductTests(unittest.TestCase):
             "id": "usr_payment_test_owner",
             "email": "Owner.Payment.Test@Example.Test",
             "name": "Payment Test Owner",
+            "emailVerified": True,
         }
         self.service = SERVER.PaymentService(
             ROOT / "server" / "payment-data" / "catalog.json",
@@ -674,7 +675,10 @@ class PaymentTestProductTests(unittest.TestCase):
         return (service or self.service).process_webhook(body, signature)
 
     def test_flag_and_normalized_session_email_gate_metadata(self) -> None:
-        metadata = self.service.payment_test_product("  OWNER.PAYMENT.TEST@example.test ")
+        metadata = self.service.payment_test_product({
+            **self.allowed_user,
+            "email": "  OWNER.PAYMENT.TEST@example.test ",
+        })
         self.assertEqual(metadata, {"success": True, "product": {
             "id": "styledash-payment-test-item",
             "slug": "styledash-payment-test-item",
@@ -685,7 +689,12 @@ class PaymentTestProductTests(unittest.TestCase):
             "fulfillmentRequired": False,
         }})
         self.assert_api_error("not_found", lambda: self.service.payment_test_product(None))
-        self.assert_api_error("not_found", lambda: self.service.payment_test_product("attacker@example.test"))
+        self.assert_api_error("not_found", lambda: self.service.payment_test_product({
+            "id": "usr_unverified", "email": self.allowed_user["email"], "emailVerified": False,
+        }))
+        self.assert_api_error("not_found", lambda: self.service.payment_test_product({
+            "id": "usr_attacker", "email": "attacker@example.test", "emailVerified": True,
+        }))
 
         disabled = SERVER.PaymentService(
             ROOT / "server" / "payment-data" / "catalog.json",
@@ -696,7 +705,7 @@ class PaymentTestProductTests(unittest.TestCase):
             payment_test_enabled=False,
             payment_test_allowed_emails={"owner.payment.test@example.test"},
         )
-        self.assert_api_error("not_found", lambda: disabled.payment_test_product(self.allowed_user["email"]))
+        self.assert_api_error("not_found", lambda: disabled.payment_test_product(self.allowed_user))
 
     def test_private_environment_flag_and_allowlist_are_applied_case_insensitively(self) -> None:
         with patch.dict(os.environ, {
@@ -710,9 +719,18 @@ class PaymentTestProductTests(unittest.TestCase):
                 key_id="rzp_live_placeholder", key_secret="live_secret_placeholder",
                 webhook_secret="live_webhook_placeholder", mode="live", gateway=FakeGateway(),
             )
-        self.assertTrue(configured.can_access_payment_test_product("FIRST.OWNER@example.test"))
-        self.assertTrue(configured.can_access_payment_test_product("second.owner@EXAMPLE.TEST"))
-        self.assertFalse(configured.can_access_payment_test_product("unlisted@example.test"))
+        self.assertTrue(configured.can_access_payment_test_product({
+            "email": "FIRST.OWNER@example.test", "emailVerified": True,
+        }))
+        self.assertTrue(configured.can_access_payment_test_product({
+            "email": "second.owner@EXAMPLE.TEST", "emailVerified": True,
+        }))
+        self.assertFalse(configured.can_access_payment_test_product({
+            "email": "unlisted@example.test", "emailVerified": True,
+        }))
+        self.assertFalse(configured.can_access_payment_test_product({
+            "email": "first.owner@example.test", "emailVerified": False,
+        }))
 
     def test_exact_live_razorpay_order_has_no_delivery_tax_discount_wallet_or_inventory(self) -> None:
         inventory_before = dict(self.service.store.state["inventory"])
@@ -743,6 +761,7 @@ class PaymentTestProductTests(unittest.TestCase):
         second_user = {
             "id": "usr_second_payment_test_owner",
             "email": "second.payment.owner@example.test",
+            "emailVerified": True,
         }
         self.service.payment_test_allowed_emails.add("second.payment.owner@example.test")
         first = self.create("payment-test-shared-idempotency")
@@ -1190,21 +1209,114 @@ class HttpApiTests(unittest.TestCase):
         )
         self.assertEqual((status, forged["code"]), (404, "not_found"))
 
+        status, forged_registration, _headers = self.post_json("/api/auth/register", {
+            "name": "HTTP Payment Owner", "email": "HTTP-PAYMENT-OWNER@EXAMPLE.TEST",
+            "password": "long payment owner password 123", "phone": "9999999999",
+            "emailVerified": True,
+        })
+        self.assertEqual((status, forged_registration["code"]), (400, "invalid_registration"))
         status, owner, owner_headers = self.post_json("/api/auth/register", {
             "name": "HTTP Payment Owner", "email": "HTTP-PAYMENT-OWNER@EXAMPLE.TEST",
             "password": "long payment owner password 123", "phone": "9999999999",
         })
         self.assertEqual(status, 201)
+        self.assertFalse(owner["user"]["emailVerified"])
         owner_cookie = owner_headers["Set-Cookie"].split(";", 1)[0]
         owner_headers_base = {
             "Cookie": owner_cookie,
             "Origin": "https://styledash.test",
             "Idempotency-Key": "payment-test-http-owner",
         }
+        status, unverified, _headers = self.get_json(endpoint, {"Cookie": owner_cookie})
+        self.assertEqual((status, unverified["code"]), (404, "not_found"))
+        route_status, route_hidden, _headers = self.get_json(
+            controlled_route, {"Cookie": owner_cookie}
+        )
+        self.assertEqual((route_status, route_hidden["code"]), (404, "not_found"))
+        status, forged_verified, _headers = self.post_json(
+            f"{endpoint}/create-order",
+            {"paymentMethod": "upi", "emailVerified": True, "email": "http-payment-owner@example.test"},
+            {**owner_headers_base, "X-CSRF-Token": owner["csrfToken"]},
+        )
+        self.assertEqual((status, forged_verified["code"]), (404, "not_found"))
+        self.assertEqual(self.gateway.calls, [])
+
+        status, reset_response, _headers = self.post_json(
+            "/api/auth/password-reset/request", {"email": "http-payment-owner@example.test"}
+        )
+        self.assertEqual(status, 200)
+        self.assertEqual(reset_response, {
+            "success": True,
+            "message": "If an account exists, reset instructions will be sent shortly.",
+        })
+        self.assertEqual(len(self.reset_deliveries), 1)
+        reset_token = self.reset_deliveries[0][1]
+        self.assertNotIn(reset_token, json.dumps(reset_response))
+        status, confirmed, _headers = self.post_json(
+            "/api/auth/password-reset/confirm",
+            {"token": reset_token, "newPassword": "verified payment owner password 456"},
+        )
+        self.assertEqual(status, 200)
+        self.assertNotIn(reset_token, json.dumps(confirmed))
+
+        status, stale_session, _headers = self.get_json(
+            "/api/auth/me", {"Cookie": owner_cookie}
+        )
+        self.assertEqual((status, stale_session["code"]), (401, "authentication_required"))
+        status, stale_hidden, _headers = self.get_json(endpoint, {"Cookie": owner_cookie})
+        self.assertEqual((status, stale_hidden["code"]), (404, "not_found"))
+
+        status, refreshed, refreshed_headers = self.post_json("/api/auth/login", {
+            "email": "HTTP-PAYMENT-OWNER@EXAMPLE.TEST",
+            "password": "verified payment owner password 456",
+            "emailVerified": False,
+        })
+        self.assertEqual(status, 200)
+        self.assertTrue(refreshed["user"]["emailVerified"])
+        owner_cookie = refreshed_headers["Set-Cookie"].split(";", 1)[0]
+        owner_headers_base = {
+            "Cookie": owner_cookie,
+            "Origin": "https://styledash.test",
+            "Idempotency-Key": "payment-test-http-owner",
+        }
+
+        with self.service.security.connect() as db:
+            proof = db.execute(
+                "SELECT email_verified,email_verified_at FROM users WHERE id=?",
+                (refreshed["user"]["id"],),
+            ).fetchone()
+            self.assertEqual(proof["email_verified"], 1)
+            self.assertIsNotNone(proof["email_verified_at"])
+            db.execute("UPDATE users SET is_active=0 WHERE id=?", (refreshed["user"]["id"],))
+        status, disabled_account, _headers = self.get_json(endpoint, {"Cookie": owner_cookie})
+        self.assertEqual((status, disabled_account["code"]), (404, "not_found"))
+        status, disabled_login, _headers = self.post_json("/api/auth/login", {
+            "email": "http-payment-owner@example.test",
+            "password": "verified payment owner password 456",
+        })
+        self.assertEqual((status, disabled_login["code"]), (401, "invalid_credentials"))
+        with self.service.security.connect() as db:
+            db.execute("UPDATE users SET is_active=1 WHERE id=?", (refreshed["user"]["id"],))
+        status, refreshed, refreshed_headers = self.post_json("/api/auth/login", {
+            "email": "http-payment-owner@example.test",
+            "password": "verified payment owner password 456",
+        })
+        self.assertEqual(status, 200)
+        owner_cookie = refreshed_headers["Set-Cookie"].split(";", 1)[0]
+        owner_headers_base = {
+            "Cookie": owner_cookie,
+            "Origin": "https://styledash.test",
+            "Idempotency-Key": "payment-test-http-owner",
+        }
+
         status, metadata, _headers = self.get_json(endpoint, {"Cookie": owner_cookie})
         self.assertEqual(status, 200)
         self.assertEqual((metadata["product"]["amount"], metadata["product"]["currency"]), (1000, "INR"))
         self.assertNotIn("allowed", json.dumps(metadata).lower())
+        status, cross_account, _headers = self.get_json(
+            endpoint, {"Cookie": attacker_cookie}
+        )
+        self.assertEqual((status, cross_account["code"]), (404, "not_found"))
         route_request = urllib.request.Request(
             f"{self.base_url}{controlled_route}", headers={"Cookie": owner_cookie}
         )
@@ -1220,7 +1332,7 @@ class HttpApiTests(unittest.TestCase):
             f"{endpoint}/create-order", {"paymentMethod": "upi"}, owner_headers_base
         )
         self.assertEqual((status, csrf_failure["code"]), (403, "csrf_failed"))
-        owner_auth = {**owner_headers_base, "X-CSRF-Token": owner["csrfToken"]}
+        owner_auth = {**owner_headers_base, "X-CSRF-Token": refreshed["csrfToken"]}
         status, created, _headers = self.post_json(
             f"{endpoint}/create-order", {"paymentMethod": "upi"}, owner_auth
         )

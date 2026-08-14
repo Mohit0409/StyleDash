@@ -121,6 +121,7 @@ class SecurityStore:
                   name TEXT NOT NULL, phone TEXT, role TEXT NOT NULL DEFAULT 'customer'
                     CHECK(role IN ('customer','admin')),
                   is_active INTEGER NOT NULL DEFAULT 1, email_verified INTEGER NOT NULL DEFAULT 0,
+                  email_verified_at TEXT,
                   created_at TEXT NOT NULL, updated_at TEXT NOT NULL, password_changed_at TEXT NOT NULL
                 );
                 CREATE TABLE IF NOT EXISTS sessions(
@@ -186,6 +187,15 @@ class SecurityStore:
                 "INSERT OR IGNORE INTO schema_migrations(version,applied_at) VALUES(2,?)",
                 (iso(utc_now()),),
             )
+            user_columns = {
+                row["name"] for row in db.execute("PRAGMA table_info(users)").fetchall()
+            }
+            if "email_verified_at" not in user_columns:
+                db.execute("ALTER TABLE users ADD COLUMN email_verified_at TEXT")
+            db.execute(
+                "INSERT OR IGNORE INTO schema_migrations(version,applied_at) VALUES(3,?)",
+                (iso(utc_now()),),
+            )
         self._secure_files()
 
     def _secure_files(self) -> None:
@@ -197,7 +207,8 @@ class SecurityStore:
     def safe_user(row: sqlite3.Row) -> dict[str, Any]:
         return {
             "id": row["id"], "uid": row["id"], "email": row["email"], "name": row["name"],
-            "phone": row["phone"], "role": row["role"], "emailVerified": bool(row["email_verified"]),
+            "phone": row["phone"], "role": row["role"],
+            "emailVerified": bool(row["email_verified_at"]),
         }
 
     def _new_session(self, db: sqlite3.Connection, user: sqlite3.Row) -> tuple[str, str]:
@@ -223,7 +234,10 @@ class SecurityStore:
         return f"{COOKIE_NAME}=; Path=/; Max-Age=0; HttpOnly; Secure; SameSite=Lax"
 
     def register(self, payload: dict[str, Any]) -> tuple[dict[str, Any], str, str]:
-        if any(field in payload for field in ("role", "isAdmin", "admin")):
+        if any(field in payload for field in (
+            "role", "isAdmin", "admin", "emailVerified", "email_verified",
+            "emailVerifiedAt", "email_verified_at",
+        )):
             raise SecurityError(400, "Unsupported registration field.", "invalid_registration")
         email = normalize_email(payload.get("email"))
         password = payload.get("password")
@@ -287,7 +301,7 @@ class SecurityStore:
         now = utc_now()
         with self.connect() as db:
             row = db.execute(
-                "SELECT s.*,u.id AS authenticated_user_id,u.email,u.name,u.phone,u.role,u.is_active,u.email_verified FROM sessions s JOIN users u ON u.id=s.user_id WHERE s.token_hash=?",
+                "SELECT s.*,u.id AS authenticated_user_id,u.email,u.name,u.phone,u.role,u.is_active,u.email_verified,u.email_verified_at FROM sessions s JOIN users u ON u.id=s.user_id WHERE s.token_hash=?",
                 (token_hash(raw_session),),
             ).fetchone()
             if row is None or row["revoked_at"] or not row["is_active"]:
@@ -302,7 +316,7 @@ class SecurityStore:
         user = {
             "id": row["authenticated_user_id"], "uid": row["authenticated_user_id"],
             "email": row["email"], "name": row["name"], "phone": row["phone"],
-            "role": row["role"], "emailVerified": bool(row["email_verified"]),
+            "role": row["role"], "emailVerified": bool(row["email_verified_at"]),
         }
         return user, row
 
@@ -429,8 +443,14 @@ class SecurityStore:
                 (now_value, reset["user_id"]),
             )
             db.execute(
-                "UPDATE users SET password_hash=?,password_changed_at=?,updated_at=? WHERE id=?",
-                (self.passwords.hash(new_password), now_value, now_value, reset["user_id"]),
+                """UPDATE users
+                   SET password_hash=?,password_changed_at=?,updated_at=?,
+                       email_verified=1,email_verified_at=COALESCE(email_verified_at,?)
+                   WHERE id=?""",
+                (
+                    self.passwords.hash(new_password), now_value, now_value,
+                    now_value, reset["user_id"],
+                ),
             )
             db.execute("UPDATE sessions SET revoked_at=? WHERE user_id=? AND revoked_at IS NULL", (now_value, reset["user_id"]))
             db.commit()
@@ -492,7 +512,10 @@ class SecurityStore:
         return result
 
     def update_profile(self, user_id: str, payload: dict[str, Any]) -> dict[str, Any]:
-        forbidden = {"id", "uid", "role", "password_hash", "is_active", "email"}
+        forbidden = {
+            "id", "uid", "role", "password_hash", "is_active", "email",
+            "emailVerified", "email_verified", "emailVerifiedAt", "email_verified_at",
+        }
         if forbidden.intersection(payload):
             raise SecurityError(400, "Unsupported profile field.", "invalid_profile")
         if set(payload) - {"name", "phone", "addresses"}:
