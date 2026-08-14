@@ -89,8 +89,8 @@ class SecurityStore:
         except Exception as exc:
             raise RuntimeError("Invalid STYLEDASH_TOTP_ENCRYPTION_KEY") from exc
         self.csrf_key = hashlib.sha256(encryption_key.encode("ascii")).digest()
-        # Delivery is deliberately injected.  The public server has no SMTP
-        # implementation until an approved provider integration is reviewed.
+        # Delivery is deliberately injected so the token lifecycle remains
+        # testable independently from the private SMTP implementation.
         self.password_reset_sender = password_reset_sender
         self._migrate()
 
@@ -346,6 +346,7 @@ class SecurityStore:
         if self.password_reset_sender is None:
             return
         raw_token: str | None = None
+        reset_id: str | None = None
         with self.connect() as db:
             user = db.execute(
                 "SELECT id,email FROM users WHERE email=? AND is_active=1 AND role='customer'",
@@ -361,10 +362,11 @@ class SecurityStore:
                 "UPDATE password_reset_tokens SET used_at=? WHERE user_id=? AND used_at IS NULL",
                 (now_value, user["id"]),
             )
+            reset_id = "reset_" + secrets.token_hex(16)
             db.execute(
                 "INSERT INTO password_reset_tokens(id,user_id,token_hash,created_at,expires_at) VALUES(?,?,?,?,?)",
                 (
-                    "reset_" + secrets.token_hex(16), user["id"], token_hash(raw_token), now_value,
+                    reset_id, user["id"], token_hash(raw_token), now_value,
                     iso(now + timedelta(minutes=PASSWORD_RESET_MINUTES)),
                 ),
             )
@@ -372,9 +374,11 @@ class SecurityStore:
         try:
             self.password_reset_sender(email, raw_token)
         except Exception:
-            # Never reveal delivery configuration or account existence to the
-            # requester. A future approved sender may add private retry logic.
-            pass
+            # Do not leave a usable token behind when delivery fails. The
+            # public response remains generic and no token/configuration is
+            # logged or exposed.
+            with self.connect() as db:
+                db.execute("UPDATE password_reset_tokens SET used_at=? WHERE id=? AND used_at IS NULL", (iso(utc_now()), reset_id))
         self._secure_files()
 
     def confirm_password_reset(self, payload: dict[str, Any]) -> None:

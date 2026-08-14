@@ -33,6 +33,11 @@ except ModuleNotFoundError:  # Repository test import path.
     from scripts.styledash_security import COOKIE_NAME, SecurityError, SecurityStore
 
 try:
+    from styledash_mail import SmtpPasswordResetSender
+except ModuleNotFoundError:  # Repository test import path.
+    from scripts.styledash_mail import SmtpPasswordResetSender
+
+try:
     import razorpay
 except ImportError:  # The static site and COD can still start without the SDK.
     razorpay = None
@@ -1211,7 +1216,7 @@ class StyleDashRequestHandler(SimpleHTTPRequestHandler):
             if path == "/api/auth/password-reset/request":
                 self._rate_limit(path, 5)
                 self._security().request_password_reset(self._read_json())
-                self._json_response(HTTPStatus.OK, {"success": True, "message": "If an account exists, reset instructions will be sent when recovery delivery is configured."})
+                self._json_response(HTTPStatus.OK, {"success": True, "message": "If an account exists, reset instructions will be sent shortly."})
                 return
             if path == "/api/auth/password-reset/confirm":
                 self._rate_limit(path, 10)
@@ -1329,7 +1334,8 @@ def create_server(
         database_path = Path(
             os.environ.get("STYLEDASH_DATABASE_PATH", str(data_directory.parent / "styledash.db"))
         ).resolve()
-        security_store = SecurityStore(database_path, encryption_key)
+        mailer = SmtpPasswordResetSender.from_environment()
+        security_store = SecurityStore(database_path, encryption_key, password_reset_sender=mailer)
         payment_service = PaymentService(
             catalog_path, settings_path, data_directory, security_store=security_store
         )

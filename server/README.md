@@ -90,12 +90,11 @@ python3 -m unittest discover -s server/tests -v
 Password recovery stores only a token hash, expires tokens after 30 minutes,
 invalidates prior unused tokens, and revokes all customer sessions on success.
 The request endpoint always returns the same response for known and unknown
-accounts. SMTP delivery is intentionally not implemented in this release.
+accounts. Delivery failure invalidates the newly created token.
 
-Before enabling an approved delivery integration, configure its values only in
+Password-reset SMTP configuration belongs only in
 `~/.config/styledash/secrets.env` (mode `600`):
 `STYLEDASH_SMTP_HOST`, `STYLEDASH_SMTP_PORT`, `STYLEDASH_SMTP_USERNAME`,
 `STYLEDASH_SMTP_PASSWORD`, `STYLEDASH_PASSWORD_RESET_FROM`, and
 `STYLEDASH_PASSWORD_RESET_URL`. Do not add these to browser variables, source,
-or logs. A reviewed server-side sender implementation is still required before
-these names have any runtime effect.
+or logs.

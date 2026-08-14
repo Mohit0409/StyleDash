@@ -150,6 +150,24 @@ class SecurityStoreTests(unittest.TestCase):
         with self.store.connect() as db:
             self.assertEqual(db.execute("SELECT COUNT(*) FROM password_reset_tokens").fetchone()[0], 0)
 
+    def test_password_reset_delivery_failure_consumes_new_token(self):
+        def failed_delivery(_email, _token):
+            raise RuntimeError("test-only delivery failure")
+
+        reset_store = SECURITY.SecurityStore(
+            Path(self.temporary.name) / "failed-delivery.db", Fernet.generate_key().decode(),
+            password_reset_sender=failed_delivery,
+        )
+        user, _raw, _csrf = reset_store.register({
+            "name": "Reset Customer", "email": "failed-delivery@example.test",
+            "password": "long test password 123", "phone": "9999999999",
+        })
+        reset_store.request_password_reset({"email": user["email"]})
+        with reset_store.connect() as db:
+            stored = db.execute("SELECT token_hash,used_at FROM password_reset_tokens").fetchone()
+            self.assertIsNotNone(stored["token_hash"])
+            self.assertIsNotNone(stored["used_at"])
+
     def test_expired_session_is_rejected_and_revoked(self):
         _user, raw, _csrf = self.registration()
         with self.store.connect() as db:
