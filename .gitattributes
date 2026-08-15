@@ -1,1 +1,1 @@
-scripts/termux/deploy-payment-release text eol=lf
+scripts/termux/** text eol=lf
