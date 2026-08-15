@@ -39,6 +39,11 @@ except ModuleNotFoundError:  # Repository test import path.
     from scripts.styledash_mail import PasswordResetDeliveryQueue, SmtpPasswordResetSender
 
 try:
+    from styledash_notify import mask_email, owner_notifier
+except ModuleNotFoundError:  # Repository test import path.
+    from scripts.styledash_notify import mask_email, owner_notifier
+
+try:
     import razorpay
 except ImportError:  # The static site and COD can still start without the SDK.
     razorpay = None
@@ -66,6 +71,119 @@ PAYMENT_TEST_PRICE_RUPEES = 10
 PAYMENT_TEST_AMOUNT_PAISE = 1000
 PAYMENT_TEST_CURRENCY = "INR"
 PAYMENT_TEST_ADMIN_LABELS = ["TEST", "NO FULFILLMENT REQUIRED"]
+LOW_STOCK_THRESHOLD = 5
+
+
+def _notify_finalized_payment(order: dict[str, Any]) -> None:
+    """Best-effort owner notification after captured payment is durable."""
+
+    try:
+        order_id = str(order.get("id") or "-")
+        grand_total = order.get("grandTotal")
+
+        amount_text = (
+            f"?{grand_total}"
+            if isinstance(grand_total, (int, float))
+            and not isinstance(grand_total, bool)
+            else "-"
+        )
+
+        payment_method = str(
+            order.get("paymentMethod") or "online"
+        ).upper()
+
+        status = order.get("status")
+
+        if status == "payment_review_required":
+            owner_notifier().send(
+                event="payment_review_required",
+                title="PAYMENT NEEDS ATTENTION",
+                message=(
+                    f"Order: {order_id}\n"
+                    f"Amount: {amount_text}\n"
+                    f"Payment: {payment_method}\n"
+                    f"Status: Paid - review required\n"
+                    f"Reason: Stock confirmation required"
+                ),
+                priority=5,
+                tags=["rotating_light"],
+            )
+            return
+
+        owner_notifier().send(
+            event="payment_captured",
+            title="StyleDash Payment Received",
+            message=(
+                f"Order: {order_id}\n"
+                f"Amount: {amount_text}\n"
+                f"Payment: {payment_method}\n"
+                f"Status: Paid"
+            ),
+            priority=5,
+            tags=["moneybag"],
+        )
+
+    except Exception:
+        # Notification preparation must never affect financial truth.
+        print(
+            "StyleDash notification preparation failed "
+            "event=payment_captured",
+            flush=True,
+        )
+
+
+def _notify_inventory_alerts(
+    alerts: list[dict[str, Any]],
+) -> None:
+    """Send inventory threshold alerts only after durable persistence."""
+
+    for alert in alerts:
+        try:
+            kind = alert.get("kind")
+
+            if kind == "out_of_stock":
+                event = "inventory_out_of_stock"
+                title = "StyleDash Out of Stock"
+                tags = ["rotating_light"]
+            elif kind == "low_stock":
+                event = "inventory_low_stock"
+                title = "StyleDash Low Stock"
+                tags = ["warning"]
+            else:
+                continue
+
+            product_name = " ".join(
+                str(alert.get("productName") or "-").split()
+            )[:120]
+
+            size = " ".join(
+                str(alert.get("size") or "-").split()
+            )[:40]
+
+            colour = " ".join(
+                str(alert.get("colour") or "-").split()
+            )[:80]
+
+            remaining = alert.get("remaining")
+
+            owner_notifier().send(
+                event=event,
+                title=title,
+                message=(
+                    f"Product: {product_name}\n"
+                    f"Variant: {size} / {colour}\n"
+                    f"Remaining: {remaining}"
+                ),
+                priority=5,
+                tags=tags,
+            )
+
+        except Exception:
+            print(
+                "StyleDash notification preparation failed "
+                "event=inventory",
+                flush=True,
+            )
 
 
 class ApiError(Exception):
@@ -782,19 +900,69 @@ class PaymentService:
             self.store.save()
             return self._create_response(order)
 
+    def _inventory_alert_for_change(
+        self,
+        product: dict[str, Any],
+        variant: dict[str, Any],
+        before: int,
+        after: int,
+    ) -> dict[str, Any] | None:
+        """Return one alert only when stock crosses an important threshold."""
+
+        kind: str | None = None
+
+        if before > 0 and after == 0:
+            kind = "out_of_stock"
+        elif (
+            before > LOW_STOCK_THRESHOLD
+            and 0 < after <= LOW_STOCK_THRESHOLD
+        ):
+            kind = "low_stock"
+
+        if kind is None:
+            return None
+
+        return {
+            "kind": kind,
+            "productId": product.get("id"),
+            "productName": product.get("name"),
+            "variantId": variant.get("id"),
+            "size": variant.get("size"),
+            "colour": (
+                variant.get("colourName")
+                or variant.get("colour")
+                or "-"
+            ),
+            "remaining": after,
+        }
+
     def _try_decrement_inventory(
         self,
         state: dict[str, Any],
         items: list[dict[str, Any]],
+        *,
+        inventory_alerts: list[dict[str, Any]] | None = None,
     ) -> bool:
         """Commit all requested inventory or none of it."""
-        checked: list[tuple[str, int, int]] = []
+
+        checked: list[
+            tuple[
+                dict[str, Any],
+                dict[str, Any],
+                int,
+                int,
+            ]
+        ] = []
+
         for item in items:
             if not isinstance(item, dict):
                 return False
+
             product = self.products.get(item.get("productId"))
+
             if not isinstance(product, dict):
                 return False
+
             variant = next(
                 (
                     entry
@@ -803,26 +971,57 @@ class PaymentService:
                 ),
                 None,
             )
+
             if not isinstance(variant, dict):
                 return False
+
             try:
                 remaining = self._inventory(state, variant)
                 quantity = int(item.get("quantity", 0))
             except (KeyError, TypeError, ValueError):
                 return False
+
             if quantity <= 0 or remaining < quantity:
                 return False
-            checked.append((variant["id"], remaining, quantity))
-        for variant_id, remaining, quantity in checked:
-            state["inventory"][variant_id] = remaining - quantity
+
+            checked.append(
+                (
+                    product,
+                    variant,
+                    remaining,
+                    quantity,
+                )
+            )
+
+        for product, variant, remaining, quantity in checked:
+            after = remaining - quantity
+            state["inventory"][variant["id"]] = after
+
+            if inventory_alerts is not None:
+                alert = self._inventory_alert_for_change(
+                    product,
+                    variant,
+                    remaining,
+                    after,
+                )
+
+                if alert is not None:
+                    inventory_alerts.append(alert)
+
         return True
 
     def _decrement_inventory(
         self,
         state: dict[str, Any],
         items: list[dict[str, Any]],
+        *,
+        inventory_alerts: list[dict[str, Any]] | None = None,
     ) -> None:
-        if not self._try_decrement_inventory(state, items):
+        if not self._try_decrement_inventory(
+            state,
+            items,
+            inventory_alerts=inventory_alerts,
+        ):
             raise ApiError(
                 HTTPStatus.CONFLICT,
                 "Stock changed while the order was being processed. Contact support before retrying.",
@@ -900,6 +1099,9 @@ class PaymentService:
         currency: Any | None = None,
     ) -> dict[str, Any]:
         """Persist captured financial truth before fulfillment decisions."""
+
+        inventory_alerts: list[dict[str, Any]] = []
+
         with self.store.lock:
             state = self.store.state
             order = state["orders"].get(style_order_id)
@@ -928,7 +1130,11 @@ class PaymentService:
             if not payment_test_order:
                 inventory_committed = (
                     order.get("inventoryCommitted") is True
-                    or self._try_decrement_inventory(state, order["items"])
+                    or self._try_decrement_inventory(
+                        state,
+                        order["items"],
+                        inventory_alerts=inventory_alerts,
+                    )
                 )
 
             now = datetime.now(timezone.utc).isoformat()
@@ -970,7 +1176,22 @@ class PaymentService:
             order.setdefault("statusHistory", []).append({"status": next_status, "timestamp": now, "note": note})
             state["processedPayments"][payment_id] = style_order_id
             self.store.save()
-            return {"success": True, "idempotent": False, "duplicate": False, "order": self._public_order(order)}
+            public_order = self._public_order(order)
+
+        # Financial state is already durable and the store lock has
+        # been released. Duplicate finalizations return above and
+        # therefore never reach this notification.
+        _notify_finalized_payment(public_order)
+
+        if inventory_alerts:
+            _notify_inventory_alerts(inventory_alerts)
+
+        return {
+            "success": True,
+            "idempotent": False,
+            "duplicate": False,
+            "order": public_order,
+        }
 
     def verify_payment(self, payload: dict[str, Any]) -> dict[str, Any]:
         if not isinstance(payload, dict):
@@ -1294,6 +1515,41 @@ class PaymentService:
                 f"refundId={refund.get('id') or '-'} result={'duplicate' if result['duplicate'] else 'recorded'}",
                 flush=True,
             )
+            if not result["duplicate"]:
+                refund_amount = refund.get("amount")
+                amount_text = (
+                    f"?{refund_amount / 100:.2f}"
+                    if isinstance(refund_amount, int)
+                    and not isinstance(refund_amount, bool)
+                    else "-"
+                )
+                order_id = order.get("id") or "-"
+
+                if result["fullRefund"]:
+                    owner_notifier().send(
+                        event="refund_processed",
+                        title="StyleDash Refund Processed",
+                        message=(
+                            f"Order: {order_id}\n"
+                            f"Amount: {amount_text}\n"
+                            f"Status: Refunded"
+                        ),
+                        priority=5,
+                        tags=["money_with_wings"],
+                    )
+                else:
+                    owner_notifier().send(
+                        event="refund_review_required",
+                        title="REFUND NEEDS ATTENTION",
+                        message=(
+                            f"Order: {order_id}\n"
+                            f"Amount: {amount_text}\n"
+                            f"Status: Review required"
+                        ),
+                        priority=5,
+                        tags=["rotating_light"],
+                    )
+
             response = {"success": True}
             if result["duplicate"]:
                 response["duplicate"] = True
@@ -1328,6 +1584,34 @@ class PaymentService:
                 f"entityId={entity_id} result={'duplicate' if recorded['duplicate'] else 'alerted'}",
                 flush=True,
             )
+            if not recorded["duplicate"]:
+                order_id = alert.get("styleDashOrderId") or "-"
+
+                if event == "refund.failed":
+                    owner_notifier().send(
+                        event="refund_failed",
+                        title="REFUND NEEDS ATTENTION",
+                        message=(
+                            f"Order: {order_id}\n"
+                            f"Refund reference: ...{entity_id[-8:]}\n"
+                            f"Status: Refund failed"
+                        ),
+                        priority=5,
+                        tags=["rotating_light"],
+                    )
+                else:
+                    owner_notifier().send(
+                        event="payment_dispute",
+                        title="PAYMENT DISPUTE ALERT",
+                        message=(
+                            f"Order: {order_id}\n"
+                            f"Dispute reference: ...{entity_id[-8:]}\n"
+                            f"Status: Immediate review required"
+                        ),
+                        priority=5,
+                        tags=["rotating_light"],
+                    )
+
             response = {"success": True}
             if recorded["duplicate"]:
                 response["duplicate"] = True
@@ -1360,6 +1644,26 @@ class PaymentService:
                 f"result={'failed' if recorded else 'ignored'}",
                 flush=True,
             )
+
+            if recorded:
+                safe_payment_ref = (
+                    f"...{payment_id[-8:]}"
+                    if isinstance(payment_id, str) and payment_id
+                    else "-"
+                )
+
+                owner_notifier().send(
+                    event="payment_failed",
+                    title="StyleDash Payment Failed",
+                    message=(
+                        f"Order: {style_order_id}\n"
+                        f"Payment reference: {safe_payment_ref}\n"
+                        f"Status: Payment failed"
+                    ),
+                    priority=5,
+                    tags=["warning"],
+                )
+
             return {"success": True}
 
         if not isinstance(payment_id, str) or not payment_id:
@@ -1391,16 +1695,28 @@ class PaymentService:
 
     def place_cod_order(self, payload: dict[str, Any], idempotency_value: str | None) -> dict[str, Any]:
         idempotency_key = self._idempotency_key(idempotency_value)
+        inventory_alerts: list[dict[str, Any]] = []
+
         with self.store.lock:
             if idempotency_key:
-                existing_id = self.store.state["idempotency"].get(f"cod:{idempotency_key}")
+                existing_id = self.store.state["idempotency"].get(
+                    f"cod:{idempotency_key}"
+                )
                 if existing_id:
-                    existing = self.store.state["orders"].get(existing_id)
+                    existing = self.store.state["orders"].get(
+                        existing_id
+                    )
                     if existing:
-                        return {"success": True, "idempotent": True, "order": self._public_order(existing)}
+                        return {
+                            "success": True,
+                            "idempotent": True,
+                            "order": self._public_order(existing),
+                        }
+
             calculated = self.calculate_order(payload)
             now = datetime.now(timezone.utc).isoformat()
             style_order_id = self._new_order_id()
+
             order = {
                 **calculated,
                 "id": style_order_id,
@@ -1409,16 +1725,40 @@ class PaymentService:
                 "status": "placed",
                 "inventoryCommitted": True,
                 "estimatedDelivery": "60 minutes",
-                "statusHistory": [{"status": "placed", "timestamp": now, "note": "Cash on Delivery order placed"}],
+                "statusHistory": [{
+                    "status": "placed",
+                    "timestamp": now,
+                    "note": "Cash on Delivery order placed",
+                }],
                 "createdAt": now,
                 "updatedAt": now,
             }
-            self._decrement_inventory(self.store.state, order["items"])
+
+            self._decrement_inventory(
+                self.store.state,
+                order["items"],
+                inventory_alerts=inventory_alerts,
+            )
+
             self.store.state["orders"][style_order_id] = order
+
             if idempotency_key:
-                self.store.state["idempotency"][f"cod:{idempotency_key}"] = style_order_id
+                self.store.state["idempotency"][
+                    f"cod:{idempotency_key}"
+                ] = style_order_id
+
             self.store.save()
-            return {"success": True, "idempotent": False, "order": self._public_order(order)}
+            public_order = self._public_order(order)
+
+        # Inventory and order are both durable before notifying.
+        if inventory_alerts:
+            _notify_inventory_alerts(inventory_alerts)
+
+        return {
+            "success": True,
+            "idempotent": False,
+            "order": public_order,
+        }
 
 
 class StyleDashRequestHandler(SimpleHTTPRequestHandler):
@@ -1681,12 +2021,60 @@ class StyleDashRequestHandler(SimpleHTTPRequestHandler):
                 result = self.payment_service.place_cod_order(
                     payload, self.headers.get("Idempotency-Key")
                 )
+
+                if not result.get("idempotent"):
+                    order = result.get("order") or {}
+                    grand_total = order.get("grandTotal")
+
+                    amount_text = (
+                        f"?{grand_total}"
+                        if isinstance(grand_total, (int, float))
+                        and not isinstance(grand_total, bool)
+                        else "-"
+                    )
+
+                    owner_notifier().send(
+                        event="cod_order_placed",
+                        title="New StyleDash Order",
+                        message=(
+                            f"Order: {order.get('id') or '-'}\n"
+                            f"Amount: {amount_text}\n"
+                            f"Payment: COD\n"
+                            f"Status: Placed"
+                        ),
+                        priority=5,
+                        tags=["shopping_cart"],
+                    )
+
                 self._json_response(HTTPStatus.CREATED, result)
                 return
             if path == "/api/auth/register":
                 self._rate_limit(path, 5)
                 user, raw, csrf = self._security().register(self._read_json())
-                self._json_response(HTTPStatus.CREATED, {"success": True, "user": user, "csrfToken": csrf}, headers={"Set-Cookie": self._security().cookie(raw)})
+
+                owner_notifier().send(
+                    event="customer_registered",
+                    title="New StyleDash Registration",
+                    message=(
+                        f"Name: {user.get('name') or '-'}\n"
+                        f"Email: {mask_email(user.get('email') or '')}\n"
+                        f"Customer ID: {user.get('id') or '-'}"
+                    ),
+                    priority=5,
+                    tags=["bust_in_silhouette"],
+                )
+
+                self._json_response(
+                    HTTPStatus.CREATED,
+                    {
+                        "success": True,
+                        "user": user,
+                        "csrfToken": csrf,
+                    },
+                    headers={
+                        "Set-Cookie": self._security().cookie(raw)
+                    },
+                )
                 return
             if path == "/api/auth/login":
                 self._rate_limit(path, 12)
@@ -1719,8 +2107,49 @@ class StyleDashRequestHandler(SimpleHTTPRequestHandler):
                 self._rate_limit(path, 5)
                 user, _session = self._current_user()
                 self._csrf()
-                result = self._security().create_vendor_application(user["id"], self._read_json())
-                self._json_response(HTTPStatus.CREATED, {"success": True, "application": result})
+
+                vendor_payload = self._read_json()
+
+                result = self._security().create_vendor_application(
+                    user["id"],
+                    vendor_payload,
+                )
+
+                # The application is already durably stored at this point.
+                # Flatten whitespace so user-controlled text cannot make the
+                # notification confusing or inject extra visual lines.
+                store_name = " ".join(
+                    str(
+                        vendor_payload.get("storeName") or "-"
+                    ).split()
+                )[:100]
+
+                category = " ".join(
+                    str(
+                        vendor_payload.get("category") or "-"
+                    ).split()
+                )[:80]
+
+                owner_notifier().send(
+                    event="vendor_application",
+                    title="New Vendor Application",
+                    message=(
+                        f"Application: {result.get('id') or '-'}\n"
+                        f"Store: {store_name}\n"
+                        f"Category: {category}\n"
+                        f"Status: Pending"
+                    ),
+                    priority=5,
+                    tags=["briefcase"],
+                )
+
+                self._json_response(
+                    HTTPStatus.CREATED,
+                    {
+                        "success": True,
+                        "application": result,
+                    },
+                )
                 return
             if path.startswith(API_PREFIX):
                 self._json_response(HTTPStatus.NOT_FOUND, {"success": False, "error": "API endpoint not found.", "code": "not_found"})

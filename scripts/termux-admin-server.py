@@ -22,6 +22,11 @@ except ModuleNotFoundError:
     from scripts.styledash_admin import ADMIN_COOKIE, CHALLENGE_COOKIE, AdminStore
     from scripts.styledash_security import SecurityError, iso, utc_now
 
+try:
+    from styledash_notify import owner_notifier
+except ModuleNotFoundError:
+    from scripts.styledash_notify import owner_notifier
+
 
 MAX_BODY_BYTES = 64 * 1024
 ALLOWED_HOSTS = {"127.0.0.1:8081", "localhost:8081"}
@@ -48,6 +53,58 @@ def load_public_module():
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     return module
+
+
+def _notify_inventory_alerts(
+    alerts: list[dict[str, Any]],
+) -> None:
+    """Send inventory alerts only after the admin mutation is durable."""
+
+    for alert in alerts:
+        try:
+            kind = alert.get("kind")
+
+            if kind == "out_of_stock":
+                event = "inventory_out_of_stock"
+                title = "StyleDash Out of Stock"
+                tags = ["rotating_light"]
+            elif kind == "low_stock":
+                event = "inventory_low_stock"
+                title = "StyleDash Low Stock"
+                tags = ["warning"]
+            else:
+                continue
+
+            product_name = " ".join(
+                str(alert.get("productName") or "-").split()
+            )[:120]
+
+            size = " ".join(
+                str(alert.get("size") or "-").split()
+            )[:40]
+
+            colour = " ".join(
+                str(alert.get("colour") or "-").split()
+            )[:80]
+
+            owner_notifier().send(
+                event=event,
+                title=title,
+                message=(
+                    f"Product: {product_name}\n"
+                    f"Variant: {size} / {colour}\n"
+                    f"Remaining: {alert.get('remaining')}"
+                ),
+                priority=5,
+                tags=tags,
+            )
+
+        except Exception:
+            print(
+                "StyleDash notification preparation failed "
+                "event=inventory",
+                flush=True,
+            )
 
 
 class AdminApplication:
@@ -119,7 +176,14 @@ class AdminApplication:
             "cancelled": set(),
         }
         if not isinstance(requested, str):
-            raise SecurityError(400, "Invalid order status.", "invalid_status")
+            raise SecurityError(
+                400,
+                "Invalid order status.",
+                "invalid_status",
+            )
+
+        inventory_alerts: list[dict[str, Any]] = []
+
         with self.payments.store.lock:
             state = self.payments.store.state
             order = state["orders"].get(order_id)
@@ -147,7 +211,11 @@ class AdminApplication:
                 if order.get("paymentStatus") != "paid":
                     raise SecurityError(409, "The payment state must be reconciled before fulfillment.", "payment_state_unresolved")
                 try:
-                    self.payments._decrement_inventory(state, order.get("items", []))
+                    self.payments._decrement_inventory(
+                        state,
+                        order.get("items", []),
+                        inventory_alerts=inventory_alerts,
+                    )
                 except Exception as error:
                     if getattr(error, "code", None) == "stock_changed":
                         raise SecurityError(409, "Stock is still unavailable for this paid order.", "stock_changed") from None
@@ -203,8 +271,51 @@ class AdminApplication:
             "order",
             order_id,
             "success",
-            {"from": current, "to": requested, "inventoryReleased": inventory_released},
+            {
+                "from": current,
+                "to": requested,
+                "inventoryReleased": inventory_released,
+            },
         )
+
+        if inventory_alerts:
+            _notify_inventory_alerts(inventory_alerts)
+
+        if requested == "cancelled":
+            try:
+                grand_total = result.get("grandTotal")
+                amount_text = (
+                    f"?{grand_total}"
+                    if isinstance(grand_total, (int, float))
+                    and not isinstance(grand_total, bool)
+                    else "-"
+                )
+
+                payment_method = str(
+                    result.get("paymentMethod") or "-"
+                ).upper()
+
+                owner_notifier().send(
+                    event="order_cancelled",
+                    title="StyleDash Order Cancelled",
+                    message=(
+                        f"Order: {order_id}\n"
+                        f"Amount: {amount_text}\n"
+                        f"Payment: {payment_method}\n"
+                        f"Status: Cancelled"
+                    ),
+                    priority=5,
+                    tags=["no_entry_sign"],
+                )
+
+            except Exception:
+                # Cancellation and audit are already durable.
+                print(
+                    "StyleDash notification preparation failed "
+                    "event=order_cancelled",
+                    flush=True,
+                )
+
         return result
 
     def inventory(self, query: str = "", low_only: bool = False) -> list[dict[str, Any]]:
@@ -227,27 +338,102 @@ class AdminApplication:
                     result.append(record)
         return result[:500]
 
-    def adjust_inventory(self, admin_id: str, variant_id: str, delta: Any) -> dict[str, Any]:
-        if isinstance(delta, bool) or not isinstance(delta, int) or delta == 0 or not -10000 <= delta <= 10000:
-            raise SecurityError(400, "Inventory adjustment must be a non-zero whole number.", "invalid_inventory_adjustment")
+    def adjust_inventory(
+        self,
+        admin_id: str,
+        variant_id: str,
+        delta: Any,
+    ) -> dict[str, Any]:
+        if (
+            isinstance(delta, bool)
+            or not isinstance(delta, int)
+            or delta == 0
+            or not -10000 <= delta <= 10000
+        ):
+            raise SecurityError(
+                400,
+                "Inventory adjustment must be a non-zero whole number.",
+                "invalid_inventory_adjustment",
+            )
+
         variant = None
         product = None
+
         for item in self.payments.products.values():
-            match = next((candidate for candidate in item["variants"] if candidate["id"] == variant_id), None)
+            match = next(
+                (
+                    candidate
+                    for candidate in item["variants"]
+                    if candidate["id"] == variant_id
+                ),
+                None,
+            )
+
             if match:
                 variant, product = match, item
                 break
+
         if variant is None or product is None:
-            raise SecurityError(404, "Product variant not found.", "variant_not_found")
+            raise SecurityError(
+                404,
+                "Product variant not found.",
+                "variant_not_found",
+            )
+
+        inventory_alert = None
+
         with self.payments.store.lock:
-            before = self.payments._inventory(self.payments.store.state, variant)
+            before = self.payments._inventory(
+                self.payments.store.state,
+                variant,
+            )
+
             after = before + delta
+
             if after < 0:
-                raise SecurityError(409, "Inventory cannot become negative.", "negative_inventory")
-            self.payments.store.state["inventory"][variant_id] = after
+                raise SecurityError(
+                    409,
+                    "Inventory cannot become negative.",
+                    "negative_inventory",
+                )
+
+            inventory_alert = (
+                self.payments._inventory_alert_for_change(
+                    product,
+                    variant,
+                    before,
+                    after,
+                )
+            )
+
+            self.payments.store.state["inventory"][
+                variant_id
+            ] = after
+
             self.payments.store.save()
-        self.identity.record_action(admin_id, "inventory_adjustment", "product_variant", variant_id, "success", {"delta": delta, "before": before, "after": after})
-        return {"productId": product["id"], "variantId": variant_id, "before": before, "after": after}
+
+        self.identity.record_action(
+            admin_id,
+            "inventory_adjustment",
+            "product_variant",
+            variant_id,
+            "success",
+            {
+                "delta": delta,
+                "before": before,
+                "after": after,
+            },
+        )
+
+        if inventory_alert is not None:
+            _notify_inventory_alerts([inventory_alert])
+
+        return {
+            "productId": product["id"],
+            "variantId": variant_id,
+            "before": before,
+            "after": after,
+        }
 
     def system_health(self, backup_root: Path) -> dict[str, Any]:
         public_health: dict[str, Any]

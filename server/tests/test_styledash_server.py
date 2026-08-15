@@ -20,6 +20,8 @@ from unittest.mock import patch
 
 from cryptography.fernet import Fernet
 
+from scripts import styledash_notify as NOTIFY
+
 
 ROOT = Path(__file__).resolve().parents[2]
 SPEC = importlib.util.spec_from_file_location("styledash_server", ROOT / "scripts" / "termux-spa-server.py")
@@ -153,6 +155,838 @@ class PaymentServiceTests(unittest.TestCase):
     def deliver(self, body: bytes) -> dict:
         signature = hmac.new(b"webhook_secret_placeholder", body, hashlib.sha256).hexdigest()
         return self.service.process_webhook(body, signature)
+
+    def test_payment_notification_is_exactly_once_across_callback_and_webhook(self) -> None:
+        created = self.create_payment(
+            "payment-notification-exactly-once"
+        )
+
+        callback = self.browser_verification(
+            created,
+            "pay_notification_exactly_once",
+        )
+
+        with patch.object(
+            SERVER,
+            "owner_notifier",
+        ) as notifier_factory:
+            notifier = notifier_factory.return_value
+
+            first = self.service.verify_payment(callback)
+
+            self.assertFalse(first["idempotent"])
+            self.assertEqual(
+                first["order"]["paymentStatus"],
+                "paid",
+            )
+            self.assertEqual(
+                notifier.send.call_count,
+                1,
+            )
+
+            body = self.webhook_body(
+                created,
+                "pay_notification_exactly_once",
+                event="order.paid",
+            )
+
+            duplicate = self.deliver(body)
+
+            self.assertTrue(duplicate["duplicate"])
+
+            # payment.captured/browser callback + order.paid
+            # still results in one phone notification.
+            self.assertEqual(
+                notifier.send.call_count,
+                1,
+            )
+
+            notification = notifier.send.call_args.kwargs
+
+            self.assertEqual(
+                notification["event"],
+                "payment_captured",
+            )
+            self.assertEqual(
+                notification["priority"],
+                5,
+            )
+            self.assertIn(
+                first["order"]["id"],
+                notification["message"],
+            )
+            self.assertIn(
+                f"?{first['order']['grandTotal']}",
+                notification["message"],
+            )
+            self.assertIn(
+                "Status: Paid",
+                notification["message"],
+            )
+
+    def test_payment_review_notification_failure_never_breaks_paid_state(self) -> None:
+        created = self.create_payment(
+            "payment-notification-review"
+        )
+
+        # Simulate stock disappearing after Razorpay order creation
+        # but before captured-payment finalization.
+        with self.service.store.lock:
+            self.service.store.state["inventory"][
+                "sd-prod-001-var-2"
+            ] = 0
+            self.service.store.save()
+
+        callback = self.browser_verification(
+            created,
+            "pay_notification_review",
+        )
+
+        notification_env = {
+            "STYLEDASH_NTFY_ENABLED": "true",
+            "STYLEDASH_NTFY_BASE_URL": "https://ntfy.test",
+            "STYLEDASH_NTFY_TOPIC":
+                "styledash-test-private-topic-1234567890",
+        }
+
+        captured_notifications = []
+
+        def fail_after_capture(request, timeout=None):
+            captured_notifications.append(
+                json.loads(request.data.decode("utf-8"))
+            )
+            raise TimeoutError(
+                "simulated payment notification timeout"
+            )
+
+        with patch.dict(
+            os.environ,
+            notification_env,
+            clear=False,
+        ):
+            with patch(
+                "scripts.styledash_notify.urlopen",
+                side_effect=fail_after_capture,
+            ):
+                result = self.service.verify_payment(callback)
+
+        # Financial truth survives notification failure.
+        self.assertEqual(
+            result["order"]["paymentStatus"],
+            "paid",
+        )
+        self.assertEqual(
+            result["order"]["status"],
+            "payment_review_required",
+        )
+        self.assertFalse(
+            result["order"]["inventoryCommitted"]
+        )
+
+        stored = self.service.store.state["orders"][
+            created["styleDashOrderId"]
+        ]
+
+        self.assertEqual(
+            stored["paymentStatus"],
+            "paid",
+        )
+        self.assertEqual(
+            stored["status"],
+            "payment_review_required",
+        )
+        self.assertTrue(
+            stored["requiresAdminAttention"]
+        )
+
+        # We attempted exactly one urgent owner alert.
+        self.assertEqual(
+            len(captured_notifications),
+            1,
+        )
+
+        notification = captured_notifications[0]
+
+        self.assertEqual(
+            notification["title"],
+            "PAYMENT NEEDS ATTENTION",
+        )
+        self.assertEqual(
+            notification["priority"],
+            5,
+        )
+        self.assertIn(
+            created["styleDashOrderId"],
+            notification["message"],
+        )
+        self.assertIn(
+            "review required",
+            notification["message"].lower(),
+        )
+
+        # Topic is transport metadata, never human-visible content.
+        visible = (
+            notification["title"]
+            + "\n"
+            + notification["message"]
+        )
+
+        self.assertNotIn(
+            notification_env["STYLEDASH_NTFY_TOPIC"],
+            visible,
+        )
+
+
+    def test_payment_failed_notification_is_deduplicated(self) -> None:
+        created = self.create_payment(
+            "notification-payment-failed"
+        )
+
+        body = self.webhook_body(
+            created,
+            "pay_notify_failed",
+            event="payment.failed",
+            status="failed",
+        )
+
+        with patch.object(SERVER, "owner_notifier") as factory:
+            notifier = factory.return_value
+
+            first = self.deliver(body)
+            second = self.deliver(body)
+
+            self.assertEqual(first, {"success": True})
+            self.assertEqual(second, {"success": True})
+            self.assertEqual(notifier.send.call_count, 1)
+
+            notification = notifier.send.call_args.kwargs
+
+            self.assertEqual(
+                notification["event"],
+                "payment_failed",
+            )
+            self.assertIn(
+                created["styleDashOrderId"],
+                notification["message"],
+            )
+            self.assertNotIn(
+                "pay_notify_failed",
+                notification["message"],
+            )
+
+    def test_refund_processed_notification_is_exactly_once(self) -> None:
+        created = self.create_payment(
+            "notification-refund-processed"
+        )
+
+        callback = self.browser_verification(
+            created,
+            "pay_notify_refund",
+        )
+
+        with patch.object(SERVER, "owner_notifier") as factory:
+            notifier = factory.return_value
+
+            paid = self.service.verify_payment(callback)
+            self.assertEqual(
+                paid["order"]["paymentStatus"],
+                "paid",
+            )
+
+            # Ignore the initial payment-received notification.
+            notifier.send.reset_mock()
+
+            refund_body = json.dumps({
+                "event": "refund.processed",
+                "payload": {
+                    "payment": {
+                        "entity": {
+                            "id": "pay_notify_refund",
+                            "order_id": created["razorpayOrderId"],
+                            "amount": created["amount"],
+                            "amount_refunded": created["amount"],
+                            "currency": created["currency"],
+                            "status": "captured",
+                        }
+                    },
+                    "refund": {
+                        "entity": {
+                            "id": "rfnd_notify_full",
+                            "payment_id": "pay_notify_refund",
+                            "amount": created["amount"],
+                            "currency": created["currency"],
+                            "status": "processed",
+                        }
+                    },
+                },
+            }, separators=(",", ":")).encode()
+
+            first = self.deliver(refund_body)
+            second = self.deliver(refund_body)
+
+            self.assertEqual(first, {"success": True})
+            self.assertTrue(second["duplicate"])
+            self.assertEqual(notifier.send.call_count, 1)
+
+            notification = notifier.send.call_args.kwargs
+
+            self.assertEqual(
+                notification["event"],
+                "refund_processed",
+            )
+            self.assertIn(
+                created["styleDashOrderId"],
+                notification["message"],
+            )
+            self.assertIn(
+                "Status: Refunded",
+                notification["message"],
+            )
+
+    def test_refund_failed_notification_is_deduplicated(self) -> None:
+        created = self.create_payment(
+            "notification-refund-failed"
+        )
+
+        callback = self.browser_verification(
+            created,
+            "pay_notify_refund_failed",
+        )
+
+        with patch.object(SERVER, "owner_notifier") as factory:
+            notifier = factory.return_value
+
+            self.service.verify_payment(callback)
+
+            # Ignore payment-received notification.
+            notifier.send.reset_mock()
+
+            body = self.operational_webhook_body(
+                created,
+                "pay_notify_refund_failed",
+                "refund.failed",
+                "rfnd_notify_failed",
+            )
+
+            first = self.deliver(body)
+            second = self.deliver(body)
+
+            self.assertEqual(first, {"success": True})
+            self.assertTrue(second["duplicate"])
+            self.assertEqual(notifier.send.call_count, 1)
+
+            notification = notifier.send.call_args.kwargs
+
+            self.assertEqual(
+                notification["event"],
+                "refund_failed",
+            )
+            self.assertIn(
+                created["styleDashOrderId"],
+                notification["message"],
+            )
+            self.assertNotIn(
+                "rfnd_notify_failed",
+                notification["message"],
+            )
+
+
+    def test_partial_refund_review_notification_is_exactly_once(self) -> None:
+        created = self.create_payment(
+            "notification-refund-review"
+        )
+
+        callback = self.browser_verification(
+            created,
+            "pay_notify_refund_review",
+        )
+
+        with patch.object(SERVER, "owner_notifier") as factory:
+            notifier = factory.return_value
+
+            paid = self.service.verify_payment(callback)
+            self.assertEqual(
+                paid["order"]["paymentStatus"],
+                "paid",
+            )
+
+            notifier.send.reset_mock()
+
+            partial_amount = created["amount"] // 2
+
+            body = json.dumps({
+                "event": "refund.processed",
+                "payload": {
+                    "payment": {
+                        "entity": {
+                            "id": "pay_notify_refund_review",
+                            "order_id": created["razorpayOrderId"],
+                            "amount": created["amount"],
+                            "amount_refunded": partial_amount,
+                            "currency": created["currency"],
+                            "status": "captured",
+                        }
+                    },
+                    "refund": {
+                        "entity": {
+                            "id": "rfnd_notify_review",
+                            "payment_id": "pay_notify_refund_review",
+                            "amount": partial_amount,
+                            "currency": created["currency"],
+                            "status": "processed",
+                        }
+                    },
+                },
+            }, separators=(",", ":")).encode()
+
+            first = self.deliver(body)
+            second = self.deliver(body)
+
+            self.assertTrue(first["reviewRequired"])
+            self.assertTrue(second["duplicate"])
+            self.assertTrue(second["reviewRequired"])
+
+            self.assertEqual(
+                notifier.send.call_count,
+                1,
+            )
+
+            notification = notifier.send.call_args.kwargs
+
+            self.assertEqual(
+                notification["event"],
+                "refund_review_required",
+            )
+            self.assertEqual(
+                notification["priority"],
+                5,
+            )
+            self.assertEqual(
+                notification["title"],
+                "REFUND NEEDS ATTENTION",
+            )
+            self.assertIn(
+                created["styleDashOrderId"],
+                notification["message"],
+            )
+            self.assertIn(
+                "Review required",
+                notification["message"],
+            )
+
+    def test_payment_dispute_notification_is_deduplicated(self) -> None:
+        created = self.create_payment(
+            "notification-payment-dispute"
+        )
+
+        callback = self.browser_verification(
+            created,
+            "pay_notify_dispute",
+        )
+
+        with patch.object(SERVER, "owner_notifier") as factory:
+            notifier = factory.return_value
+
+            self.service.verify_payment(callback)
+
+            notifier.send.reset_mock()
+
+            body = self.operational_webhook_body(
+                created,
+                "pay_notify_dispute",
+                "payment.dispute.created",
+                "disp_notify_001",
+            )
+
+            first = self.deliver(body)
+            second = self.deliver(body)
+
+            self.assertEqual(first, {"success": True})
+            self.assertTrue(second["duplicate"])
+
+            self.assertEqual(
+                notifier.send.call_count,
+                1,
+            )
+
+            notification = notifier.send.call_args.kwargs
+
+            self.assertEqual(
+                notification["event"],
+                "payment_dispute",
+            )
+            self.assertEqual(
+                notification["priority"],
+                5,
+            )
+            self.assertEqual(
+                notification["title"],
+                "PAYMENT DISPUTE ALERT",
+            )
+            self.assertIn(
+                created["styleDashOrderId"],
+                notification["message"],
+            )
+
+            # Only a shortened reference may be visible.
+            self.assertNotIn(
+                "disp_notify_001",
+                notification["message"],
+            )
+
+
+    def test_cod_low_stock_threshold_notifies_only_on_crossing(self) -> None:
+        variant_id = "sd-prod-001-var-2"
+
+        with self.service.store.lock:
+            self.service.store.state["inventory"][variant_id] = 6
+            self.service.store.save()
+
+        payload = self.payload(
+                paymentMethod="cod",
+                items=[{
+                    "productId": "sd-prod-001",
+                    "variantId": "sd-prod-001-var-2",
+                    "quantity": 1,
+                }],
+            )
+
+        with patch.object(
+            SERVER,
+            "owner_notifier",
+        ) as notifier_factory:
+            notifier = notifier_factory.return_value
+
+            first = self.service.place_cod_order(
+                payload,
+                "inventory-low-stock-cod-001",
+            )
+
+            self.assertFalse(first["idempotent"])
+            self.assertEqual(
+                self.service.store.state["inventory"][variant_id],
+                5,
+            )
+
+            self.assertEqual(notifier.send.call_count, 1)
+
+            notification = notifier.send.call_args.kwargs
+
+            self.assertEqual(
+                notification["event"],
+                "inventory_low_stock",
+            )
+            self.assertEqual(notification["priority"], 5)
+            self.assertIn(
+                "Remaining: 5",
+                notification["message"],
+            )
+
+            # Idempotent retry must not ring again.
+            duplicate = self.service.place_cod_order(
+                payload,
+                "inventory-low-stock-cod-001",
+            )
+
+            self.assertTrue(duplicate["idempotent"])
+            self.assertEqual(notifier.send.call_count, 1)
+
+            # 5 -> 4 remains inside the low-stock range and must
+            # therefore stay silent.
+            second = self.service.place_cod_order(
+                payload,
+                "inventory-low-stock-cod-002",
+            )
+
+            self.assertFalse(second["idempotent"])
+            self.assertEqual(
+                self.service.store.state["inventory"][variant_id],
+                4,
+            )
+
+            self.assertEqual(notifier.send.call_count, 1)
+
+    def test_out_of_stock_notification_failure_does_not_break_cod(self) -> None:
+        variant_id = "sd-prod-001-var-2"
+
+        with self.service.store.lock:
+            self.service.store.state["inventory"][variant_id] = 1
+            self.service.store.save()
+
+        with patch.object(
+            SERVER,
+            "owner_notifier",
+            side_effect=RuntimeError(
+                "simulated inventory notification failure"
+            ),
+        ):
+            result = self.service.place_cod_order(
+                self.payload(
+                paymentMethod="cod",
+                items=[{
+                    "productId": "sd-prod-001",
+                    "variantId": "sd-prod-001-var-2",
+                    "quantity": 1,
+                }],
+            ),
+                "inventory-out-of-stock-failure-001",
+            )
+
+        self.assertFalse(result["idempotent"])
+
+        self.assertEqual(
+            self.service.store.state["inventory"][variant_id],
+            0,
+        )
+
+        order_id = result["order"]["id"]
+
+        self.assertIn(
+            order_id,
+            self.service.store.state["orders"],
+        )
+
+        self.assertEqual(
+            self.service.store.state["orders"][order_id]["status"],
+            "placed",
+        )
+
+    def test_captured_payment_low_stock_notification_is_exactly_once(self) -> None:
+        variant_id = "sd-prod-001-var-2"
+
+        created = self.create_payment(
+            "inventory-payment-low-stock-001",
+            items=[{
+                "productId": "sd-prod-001",
+                "variantId": "sd-prod-001-var-2",
+                "quantity": 1,
+            }],
+        )
+
+        with self.service.store.lock:
+            self.service.store.state["inventory"][variant_id] = 6
+            self.service.store.save()
+
+        callback = self.browser_verification(
+            created,
+            "pay_inventory_low_stock",
+        )
+
+        with patch.object(
+            SERVER,
+            "owner_notifier",
+        ) as notifier_factory:
+            notifier = notifier_factory.return_value
+
+            first = self.service.verify_payment(callback)
+
+            self.assertFalse(first["idempotent"])
+            self.assertEqual(
+                self.service.store.state["inventory"][variant_id],
+                5,
+            )
+
+            events = [
+                call.kwargs["event"]
+                for call in notifier.send.call_args_list
+            ]
+
+            self.assertEqual(
+                events.count("payment_captured"),
+                1,
+            )
+
+            self.assertEqual(
+                events.count("inventory_low_stock"),
+                1,
+            )
+
+            calls_before_duplicate = notifier.send.call_count
+
+            duplicate = self.deliver(
+                self.webhook_body(
+                    created,
+                    "pay_inventory_low_stock",
+                    event="order.paid",
+                )
+            )
+
+            self.assertTrue(duplicate["duplicate"])
+
+            self.assertEqual(
+                notifier.send.call_count,
+                calls_before_duplicate,
+            )
+
+            self.assertEqual(
+                self.service.store.state["inventory"][variant_id],
+                5,
+            )
+
+    def test_payment_test_order_never_emits_inventory_alert(self) -> None:
+        variant_id = "sd-prod-001-var-2"
+
+        created = self.create_payment(
+            "inventory-payment-test-skip-001"
+        )
+
+        with self.service.store.lock:
+            order = self.service.store.state["orders"][
+                created["styleDashOrderId"]
+            ]
+
+            # Convert this isolated test fixture into the same
+            # no-fulfillment state used by the hidden validation item.
+            order["isPaymentTestOrder"] = True
+            order["fulfillmentRequired"] = False
+            order["inventoryCommitted"] = False
+
+            self.service.store.state["inventory"][variant_id] = 6
+            self.service.store.save()
+
+        callback = self.browser_verification(
+            created,
+            "pay_inventory_payment_test_skip",
+        )
+
+        with patch.object(
+            SERVER,
+            "owner_notifier",
+        ) as notifier_factory:
+            notifier = notifier_factory.return_value
+
+            result = self.service.verify_payment(callback)
+
+            self.assertEqual(
+                result["order"]["status"],
+                "payment_test_completed",
+            )
+
+            self.assertEqual(
+                self.service.store.state["inventory"][variant_id],
+                6,
+            )
+
+            events = [
+                call.kwargs["event"]
+                for call in notifier.send.call_args_list
+            ]
+
+            self.assertFalse(
+                any(
+                    event.startswith("inventory_")
+                    for event in events
+                )
+            )
+
+
+    def test_ntfy_background_delivery_is_non_blocking(self) -> None:
+        delivered = threading.Event()
+
+        class Response:
+            status = 200
+
+            def __enter__(self):
+                return self
+
+            def __exit__(
+                self,
+                exc_type,
+                exc,
+                traceback,
+            ):
+                return False
+
+        def slow_urlopen(
+            request,
+            timeout=None,
+        ):
+            time.sleep(0.35)
+            delivered.set()
+            return Response()
+
+        notifier = NOTIFY.NtfyNotifier(
+            enabled=True,
+            base_url="https://ntfy.test",
+            topic="private-test-topic",
+            timeout=1.0,
+            background=True,
+        )
+
+        with patch(
+            "scripts.styledash_notify.urlopen",
+            side_effect=slow_urlopen,
+        ) as mocked_urlopen:
+            started = time.perf_counter()
+
+            queued = notifier.send(
+                event="background_test",
+                title="Background Test",
+                message="Safe test message",
+                priority=5,
+            )
+
+            elapsed = (
+                time.perf_counter()
+                - started
+            )
+
+            self.assertTrue(queued)
+
+            # Network sleeps for 350ms; enqueueing must
+            # return substantially earlier than that.
+            self.assertLess(elapsed, 0.20)
+
+            self.assertTrue(
+                NOTIFY.wait_for_notifications(
+                    timeout=2.0
+                )
+            )
+
+            self.assertTrue(
+                delivered.is_set()
+            )
+
+            self.assertEqual(
+                mocked_urlopen.call_count,
+                1,
+            )
+
+    def test_ntfy_background_network_failure_is_isolated(self) -> None:
+        notifier = NOTIFY.NtfyNotifier(
+            enabled=True,
+            base_url="https://ntfy.test",
+            topic="private-test-topic",
+            timeout=1.0,
+            background=True,
+        )
+
+        with patch(
+            "scripts.styledash_notify.urlopen",
+            side_effect=TimeoutError(
+                "simulated background timeout"
+            ),
+        ) as mocked_urlopen:
+            queued = notifier.send(
+                event="background_failure_test",
+                title="Background Failure Test",
+                message="Safe test message",
+                priority=5,
+            )
+
+            self.assertTrue(queued)
+
+            self.assertTrue(
+                NOTIFY.wait_for_notifications(
+                    timeout=2.0
+                )
+            )
+
+            self.assertEqual(
+                mocked_urlopen.call_count,
+                1,
+            )
+
 
     def test_server_calculates_trusted_amount_in_paise(self) -> None:
         response = self.service.create_razorpay_order(self.payload(), "checkout-test-001")
@@ -1111,6 +1945,527 @@ class HttpApiTests(unittest.TestCase):
         self.assertEqual((status, invalid["code"]), (400, "invalid_variant"))
         status, _body, _headers = self.post_json("/api/inventory/availability", {})
         self.assertEqual(status, 404)
+
+    def test_registration_sends_exactly_one_private_owner_notification(self) -> None:
+        notification_env = {
+            "STYLEDASH_NTFY_ENABLED": "true",
+            "STYLEDASH_NTFY_BASE_URL": "https://ntfy.test",
+            "STYLEDASH_NTFY_TOPIC": "styledash-test-private-topic-1234567890",
+        }
+
+        with patch.dict(os.environ, notification_env, clear=False):
+            with patch("scripts.styledash_notify.urlopen") as mocked_urlopen:
+                mocked_urlopen.return_value.__enter__.return_value.status = 200
+
+                payload = {
+                    "name": "Notification Customer",
+                    "email": "notification-customer@example.test",
+                    "password": "very secure notification password 123",
+                    "phone": "9999999999",
+                }
+
+                status, registered, _headers = self.post_json(
+                    "/api/auth/register",
+                    payload,
+                )
+
+                self.assertEqual(status, 201)
+                self.assertTrue(registered["success"])
+                self.assertEqual(mocked_urlopen.call_count, 1)
+
+                request = mocked_urlopen.call_args.args[0]
+                ntfy_payload = json.loads(request.data.decode("utf-8"))
+
+                self.assertEqual(
+                    ntfy_payload["topic"],
+                    notification_env["STYLEDASH_NTFY_TOPIC"],
+                )
+                self.assertEqual(ntfy_payload["priority"], 5)
+                self.assertIn(
+                    "Notification Customer",
+                    ntfy_payload["message"],
+                )
+                self.assertIn(
+                    "no*******************@example.test",
+                    ntfy_payload["message"],
+                )
+
+                # Sensitive registration fields must not appear in the
+                # human-visible notification title/message.
+                visible = (
+                    ntfy_payload["title"] + "\n" + ntfy_payload["message"]
+                )
+                self.assertNotIn(payload["password"], visible)
+                self.assertNotIn(payload["phone"], visible)
+                self.assertNotIn(payload["email"], visible)
+                self.assertNotIn(
+                    notification_env["STYLEDASH_NTFY_TOPIC"],
+                    visible,
+                )
+
+                # A failed duplicate registration must not produce
+                # a second owner notification.
+                duplicate_status, duplicate, _headers = self.post_json(
+                    "/api/auth/register",
+                    payload,
+                )
+
+                self.assertEqual(duplicate_status, 409)
+                self.assertEqual(duplicate["code"], "email_exists")
+                self.assertEqual(mocked_urlopen.call_count, 1)
+
+    def test_ntfy_network_failure_does_not_break_registration(self) -> None:
+        notification_env = {
+            "STYLEDASH_NTFY_ENABLED": "true",
+            "STYLEDASH_NTFY_BASE_URL": "https://ntfy.test",
+            "STYLEDASH_NTFY_TOPIC": "styledash-test-private-topic-1234567890",
+        }
+
+        with patch.dict(os.environ, notification_env, clear=False):
+            with patch(
+                "scripts.styledash_notify.urlopen",
+                side_effect=TimeoutError("simulated ntfy timeout"),
+            ):
+                status, registered, headers = self.post_json(
+                    "/api/auth/register",
+                    {
+                        "name": "Notification Failure Customer",
+                        "email": "notification-failure@example.test",
+                        "password": "very secure failure password 123",
+                        "phone": "9999999999",
+                    },
+                )
+
+        self.assertEqual(status, 201)
+        self.assertTrue(registered["success"])
+        self.assertIn("__Host-styledash_session=", headers["Set-Cookie"])
+
+        # Registration really persisted despite notification failure.
+        with self.service.security.connect() as db:
+            row = db.execute(
+                "SELECT id FROM users WHERE email=?",
+                ("notification-failure@example.test",),
+            ).fetchone()
+
+        self.assertIsNotNone(row)
+
+
+    def test_cod_order_sends_exactly_one_owner_notification(self) -> None:
+        # Registration notification is intentionally disabled here so
+        # this test counts only the COD notification.
+        with patch.dict(
+            os.environ,
+            {"STYLEDASH_NTFY_ENABLED": "false"},
+            clear=False,
+        ):
+            status, registered, headers = self.post_json(
+                "/api/auth/register",
+                {
+                    "name": "COD Notification Customer",
+                    "email": "cod-notification@example.test",
+                    "password": "very secure cod password 123",
+                    "phone": "9999999999",
+                },
+            )
+
+        self.assertEqual(status, 201)
+
+        cookie = headers["Set-Cookie"].split(";", 1)[0]
+
+        cod_payload = {
+            "items": [{
+                "productId": "sd-prod-001",
+                "variantId": "sd-prod-001-var-2",
+                "quantity": 1,
+            }],
+            "address": {
+                "name": "COD Notification Customer",
+                "phone": "9999999999",
+                "street": "123 Notification Street",
+                "city": "Neemuch",
+                "pincode": "458441",
+            },
+            "deliveryMethod": "express",
+            "paymentMethod": "cod",
+            "couponCode": None,
+        }
+
+        request_headers = {
+            "Cookie": cookie,
+            "X-CSRF-Token": registered["csrfToken"],
+            "Origin": "https://styledash.test",
+            "Idempotency-Key": "cod-notification-test-001",
+        }
+
+        notification_env = {
+            "STYLEDASH_NTFY_ENABLED": "true",
+            "STYLEDASH_NTFY_BASE_URL": "https://ntfy.test",
+            "STYLEDASH_NTFY_TOPIC":
+                "styledash-test-private-topic-1234567890",
+        }
+
+        with patch.dict(os.environ, notification_env, clear=False):
+            with patch(
+                "scripts.styledash_notify.urlopen"
+            ) as mocked_urlopen:
+                mocked_urlopen.return_value.__enter__.return_value.status = 200
+
+                status, placed, _headers = self.post_json(
+                    "/api/place-cod-order",
+                    cod_payload,
+                    request_headers,
+                )
+
+                self.assertEqual(status, 201)
+                self.assertTrue(placed["success"])
+                self.assertFalse(placed["idempotent"])
+                self.assertEqual(mocked_urlopen.call_count, 1)
+
+                request = mocked_urlopen.call_args.args[0]
+                ntfy_payload = json.loads(
+                    request.data.decode("utf-8")
+                )
+
+                order = placed["order"]
+                grand_total = order["grandTotal"]
+
+                self.assertEqual(ntfy_payload["priority"], 5)
+                self.assertIn(
+                    order["id"],
+                    ntfy_payload["message"],
+                )
+                self.assertIn(
+                    f"?{grand_total}",
+                    ntfy_payload["message"],
+                )
+                self.assertIn(
+                    "Payment: COD",
+                    ntfy_payload["message"],
+                )
+                self.assertIn(
+                    "Status: Placed",
+                    ntfy_payload["message"],
+                )
+
+                visible = (
+                    ntfy_payload["title"]
+                    + "\n"
+                    + ntfy_payload["message"]
+                )
+
+                # Private address/phone/topic must not be visible.
+                self.assertNotIn(
+                    cod_payload["address"]["street"],
+                    visible,
+                )
+                self.assertNotIn(
+                    cod_payload["address"]["phone"],
+                    visible,
+                )
+                self.assertNotIn(
+                    notification_env["STYLEDASH_NTFY_TOPIC"],
+                    visible,
+                )
+
+                # Same logical COD order must not ring twice.
+                duplicate_status, duplicate, _headers = self.post_json(
+                    "/api/place-cod-order",
+                    cod_payload,
+                    request_headers,
+                )
+
+                self.assertEqual(duplicate_status, 201)
+                self.assertTrue(duplicate["idempotent"])
+                self.assertEqual(
+                    duplicate["order"]["id"],
+                    order["id"],
+                )
+                self.assertEqual(mocked_urlopen.call_count, 1)
+
+    def test_ntfy_failure_does_not_break_cod_order(self) -> None:
+        with patch.dict(
+            os.environ,
+            {"STYLEDASH_NTFY_ENABLED": "false"},
+            clear=False,
+        ):
+            status, registered, headers = self.post_json(
+                "/api/auth/register",
+                {
+                    "name": "COD Failure Customer",
+                    "email": "cod-failure@example.test",
+                    "password": "very secure cod failure password 123",
+                    "phone": "9999999999",
+                },
+            )
+
+        self.assertEqual(status, 201)
+
+        cookie = headers["Set-Cookie"].split(";", 1)[0]
+
+        cod_payload = {
+            "items": [{
+                "productId": "sd-prod-001",
+                "variantId": "sd-prod-001-var-2",
+                "quantity": 1,
+            }],
+            "address": {
+                "name": "COD Failure Customer",
+                "phone": "9999999999",
+                "street": "123 Failure Street",
+                "city": "Neemuch",
+                "pincode": "458441",
+            },
+            "deliveryMethod": "express",
+            "paymentMethod": "cod",
+            "couponCode": None,
+        }
+
+        request_headers = {
+            "Cookie": cookie,
+            "X-CSRF-Token": registered["csrfToken"],
+            "Origin": "https://styledash.test",
+            "Idempotency-Key": "cod-notification-failure-001",
+        }
+
+        notification_env = {
+            "STYLEDASH_NTFY_ENABLED": "true",
+            "STYLEDASH_NTFY_BASE_URL": "https://ntfy.test",
+            "STYLEDASH_NTFY_TOPIC":
+                "styledash-test-private-topic-1234567890",
+        }
+
+        with patch.dict(os.environ, notification_env, clear=False):
+            with patch(
+                "scripts.styledash_notify.urlopen",
+                side_effect=TimeoutError(
+                    "simulated COD notification timeout"
+                ),
+            ):
+                status, placed, _headers = self.post_json(
+                    "/api/place-cod-order",
+                    cod_payload,
+                    request_headers,
+                )
+
+        self.assertEqual(status, 201)
+        self.assertTrue(placed["success"])
+        self.assertFalse(placed["idempotent"])
+
+        order_id = placed["order"]["id"]
+        persisted = self.service.store.state["orders"][order_id]
+
+        self.assertEqual(persisted["status"], "placed")
+        self.assertEqual(persisted["paymentMethod"], "cod")
+        self.assertTrue(persisted["inventoryCommitted"])
+
+
+    def test_vendor_application_sends_one_private_owner_notification(self) -> None:
+        # Registration itself is not part of this notification test.
+        with patch.dict(
+            os.environ,
+            {"STYLEDASH_NTFY_ENABLED": "false"},
+            clear=False,
+        ):
+            status, registered, headers = self.post_json(
+                "/api/auth/register",
+                {
+                    "name": "Vendor Notification Owner",
+                    "email": "vendor-notify@example.test",
+                    "password": "very secure vendor password 123",
+                    "phone": "9999999999",
+                },
+            )
+
+        self.assertEqual(status, 201)
+
+        cookie = headers["Set-Cookie"].split(";", 1)[0]
+
+        request_headers = {
+            "Cookie": cookie,
+            "X-CSRF-Token": registered["csrfToken"],
+            "Origin": "https://styledash.test",
+        }
+
+        payload = {
+            "storeName": "Notification Fashion Store",
+            "ownerName": "Vendor Notification Owner",
+            "email": "vendor-notify@example.test",
+            "phone": "9999999999",
+            "category": "Clothing & Fashion",
+            "address": "123 Private Vendor Market",
+            "pincode": "458441",
+            "description":
+                "A test vendor application for notification coverage.",
+        }
+
+        with patch.object(
+            SERVER,
+            "owner_notifier",
+        ) as notifier_factory:
+            notifier = notifier_factory.return_value
+
+            status, response, _headers = self.post_json(
+                "/api/vendor-applications",
+                payload,
+                request_headers,
+            )
+
+            self.assertEqual(status, 201)
+            self.assertTrue(response["success"])
+            self.assertTrue(
+                response["application"]["id"].startswith("vendor_")
+            )
+
+            self.assertEqual(
+                notifier.send.call_count,
+                1,
+            )
+
+            notification = notifier.send.call_args.kwargs
+
+            self.assertEqual(
+                notification["event"],
+                "vendor_application",
+            )
+            self.assertEqual(
+                notification["priority"],
+                5,
+            )
+            self.assertIn(
+                response["application"]["id"],
+                notification["message"],
+            )
+            self.assertIn(
+                "Notification Fashion Store",
+                notification["message"],
+            )
+            self.assertIn(
+                "Clothing & Fashion",
+                notification["message"],
+            )
+
+            visible = (
+                notification["title"]
+                + "\n"
+                + notification["message"]
+            )
+
+            # Customer/vendor private contact and address information
+            # must not be sent to the phone notification.
+            self.assertNotIn(
+                payload["email"],
+                visible,
+            )
+            self.assertNotIn(
+                payload["phone"],
+                visible,
+            )
+            self.assertNotIn(
+                payload["address"],
+                visible,
+            )
+
+            # Failed validation must not generate a notification.
+            invalid_payload = dict(
+                payload,
+                category="Unsupported Category",
+            )
+
+            invalid_status, invalid, _headers = self.post_json(
+                "/api/vendor-applications",
+                invalid_payload,
+                request_headers,
+            )
+
+            self.assertEqual(invalid_status, 400)
+            self.assertEqual(
+                invalid["code"],
+                "invalid_vendor_application",
+            )
+            self.assertEqual(
+                notifier.send.call_count,
+                1,
+            )
+
+    def test_ntfy_failure_does_not_break_vendor_application(self) -> None:
+        with patch.dict(
+            os.environ,
+            {"STYLEDASH_NTFY_ENABLED": "false"},
+            clear=False,
+        ):
+            status, registered, headers = self.post_json(
+                "/api/auth/register",
+                {
+                    "name": "Vendor Failure Owner",
+                    "email": "vendor-failure@example.test",
+                    "password": "very secure vendor failure password 123",
+                    "phone": "9999999999",
+                },
+            )
+
+        self.assertEqual(status, 201)
+
+        request_headers = {
+            "Cookie": headers["Set-Cookie"].split(";", 1)[0],
+            "X-CSRF-Token": registered["csrfToken"],
+            "Origin": "https://styledash.test",
+        }
+
+        notification_env = {
+            "STYLEDASH_NTFY_ENABLED": "true",
+            "STYLEDASH_NTFY_BASE_URL": "https://ntfy.test",
+            "STYLEDASH_NTFY_TOPIC":
+                "styledash-test-private-topic-1234567890",
+        }
+
+        payload = {
+            "storeName": "Failure Isolation Store",
+            "ownerName": "Vendor Failure Owner",
+            "email": "vendor-failure@example.test",
+            "phone": "9999999999",
+            "category": "Clothing & Fashion",
+            "address": "456 Private Vendor Market",
+            "pincode": "458441",
+            "description":
+                "Vendor notification failure isolation test.",
+        }
+
+        with patch.dict(
+            os.environ,
+            notification_env,
+            clear=False,
+        ):
+            with patch(
+                "scripts.styledash_notify.urlopen",
+                side_effect=TimeoutError(
+                    "simulated vendor ntfy timeout"
+                ),
+            ):
+                status, response, _headers = self.post_json(
+                    "/api/vendor-applications",
+                    payload,
+                    request_headers,
+                )
+
+        self.assertEqual(status, 201)
+        self.assertTrue(response["success"])
+
+        application_id = response["application"]["id"]
+
+        # The database write must survive notification failure.
+        with self.service.security.connect() as db:
+            row = db.execute(
+                """
+                SELECT id, status
+                FROM vendor_applications
+                WHERE id=?
+                """,
+                (application_id,),
+            ).fetchone()
+
+        self.assertIsNotNone(row)
+        self.assertEqual(row["status"], "pending")
+
 
     def test_auth_cookie_csrf_public_admin_absent_and_server_user_ownership(self) -> None:
         status, registered, headers = self.post_json("/api/auth/register", {

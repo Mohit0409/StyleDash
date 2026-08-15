@@ -8,6 +8,7 @@ import unittest
 import urllib.error
 import urllib.request
 from http.cookiejar import CookieJar
+from unittest.mock import patch
 from pathlib import Path
 
 import pyotp
@@ -113,6 +114,323 @@ class AdminStoreTests(unittest.TestCase):
         self.assertFalse(disabled["active"])
         actions = {row["action"] for row in self.store.audit()}
         self.assertTrue({"order_status", "inventory_adjustment", "vendor_approved", "customer_disabled"}.issubset(actions))
+
+    def test_order_cancellation_sends_owner_notification(self):
+        app = ADMIN_SERVER.AdminApplication(
+            self.database,
+            self.key,
+            ROOT / "server/payment-data/catalog.json",
+            ROOT / "server/payment-data/settings.json",
+            self.root / "data-cancel-notify",
+        )
+
+        with app.payments.store.lock:
+            app.payments.store.state["orders"]["ORDER-CANCEL-NOTIFY"] = {
+                "id": "ORDER-CANCEL-NOTIFY",
+                "userId": "customer-cancel-notify",
+                "status": "placed",
+                "paymentStatus": "pending",
+                "paymentMethod": "cod",
+                "grandTotal": 1072,
+                "inventoryCommitted": False,
+                "createdAt": "2026-08-15T00:00:00+00:00",
+            }
+            app.payments.store.save()
+
+        with patch.object(
+            ADMIN_SERVER,
+            "owner_notifier",
+        ) as notifier_factory:
+            notifier = notifier_factory.return_value
+
+            result = app.update_order_status(
+                self.admin["id"],
+                "ORDER-CANCEL-NOTIFY",
+                "cancelled",
+            )
+
+            self.assertEqual(result["status"], "cancelled")
+            self.assertEqual(notifier.send.call_count, 1)
+
+            notification = notifier.send.call_args.kwargs
+
+            self.assertEqual(
+                notification["event"],
+                "order_cancelled",
+            )
+            self.assertEqual(
+                notification["priority"],
+                5,
+            )
+            self.assertIn(
+                "ORDER-CANCEL-NOTIFY",
+                notification["message"],
+            )
+            self.assertIn(
+                "?1072",
+                notification["message"],
+            )
+            self.assertIn(
+                "Payment: COD",
+                notification["message"],
+            )
+            self.assertIn(
+                "Status: Cancelled",
+                notification["message"],
+            )
+
+            # A second cancellation is an invalid state transition,
+            # therefore it must not produce another notification.
+            self.assert_error(
+                "invalid_transition",
+                lambda: app.update_order_status(
+                    self.admin["id"],
+                    "ORDER-CANCEL-NOTIFY",
+                    "cancelled",
+                ),
+            )
+
+            self.assertEqual(notifier.send.call_count, 1)
+
+    def test_cancellation_notification_failure_does_not_break_cancellation(self):
+        app = ADMIN_SERVER.AdminApplication(
+            self.database,
+            self.key,
+            ROOT / "server/payment-data/catalog.json",
+            ROOT / "server/payment-data/settings.json",
+            self.root / "data-cancel-failure",
+        )
+
+        with app.payments.store.lock:
+            app.payments.store.state["orders"]["ORDER-CANCEL-FAILURE"] = {
+                "id": "ORDER-CANCEL-FAILURE",
+                "userId": "customer-cancel-failure",
+                "status": "placed",
+                "paymentStatus": "pending",
+                "paymentMethod": "cod",
+                "grandTotal": 999,
+                "inventoryCommitted": False,
+                "createdAt": "2026-08-15T00:00:00+00:00",
+            }
+            app.payments.store.save()
+
+        with patch.object(
+            ADMIN_SERVER,
+            "owner_notifier",
+            side_effect=RuntimeError(
+                "simulated notification configuration failure"
+            ),
+        ):
+            result = app.update_order_status(
+                self.admin["id"],
+                "ORDER-CANCEL-FAILURE",
+                "cancelled",
+            )
+
+        self.assertEqual(result["status"], "cancelled")
+
+        persisted = app.get_order("ORDER-CANCEL-FAILURE")
+
+        self.assertEqual(
+            persisted["status"],
+            "cancelled",
+        )
+
+        actions = [
+            entry
+            for entry in self.store.audit()
+            if entry["target_id"] == "ORDER-CANCEL-FAILURE"
+        ]
+
+        self.assertTrue(
+            any(
+                entry["action"] == "order_status"
+                and entry["result"] == "success"
+                for entry in actions
+            )
+        )
+
+
+    def test_admin_inventory_threshold_notifications(self):
+        app = ADMIN_SERVER.AdminApplication(
+            self.database,
+            self.key,
+            ROOT / "server/payment-data/catalog.json",
+            ROOT / "server/payment-data/settings.json",
+            self.root / "data-inventory-notify",
+        )
+
+        variant_id = "sd-prod-001-var-2"
+
+        with app.payments.store.lock:
+            app.payments.store.state["inventory"][variant_id] = 6
+            app.payments.store.save()
+
+        with patch.object(
+            ADMIN_SERVER,
+            "owner_notifier",
+        ) as notifier_factory:
+            notifier = notifier_factory.return_value
+
+            # 6 -> 5: one low-stock alert.
+            first = app.adjust_inventory(
+                self.admin["id"],
+                variant_id,
+                -1,
+            )
+
+            self.assertEqual(first["before"], 6)
+            self.assertEqual(first["after"], 5)
+
+            self.assertEqual(
+                notifier.send.call_count,
+                1,
+            )
+
+            self.assertEqual(
+                notifier.send.call_args.kwargs["event"],
+                "inventory_low_stock",
+            )
+
+            # 5 -> 4: no repeated low-stock alert.
+            second = app.adjust_inventory(
+                self.admin["id"],
+                variant_id,
+                -1,
+            )
+
+            self.assertEqual(second["after"], 4)
+
+            self.assertEqual(
+                notifier.send.call_count,
+                1,
+            )
+
+            # Prepare an independent 1 -> 0 crossing.
+            with app.payments.store.lock:
+                app.payments.store.state["inventory"][
+                    variant_id
+                ] = 1
+                app.payments.store.save()
+
+            third = app.adjust_inventory(
+                self.admin["id"],
+                variant_id,
+                -1,
+            )
+
+            self.assertEqual(third["after"], 0)
+
+            self.assertEqual(
+                notifier.send.call_count,
+                2,
+            )
+
+            events = [
+                call.kwargs["event"]
+                for call in notifier.send.call_args_list
+            ]
+
+            self.assertEqual(
+                events,
+                [
+                    "inventory_low_stock",
+                    "inventory_out_of_stock",
+                ],
+            )
+
+            out_notification = (
+                notifier.send.call_args_list[-1].kwargs
+            )
+
+            self.assertIn(
+                "Remaining: 0",
+                out_notification["message"],
+            )
+
+    def test_paid_order_reconciliation_can_trigger_low_stock_notification(self):
+        app = ADMIN_SERVER.AdminApplication(
+            self.database,
+            self.key,
+            ROOT / "server/payment-data/catalog.json",
+            ROOT / "server/payment-data/settings.json",
+            self.root / "data-reconcile-notify",
+        )
+
+        variant_id = "sd-prod-001-var-2"
+
+        with app.payments.store.lock:
+            app.payments.store.state["inventory"][variant_id] = 6
+
+            app.payments.store.state["orders"][
+                "ORDER-RECONCILE-LOW-STOCK"
+            ] = {
+                "id": "ORDER-RECONCILE-LOW-STOCK",
+                "userId": "customer-reconcile",
+                "status": "payment_review_required",
+                "paymentStatus": "paid",
+                "paymentMethod": "card",
+                "grandTotal": 1072,
+                "inventoryCommitted": False,
+                "requiresAdminAttention": True,
+                "inventoryShortfall": True,
+                "items": [{
+                    "productId": "sd-prod-001",
+                    "variantId": variant_id,
+                    "quantity": 1,
+                }],
+                "statusHistory": [],
+                "createdAt": "2026-08-15T00:00:00+00:00",
+                "updatedAt": "2026-08-15T00:00:00+00:00",
+            }
+
+            app.payments.store.save()
+
+        with patch.object(
+            ADMIN_SERVER,
+            "owner_notifier",
+        ) as notifier_factory:
+            notifier = notifier_factory.return_value
+
+            result = app.update_order_status(
+                self.admin["id"],
+                "ORDER-RECONCILE-LOW-STOCK",
+                "placed",
+            )
+
+            self.assertEqual(
+                result["status"],
+                "placed",
+            )
+
+            self.assertTrue(
+                result["inventoryCommitted"]
+            )
+
+            self.assertEqual(
+                app.payments.store.state["inventory"][
+                    variant_id
+                ],
+                5,
+            )
+
+            self.assertEqual(
+                notifier.send.call_count,
+                1,
+            )
+
+            notification = notifier.send.call_args.kwargs
+
+            self.assertEqual(
+                notification["event"],
+                "inventory_low_stock",
+            )
+
+            self.assertIn(
+                "Remaining: 5",
+                notification["message"],
+            )
+
 
     def test_payment_test_order_is_prominently_labelled_and_cannot_enter_fulfillment(self):
         app = ADMIN_SERVER.AdminApplication(
