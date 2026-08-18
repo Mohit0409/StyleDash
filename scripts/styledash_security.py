@@ -72,6 +72,31 @@ def clean_text(value: Any, label: str, minimum: int, maximum: int) -> str:
     return cleaned
 
 
+INDIA_MOBILE_PATTERN = re.compile(r"^[6-9]\d{9}$")
+
+
+def normalize_indian_phone(value: Any) -> str:
+    """Normalize an Indian mobile number to E.164 (+91XXXXXXXXXX).
+
+    Only well-known prefixes are stripped explicitly (never a blind digit
+    strip) so malformed numbers are rejected rather than silently coerced.
+    """
+    if not isinstance(value, str):
+        raise SecurityError(400, "Enter a valid Indian mobile number.", "invalid_phone")
+    condensed = re.sub(r"[\s\-()]", "", value.strip())
+    if condensed.startswith("+91"):
+        digits = condensed[3:]
+    elif condensed.startswith("91") and len(condensed) == 12:
+        digits = condensed[2:]
+    elif condensed.startswith("0") and len(condensed) == 11:
+        digits = condensed[1:]
+    else:
+        digits = condensed
+    if not INDIA_MOBILE_PATTERN.fullmatch(digits):
+        raise SecurityError(400, "Enter a valid Indian mobile number.", "invalid_phone")
+    return f"+91{digits}"
+
+
 class SecurityStore:
     """SQLite-backed users, sessions, profiles, vendors, and audit records."""
 
@@ -82,10 +107,14 @@ class SecurityStore:
         *,
         password_reset_sender: Callable[[str, str], None] | None = None,
         password_reset_dispatcher: PasswordResetDispatcher | None = None,
+        firebase_verifier: Callable[[str], dict[str, Any]] | None = None,
     ) -> None:
         self.path = path
         self.path.parent.mkdir(parents=True, exist_ok=True)
         self.passwords = PasswordHasher(type=Type.ID)
+        # Injected so Google/Phone federated sign-in is fully testable without
+        # a real Firebase project or network access.
+        self.firebase_verifier = firebase_verifier
         try:
             self.fernet = Fernet(encryption_key.encode("ascii"))
         except Exception as exc:
@@ -196,6 +225,68 @@ class SecurityStore:
                 "INSERT OR IGNORE INTO schema_migrations(version,applied_at) VALUES(3,?)",
                 (iso(utc_now()),),
             )
+
+            # Migration 4: allow email/password to be optional so Google and
+            # phone-only customers can exist without fabricating placeholder
+            # credentials. Additive/idempotent: skipped once email is already
+            # nullable. Existing rows and IDs are preserved verbatim.
+            users_info = db.execute("PRAGMA table_info(users)").fetchall()
+            email_notnull = next((row["notnull"] for row in users_info if row["name"] == "email"), 1)
+            if email_notnull:
+                db.execute("PRAGMA foreign_keys=OFF")
+                db.execute("BEGIN IMMEDIATE")
+                db.execute(
+                    """
+                    CREATE TABLE users_new(
+                      id TEXT PRIMARY KEY, email TEXT, password_hash TEXT,
+                      name TEXT NOT NULL, phone TEXT, role TEXT NOT NULL DEFAULT 'customer'
+                        CHECK(role IN ('customer','admin')),
+                      is_active INTEGER NOT NULL DEFAULT 1, email_verified INTEGER NOT NULL DEFAULT 0,
+                      email_verified_at TEXT,
+                      created_at TEXT NOT NULL, updated_at TEXT NOT NULL, password_changed_at TEXT NOT NULL
+                    )
+                    """
+                )
+                db.execute(
+                    "INSERT INTO users_new(id,email,password_hash,name,phone,role,is_active,email_verified,"
+                    "email_verified_at,created_at,updated_at,password_changed_at) "
+                    "SELECT id,email,password_hash,name,phone,role,is_active,email_verified,"
+                    "email_verified_at,created_at,updated_at,password_changed_at FROM users"
+                )
+                db.execute("DROP TABLE users")
+                db.execute("ALTER TABLE users_new RENAME TO users")
+                db.execute("CREATE INDEX IF NOT EXISTS sessions_token_idx ON sessions(token_hash)")
+                db.execute(
+                    "CREATE UNIQUE INDEX IF NOT EXISTS users_email_unique_idx ON users(email) WHERE email IS NOT NULL"
+                )
+                fk_problems = db.execute("PRAGMA foreign_key_check").fetchall()
+                if fk_problems:
+                    db.rollback()
+                    db.execute("PRAGMA foreign_keys=ON")
+                    raise RuntimeError("users table migration (nullable email/password) failed foreign key check")
+                db.commit()
+                db.execute("PRAGMA foreign_keys=ON")
+            db.executescript(
+                """
+                CREATE TABLE IF NOT EXISTS customer_auth_identities(
+                  id TEXT PRIMARY KEY,
+                  user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                  provider TEXT NOT NULL CHECK(provider IN ('google','phone')),
+                  provider_subject TEXT NOT NULL,
+                  verified_email TEXT,
+                  verified_phone TEXT,
+                  created_at TEXT NOT NULL,
+                  last_used_at TEXT NOT NULL,
+                  UNIQUE(provider, provider_subject)
+                );
+                CREATE INDEX IF NOT EXISTS customer_auth_identities_user_idx
+                  ON customer_auth_identities(user_id);
+                """
+            )
+            db.execute(
+                "INSERT OR IGNORE INTO schema_migrations(version,applied_at) VALUES(4,?)",
+                (iso(utc_now()),),
+            )
         self._secure_files()
 
     def _secure_files(self) -> None:
@@ -209,6 +300,7 @@ class SecurityStore:
             "id": row["id"], "uid": row["id"], "email": row["email"], "name": row["name"],
             "phone": row["phone"], "role": row["role"],
             "emailVerified": bool(row["email_verified_at"]),
+            "hasPassword": bool(row["password_hash"]),
         }
 
     def _new_session(self, db: sqlite3.Connection, user: sqlite3.Row) -> tuple[str, str]:
@@ -281,7 +373,7 @@ class SecurityStore:
                 raise SecurityError(429, "Too many login attempts. Please wait and try again.", "login_rate_limited")
             user = db.execute("SELECT * FROM users WHERE email=?", (email,)).fetchone()
             valid = False
-            if user is not None and user["is_active"] and user["role"] == "customer":
+            if user is not None and user["is_active"] and user["role"] == "customer" and user["password_hash"]:
                 try:
                     valid = self.passwords.verify(user["password_hash"], password)
                 except (VerifyMismatchError, InvalidHashError):
@@ -301,7 +393,7 @@ class SecurityStore:
         now = utc_now()
         with self.connect() as db:
             row = db.execute(
-                "SELECT s.*,u.id AS authenticated_user_id,u.email,u.name,u.phone,u.role,u.is_active,u.email_verified,u.email_verified_at FROM sessions s JOIN users u ON u.id=s.user_id WHERE s.token_hash=?",
+                "SELECT s.*,u.id AS authenticated_user_id,u.email,u.name,u.phone,u.role,u.is_active,u.email_verified,u.email_verified_at,u.password_hash FROM sessions s JOIN users u ON u.id=s.user_id WHERE s.token_hash=?",
                 (token_hash(raw_session),),
             ).fetchone()
             if row is None or row["revoked_at"] or not row["is_active"]:
@@ -317,12 +409,211 @@ class SecurityStore:
             "id": row["authenticated_user_id"], "uid": row["authenticated_user_id"],
             "email": row["email"], "name": row["name"], "phone": row["phone"],
             "role": row["role"], "emailVerified": bool(row["email_verified_at"]),
+            "hasPassword": bool(row["password_hash"]),
         }
         return user, row
 
     def revoke(self, raw_session: str) -> None:
         with self.connect() as db:
             db.execute("UPDATE sessions SET revoked_at=? WHERE token_hash=?", (iso(utc_now()), token_hash(raw_session)))
+
+    def federated_session(
+        self, provider: str, payload: dict[str, Any]
+    ) -> tuple[dict[str, Any], str, str, bool]:
+        """Exchange a verified Firebase ID token for a normal StyleDash session.
+
+        Firebase is used only to cryptographically prove a Google or phone
+        identity. Nothing from the request body is trusted; every claim used
+        below comes from the verified token, never from ``payload`` directly.
+        Returns (safe_user, raw_session, csrf_token, created).
+        """
+        if provider not in ("google", "phone"):
+            raise SecurityError(400, "Unsupported sign-in method.", "invalid_provider")
+        id_token = payload.get("idToken")
+        if not isinstance(id_token, str) or not 20 <= len(id_token) <= 4096:
+            raise SecurityError(400, "A valid identity token is required.", "invalid_token")
+        verifier = self.firebase_verifier
+        if verifier is None:
+            try:
+                from styledash_firebase import verify_firebase_id_token as verifier  # type: ignore[assignment]
+            except ImportError:
+                from scripts.styledash_firebase import verify_firebase_id_token as verifier  # type: ignore[assignment]
+        try:
+            claims = verifier(id_token)
+        except Exception:
+            # Never surface Firebase's internal exception (expired/invalid
+            # signature/revoked/wrong project) — a single generic error
+            # avoids leaking which case applies.
+            raise SecurityError(401, "Unable to complete sign in. Please try again.", "identity_verification_failed") from None
+        if not isinstance(claims, dict):
+            raise SecurityError(401, "Unable to complete sign in. Please try again.", "identity_verification_failed")
+        sign_in_provider = str((claims.get("firebase") or {}).get("sign_in_provider") or "")
+        expected_provider = "google.com" if provider == "google" else "phone"
+        if sign_in_provider != expected_provider:
+            raise SecurityError(401, "Unable to complete sign in. Please try again.", "identity_verification_failed")
+        uid = claims.get("uid") or claims.get("sub")
+        if not isinstance(uid, str) or not uid:
+            raise SecurityError(401, "Unable to complete sign in. Please try again.", "identity_verification_failed")
+        now = iso(utc_now())
+        try:
+            with self.connect() as db:
+                db.execute("BEGIN IMMEDIATE")
+                identity = db.execute(
+                    "SELECT * FROM customer_auth_identities WHERE provider=? AND provider_subject=?",
+                    (provider, uid),
+                ).fetchone()
+                created = False
+                if identity is not None:
+                    user = db.execute("SELECT * FROM users WHERE id=?", (identity["user_id"],)).fetchone()
+                    if user is None or not user["is_active"]:
+                        raise SecurityError(401, "Unable to complete sign in. Please try again.", "identity_verification_failed")
+                    db.execute(
+                        "UPDATE customer_auth_identities SET last_used_at=? WHERE id=?", (now, identity["id"])
+                    )
+                elif provider == "google":
+                    user, created = self._google_identity(db, uid, claims, now)
+                else:
+                    user, created = self._phone_identity(db, uid, claims, now)
+                raw, csrf = self._new_session(db, user)
+                db.commit()
+        except sqlite3.IntegrityError:
+            raise SecurityError(401, "Unable to complete sign in. Please try again.", "identity_verification_failed") from None
+        self._secure_files()
+        result = self.safe_user(user)
+        result["needsProfile"] = provider == "phone" and not user["name"]
+        return result, raw, csrf, created
+
+    def link_federated_identity(
+        self, raw_session: str, provider: str, payload: dict[str, Any]
+    ) -> dict[str, Any]:
+        """Link a verified external identity to the authenticated customer."""
+        current, _session = self.authenticate(raw_session)
+        if provider not in ("google", "phone"):
+            raise SecurityError(400, "Unsupported sign-in method.", "invalid_provider")
+        id_token = payload.get("idToken")
+        if not isinstance(id_token, str) or not 20 <= len(id_token) <= 4096:
+            raise SecurityError(400, "A valid identity token is required.", "invalid_token")
+        verifier = self.firebase_verifier
+        if verifier is None:
+            try:
+                from styledash_firebase import verify_firebase_id_token as verifier  # type: ignore[assignment]
+            except ImportError:
+                from scripts.styledash_firebase import verify_firebase_id_token as verifier  # type: ignore[assignment]
+        try:
+            claims = verifier(id_token)
+        except Exception:
+            raise SecurityError(401, "Unable to complete sign in. Please try again.", "identity_verification_failed") from None
+        expected_provider = "google.com" if provider == "google" else "phone"
+        if not isinstance(claims, dict) or str((claims.get("firebase") or {}).get("sign_in_provider") or "") != expected_provider:
+            raise SecurityError(401, "Unable to complete sign in. Please try again.", "identity_verification_failed")
+        uid = claims.get("uid") or claims.get("sub")
+        if not isinstance(uid, str) or not uid:
+            raise SecurityError(401, "Unable to complete sign in. Please try again.", "identity_verification_failed")
+        verified_email = None
+        verified_phone = None
+        if provider == "google":
+            if not claims.get("email_verified") or not isinstance(claims.get("email"), str) or not claims.get("email"):
+                raise SecurityError(400, "Unable to link Google securely.", "google_email_required")
+            verified_email = normalize_email(claims["email"])
+        else:
+            try:
+                verified_phone = normalize_indian_phone(claims.get("phone_number"))
+            except SecurityError:
+                raise SecurityError(400, "Unable to link mobile securely.", "phone_required") from None
+        now = iso(utc_now())
+        with self.connect() as db:
+            db.execute("BEGIN IMMEDIATE")
+            collision = db.execute(
+                "SELECT * FROM customer_auth_identities WHERE provider=? AND provider_subject=?",
+                (provider, uid),
+            ).fetchone()
+            if collision and collision["user_id"] != current["id"]:
+                raise SecurityError(409, "This identity is already linked.", "identity_already_linked")
+            if provider == "phone":
+                collision = db.execute(
+                    "SELECT * FROM customer_auth_identities WHERE provider='phone' AND verified_phone=?",
+                    (verified_phone,),
+                ).fetchone()
+            if collision and collision["user_id"] != current["id"]:
+                raise SecurityError(409, "This mobile number is already linked.", "identity_already_linked")
+            if not collision:
+                db.execute(
+                    "INSERT INTO customer_auth_identities(id,user_id,provider,provider_subject,verified_email,verified_phone,created_at,last_used_at) "
+                    "VALUES(?,?,?,?,?,?,?,?)",
+                    ("cai_" + secrets.token_hex(12), current["id"], provider, uid, verified_email, verified_phone, now, now),
+                )
+            db.commit()
+        return self.profile(current["id"])
+
+    def _google_identity(
+        self, db: sqlite3.Connection, uid: str, claims: dict[str, Any], now: str
+    ) -> tuple[sqlite3.Row, bool]:
+        if not claims.get("email_verified") or not isinstance(claims.get("email"), str) or not claims.get("email"):
+            raise SecurityError(400, "Unable to complete sign in with Google.", "google_email_required")
+        email = normalize_email(claims["email"])
+        existing = db.execute("SELECT * FROM users WHERE email=?", (email,)).fetchone()
+        created = False
+        if existing is not None:
+            user_id = existing["id"]
+            if not existing["email_verified_at"]:
+                db.execute(
+                    "UPDATE users SET email_verified=1,email_verified_at=?,updated_at=? WHERE id=?",
+                    (now, now, user_id),
+                )
+        else:
+            raw_name = claims.get("name")
+            name = clean_text(raw_name, "name", 1, 80) if isinstance(raw_name, str) and raw_name.strip() else email.split("@", 1)[0][:80]
+            user_id = "usr_" + secrets.token_hex(12)
+            db.execute(
+                "INSERT INTO users(id,email,password_hash,name,phone,created_at,updated_at,password_changed_at,"
+                "email_verified,email_verified_at) VALUES(?,?,?,?,?,?,?,?,1,?)",
+                (user_id, email, None, name, None, now, now, now, now),
+            )
+            created = True
+        db.execute(
+            "INSERT INTO customer_auth_identities(id,user_id,provider,provider_subject,verified_email,created_at,last_used_at) "
+            "VALUES(?,?,?,?,?,?,?)",
+            ("cai_" + secrets.token_hex(12), user_id, "google", uid, email, now, now),
+        )
+        user = db.execute("SELECT * FROM users WHERE id=?", (user_id,)).fetchone()
+        return user, created
+
+    def _phone_identity(
+        self, db: sqlite3.Connection, uid: str, claims: dict[str, Any], now: str
+    ) -> tuple[sqlite3.Row, bool]:
+        raw_phone = claims.get("phone_number")
+        if not isinstance(raw_phone, str) or not raw_phone:
+            raise SecurityError(400, "Unable to complete sign in with mobile.", "phone_required")
+        try:
+            phone = normalize_indian_phone(raw_phone)
+        except SecurityError:
+            raise SecurityError(400, "Unable to complete sign in with mobile.", "phone_required") from None
+        existing = db.execute(
+            "SELECT * FROM customer_auth_identities WHERE provider='phone' AND verified_phone=?",
+            (phone,),
+        ).fetchone()
+        if existing is not None:
+            user = db.execute("SELECT * FROM users WHERE id=?", (existing["user_id"],)).fetchone()
+            if user is None or not user["is_active"]:
+                raise SecurityError(401, "Unable to complete sign in. Please try again.", "identity_verification_failed")
+            raise SecurityError(409, "This mobile identity is already linked to another sign-in.", "identity_already_linked")
+        # Deliberately never matched against the free-text `phone` column on
+        # password accounts: that field is unverified user input and linking
+        # against it would let anyone claim another customer's account by
+        # typing their number and later verifying it themselves.
+        user_id = "usr_" + secrets.token_hex(12)
+        db.execute(
+            "INSERT INTO users(id,email,password_hash,name,phone,created_at,updated_at,password_changed_at) "
+            "VALUES(?,?,?,?,?,?,?,?)",
+            (user_id, None, None, "", phone, now, now, now),
+        )
+        db.execute(
+            "INSERT INTO customer_auth_identities(id,user_id,provider,provider_subject,verified_phone,created_at,last_used_at) "
+            "VALUES(?,?,?,?,?,?,?)",
+            ("cai_" + secrets.token_hex(12), user_id, "phone", uid, phone, now, now),
+        )
+        user = db.execute("SELECT * FROM users WHERE id=?", (user_id,)).fetchone()
+        return user, True
 
     def verify_csrf(self, raw_session: str | None, supplied: str | None) -> None:
         if not raw_session or not supplied or not hmac.compare_digest(self.csrf_token(raw_session), supplied):
@@ -366,7 +657,7 @@ class SecurityStore:
         reset_id: str | None = None
         with self.connect() as db:
             user = db.execute(
-                "SELECT id,email FROM users WHERE email=? AND is_active=1 AND role='customer'",
+                "SELECT id,email FROM users WHERE email=? AND is_active=1 AND role='customer' AND password_hash IS NOT NULL",
                 (email,),
             ).fetchone()
             if user is None:

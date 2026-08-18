@@ -6,6 +6,7 @@ import json
 import logging
 import os
 import queue
+import re
 import threading
 import time
 from typing import Iterable
@@ -42,6 +43,21 @@ def mask_email(email: str) -> str:
     hidden = "*" * max(4, len(local) - len(visible))
 
     return f"{visible}{hidden}@{domain}"
+
+
+def mask_phone(phone: str) -> str:
+    """Return a notification-safe masked phone number, e.g. '+91 98******10'."""
+    value = (phone or "").strip()
+    match = re.match(r"^(\+\d{1,3})(\d{5,})$", value)
+    if not match:
+        return "***"
+    country, national = match.groups()
+    if len(national) <= 4:
+        return f"{country} {'*' * len(national)}"
+    visible_start = national[:2]
+    visible_end = national[-2:]
+    hidden = "*" * (len(national) - 4)
+    return f"{country} {visible_start}{hidden}{visible_end}"
 
 
 class NtfyNotifier:

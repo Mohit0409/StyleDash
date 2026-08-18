@@ -5,6 +5,7 @@ interface AuthResponse {
   success: true;
   user: UserProfile;
   csrfToken: string;
+  needsProfile?: boolean;
 }
 
 interface PasswordResetRequestResponse {
@@ -16,6 +17,7 @@ const accept = (response: AuthResponse) => {
   setCsrfToken(response.csrfToken);
   return response;
 };
+export type FederatedProvider = 'google' | 'phone';
 
 export const authApi = {
   async me(): Promise<UserProfile> {
@@ -27,6 +29,12 @@ export const authApi = {
   },
   async register(name: string, email: string, password: string, phone?: string): Promise<AuthResponse> {
     return accept(await apiJson<AuthResponse>('/api/auth/register', 'POST', { name, email, password, phone }));
+  },
+  async federated(provider: FederatedProvider, idToken: string): Promise<AuthResponse> {
+    return accept(await apiJson<AuthResponse>(`/api/auth/federated/${provider}`, 'POST', { idToken }));
+  },
+  async linkFederated(provider: FederatedProvider, idToken: string): Promise<UserProfile> {
+    return (await apiJson<{ success: true; profile: UserProfile }>(`/api/auth/federated/link/${provider}`, 'POST', { idToken })).profile;
   },
   async logout(): Promise<void> {
     await apiJson('/api/auth/logout', 'POST', {});

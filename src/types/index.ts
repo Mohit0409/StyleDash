@@ -196,12 +196,13 @@ export interface Coupon {
 export interface UserProfile {
   uid: string;
   name: string;
-  email: string;
+  email?: string;
   phone?: string;
   role: 'customer';
   addresses?: Address[];
   createdAt?: string;
   emailVerified?: boolean;
+  hasPassword?: boolean;
 }
 
 export interface ServiceArea {

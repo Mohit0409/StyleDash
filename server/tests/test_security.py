@@ -310,7 +310,7 @@ class SecurityStoreTests(unittest.TestCase):
             self.assertEqual(db.execute("PRAGMA foreign_keys").fetchone()[0], 1)
             self.assertEqual(db.execute("PRAGMA journal_mode").fetchone()[0], "wal")
             self.assertEqual(db.execute("PRAGMA integrity_check").fetchone()[0], "ok")
-            self.assertEqual(db.execute("SELECT MAX(version) FROM schema_migrations").fetchone()[0], 3)
+            self.assertEqual(db.execute("SELECT MAX(version) FROM schema_migrations").fetchone()[0], 4)
             backup_path = Path(self.temporary.name) / "backup.db"
             backup = sqlite3.connect(backup_path)
             db.backup(backup)
@@ -356,14 +356,14 @@ class SecurityStoreTests(unittest.TestCase):
             ).fetchone()
             self.assertEqual((row["email"], row["email_verified"]), ("legacy-owner@example.test", 1))
             self.assertIsNone(row["email_verified_at"])
-            self.assertEqual(db.execute("SELECT MAX(version) FROM schema_migrations").fetchone()[0], 3)
+            self.assertEqual(db.execute("SELECT MAX(version) FROM schema_migrations").fetchone()[0], 4)
             self.assertEqual(db.execute("PRAGMA integrity_check").fetchone()[0], "ok")
         self.assertFalse(migrated.profile("usr_legacy")["emailVerified"])
 
         reopened = SECURITY.SecurityStore(legacy_path, key)
         with reopened.connect() as db:
             self.assertEqual(
-                db.execute("SELECT COUNT(*) FROM schema_migrations WHERE version=3").fetchone()[0],
+                db.execute("SELECT COUNT(*) FROM schema_migrations WHERE version=4").fetchone()[0],
                 1,
             )
             self.assertEqual(db.execute("PRAGMA integrity_check").fetchone()[0], "ok")

@@ -39,9 +39,9 @@ except ModuleNotFoundError:  # Repository test import path.
     from scripts.styledash_mail import PasswordResetDeliveryQueue, SmtpPasswordResetSender
 
 try:
-    from styledash_notify import mask_email, owner_notifier
+    from styledash_notify import mask_email, mask_phone, owner_notifier
 except ModuleNotFoundError:  # Repository test import path.
-    from scripts.styledash_notify import mask_email, owner_notifier
+    from scripts.styledash_notify import mask_email, mask_phone, owner_notifier
 
 try:
     import razorpay
@@ -51,14 +51,21 @@ except ImportError:  # The static site and COD can still start without the SDK.
 
 MAX_BODY_BYTES = 64 * 1024
 API_PREFIX = "/api/"
+# Firebase/Google endpoints are added narrowly (never a wildcard) and only to
+# support the Google + Phone-OTP identity flows; Firebase is never granted
+# order/payment/inventory/admin authority.
 SECURITY_POLICY = (
     "default-src 'self'; "
     "base-uri 'self'; object-src 'none'; frame-ancestors 'self'; "
-    "script-src 'self' https://checkout.razorpay.com https://*.razorpay.com; "
+    "script-src 'self' https://checkout.razorpay.com https://*.razorpay.com "
+    "https://apis.google.com https://www.gstatic.com https://www.google.com https://www.recaptcha.net; "
     "style-src 'self' 'unsafe-inline' https://*.razorpay.com; "
     "img-src 'self' data: https:; font-src 'self' data: https:; "
-    "connect-src 'self' https://api.razorpay.com https://*.razorpay.com; "
-    "frame-src https://api.razorpay.com https://checkout.razorpay.com https://*.razorpay.com; "
+    "connect-src 'self' https://api.razorpay.com https://*.razorpay.com "
+    "https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://www.googleapis.com "
+    "https://*.firebaseio.com wss://*.firebaseio.com; "
+    "frame-src https://api.razorpay.com https://checkout.razorpay.com https://*.razorpay.com "
+    "https://accounts.google.com https://*.firebaseapp.com https://www.google.com https://www.recaptcha.net; "
     "form-action 'self' https://api.razorpay.com https://*.razorpay.com"
 )
 ACCESS_LOG_TOKEN_PATTERN = re.compile(r"([?&](?:token|reset_token)=)[^&#\s]*", re.IGNORECASE)
@@ -2081,6 +2088,45 @@ class StyleDashRequestHandler(SimpleHTTPRequestHandler):
                 user, raw, csrf = self._security().login(self._read_json(), self._client_key("login"))
                 self._json_response(HTTPStatus.OK, {"success": True, "user": user, "csrfToken": csrf}, headers={"Set-Cookie": self._security().cookie(raw)})
                 return
+            if path in ("/api/auth/federated/google", "/api/auth/federated/phone"):
+                self._rate_limit(path, 10)
+                provider = "google" if path.endswith("google") else "phone"
+                user, raw, csrf, created = self._security().federated_session(provider, self._read_json())
+
+                if created:
+                    contact = (
+                        f"Email: {mask_email(user.get('email') or '')}"
+                        if provider == "google"
+                        else f"Mobile: {mask_phone(user.get('phone') or '')}"
+                    )
+                    owner_notifier().send(
+                        event="customer_registered",
+                        title="New StyleDash Registration",
+                        message=(
+                            f"Name: {user.get('name') or '-'}\n"
+                            f"{contact}\n"
+                            f"Method: {'Google' if provider == 'google' else 'Mobile OTP'}\n"
+                            f"Customer ID: {user.get('id') or '-'}"
+                        ),
+                        priority=5,
+                        tags=["bust_in_silhouette"],
+                    )
+
+                self._json_response(
+                    HTTPStatus.OK if not created else HTTPStatus.CREATED,
+                    {"success": True, "user": user, "csrfToken": csrf},
+                    headers={"Set-Cookie": self._security().cookie(raw)},
+                )
+                return
+            if path in ("/api/auth/federated/link/google", "/api/auth/federated/link/phone"):
+                self._rate_limit(path, 10)
+                raw = self._session_token()
+                self._security().verify_csrf(raw, self.headers.get("X-CSRF-Token"))
+                provider = "google" if path.endswith("google") else "phone"
+                self._security().link_federated_identity(raw or "", provider, self._read_json())
+                current, _session = self._current_user()
+                self._json_response(HTTPStatus.OK, {"success": True, "profile": self._security().profile(current["id"])})
+                return
             if path == "/api/auth/password-reset/request":
                 payload = self._read_json()
                 self._password_reset_rate_limit(payload)
@@ -2181,6 +2227,7 @@ class StyleDashRequestHandler(SimpleHTTPRequestHandler):
                 self._json_response(HTTPStatus.NOT_FOUND, {"success": False, "error": "Not found.", "code": "not_found"})
                 return
             if path == "/api/profile":
+                self._rate_limit(path, 30)
                 user, _session = self._current_user()
                 self._csrf()
                 profile = self._security().update_profile(user["id"], self._read_json())
