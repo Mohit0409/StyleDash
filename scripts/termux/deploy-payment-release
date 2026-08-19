@@ -12,7 +12,8 @@ DATA_ROOT="$HOME/.local/share/styledash"
 LIVE_DB="$DATA_ROOT/styledash.db"
 LIVE_STATE="$DATA_ROOT/runtime/orders.json"
 BACKUP_SCRIPT="$STAGE/scripts/termux/backup-styledash-data"
-SECRETS_FILE="$HOME/.config/styledash/secrets.env"
+PRIVATE_CONFIG_DIR="$HOME/.config/styledash"
+SECRETS_FILE="$PRIVATE_CONFIG_DIR/secrets.env"
 
 if [ ! -f "$STAGE/scripts/styledash_firebase.py" ]; then
   echo "release is missing styledash_firebase.py; deployment aborted" >&2
@@ -29,7 +30,16 @@ for empty_firebase_field in 'apiKey:""' 'authDomain:""' 'projectId:""' 'appId:""
     exit 1
   fi
 done
-if [ ! -f "$SECRETS_FILE" ] || [ "$(stat -c '%a' "$SECRETS_FILE")" != 600 ]; then
+if [ ! -d "$PRIVATE_CONFIG_DIR" ] || \
+   [ "$(realpath -e "$PRIVATE_CONFIG_DIR")" != "$PRIVATE_CONFIG_DIR" ] || \
+   [ "$(stat -c '%a' "$PRIVATE_CONFIG_DIR")" != 700 ] || \
+   [ "$(stat -c '%u' "$PRIVATE_CONFIG_DIR")" != "$(id -u)" ]; then
+  echo "private configuration directory is missing, redirected, or has unsafe ownership or permissions; deployment aborted" >&2
+  exit 1
+fi
+if [ ! -f "$SECRETS_FILE" ] || \
+   [ "$(stat -c '%a' "$SECRETS_FILE")" != 600 ] || \
+   [ "$(stat -c '%u' "$SECRETS_FILE")" != "$(id -u)" ]; then
   echo "private runtime configuration is missing or has unsafe permissions; deployment aborted" >&2
   exit 1
 fi
@@ -42,10 +52,22 @@ case "$STYLEDASH_FIREBASE_CREDENTIALS" in
   /*) ;;
   *) echo "Firebase credentials path must be absolute; deployment aborted" >&2; exit 1 ;;
 esac
-if [ ! -r "$STYLEDASH_FIREBASE_CREDENTIALS" ] || [ "$(stat -c '%a' "$STYLEDASH_FIREBASE_CREDENTIALS")" != 600 ]; then
-  echo "Firebase credentials are missing, unreadable, or have unsafe permissions; deployment aborted" >&2
+FIREBASE_CREDENTIALS_REAL="$(realpath -e "$STYLEDASH_FIREBASE_CREDENTIALS")" || {
+  echo "Firebase credentials path cannot be resolved; deployment aborted" >&2
+  exit 1
+}
+case "$FIREBASE_CREDENTIALS_REAL" in
+  "$PRIVATE_CONFIG_DIR"/*) ;;
+  *) echo "Firebase credentials must remain inside the private StyleDash configuration directory; deployment aborted" >&2; exit 1 ;;
+esac
+if [ ! -f "$FIREBASE_CREDENTIALS_REAL" ] || \
+   [ ! -r "$FIREBASE_CREDENTIALS_REAL" ] || \
+   [ "$(stat -c '%a' "$FIREBASE_CREDENTIALS_REAL")" != 600 ] || \
+   [ "$(stat -c '%u' "$FIREBASE_CREDENTIALS_REAL")" != "$(id -u)" ]; then
+  echo "Firebase credentials are missing, unreadable, or have unsafe ownership or permissions; deployment aborted" >&2
   exit 1
 fi
+export STYLEDASH_FIREBASE_CREDENTIALS="$FIREBASE_CREDENTIALS_REAL"
 PYTHONPATH="$STAGE/scripts${PYTHONPATH:+:$PYTHONPATH}" python3 -c 'from styledash_firebase import _initialize_app; _initialize_app(); print("firebase_admin_preflight=ok")'
 
 if [ -f "$LIVE_DB" ]; then
@@ -99,6 +121,14 @@ for optional in start-styledash-admin styledash-create-admin audit-styledash-net
 done
 cp -a "$HOME/.termux/boot/start-styledash" "$BACKUP/boot/"
 printf 'rollback=%s\n' "$BACKUP"
+
+cloudflare_marker='cloudflared tunnel --no-autoupdate --url http://127.0.0.1:8080'
+for cloudflare_pid in $(pgrep -f "$cloudflare_marker" 2>/dev/null || true); do
+  if tr '\0' ' ' < "/proc/$cloudflare_pid/cmdline" 2>/dev/null | grep -Fq "$cloudflare_marker"; then
+    kill "$cloudflare_pid"
+  fi
+done
+rm -f -- "$HOME/run/styledash-cloudflare.pid" "$HOME/run/styledash-cloudflare-url"
 
 if [ -d "$HOME/server/assets" ]; then rm -rf -- "$HOME/server/assets"; fi
 cp -a "$STAGE/dist/." "$HOME/server/"

@@ -18,6 +18,11 @@ test "$(pgrep -f "$HOME/server/serve.py" | wc -l)" -eq 1
 test "$(pgrep -f "$HOME/admin/serve.py" | wc -l)" -eq 1
 test "$(pgrep -f 'ngrok http http://127.0.0.1:8080' | wc -l)" -eq 1
 echo 'managed_process_counts=one-each'
+if pgrep -f 'cloudflared tunnel --no-autoupdate --url http://127.0.0.1:8080' >/dev/null 2>&1; then
+  echo 'styledash_cloudflare=running' >&2
+  exit 1
+fi
+echo 'styledash_cloudflare=absent'
 printf 'ngrok_url='; cat "$HOME/run/styledash-public-url"
 if curl -fsS --max-time 2 http://192.168.1.7:8081/ >/dev/null 2>&1; then
   echo 'admin_lan=reachable' >&2; exit 1

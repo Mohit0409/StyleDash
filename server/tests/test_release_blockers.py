@@ -323,6 +323,9 @@ class DeploymentAndTaxTests(unittest.TestCase):
         self.assertIn("STYLEDASH_FIREBASE_PROJECT_ID", text)
         self.assertIn("STYLEDASH_FIREBASE_CREDENTIALS", text)
         self.assertIn("Firebase credentials path must be absolute", text)
+        self.assertIn("Firebase credentials must remain inside the private StyleDash configuration directory", text)
+        self.assertIn("realpath -e", text)
+        self.assertIn("stat -c '%u'", text)
         self.assertIn(
             'cp -a "$DATA_ROOT/$authoritative_config" "$BACKUP/data/$authoritative_config"',
             text,
@@ -332,6 +335,9 @@ class DeploymentAndTaxTests(unittest.TestCase):
         text = (ROOT / "scripts/termux/boot-start-styledash").read_text(encoding="utf-8")
         self.assertIn('"$HOME/bin/start-styledash-stack"', text)
         self.assertNotIn("cloudflare", text.casefold())
+
+        verifier = (ROOT / "scripts/termux/verify-styledash-processes").read_text(encoding="utf-8")
+        self.assertIn("styledash_cloudflare=absent", verifier)
 
     def test_refund_processed_is_documented_for_live_webhook(self):
         readme = (ROOT / "server/README.md").read_text(encoding="utf-8")
