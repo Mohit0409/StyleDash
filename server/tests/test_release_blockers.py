@@ -289,6 +289,10 @@ class DeploymentAndTaxTests(unittest.TestCase):
             text.index('PYTHONPATH="$STAGE/scripts'),
             text.index("PRAGMA integrity_check"),
         )
+        self.assertLess(
+            text.index("empty Firebase web configuration"),
+            text.index("PRAGMA integrity_check"),
+        )
         self.assertLess(text.index("PRAGMA integrity_check"), text.index('bash "$BACKUP_SCRIPT"'))
         self.assertLess(text.index('bash "$BACKUP_SCRIPT"'), text.index('if [ -d "$HOME/server/assets" ]'))
         self.assertLess(text.index("printf 'rollback=%s"), text.index('if [ -d "$HOME/server/assets" ]'))
@@ -313,9 +317,12 @@ class DeploymentAndTaxTests(unittest.TestCase):
             text,
         )
         self.assertIn(
-            "import firebase_admin, styledash_firebase",
+            "from styledash_firebase import _initialize_app",
             text,
         )
+        self.assertIn("STYLEDASH_FIREBASE_PROJECT_ID", text)
+        self.assertIn("STYLEDASH_FIREBASE_CREDENTIALS", text)
+        self.assertIn("Firebase credentials path must be absolute", text)
         self.assertIn(
             'cp -a "$DATA_ROOT/$authoritative_config" "$BACKUP/data/$authoritative_config"',
             text,

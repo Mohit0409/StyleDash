@@ -12,12 +12,41 @@ DATA_ROOT="$HOME/.local/share/styledash"
 LIVE_DB="$DATA_ROOT/styledash.db"
 LIVE_STATE="$DATA_ROOT/runtime/orders.json"
 BACKUP_SCRIPT="$STAGE/scripts/termux/backup-styledash-data"
+SECRETS_FILE="$HOME/.config/styledash/secrets.env"
 
 if [ ! -f "$STAGE/scripts/styledash_firebase.py" ]; then
   echo "release is missing styledash_firebase.py; deployment aborted" >&2
   exit 1
 fi
-PYTHONPATH="$STAGE/scripts${PYTHONPATH:+:$PYTHONPATH}" python3 -c 'import firebase_admin, styledash_firebase; print("firebase_sdk=ok")'
+auth_assets=("$STAGE"/dist/assets/AuthPage-*.js)
+if [ ! -f "${auth_assets[0]}" ]; then
+  echo "release is missing the authentication frontend asset; deployment aborted" >&2
+  exit 1
+fi
+for empty_firebase_field in 'apiKey:""' 'authDomain:""' 'projectId:""' 'appId:""'; do
+  if grep -Fq "$empty_firebase_field" "${auth_assets[@]}"; then
+    echo "release contains an empty Firebase web configuration; deployment aborted" >&2
+    exit 1
+  fi
+done
+if [ ! -f "$SECRETS_FILE" ] || [ "$(stat -c '%a' "$SECRETS_FILE")" != 600 ]; then
+  echo "private runtime configuration is missing or has unsafe permissions; deployment aborted" >&2
+  exit 1
+fi
+set -a
+. "$SECRETS_FILE"
+set +a
+: "${STYLEDASH_FIREBASE_PROJECT_ID:?Firebase project ID is not configured}"
+: "${STYLEDASH_FIREBASE_CREDENTIALS:?Firebase credentials path is not configured}"
+case "$STYLEDASH_FIREBASE_CREDENTIALS" in
+  /*) ;;
+  *) echo "Firebase credentials path must be absolute; deployment aborted" >&2; exit 1 ;;
+esac
+if [ ! -r "$STYLEDASH_FIREBASE_CREDENTIALS" ] || [ "$(stat -c '%a' "$STYLEDASH_FIREBASE_CREDENTIALS")" != 600 ]; then
+  echo "Firebase credentials are missing, unreadable, or have unsafe permissions; deployment aborted" >&2
+  exit 1
+fi
+PYTHONPATH="$STAGE/scripts${PYTHONPATH:+:$PYTHONPATH}" python3 -c 'from styledash_firebase import _initialize_app; _initialize_app(); print("firebase_admin_preflight=ok")'
 
 if [ -f "$LIVE_DB" ]; then
   python3 - "$LIVE_DB" <<'PY'
