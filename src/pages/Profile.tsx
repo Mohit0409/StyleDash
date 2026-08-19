@@ -54,7 +54,7 @@ export const Profile: React.FC = () => {
     {error && <p className="text-sm text-red-600" role="alert">{error}</p>}{message && <p className="text-sm text-green-700" role="status">{message}</p>}
     <form onSubmit={saveProfile} className="p-6 bg-white dark:bg-neutral-900 rounded-3xl border dark:border-neutral-800 space-y-4">
       <h2 className="text-xl font-black">Contact and delivery address</h2>
-      <p className="text-xs text-neutral-500">Signed in as {user?.email}. Email changes require support.</p>
+      <p className="text-xs text-neutral-500">Signed in as {user?.email || user?.phone}. Email changes require support.</p>
       <div className="grid sm:grid-cols-2 gap-4">
         <label className="text-xs font-bold">Full name<input required minLength={2} maxLength={80} value={name} onChange={event => setName(event.target.value)} className="mt-1 w-full p-3 rounded-xl border dark:bg-neutral-800" /></label>
         <label className="text-xs font-bold">Phone<input required minLength={10} maxLength={20} value={phone} onChange={event => setPhone(event.target.value)} className="mt-1 w-full p-3 rounded-xl border dark:bg-neutral-800" /></label>
@@ -64,12 +64,15 @@ export const Profile: React.FC = () => {
       </div>
       <button disabled={saving} className="flex items-center gap-2 bg-neutral-950 text-white dark:bg-lime-400 dark:text-black px-5 py-3 rounded-xl font-bold"><Save className="w-4" />Save profile</button>
     </form>
-    <form onSubmit={changePassword} className="p-6 bg-white dark:bg-neutral-900 rounded-3xl border dark:border-neutral-800 space-y-4">
+    {user?.hasPassword ? <form onSubmit={changePassword} className="p-6 bg-white dark:bg-neutral-900 rounded-3xl border dark:border-neutral-800 space-y-4">
       <h2 className="text-xl font-black">Change password</h2>
       <input required type="password" autoComplete="current-password" maxLength={256} value={currentPassword} onChange={event => setCurrentPassword(event.target.value)} placeholder="Current password" className="w-full p-3 rounded-xl border dark:bg-neutral-800" />
       <input required type="password" autoComplete="new-password" minLength={12} maxLength={256} value={newPassword} onChange={event => setNewPassword(event.target.value)} placeholder="New password (12+ characters)" className="w-full p-3 rounded-xl border dark:bg-neutral-800" />
       <button disabled={saving} className="px-5 py-3 rounded-xl border font-bold">Change password</button>
-    </form>
+    </form> : <div className="p-6 bg-white dark:bg-neutral-900 rounded-3xl border dark:border-neutral-800 space-y-2">
+      <h2 className="text-xl font-black">Sign-in security</h2>
+      <p className="text-sm text-neutral-500">This account uses a linked Google or mobile sign-in method and does not have a StyleDash password.</p>
+    </div>}
     <div className="grid sm:grid-cols-2 gap-3">
       <Link to="/orders" className="flex gap-3 p-4 bg-white dark:bg-neutral-900 rounded-2xl border dark:border-neutral-800 font-bold"><Package className="w-4" />Order history</Link>
       <Link to="/wishlist" className="flex gap-3 p-4 bg-white dark:bg-neutral-900 rounded-2xl border dark:border-neutral-800 font-bold"><Heart className="w-4" />Saved wishlist</Link>

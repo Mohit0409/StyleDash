@@ -8,6 +8,7 @@ import hashlib
 import hmac
 import json
 import os
+import posixpath
 import re
 import secrets
 import threading
@@ -21,7 +22,7 @@ from http import HTTPStatus
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Any, Callable
-from urllib.parse import parse_qs, urlsplit
+from urllib.parse import parse_qs, unquote, urlsplit
 
 try:
     import fcntl
@@ -2114,7 +2115,12 @@ class StyleDashRequestHandler(SimpleHTTPRequestHandler):
 
                 self._json_response(
                     HTTPStatus.OK if not created else HTTPStatus.CREATED,
-                    {"success": True, "user": user, "csrfToken": csrf},
+                    {
+                        "success": True,
+                        "user": user,
+                        "csrfToken": csrf,
+                        "needsProfile": bool(user.get("needsProfile")),
+                    },
                     headers={"Set-Cookie": self._security().cookie(raw)},
                 )
                 return
@@ -2217,6 +2223,12 @@ class StyleDashRequestHandler(SimpleHTTPRequestHandler):
             return
         self._json_response(HTTPStatus.METHOD_NOT_ALLOWED, {"success": False, "error": "Method not allowed.", "code": "method_not_allowed"})
 
+    def do_OPTIONS(self) -> None:  # noqa: N802 - stdlib override name
+        self.do_PUT()
+
+    def do_TRACE(self) -> None:  # noqa: N802 - stdlib override name
+        self.do_PUT()
+
     def do_DELETE(self) -> None:  # noqa: N802 - stdlib override name
         self.do_PUT()
 
@@ -2251,7 +2263,8 @@ class StyleDashRequestHandler(SimpleHTTPRequestHandler):
 
     @staticmethod
     def _sensitive_path(path: str) -> bool:
-        lowered = path.lower()
+        decoded = unquote(path).replace("\\", "/")
+        lowered = ("/" + posixpath.normpath(decoded).lstrip("/")).casefold()
         return (
             lowered.startswith(("/backups/", "/logs/", "/.config/", "/admin", "/api/admin/", "/api/internal-admin/", "/admin-api/"))
             or lowered.startswith(("/tools/", "/payment-data/"))
@@ -2262,7 +2275,12 @@ class StyleDashRequestHandler(SimpleHTTPRequestHandler):
     def log_message(self, format: str, *args: Any) -> None:
         # Request bodies and environment configuration are never logged. Redact
         # token-shaped query parameters as defense in depth for stale/manual URLs.
-        redacted = tuple(ACCESS_LOG_TOKEN_PATTERN.sub(r"\1[redacted]", str(value)) for value in args)
+        redacted = tuple(
+            ACCESS_LOG_TOKEN_PATTERN.sub(r"\1[redacted]", value)
+            if isinstance(value, str)
+            else value
+            for value in args
+        )
         super().log_message(format, *redacted)
 
 

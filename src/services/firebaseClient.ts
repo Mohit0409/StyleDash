@@ -63,8 +63,17 @@ export async function startPhoneVerification(phone: string): Promise<PhoneVerifi
     callback: () => undefined,
   });
 
-  const confirmationResult = await signInWithPhoneNumber(auth, normalizeIndianPhone(phone), verifier);
-  return { confirmationResult, verifier };
+  try {
+    const confirmationResult = await signInWithPhoneNumber(auth, normalizeIndianPhone(phone), verifier);
+    return { confirmationResult, verifier };
+  } catch (cause) {
+    try {
+      verifier.clear();
+    } catch {
+      // Preserve Firebase's actionable error if best-effort cleanup also fails.
+    }
+    throw cause;
+  }
 }
 
 export async function verifyPhoneCode(session: PhoneVerificationSession, code: string): Promise<string> {

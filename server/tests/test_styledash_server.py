@@ -1738,9 +1738,11 @@ class HttpApiTests(unittest.TestCase):
         web_root.mkdir()
         (web_root / "index.html").write_text("<!doctype html><title>StyleDash</title>", encoding="utf-8")
         self.reset_deliveries = []
+        self.firebase_claims = {}
         security_store = SERVER.SecurityStore(
             root / "styledash.db", Fernet.generate_key().decode(),
             password_reset_sender=lambda email, token: self.reset_deliveries.append((email, token)),
+            firebase_verifier=lambda token: self.firebase_claims[token],
         )
         self.gateway = FakeGateway()
         service = SERVER.PaymentService(
@@ -2484,6 +2486,11 @@ class HttpApiTests(unittest.TestCase):
             urllib.request.urlopen(unauthenticated)
         self.assertEqual(caught.exception.code, 401); caught.exception.close()
 
+        anonymous_admin = urllib.request.Request(f"{self.base_url}/api/admin/orders")
+        with self.assertRaises(urllib.error.HTTPError) as caught:
+            urllib.request.urlopen(anonymous_admin)
+        self.assertEqual(caught.exception.code, 404); caught.exception.close()
+
         customer_admin = urllib.request.Request(f"{self.base_url}/api/admin/orders", headers={"Cookie": cookie})
         with self.assertRaises(urllib.error.HTTPError) as caught:
             urllib.request.urlopen(customer_admin)
@@ -2493,6 +2500,9 @@ class HttpApiTests(unittest.TestCase):
         with self.assertRaises(urllib.error.HTTPError) as caught:
             urllib.request.urlopen(public_admin_ui)
         self.assertEqual(caught.exception.code, 404); caught.exception.close()
+        for concealed_path in ("/%61dmin", "/.%2e/admin", "/api/%61dmin/orders"):
+            status, body, _headers = self.get_json(concealed_path)
+            self.assertEqual((status, body["code"]), (404, "not_found"))
 
         payment_payload = {
             "items": [{"productId": "sd-prod-001", "variantId": "sd-prod-001-var-2", "quantity": 1}],
@@ -2531,6 +2541,83 @@ class HttpApiTests(unittest.TestCase):
         with self.assertRaises(urllib.error.HTTPError) as caught:
             urllib.request.urlopen(oversized)
         self.assertEqual(caught.exception.code, 413); caught.exception.close()
+
+    def test_federated_phone_and_returning_google_http_contract(self) -> None:
+        phone_token = "phone-http-token-" + ("x" * 24)
+        self.firebase_claims[phone_token] = {
+            "uid": "firebase-phone-http-uid",
+            "email": None,
+            "phone_number": "+91 99999 99999",
+            "firebase": {"sign_in_provider": "phone"},
+        }
+        phone_status, phone_body, phone_headers = self.post_json(
+            "/api/auth/federated/phone", {"idToken": phone_token}
+        )
+        self.assertEqual(phone_status, 201)
+        self.assertTrue(phone_body["needsProfile"])
+        self.assertTrue(phone_body["csrfToken"])
+        phone_cookie = phone_headers["Set-Cookie"].split(";", 1)[0]
+        me_status, me_body, _headers = self.get_json(
+            "/api/auth/me", {"Cookie": phone_cookie}
+        )
+        self.assertEqual(me_status, 200)
+        self.assertEqual(me_body["user"]["phone"], "+919999999999")
+
+        google_token = "google-http-token-" + ("y" * 24)
+        self.firebase_claims[google_token] = {
+            "uid": "firebase-google-http-uid",
+            "email": "existing-google@example.test",
+            "email_verified": True,
+            "name": "Existing Google",
+            "firebase": {"sign_in_provider": "google.com"},
+        }
+        first_status, first_body, first_headers = self.post_json(
+            "/api/auth/federated/google", {"idToken": google_token}
+        )
+        self.assertEqual(first_status, 201)
+        with self.service.security.connect() as db:
+            google_user_id = first_body["user"]["id"]
+            db.execute("UPDATE users SET last_login_at='stale' WHERE id=?", (google_user_id,))
+            db.execute("UPDATE customer_auth_identities SET last_used_at='stale' WHERE user_id=?", (google_user_id,))
+            users_before = db.execute("SELECT COUNT(*) FROM users").fetchone()[0]
+            identities_before = db.execute("SELECT COUNT(*) FROM customer_auth_identities").fetchone()[0]
+        second_status, second_body, second_headers = self.post_json(
+            "/api/auth/federated/google", {"idToken": google_token}
+        )
+        self.assertEqual(second_status, 200)
+        self.assertEqual(second_body["user"]["id"], google_user_id)
+        self.assertTrue(second_body["csrfToken"])
+        self.assertNotEqual(first_body["csrfToken"], second_body["csrfToken"])
+        self.assertNotEqual(
+            first_headers["Set-Cookie"].split(";", 1)[0],
+            second_headers["Set-Cookie"].split(";", 1)[0],
+        )
+        with self.service.security.connect() as db:
+            self.assertEqual(db.execute("SELECT COUNT(*) FROM users").fetchone()[0], users_before)
+            self.assertEqual(
+                db.execute("SELECT COUNT(*) FROM customer_auth_identities").fetchone()[0],
+                identities_before,
+            )
+            login_at = db.execute("SELECT last_login_at FROM users WHERE id=?", (google_user_id,)).fetchone()[0]
+            last_used_at = db.execute(
+                "SELECT last_used_at FROM customer_auth_identities WHERE user_id=?", (google_user_id,)
+            ).fetchone()[0]
+        self.assertNotEqual(login_at, "stale")
+        self.assertNotEqual(last_used_at, "stale")
+
+    def test_standard_http_errors_remain_available_with_redacted_logging(self) -> None:
+        with self.assertRaises(urllib.error.HTTPError) as caught:
+            urllib.request.urlopen(f"{self.base_url}/missing.js")
+        self.assertEqual(caught.exception.code, 404)
+        caught.exception.close()
+
+        admin_options = urllib.request.Request(
+            f"{self.base_url}/api/admin/orders", method="OPTIONS"
+        )
+        with self.assertRaises(urllib.error.HTTPError) as caught:
+            urllib.request.urlopen(admin_options)
+        self.assertEqual(caught.exception.code, 404)
+        caught.exception.close()
 
     def test_payment_test_http_authorizes_session_only_and_preserves_paid_history_when_disabled(self) -> None:
         endpoint = "/api/payment-test-product/styledash-payment-test-item"

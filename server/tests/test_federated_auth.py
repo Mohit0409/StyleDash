@@ -52,6 +52,7 @@ class FederatedAuthTests(unittest.TestCase):
         return self.add_claim(
             uid,
             uid=uid,
+            email=None,
             phone_number=phone,
             firebase={"sign_in_provider": "phone"},
         )
@@ -59,13 +60,28 @@ class FederatedAuthTests(unittest.TestCase):
     def test_new_and_returning_google_use_one_customer(self):
         token = self.google("google-1", "google@example.test")
         first, raw, csrf, created = self.store.federated_session("google", {"idToken": token})
-        second, _raw2, _csrf2, created_again = self.store.federated_session("google", {"idToken": token})
+        with self.store.connect() as db:
+            db.execute("UPDATE users SET last_login_at='stale' WHERE id=?", (first["id"],))
+            db.execute("UPDATE customer_auth_identities SET last_used_at='stale' WHERE user_id=?", (first["id"],))
+        second, raw2, csrf2, created_again = self.store.federated_session("google", {"idToken": token})
         self.assertTrue(created)
         self.assertFalse(created_again)
         self.assertEqual(first["id"], second["id"])
         self.assertEqual(self.store.profile(first["id"])["email"], "google@example.test")
         self.assertIn("HttpOnly", self.store.cookie(raw))
         self.assertTrue(csrf)
+        self.assertNotEqual(raw, raw2)
+        self.assertNotEqual(csrf, csrf2)
+        with self.store.connect() as db:
+            self.assertEqual(db.execute("SELECT COUNT(*) FROM users").fetchone()[0], 1)
+            self.assertEqual(db.execute("SELECT COUNT(*) FROM customer_auth_identities").fetchone()[0], 1)
+            self.assertEqual(db.execute("SELECT COUNT(*) FROM sessions").fetchone()[0], 2)
+            login_at = db.execute("SELECT last_login_at FROM users WHERE id=?", (first["id"],)).fetchone()[0]
+            last_used_at = db.execute(
+                "SELECT last_used_at FROM customer_auth_identities WHERE user_id=?", (first["id"],)
+            ).fetchone()[0]
+        self.assertNotEqual(login_at, "stale")
+        self.assertNotEqual(last_used_at, "stale")
 
     def test_verified_google_email_links_existing_password_customer(self):
         existing, _raw, _csrf = self.store.register({
@@ -97,6 +113,72 @@ class FederatedAuthTests(unittest.TestCase):
         self.assertFalse(created_again)
         self.assertEqual(first["id"], second["id"])
         self.assertTrue(second["needsProfile"])
+        with self.store.connect() as db:
+            columns = {row["name"]: row for row in db.execute("PRAGMA table_info(users)")}
+            user = db.execute("SELECT email,password_hash,phone,last_login_at FROM users WHERE id=?", (first["id"],)).fetchone()
+            identity = db.execute(
+                "SELECT provider,provider_subject,verified_email,verified_phone FROM customer_auth_identities WHERE user_id=?",
+                (first["id"],),
+            ).fetchone()
+        self.assertEqual(columns["email"]["notnull"], 0)
+        self.assertEqual(columns["password_hash"]["notnull"], 0)
+        self.assertIsNone(user["email"])
+        self.assertIsNone(user["password_hash"])
+        self.assertEqual(user["phone"], "+919876543210")
+        self.assertTrue(user["last_login_at"])
+        self.assertEqual((identity["provider"], identity["provider_subject"]), ("phone", "phone-1"))
+        self.assertIsNone(identity["verified_email"])
+        self.assertEqual(identity["verified_phone"], "+919876543210")
+
+    def test_malformed_nested_firebase_claim_fails_closed(self):
+        token = self.add_claim("malformed-firebase", uid="malformed-firebase", firebase="phone")
+        with self.assertRaises(SECURITY.SecurityError) as caught:
+            self.store.federated_session("phone", {"idToken": token})
+        self.assertEqual(caught.exception.code, "identity_verification_failed")
+        with self.store.connect() as db:
+            self.assertEqual(db.execute("SELECT COUNT(*) FROM users").fetchone()[0], 0)
+
+    def test_federated_only_account_password_change_returns_controlled_error(self):
+        token = self.phone("phone-no-password", "+919999999999")
+        user, raw, _csrf, _created = self.store.federated_session("phone", {"idToken": token})
+        with self.assertRaises(SECURITY.SecurityError) as caught:
+            self.store.change_password(raw, {
+                "currentPassword": "unused current password",
+                "newPassword": "new long password 456",
+            })
+        self.assertEqual((caught.exception.status, caught.exception.code), (409, "password_not_set"))
+        self.assertEqual(self.store.authenticate(raw)[0]["id"], user["id"])
+
+    def test_federated_login_rejects_inactive_and_non_customer_accounts(self):
+        inactive, _raw, _csrf = self.store.register({
+            "name": "Inactive Customer",
+            "email": "inactive@example.test",
+            "password": "long inactive password 123",
+        })
+        with self.store.connect() as db:
+            db.execute("UPDATE users SET is_active=0 WHERE id=?", (inactive["id"],))
+        with self.assertRaises(SECURITY.SecurityError) as inactive_error:
+            self.store.federated_session(
+                "google", {"idToken": self.google("inactive-google", "inactive@example.test")}
+            )
+        self.assertEqual(inactive_error.exception.code, "identity_verification_failed")
+
+        legacy, legacy_raw, _csrf = self.store.register({
+            "name": "Legacy Role",
+            "email": "legacy-role@example.test",
+            "password": "long legacy password 123",
+        })
+        with self.store.connect() as db:
+            db.execute("UPDATE users SET role='admin' WHERE id=?", (legacy["id"],))
+        with self.assertRaises(SECURITY.SecurityError) as role_error:
+            self.store.federated_session(
+                "google", {"idToken": self.google("legacy-google", "legacy-role@example.test")}
+            )
+        self.assertEqual(role_error.exception.code, "identity_verification_failed")
+        with self.assertRaises(SECURITY.SecurityError):
+            self.store.authenticate(legacy_raw)
+        with self.store.connect() as db:
+            self.assertEqual(db.execute("SELECT COUNT(*) FROM customer_auth_identities").fetchone()[0], 0)
 
     def test_verified_phone_collision_fails_closed(self):
         first_token = self.phone("phone-a", "09876543210")

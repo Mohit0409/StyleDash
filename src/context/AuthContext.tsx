@@ -51,7 +51,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const federatedLogin = async (provider: FederatedProvider, idToken: string) => {
     setLoading(true); setError('');
-    try { const response = await authApi.federated(provider, idToken); setUser(response.user); setNeedsProfile(Boolean(response.needsProfile)); return true; }
+    try {
+      const response = await authApi.federated(provider, idToken);
+      setUser(response.user);
+      setNeedsProfile(Boolean(response.needsProfile || (response.user.phone && !response.user.name)));
+      return true;
+    }
     catch (cause) { setError(cause instanceof ApiError ? cause.message : 'Sign in failed.'); return false; }
     finally { setLoading(false); }
   };

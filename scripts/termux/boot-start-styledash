@@ -20,7 +20,4 @@ for _ in $(seq 1 30); do
 done
 
 "$HOME/bin/start-styledash-stack" || echo "$(date -Iseconds) stack start failed"
-
-# Temporary rollback endpoint during migration. Remove after ngrok survives reboot.
-"$HOME/bin/start-styledash-cloudflare-rollback" || echo "$(date -Iseconds) Cloudflare rollback tunnel did not start"
 echo "$(date -Iseconds) boot startup finished"

@@ -13,6 +13,12 @@ LIVE_DB="$DATA_ROOT/styledash.db"
 LIVE_STATE="$DATA_ROOT/runtime/orders.json"
 BACKUP_SCRIPT="$STAGE/scripts/termux/backup-styledash-data"
 
+if [ ! -f "$STAGE/scripts/styledash_firebase.py" ]; then
+  echo "release is missing styledash_firebase.py; deployment aborted" >&2
+  exit 1
+fi
+PYTHONPATH="$STAGE/scripts${PYTHONPATH:+:$PYTHONPATH}" python3 -c 'import firebase_admin, styledash_firebase; print("firebase_sdk=ok")'
+
 if [ -f "$LIVE_DB" ]; then
   python3 - "$LIVE_DB" <<'PY'
 import sqlite3, sys
@@ -48,7 +54,12 @@ BACKUP="$(mktemp -d "$BACKUP_ROOT/styledash-pre-payment.XXXXXX")"
 
 cp -a "$HOME/server" "$BACKUP/server"
 if [ -d "$HOME/admin" ]; then cp -a "$HOME/admin" "$BACKUP/admin"; fi
-mkdir -p "$BACKUP/bin" "$BACKUP/boot"
+mkdir -p "$BACKUP/bin" "$BACKUP/boot" "$BACKUP/data"
+for authoritative_config in catalog.json settings.json; do
+  if [ -f "$DATA_ROOT/$authoritative_config" ]; then
+    cp -a "$DATA_ROOT/$authoritative_config" "$BACKUP/data/$authoritative_config"
+  fi
+done
 cp -a \
   "$HOME/bin/start-styledash" \
   "$HOME/bin/start-styledash-stack" \
@@ -58,11 +69,13 @@ for optional in start-styledash-admin styledash-create-admin audit-styledash-net
   if [ -f "$HOME/bin/$optional" ]; then cp -a "$HOME/bin/$optional" "$BACKUP/bin/"; fi
 done
 cp -a "$HOME/.termux/boot/start-styledash" "$BACKUP/boot/"
+printf 'rollback=%s\n' "$BACKUP"
 
 if [ -d "$HOME/server/assets" ]; then rm -rf -- "$HOME/server/assets"; fi
 cp -a "$STAGE/dist/." "$HOME/server/"
 install -m 755 "$STAGE/scripts/termux-spa-server.py" "$HOME/server/serve.py"
 install -m 600 "$STAGE/scripts/styledash_security.py" "$HOME/server/styledash_security.py"
+install -m 600 "$STAGE/scripts/styledash_firebase.py" "$HOME/server/styledash_firebase.py"
 install -m 600 "$STAGE/scripts/styledash_mail.py" "$HOME/server/styledash_mail.py"
 install -m 600 "$STAGE/scripts/styledash_notify.py" "$HOME/server/styledash_notify.py"
 mkdir -p "$HOME/admin/admin" "$HOME/admin/tools"
@@ -119,6 +132,7 @@ fi
 "$HOME/bin/start-styledash"
 "$HOME/bin/start-styledash-admin"
 python3 -c 'import razorpay; print("razorpay_sdk=ok")'
+PYTHONPATH="$HOME/server${PYTHONPATH:+:$PYTHONPATH}" python3 -c 'import firebase_admin, styledash_firebase; print("firebase_sdk=ok")'
 printf 'backup=%s\n' "$BACKUP"
 printf 'health='
 curl -fsS http://127.0.0.1:8080/api/health

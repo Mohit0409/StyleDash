@@ -67,9 +67,12 @@ def verify_firebase_id_token(id_token: str) -> dict[str, Any]:
     from firebase_admin import auth as firebase_auth
 
     try:
-        return firebase_auth.verify_id_token(id_token, app=app, check_revoked=True)
+        claims = firebase_auth.verify_id_token(id_token, app=app, check_revoked=True)
     except Exception as exc:  # noqa: BLE001 - never leak which check failed
         raise FirebaseTokenInvalid("token verification failed") from exc
+    if not isinstance(claims, dict):
+        raise FirebaseTokenInvalid("token verification failed")
+    return claims
 
 
 def reset_app_for_tests() -> None:

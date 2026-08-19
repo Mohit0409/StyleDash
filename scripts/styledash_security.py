@@ -97,6 +97,15 @@ def normalize_indian_phone(value: Any) -> str:
     return f"+91{digits}"
 
 
+def firebase_sign_in_provider(claims: dict[str, Any]) -> str:
+    """Read Firebase's nested provider claim without trusting its shape."""
+    firebase_claims = claims.get("firebase")
+    if not isinstance(firebase_claims, dict):
+        return ""
+    provider = firebase_claims.get("sign_in_provider")
+    return provider if isinstance(provider, str) else ""
+
+
 class SecurityStore:
     """SQLite-backed users, sessions, profiles, vendors, and audit records."""
 
@@ -287,6 +296,18 @@ class SecurityStore:
                 "INSERT OR IGNORE INTO schema_migrations(version,applied_at) VALUES(4,?)",
                 (iso(utc_now()),),
             )
+            user_columns = {
+                row["name"] for row in db.execute("PRAGMA table_info(users)").fetchall()
+            }
+            if "last_login_at" not in user_columns:
+                db.execute("ALTER TABLE users ADD COLUMN last_login_at TEXT")
+            db.execute(
+                "CREATE UNIQUE INDEX IF NOT EXISTS users_email_unique_idx ON users(email) WHERE email IS NOT NULL"
+            )
+            db.execute(
+                "INSERT OR IGNORE INTO schema_migrations(version,applied_at) VALUES(5,?)",
+                (iso(utc_now()),),
+            )
         self._secure_files()
 
     def _secure_files(self) -> None:
@@ -312,6 +333,7 @@ class SecurityStore:
             "INSERT INTO sessions(id,user_id,token_hash,created_at,expires_at,idle_expires_at,last_seen_at,admin_2fa_verified) VALUES(?,?,?,?,?,?,?,?)",
             (secrets.token_hex(16), user["id"], token_hash(raw), iso(now), iso(absolute), iso(idle), iso(now), 0),
         )
+        db.execute("UPDATE users SET last_login_at=? WHERE id=?", (iso(now), user["id"]))
         return raw, self.csrf_token(raw)
 
     def csrf_token(self, raw_session: str) -> str:
@@ -357,7 +379,7 @@ class SecurityStore:
         self._secure_files()
         return self.safe_user(user), raw, csrf
 
-    def login(self, payload: dict[str, Any], client_key: str) -> tuple[dict[str, Any], str, str, bool]:
+    def login(self, payload: dict[str, Any], client_key: str) -> tuple[dict[str, Any], str, str]:
         email = normalize_email(payload.get("email"))
         password = payload.get("password")
         if not isinstance(password, str) or len(password) > PASSWORD_MAX:
@@ -396,7 +418,7 @@ class SecurityStore:
                 "SELECT s.*,u.id AS authenticated_user_id,u.email,u.name,u.phone,u.role,u.is_active,u.email_verified,u.email_verified_at,u.password_hash FROM sessions s JOIN users u ON u.id=s.user_id WHERE s.token_hash=?",
                 (token_hash(raw_session),),
             ).fetchone()
-            if row is None or row["revoked_at"] or not row["is_active"]:
+            if row is None or row["revoked_at"] or not row["is_active"] or row["role"] != "customer":
                 raise SecurityError(401, "Authentication required.", "authentication_required")
             if datetime.fromisoformat(row["expires_at"]) <= now or datetime.fromisoformat(row["idle_expires_at"]) <= now:
                 db.execute("UPDATE sessions SET revoked_at=? WHERE id=?", (iso(now), row["id"]))
@@ -447,7 +469,7 @@ class SecurityStore:
             raise SecurityError(401, "Unable to complete sign in. Please try again.", "identity_verification_failed") from None
         if not isinstance(claims, dict):
             raise SecurityError(401, "Unable to complete sign in. Please try again.", "identity_verification_failed")
-        sign_in_provider = str((claims.get("firebase") or {}).get("sign_in_provider") or "")
+        sign_in_provider = firebase_sign_in_provider(claims)
         expected_provider = "google.com" if provider == "google" else "phone"
         if sign_in_provider != expected_provider:
             raise SecurityError(401, "Unable to complete sign in. Please try again.", "identity_verification_failed")
@@ -465,7 +487,7 @@ class SecurityStore:
                 created = False
                 if identity is not None:
                     user = db.execute("SELECT * FROM users WHERE id=?", (identity["user_id"],)).fetchone()
-                    if user is None or not user["is_active"]:
+                    if user is None or not user["is_active"] or user["role"] != "customer":
                         raise SecurityError(401, "Unable to complete sign in. Please try again.", "identity_verification_failed")
                     db.execute(
                         "UPDATE customer_auth_identities SET last_used_at=? WHERE id=?", (now, identity["id"])
@@ -504,7 +526,7 @@ class SecurityStore:
         except Exception:
             raise SecurityError(401, "Unable to complete sign in. Please try again.", "identity_verification_failed") from None
         expected_provider = "google.com" if provider == "google" else "phone"
-        if not isinstance(claims, dict) or str((claims.get("firebase") or {}).get("sign_in_provider") or "") != expected_provider:
+        if not isinstance(claims, dict) or firebase_sign_in_provider(claims) != expected_provider:
             raise SecurityError(401, "Unable to complete sign in. Please try again.", "identity_verification_failed")
         uid = claims.get("uid") or claims.get("sub")
         if not isinstance(uid, str) or not uid:
@@ -512,7 +534,7 @@ class SecurityStore:
         verified_email = None
         verified_phone = None
         if provider == "google":
-            if not claims.get("email_verified") or not isinstance(claims.get("email"), str) or not claims.get("email"):
+            if claims.get("email_verified") is not True or not isinstance(claims.get("email"), str) or not claims.get("email"):
                 raise SecurityError(400, "Unable to link Google securely.", "google_email_required")
             verified_email = normalize_email(claims["email"])
         else:
@@ -548,12 +570,14 @@ class SecurityStore:
     def _google_identity(
         self, db: sqlite3.Connection, uid: str, claims: dict[str, Any], now: str
     ) -> tuple[sqlite3.Row, bool]:
-        if not claims.get("email_verified") or not isinstance(claims.get("email"), str) or not claims.get("email"):
+        if claims.get("email_verified") is not True or not isinstance(claims.get("email"), str) or not claims.get("email"):
             raise SecurityError(400, "Unable to complete sign in with Google.", "google_email_required")
         email = normalize_email(claims["email"])
         existing = db.execute("SELECT * FROM users WHERE email=?", (email,)).fetchone()
         created = False
         if existing is not None:
+            if not existing["is_active"] or existing["role"] != "customer":
+                raise SecurityError(401, "Unable to complete sign in. Please try again.", "identity_verification_failed")
             user_id = existing["id"]
             if not existing["email_verified_at"]:
                 db.execute(
@@ -594,7 +618,7 @@ class SecurityStore:
         ).fetchone()
         if existing is not None:
             user = db.execute("SELECT * FROM users WHERE id=?", (existing["user_id"],)).fetchone()
-            if user is None or not user["is_active"]:
+            if user is None or not user["is_active"] or user["role"] != "customer":
                 raise SecurityError(401, "Unable to complete sign in. Please try again.", "identity_verification_failed")
             raise SecurityError(409, "This mobile identity is already linked to another sign-in.", "identity_already_linked")
         # Deliberately never matched against the free-text `phone` column on
@@ -627,6 +651,12 @@ class SecurityStore:
             raise SecurityError(400, "Invalid password change request.", "invalid_password_change")
         with self.connect() as db:
             row = db.execute("SELECT * FROM users WHERE id=?", (user["id"],)).fetchone()
+            if row is None or not isinstance(row["password_hash"], str) or not row["password_hash"]:
+                raise SecurityError(
+                    409,
+                    "This account does not have a password. Use its linked sign-in method.",
+                    "password_not_set",
+                )
             try:
                 self.passwords.verify(row["password_hash"], current)
             except (VerifyMismatchError, InvalidHashError):
