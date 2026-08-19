@@ -15,6 +15,8 @@ export default defineConfig({
 
   outputDir: 'test-results',
 
+  globalTeardown: './e2e/global-teardown.mjs',
+
   reporter: [
     ['list'],
     ['html', { outputFolder: 'playwright-report', open: 'never' }],
