@@ -12,6 +12,12 @@ DATA_ROOT="$HOME/.local/share/styledash"
 LIVE_DB="$DATA_ROOT/styledash.db"
 LIVE_STATE="$DATA_ROOT/runtime/orders.json"
 BACKUP_SCRIPT="$STAGE/scripts/termux/backup-styledash-data"
+for required_ops_script in styledash-health styledash-notify rollback-payment-release; do
+  if [ ! -f "$STAGE/scripts/termux/$required_ops_script" ]; then
+    echo "release is missing $required_ops_script; deployment aborted" >&2
+    exit 1
+  fi
+done
 PRIVATE_CONFIG_DIR="$HOME/.config/styledash"
 SECRETS_FILE="$PRIVATE_CONFIG_DIR/secrets.env"
 
@@ -148,11 +154,16 @@ cp -a \
   "$HOME/bin/start-styledash-stack" \
   "$HOME/bin/styledash-health" \
   "$BACKUP/bin/"
-for optional in start-styledash-admin styledash-create-admin audit-styledash-network; do
+for optional in start-styledash-admin styledash-create-admin audit-styledash-network backup-styledash-data rollback-payment-release styledash-notify stop-styledash-ngrok start-styledash-ngrok verify-styledash-processes; do
   if [ -f "$HOME/bin/$optional" ]; then cp -a "$HOME/bin/$optional" "$BACKUP/bin/"; fi
 done
 cp -a "$HOME/.termux/boot/start-styledash" "$BACKUP/boot/"
 printf 'rollback=%s\n' "$BACKUP"
+mkdir -p "$HOME/run" "$HOME/bin"
+printf '%s\n' "$BACKUP" > "$HOME/run/styledash-last-release-backup"
+chmod 600 "$HOME/run/styledash-last-release-backup"
+install -m 755 "$STAGE/scripts/termux/rollback-payment-release" "$HOME/bin/rollback-payment-release"
+install -m 755 "$STAGE/scripts/termux/styledash-notify" "$HOME/bin/styledash-notify"
 
 cloudflare_marker='cloudflared tunnel --no-autoupdate --url http://127.0.0.1:8080'
 for cloudflare_pid in $(pgrep -f "$cloudflare_marker" 2>/dev/null || true); do
@@ -203,6 +214,8 @@ install -m 755 "$STAGE/scripts/termux/start-styledash-stack" "$HOME/bin/start-st
 install -m 755 "$STAGE/scripts/termux/styledash-health" "$HOME/bin/styledash-health"
 install -m 755 "$STAGE/scripts/termux/normalize-razorpay-secrets" "$HOME/bin/normalize-razorpay-secrets"
 install -m 755 "$STAGE/scripts/termux/backup-styledash-data" "$HOME/bin/backup-styledash-data"
+install -m 755 "$STAGE/scripts/termux/styledash-notify" "$HOME/bin/styledash-notify"
+install -m 755 "$STAGE/scripts/termux/rollback-payment-release" "$HOME/bin/rollback-payment-release"
 install -m 755 "$STAGE/scripts/termux/verify-option-b-release" "$HOME/bin/verify-option-b-release"
 install -m 755 "$STAGE/scripts/termux/deploy-payment-release" "$HOME/bin/deploy-payment-release"
 install -m 755 "$STAGE/scripts/termux/styledash-create-admin" "$HOME/bin/styledash-create-admin"
@@ -261,3 +274,5 @@ else
   echo razorpay-script-missing
   exit 1
 fi
+"$HOME/bin/styledash-notify" release_deployed "StyleDash release deployed" "The production release passed local post-deploy health validation." 3 white_check_mark || true
+printf 'rollback_command=%s\n' "$HOME/bin/rollback-payment-release"

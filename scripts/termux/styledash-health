@@ -1,21 +1,31 @@
 #!/data/data/com.termux/files/usr/bin/bash
-# Low-frequency watchdog for the local SPA server and authenticated ngrok agent.
+# Low-frequency watchdog for local StyleDash services and the authenticated ngrok agent.
 set -u
 
 LOG_DIR="$HOME/logs"
-PID_FILE="$HOME/run/styledash-health.pid"
+RUN_DIR="$HOME/run"
+PID_FILE="$RUN_DIR/styledash-health.pid"
 LOG_FILE="$LOG_DIR/styledash-health.log"
-NGROK_PID_FILE="$HOME/run/styledash-ngrok.pid"
-URL_FILE="$HOME/run/styledash-public-url"
+NGROK_PID_FILE="$RUN_DIR/styledash-ngrok.pid"
+URL_FILE="$RUN_DIR/styledash-public-url"
 EXPECTED_CMD='ngrok http http://127.0.0.1:8080'
-LAST_BACKUP_FILE="$HOME/run/styledash-last-backup-date"
-mkdir -p "$HOME/run" "$LOG_DIR"
+LAST_BACKUP_FILE="$RUN_DIR/styledash-last-backup-date"
+LAST_BACKUP_ATTEMPT_FILE="$RUN_DIR/styledash-last-backup-attempt"
+BACKUP_RETRY_SECONDS=3600
+
+mkdir -p "$RUN_DIR" "$LOG_DIR"
 
 if [ -s "$PID_FILE" ] && kill -0 "$(cat "$PID_FILE")" 2>/dev/null; then
   exit 0
 fi
 printf '%s\n' "$$" > "$PID_FILE"
 trap 'rm -f "$PID_FILE"' EXIT INT TERM
+
+notify() {
+  if [ -x "$HOME/bin/styledash-notify" ]; then
+    "$HOME/bin/styledash-notify" "$@" >/dev/null 2>&1 || true
+  fi
+}
 
 agent_url() {
   curl -fsS --max-time 3 http://127.0.0.1:4040/api/tunnels 2>/dev/null |
@@ -29,29 +39,80 @@ ngrok_process_ok() {
   tr '\0' ' ' < "/proc/$pid/cmdline" 2>/dev/null | grep -Fq "$EXPECTED_CMD"
 }
 
+public_unhealthy=0
+admin_unhealthy=0
+backup_failed=0
 ngrok_failures=0
+ngrok_unhealthy=0
 public_failures=0
 public_counter=0
 
 while true; do
-  if ! curl -fsS --max-time 5 http://127.0.0.1:8080/api/health >/dev/null; then
-    echo "$(date -Iseconds) local site unhealthy; restarting" >> "$LOG_FILE"
-    "$HOME/bin/start-styledash" || true
+  if curl -fsS --max-time 5 http://127.0.0.1:8080/api/health >/dev/null; then
+    if [ "$public_unhealthy" -eq 1 ]; then
+      echo "$(date -Iseconds) local public service recovered" >> "$LOG_FILE"
+      notify public_recovered "StyleDash public service recovered" "Port 8080 is healthy again." 3 white_check_mark
+    fi
+    public_unhealthy=0
+  else
+    echo "$(date -Iseconds) local public site unhealthy; restarting" >> "$LOG_FILE"
+    if [ "$public_unhealthy" -eq 0 ]; then
+      notify public_unhealthy "StyleDash public service unhealthy" "Port 8080 failed its health check; a restart was requested." 5 rotating_light
+    fi
+    public_unhealthy=1
+    if ! "$HOME/bin/start-styledash"; then
+      echo "$(date -Iseconds) local public service restart failed" >> "$LOG_FILE"
+      notify public_restart_failed "StyleDash public restart failed" "Port 8080 is still unavailable after a restart attempt." 5 rotating_light
+    fi
   fi
 
-  if ! curl -fsS --max-time 3 -H 'Host: 127.0.0.1:8081' http://127.0.0.1:8081/ >/dev/null; then
+  if curl -fsS --max-time 3 -H 'Host: 127.0.0.1:8081' http://127.0.0.1:8081/ >/dev/null; then
+    if [ "$admin_unhealthy" -eq 1 ]; then
+      echo "$(date -Iseconds) local admin service recovered" >> "$LOG_FILE"
+      notify admin_recovered "StyleDash admin service recovered" "Private port 8081 is healthy again." 3 white_check_mark
+    fi
+    admin_unhealthy=0
+  else
     echo "$(date -Iseconds) local admin service unhealthy; restarting it independently" >> "$LOG_FILE"
-    "$HOME/bin/start-styledash-admin" || true
+    if [ "$admin_unhealthy" -eq 0 ]; then
+      notify admin_unhealthy "StyleDash admin service unhealthy" "Private port 8081 failed its health check; a restart was requested." 5 rotating_light
+    fi
+    admin_unhealthy=1
+    if ! "$HOME/bin/start-styledash-admin"; then
+      echo "$(date -Iseconds) local admin service restart failed" >> "$LOG_FILE"
+      notify admin_restart_failed "StyleDash admin restart failed" "Private port 8081 is still unavailable after a restart attempt." 5 rotating_light
+    fi
   fi
 
   backup_date="$(date -u +%F)"
   previous_backup_date=''
-  if [ -s "$LAST_BACKUP_FILE" ]; then previous_backup_date="$(cat "$LAST_BACKUP_FILE")"; fi
-  if [ "$previous_backup_date" != "$backup_date" ]; then
+  if [ -s "$LAST_BACKUP_FILE" ]; then
+    previous_backup_date="$(cat "$LAST_BACKUP_FILE")"
+  fi
+  now_epoch="$(date +%s)"
+  last_attempt=0
+  if [ -s "$LAST_BACKUP_ATTEMPT_FILE" ]; then
+    last_attempt="$(cat "$LAST_BACKUP_ATTEMPT_FILE" 2>/dev/null || printf '0')"
+  fi
+  case "$last_attempt" in
+    ''|*[!0-9]*) last_attempt=0 ;;
+  esac
+
+  if [ "$previous_backup_date" != "$backup_date" ] &&
+     [ $((now_epoch - last_attempt)) -ge "$BACKUP_RETRY_SECONDS" ]; then
+    printf '%s\n' "$now_epoch" > "$LAST_BACKUP_ATTEMPT_FILE"
     if "$HOME/bin/backup-styledash-data" >> "$LOG_FILE" 2>&1; then
       printf '%s\n' "$backup_date" > "$LAST_BACKUP_FILE"
+      if [ "$backup_failed" -eq 1 ]; then
+        notify backup_recovered "StyleDash backup recovered" "The scheduled production backup completed successfully." 3 white_check_mark
+      fi
+      backup_failed=0
     else
-      echo "$(date -Iseconds) private data backup failed; watchdog will retry" >> "$LOG_FILE"
+      echo "$(date -Iseconds) private data backup failed; watchdog will retry after cooldown" >> "$LOG_FILE"
+      if [ "$backup_failed" -eq 0 ]; then
+        notify backup_failed "StyleDash backup failed" "The scheduled production backup failed; the watchdog will retry after its cooldown." 5 warning
+      fi
+      backup_failed=1
     fi
   fi
 
@@ -62,14 +123,22 @@ while true; do
 
   if printf '%s' "$url" | grep -Eq '^https://[-a-z0-9]+\.ngrok-free\.(app|dev)$'; then
     printf '%s\n' "$url" > "$URL_FILE"
+    if [ "$ngrok_unhealthy" -eq 1 ]; then
+      notify tunnel_recovered "StyleDash tunnel recovered" "The authenticated ngrok tunnel is healthy again." 3 white_check_mark
+    fi
     ngrok_failures=0
+    ngrok_unhealthy=0
   else
     ngrok_failures=$((ngrok_failures + 1))
+    ngrok_unhealthy=1
     echo "$(date -Iseconds) ngrok local health failure $ngrok_failures/2" >> "$LOG_FILE"
     if [ "$ngrok_failures" -ge 2 ]; then
+      notify tunnel_restart "StyleDash tunnel restarting" "The ngrok agent failed repeated local health checks and is being restarted." 4 warning
       "$HOME/bin/stop-styledash-ngrok" || true
       sleep 5
-      "$HOME/bin/start-styledash-ngrok" || true
+      if ! "$HOME/bin/start-styledash-ngrok"; then
+        notify tunnel_restart_failed "StyleDash tunnel restart failed" "The ngrok agent did not restart successfully." 5 rotating_light
+      fi
       ngrok_failures=0
     fi
   fi
@@ -84,6 +153,7 @@ while true; do
       public_failures=$((public_failures + 1))
       echo "$(date -Iseconds) ngrok public health failure $public_failures/2" >> "$LOG_FILE"
       if [ "$public_failures" -ge 2 ]; then
+        notify public_tunnel_failed "StyleDash public tunnel unhealthy" "The public site failed repeated external health checks; ngrok is being restarted." 5 rotating_light
         "$HOME/bin/stop-styledash-ngrok" || true
         sleep 5
         "$HOME/bin/start-styledash-ngrok" || true
@@ -92,6 +162,9 @@ while true; do
     fi
   fi
 
-  [ -f "$LOG_FILE" ] && [ "$(wc -l < "$LOG_FILE")" -gt 2000 ] && tail -n 1500 "$LOG_FILE" > "$LOG_FILE.trim" && mv "$LOG_FILE.trim" "$LOG_FILE"
+  if [ -f "$LOG_FILE" ] && [ "$(wc -l < "$LOG_FILE")" -gt 2000 ]; then
+    tail -n 1500 "$LOG_FILE" > "$LOG_FILE.trim" &&
+      mv "$LOG_FILE.trim" "$LOG_FILE"
+  fi
   sleep 60
 done
