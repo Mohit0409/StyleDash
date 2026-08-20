@@ -39,7 +39,7 @@ function getOrCreateApp(): FirebaseApp {
     return existing[0];
   }
   const firebaseConfig = getFirebaseConfig();
-  if (!Boolean(firebaseConfig.apiKey && firebaseConfig.authDomain && firebaseConfig.projectId)) {
+  if (!(firebaseConfig.apiKey && firebaseConfig.authDomain && firebaseConfig.projectId)) {
     throw new Error('Firebase authentication is not configured.');
   }
   return initializeApp(firebaseConfig);
