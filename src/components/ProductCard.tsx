@@ -4,13 +4,17 @@ import { Heart, Star, Zap, Eye } from 'lucide-react';
 import { Product } from '../types';
 import { useWishlist } from '../context/WishlistContext';
 
+const PRODUCT_IMAGE_FALLBACK = '/product-placeholder.svg';
+
 export const ProductCard: React.FC<{ product: Product; onQuickView?: (p: Product) => void }> = ({
   product,
   onQuickView
 }) => {
   const { isInWishlist, toggleWishlist } = useWishlist();
   const [hoveredImage, setHoveredImage] = useState(false);
+  const [failedProductId, setFailedProductId] = useState<string | null>(null);
   const isWishlisted = isInWishlist(product.id);
+  const imageFailed = failedProductId === product.id;
 
   const primaryImage = product.images[0] || product.thumbnail;
   const secondaryImage = product.images[1] || primaryImage;
@@ -61,12 +65,13 @@ export const ProductCard: React.FC<{ product: Product; onQuickView?: (p: Product
         onMouseLeave={() => setHoveredImage(false)}
       >
         <img
-          src={hoveredImage ? secondaryImage : primaryImage}
+          src={imageFailed ? PRODUCT_IMAGE_FALLBACK : (hoveredImage ? secondaryImage : primaryImage)}
           alt={product.name}
           className="w-full h-full object-cover object-center group-hover:scale-105 transition-transform duration-500"
           loading="lazy"
-          onError={(e) => {
-            (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1521572267360-ee0c2909d518?auto=format&fit=crop&w=800&q=80';
+          decoding="async"
+          onError={() => {
+            if (!imageFailed) setFailedProductId(product.id);
           }}
         />
 

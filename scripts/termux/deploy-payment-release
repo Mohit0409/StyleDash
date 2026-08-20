@@ -12,6 +12,78 @@ DATA_ROOT="$HOME/.local/share/styledash"
 LIVE_DB="$DATA_ROOT/styledash.db"
 LIVE_STATE="$DATA_ROOT/runtime/orders.json"
 BACKUP_SCRIPT="$STAGE/scripts/termux/backup-styledash-data"
+PRIVATE_CONFIG_DIR="$HOME/.config/styledash"
+SECRETS_FILE="$PRIVATE_CONFIG_DIR/secrets.env"
+
+if [ ! -f "$STAGE/scripts/styledash_firebase.py" ]; then
+  echo "release is missing styledash_firebase.py; deployment aborted" >&2
+  exit 1
+fi
+if [ ! -f "$STAGE/scripts/styledash_shops.py" ] || \
+   [ ! -f "$STAGE/scripts/audit_identity_duplicates.py" ]; then
+  echo "release is missing shop or identity-migration safety modules; deployment aborted" >&2
+  exit 1
+fi
+firebase_assets=("$STAGE"/dist/assets/*.js)
+if [ ! -f "${firebase_assets[0]}" ]; then
+  echo "release is missing frontend JavaScript assets; deployment aborted" >&2
+  exit 1
+fi
+for empty_firebase_field in 'apiKey:""' 'authDomain:""' 'projectId:""' 'appId:""'; do
+  if grep -Fq "$empty_firebase_field" "${firebase_assets[@]}"; then
+    echo "release contains an empty Firebase web configuration; deployment aborted" >&2
+    exit 1
+  fi
+done
+for firebase_field in apiKey authDomain projectId appId; do
+  if ! grep -Ehq "$firebase_field:\"[^\"]+\"" "${firebase_assets[@]}"; then
+    echo "release is missing a complete Firebase web configuration; deployment aborted" >&2
+    exit 1
+  fi
+done
+if [ ! -d "$PRIVATE_CONFIG_DIR" ] || \
+   [ "$(realpath -e "$PRIVATE_CONFIG_DIR")" != "$PRIVATE_CONFIG_DIR" ] || \
+   [ "$(stat -c '%a' "$PRIVATE_CONFIG_DIR")" != 700 ] || \
+   [ "$(stat -c '%u' "$PRIVATE_CONFIG_DIR")" != "$(id -u)" ]; then
+  echo "private configuration directory is missing, redirected, or has unsafe ownership or permissions; deployment aborted" >&2
+  exit 1
+fi
+if [ ! -f "$SECRETS_FILE" ] || \
+   [ "$(stat -c '%a' "$SECRETS_FILE")" != 600 ] || \
+   [ "$(stat -c '%u' "$SECRETS_FILE")" != "$(id -u)" ]; then
+  echo "private runtime configuration is missing or has unsafe permissions; deployment aborted" >&2
+  exit 1
+fi
+set -a
+. "$SECRETS_FILE"
+set +a
+: "${STYLEDASH_FIREBASE_PROJECT_ID:?Firebase project ID is not configured}"
+: "${STYLEDASH_FIREBASE_CREDENTIALS:?Firebase credentials path is not configured}"
+if ! grep -Fq "projectId:\"$STYLEDASH_FIREBASE_PROJECT_ID\"" "${firebase_assets[@]}"; then
+  echo "Firebase browser and server project IDs do not match; deployment aborted" >&2
+  exit 1
+fi
+case "$STYLEDASH_FIREBASE_CREDENTIALS" in
+  /*) ;;
+  *) echo "Firebase credentials path must be absolute; deployment aborted" >&2; exit 1 ;;
+esac
+FIREBASE_CREDENTIALS_REAL="$(realpath -e "$STYLEDASH_FIREBASE_CREDENTIALS")" || {
+  echo "Firebase credentials path cannot be resolved; deployment aborted" >&2
+  exit 1
+}
+case "$FIREBASE_CREDENTIALS_REAL" in
+  "$PRIVATE_CONFIG_DIR"/*) ;;
+  *) echo "Firebase credentials must remain inside the private StyleDash configuration directory; deployment aborted" >&2; exit 1 ;;
+esac
+if [ ! -f "$FIREBASE_CREDENTIALS_REAL" ] || \
+   [ ! -r "$FIREBASE_CREDENTIALS_REAL" ] || \
+   [ "$(stat -c '%a' "$FIREBASE_CREDENTIALS_REAL")" != 600 ] || \
+   [ "$(stat -c '%u' "$FIREBASE_CREDENTIALS_REAL")" != "$(id -u)" ]; then
+  echo "Firebase credentials are missing, unreadable, or have unsafe ownership or permissions; deployment aborted" >&2
+  exit 1
+fi
+export STYLEDASH_FIREBASE_CREDENTIALS="$FIREBASE_CREDENTIALS_REAL"
+PYTHONPATH="$STAGE/scripts${PYTHONPATH:+:$PYTHONPATH}" python3 -c 'from styledash_firebase import _initialize_app; _initialize_app(); print("firebase_admin_preflight=ok")'
 
 if [ -f "$LIVE_DB" ]; then
   python3 - "$LIVE_DB" <<'PY'
@@ -19,11 +91,28 @@ import sqlite3, sys
 connection = sqlite3.connect(sys.argv[1])
 try:
     result = connection.execute("PRAGMA integrity_check").fetchone()[0]
+    has_vendors = connection.execute(
+        "SELECT 1 FROM sqlite_master WHERE type='table' AND name='vendor_applications'"
+    ).fetchone()
+    duplicate_shop_accounts = 0
+    if has_vendors:
+        duplicate_shop_accounts = connection.execute(
+            "SELECT COUNT(*) FROM ("
+            "SELECT submitted_by_user_id FROM vendor_applications "
+            "GROUP BY submitted_by_user_id HAVING COUNT(*)>1)"
+        ).fetchone()[0]
 finally:
     connection.close()
 if result != "ok":
     raise SystemExit("Live SQLite integrity check failed; deployment aborted")
+if duplicate_shop_accounts:
+    raise SystemExit(
+        f"Shop migration blocked: duplicate applications exist for "
+        f"{duplicate_shop_accounts} customer account(s)"
+    )
 PY
+  PYTHONPATH="$STAGE/scripts${PYTHONPATH:+:$PYTHONPATH}" \
+    python3 "$STAGE/scripts/audit_identity_duplicates.py" "$LIVE_DB"
 fi
 
 if [ -f "$LIVE_STATE" ]; then
@@ -48,7 +137,12 @@ BACKUP="$(mktemp -d "$BACKUP_ROOT/styledash-pre-payment.XXXXXX")"
 
 cp -a "$HOME/server" "$BACKUP/server"
 if [ -d "$HOME/admin" ]; then cp -a "$HOME/admin" "$BACKUP/admin"; fi
-mkdir -p "$BACKUP/bin" "$BACKUP/boot"
+mkdir -p "$BACKUP/bin" "$BACKUP/boot" "$BACKUP/data"
+for authoritative_config in catalog.json settings.json; do
+  if [ -f "$DATA_ROOT/$authoritative_config" ]; then
+    cp -a "$DATA_ROOT/$authoritative_config" "$BACKUP/data/$authoritative_config"
+  fi
+done
 cp -a \
   "$HOME/bin/start-styledash" \
   "$HOME/bin/start-styledash-stack" \
@@ -58,11 +152,23 @@ for optional in start-styledash-admin styledash-create-admin audit-styledash-net
   if [ -f "$HOME/bin/$optional" ]; then cp -a "$HOME/bin/$optional" "$BACKUP/bin/"; fi
 done
 cp -a "$HOME/.termux/boot/start-styledash" "$BACKUP/boot/"
+printf 'rollback=%s\n' "$BACKUP"
+
+cloudflare_marker='cloudflared tunnel --no-autoupdate --url http://127.0.0.1:8080'
+for cloudflare_pid in $(pgrep -f "$cloudflare_marker" 2>/dev/null || true); do
+  if tr '\0' ' ' < "/proc/$cloudflare_pid/cmdline" 2>/dev/null | grep -Fq "$cloudflare_marker"; then
+    kill "$cloudflare_pid"
+  fi
+done
+rm -f -- "$HOME/run/styledash-cloudflare.pid" "$HOME/run/styledash-cloudflare-url"
 
 if [ -d "$HOME/server/assets" ]; then rm -rf -- "$HOME/server/assets"; fi
 cp -a "$STAGE/dist/." "$HOME/server/"
 install -m 755 "$STAGE/scripts/termux-spa-server.py" "$HOME/server/serve.py"
 install -m 600 "$STAGE/scripts/styledash_security.py" "$HOME/server/styledash_security.py"
+install -m 600 "$STAGE/scripts/styledash_firebase.py" "$HOME/server/styledash_firebase.py"
+install -m 600 "$STAGE/scripts/styledash_shops.py" "$HOME/server/styledash_shops.py"
+install -m 600 "$STAGE/scripts/audit_identity_duplicates.py" "$HOME/server/audit_identity_duplicates.py"
 install -m 600 "$STAGE/scripts/styledash_mail.py" "$HOME/server/styledash_mail.py"
 install -m 600 "$STAGE/scripts/styledash_notify.py" "$HOME/server/styledash_notify.py"
 mkdir -p "$HOME/admin/admin" "$HOME/admin/tools"
@@ -72,11 +178,19 @@ chmod 700 "$HOME/admin" "$HOME/admin/admin" "$HOME/admin/tools"
 install -m 600 "$STAGE/scripts/termux-admin-server.py" "$HOME/admin/serve.py"
 install -m 600 "$STAGE/scripts/styledash_admin.py" "$HOME/admin/styledash_admin.py"
 install -m 600 "$STAGE/scripts/styledash_security.py" "$HOME/admin/styledash_security.py"
+install -m 600 "$STAGE/scripts/styledash_shops.py" "$HOME/admin/styledash_shops.py"
 install -m 600 "$STAGE/server/admin/index.html" "$HOME/admin/admin/index.html"
 install -m 600 "$STAGE/server/admin/admin.css" "$HOME/admin/admin/admin.css"
 install -m 600 "$STAGE/server/admin/admin.js" "$HOME/admin/admin/admin.js"
 install -m 700 "$STAGE/server/tools/create_admin.py" "$HOME/admin/tools/create_admin.py"
 rm -f -- "$HOME/server/tools/set_admin.py" "$HOME/server/tools/setup_admin_totp.py"
+
+for runtime_module in styledash_security.py styledash_mail.py styledash_notify.py styledash_shops.py; do
+  if [ ! -f "$HOME/server/$runtime_module" ] || [ ! -f "$HOME/admin/$runtime_module" ]; then
+    echo "deployed runtime is missing $runtime_module; deployment aborted" >&2
+    exit 1
+  fi
+done
 
 mkdir -p "$HOME/.local/share/styledash/runtime"
 chmod 700 "$HOME/.local/share/styledash" "$HOME/.local/share/styledash/runtime"
@@ -119,6 +233,24 @@ fi
 "$HOME/bin/start-styledash"
 "$HOME/bin/start-styledash-admin"
 python3 -c 'import razorpay; print("razorpay_sdk=ok")'
+PYTHONPATH="$HOME/server${PYTHONPATH:+:$PYTHONPATH}" python3 -c 'import firebase_admin, styledash_firebase; print("firebase_sdk=ok")'
+PYTHONPATH="$HOME/server${PYTHONPATH:+:$PYTHONPATH}" python3 "$HOME/server/audit_identity_duplicates.py" "$LIVE_DB"
+python3 - "$LIVE_DB" <<'PY'
+import sqlite3, sys
+connection = sqlite3.connect(sys.argv[1])
+try:
+    identity_versions = {row[0] for row in connection.execute("SELECT version FROM schema_migrations")}
+    shop_versions = {row[0] for row in connection.execute("SELECT version FROM shop_schema_migrations")}
+    integrity = connection.execute("PRAGMA integrity_check").fetchone()[0]
+    foreign_keys = connection.execute("PRAGMA foreign_key_check").fetchall()
+finally:
+    connection.close()
+if 6 not in identity_versions or not {1, 2}.issubset(shop_versions):
+    raise SystemExit("StyleDash schema migrations are incomplete")
+if integrity != "ok" or foreign_keys:
+    raise SystemExit("StyleDash post-migration database validation failed")
+print("styledash_migrations=ok")
+PY
 printf 'backup=%s\n' "$BACKUP"
 printf 'health='
 curl -fsS http://127.0.0.1:8080/api/health

@@ -413,7 +413,7 @@ test('authenticated vendor application persists through the real local API', asy
 
   await expect(
     page.getByRole('heading', {
-      name: 'Partner & List Your Local Store',
+      name: 'Start Shop Application',
     }),
   ).toBeVisible();
 
@@ -426,20 +426,12 @@ test('authenticated vendor application persists through the real local API', asy
     .fill('E2E Vendor Owner');
 
   await page
-    .getByPlaceholder('+91 9876543210')
-    .fill('+91 9876543210');
-
-  await page
-    .getByPlaceholder('store@neemuch.in')
-    .fill('vendor-store-e2e@example.test');
-
-  await page
-    .getByPlaceholder('e.g. 45 Main Market, Neemuch')
+    .getByPlaceholder('Street, market, landmark')
     .fill('45 E2E Main Market, Neemuch');
 
   await page
     .getByPlaceholder(
-      /Describe your store inventory/,
+      /Describe your shop/,
     )
     .fill(
       'E2E-only test inventory description for automated launch validation.',
@@ -447,15 +439,29 @@ test('authenticated vendor application persists through the real local API', asy
 
   await page
     .getByRole('button', {
-      name: 'Submit Store Application',
+      name: 'Save Draft',
     })
     .click();
 
   await expect(
     page.getByRole('heading', {
-      name: 'Store Registration Submitted!',
-    }),
+      name: 'Continue Application',
+    }).first(),
   ).toBeVisible();
+
+  await page
+    .getByPlaceholder(/Describe your shop/)
+    .fill('Corrected E2E-only inventory description saved in the authenticated draft.');
+
+  await page.getByRole('button', { name: 'Save Draft' }).click();
+  await expect(page.getByRole('status')).toContainText('Draft saved');
+
+  await page.getByRole('button', { name: 'Submit for Review' }).click();
+
+  await expect(
+    page.getByRole('heading', { name: 'Application Submitted', exact: true }).first(),
+  ).toBeVisible();
+  await expect(page.getByText(/not publicly active/i).first()).toBeVisible();
 });
 
 

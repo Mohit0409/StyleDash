@@ -3,3 +3,6 @@ argon2-cffi==25.1.0
 pyotp==2.10.0
 # On Termux install cryptography with: pkg install python-cryptography
 cryptography==50.0.0
+# Verifies Google/Phone Firebase ID tokens server-side only (identity check,
+# never the app's session/authorization source). See scripts/styledash_firebase.py.
+firebase-admin==6.5.0

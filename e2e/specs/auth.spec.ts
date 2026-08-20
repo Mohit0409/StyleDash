@@ -5,11 +5,12 @@ test('customer can register and receive a working authenticated session', async 
 }) => {
   const unique = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
   const email = `e2e-${unique}@example.test`;
+  const phone = `+919${String(Date.now()).slice(-9)}`;
 
   await page.goto('/register');
 
   await page.getByPlaceholder('Full name').fill('StyleDash E2E Customer');
-  await page.getByPlaceholder('Phone number').fill('9876543210');
+  await page.getByPlaceholder('Phone number').fill(phone);
   await page.getByPlaceholder('Email').fill(email);
   await page
     .getByPlaceholder('Password (12+ characters)')

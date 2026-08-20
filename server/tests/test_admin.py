@@ -510,6 +510,19 @@ class AdminHttpTests(unittest.TestCase):
         bad = urllib.request.Request(self.base + "/", headers={"Host": "evil.example"})
         with self.assertRaises(urllib.error.HTTPError) as caught: urllib.request.urlopen(bad)
         self.assertEqual(caught.exception.code, 421); caught.exception.close()
+        status, body, _headers = self.request("/api/admin/orders")
+        self.assertEqual((status, body["code"]), (401, "admin_authentication_required"))
+        customer_cookie = urllib.request.Request(
+            self.base + "/api/admin/orders",
+            headers={
+                "Host": "127.0.0.1:8081",
+                "Origin": "http://127.0.0.1:8081",
+                "Cookie": "__Host-styledash_session=customer-cookie-is-not-an-admin-session",
+            },
+        )
+        with self.assertRaises(urllib.error.HTTPError) as caught:
+            urllib.request.urlopen(customer_cookie)
+        self.assertEqual(caught.exception.code, 401); caught.exception.close()
         status, body, _headers = self.request("/api/admin/login", {"username": "local-owner", "password": "wrong administrator password"}, method="POST")
         self.assertEqual((status, body["code"]), (401, "invalid_admin_credentials"))
         status, body, _headers = self.request("/api/admin/login", {"username": "local-owner", "password": "long administrator password 123"}, method="POST")
@@ -520,6 +533,8 @@ class AdminHttpTests(unittest.TestCase):
         self.assertEqual(status, 200); csrf = body["csrfToken"]
         status, body, _headers = self.request("/api/admin/me")
         self.assertEqual(status, 200)
+        status, body, _headers = self.request("/api/admin/orders")
+        self.assertEqual(status, 200); self.assertEqual(body["orders"], [])
         status, body, _headers = self.request("/api/admin/payment-alerts")
         self.assertEqual(status, 200); self.assertEqual(body["alerts"], [])
         status, body, _headers = self.request("/api/admin/logout", {}, method="POST")

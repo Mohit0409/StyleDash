@@ -22,6 +22,11 @@ try:
 except ModuleNotFoundError:
     from scripts.styledash_security import ClosingConnection, SecurityError, iso, token_hash, utc_now
 
+try:
+    from styledash_shops import ShopWorkflow
+except ModuleNotFoundError:
+    from scripts.styledash_shops import ShopWorkflow
+
 
 ADMIN_COOKIE = "styledash_admin_session"
 CHALLENGE_COOKIE = "styledash_admin_challenge"
@@ -328,27 +333,54 @@ class AdminStore:
             db.commit()
         return {"id": user_id, "active": active}
 
-    def vendor_applications(self) -> list[dict[str, Any]]:
-        with self.connect() as db:
-            rows = db.execute("SELECT * FROM vendor_applications ORDER BY created_at DESC LIMIT 200").fetchall()
-        return [{key: row[key] for key in row.keys()} for row in rows]
+    def vendor_applications(self, admin_id: str) -> list[dict[str, Any]]:
+        return ShopWorkflow(self.path).admin_list_applications(admin_id)
 
-    def review_vendor(self, admin_id: str, application_id: str, status: str) -> dict[str, Any]:
+    def review_vendor(
+        self,
+        admin_id: str,
+        application_id: str,
+        status: str,
+        reason: str | None = None,
+    ) -> dict[str, Any]:
+        """Compatibility adapter for older private-admin callers.
+
+        New HTTP handlers use ShopWorkflow directly with explicit uppercase
+        transitions. The legacy approve action advances SUBMITTED through
+        UNDER_REVIEW before approval, preserving the enforced state machine.
+        """
         if status not in ("approved", "rejected"):
             raise SecurityError(400, "Invalid vendor decision.", "invalid_vendor_status")
-        now = iso(utc_now())
-        with self.connect() as db:
-            db.execute("BEGIN IMMEDIATE")
-            changed = db.execute(
-                "UPDATE vendor_applications SET status=?,reviewed_by=NULL,updated_at=? WHERE id=? AND status='pending'",
-                (status, now, application_id),
-            ).rowcount
-            if not changed:
-                db.rollback()
-                raise SecurityError(409, "Vendor application cannot be changed.", "invalid_vendor_transition")
-            self._audit(db, admin_id, f"vendor_{status}", "vendor_application", application_id, "success")
-            db.commit()
-        return {"id": application_id, "status": status, "updatedAt": now}
+        shops = ShopWorkflow(self.path)
+        application = next(
+            (
+                item
+                for item in shops.admin_list_applications(admin_id)
+                if item["id"] == application_id
+            ),
+            None,
+        )
+        if application is None:
+            raise SecurityError(404, "Shop application not found.", "vendor_application_not_found")
+        if application["status"] == "SUBMITTED":
+            shops.admin_transition_application(
+                admin_id, application_id, "UNDER_REVIEW"
+            )
+        result = shops.admin_transition_application(
+            admin_id, application_id, status.upper(), reason
+        )
+        self.record_action(
+            admin_id,
+            f"vendor_{status}",
+            "vendor_application",
+            application_id,
+            "success",
+        )
+        return {
+            "id": result["id"],
+            "status": status,
+            "updatedAt": result["updatedAt"],
+        }
 
     def audit(self, limit: int = 100) -> list[dict[str, Any]]:
         with self.connect() as db:

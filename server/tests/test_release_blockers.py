@@ -285,8 +285,35 @@ class AdminCancellationTests(unittest.TestCase):
 class DeploymentAndTaxTests(unittest.TestCase):
     def test_preflight_precedes_code_mutation(self):
         text = (ROOT / "scripts/termux/deploy-payment-release").read_text(encoding="utf-8")
+        self.assertLess(
+            text.index('PYTHONPATH="$STAGE/scripts'),
+            text.index("PRAGMA integrity_check"),
+        )
+        self.assertLess(
+            text.index("empty Firebase web configuration"),
+            text.index("PRAGMA integrity_check"),
+        )
+        self.assertLess(
+            text.index("missing a complete Firebase web configuration"),
+            text.index("PRAGMA integrity_check"),
+        )
+        self.assertLess(
+            text.index("Firebase browser and server project IDs do not match"),
+            text.index("PRAGMA integrity_check"),
+        )
+        self.assertIn('firebase_assets=("$STAGE"/dist/assets/*.js)', text)
+        self.assertNotIn('auth_assets=("$STAGE"/dist/assets/AuthPage-*.js)', text)
+        self.assertIn(
+            'grep -Fq "projectId:\\"$STYLEDASH_FIREBASE_PROJECT_ID\\\"" "${firebase_assets[@]}"',
+            text,
+        )
         self.assertLess(text.index("PRAGMA integrity_check"), text.index('bash "$BACKUP_SCRIPT"'))
+        self.assertLess(
+            text.index('audit_identity_duplicates.py" "$LIVE_DB"'),
+            text.index('bash "$BACKUP_SCRIPT"'),
+        )
         self.assertLess(text.index('bash "$BACKUP_SCRIPT"'), text.index('if [ -d "$HOME/server/assets" ]'))
+        self.assertLess(text.index("printf 'rollback=%s"), text.index('if [ -d "$HOME/server/assets" ]'))
         self.assertIn(
             'install -m 600 "$STAGE/scripts/styledash_mail.py" "$HOME/server/styledash_mail.py"',
             text,
@@ -303,6 +330,46 @@ class DeploymentAndTaxTests(unittest.TestCase):
             'install -m 600 "$STAGE/scripts/styledash_notify.py" "$HOME/admin/styledash_notify.py"',
             text,
         )
+        self.assertIn(
+            'install -m 600 "$STAGE/scripts/styledash_firebase.py" "$HOME/server/styledash_firebase.py"',
+            text,
+        )
+        self.assertIn(
+            'install -m 600 "$STAGE/scripts/styledash_shops.py" "$HOME/server/styledash_shops.py"',
+            text,
+        )
+        self.assertIn(
+            'install -m 600 "$STAGE/scripts/styledash_shops.py" "$HOME/admin/styledash_shops.py"',
+            text,
+        )
+        self.assertIn(
+            'install -m 600 "$STAGE/scripts/audit_identity_duplicates.py" "$HOME/server/audit_identity_duplicates.py"',
+            text,
+        )
+        self.assertIn("styledash_migrations=ok", text)
+        self.assertIn("duplicate applications exist for", text)
+        self.assertIn(
+            "from styledash_firebase import _initialize_app",
+            text,
+        )
+        self.assertIn("STYLEDASH_FIREBASE_PROJECT_ID", text)
+        self.assertIn("STYLEDASH_FIREBASE_CREDENTIALS", text)
+        self.assertIn("Firebase credentials path must be absolute", text)
+        self.assertIn("Firebase credentials must remain inside the private StyleDash configuration directory", text)
+        self.assertIn("realpath -e", text)
+        self.assertIn("stat -c '%u'", text)
+        self.assertIn(
+            'cp -a "$DATA_ROOT/$authoritative_config" "$BACKUP/data/$authoritative_config"',
+            text,
+        )
+
+    def test_boot_uses_only_the_managed_ngrok_stack(self):
+        text = (ROOT / "scripts/termux/boot-start-styledash").read_text(encoding="utf-8")
+        self.assertIn('"$HOME/bin/start-styledash-stack"', text)
+        self.assertNotIn("cloudflare", text.casefold())
+
+        verifier = (ROOT / "scripts/termux/verify-styledash-processes").read_text(encoding="utf-8")
+        self.assertIn("styledash_cloudflare=absent", verifier)
 
     def test_refund_processed_is_documented_for_live_webhook(self):
         readme = (ROOT / "server/README.md").read_text(encoding="utf-8")
