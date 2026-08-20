@@ -9,14 +9,19 @@ import {
   type UserCredential,
 } from 'firebase/auth';
 
-const firebaseConfig = {
+const getFirebaseConfig = () => ({
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY || '',
   authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || '',
   projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || '',
   appId: import.meta.env.VITE_FIREBASE_APP_ID || '',
-};
+});
 
-const hasFirebaseConfig = Boolean(firebaseConfig.apiKey && firebaseConfig.authDomain && firebaseConfig.projectId) || import.meta.env.MODE === 'test';
+export function isFirebaseConfigured(): boolean {
+  const firebaseConfig = getFirebaseConfig();
+  return Boolean(firebaseConfig.apiKey && firebaseConfig.authDomain && firebaseConfig.projectId) || import.meta.env.MODE === 'test';
+}
+
+const hasFirebaseConfig = isFirebaseConfigured();
 
 export function normalizeIndianPhone(value: string): string {
   const digits = value.replace(/\D/g, '');
@@ -33,7 +38,8 @@ function getOrCreateApp(): FirebaseApp {
   if (existing.length > 0) {
     return existing[0];
   }
-  if (!hasFirebaseConfig) {
+  const firebaseConfig = getFirebaseConfig();
+  if (!Boolean(firebaseConfig.apiKey && firebaseConfig.authDomain && firebaseConfig.projectId)) {
     throw new Error('Firebase authentication is not configured.');
   }
   return initializeApp(firebaseConfig);

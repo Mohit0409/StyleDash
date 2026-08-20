@@ -19,7 +19,7 @@ vi.mock('firebase/auth', () => ({
   signInWithPhoneNumber: firebaseAuthMocks.signInWithPhoneNumber,
 }));
 
-import { normalizeIndianPhone, signInWithGoogleProvider, startPhoneVerification, verifyPhoneCode } from '../services/firebaseClient';
+import { isFirebaseConfigured, normalizeIndianPhone, signInWithGoogleProvider, startPhoneVerification, verifyPhoneCode } from '../services/firebaseClient';
 
 describe('firebase client helpers', () => {
   beforeEach(() => {
@@ -36,6 +36,16 @@ describe('firebase client helpers', () => {
     vi.stubEnv('VITE_FIREBASE_AUTH_DOMAIN', 'example.firebaseapp.com');
     vi.stubEnv('VITE_FIREBASE_PROJECT_ID', 'project');
     vi.stubEnv('VITE_FIREBASE_APP_ID', 'app');
+  });
+
+  it('keeps Firebase available in the Vitest environment while allowing env overrides for real app mode checks', () => {
+    vi.stubEnv('VITE_FIREBASE_API_KEY', '');
+    vi.stubEnv('VITE_FIREBASE_AUTH_DOMAIN', '');
+    vi.stubEnv('VITE_FIREBASE_PROJECT_ID', '');
+    vi.stubEnv('VITE_FIREBASE_APP_ID', '');
+
+    expect(import.meta.env.MODE).toBe('test');
+    expect(isFirebaseConfigured()).toBe(true);
   });
 
   it('requests a Google ID token from Firebase popup auth', async () => {

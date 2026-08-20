@@ -25,7 +25,14 @@ export const AuthPage: React.FC<{ mode: 'login' | 'register' }> = ({ mode }) => 
   const [resendIn, setResendIn] = useState(0);
   const phoneSessionRef = useRef<PhoneVerificationSession | null>(null);
   const authAttemptRef = useRef(false);
+  const [firebaseEnabled, setFirebaseEnabled] = useState(true);
   const authBusy = loading || otpBusy || providerBusy !== null;
+
+  useEffect(() => {
+    void getFirebaseClient().then(({ isFirebaseConfigured }) => {
+      setFirebaseEnabled(isFirebaseConfigured());
+    }).catch(() => setFirebaseEnabled(false));
+  }, []);
 
   useEffect(() => {
     if (!resendIn) return undefined;
@@ -54,6 +61,10 @@ export const AuthPage: React.FC<{ mode: 'login' | 'register' }> = ({ mode }) => 
   };
 
   const handleGoogle = async () => {
+    if (!firebaseEnabled) {
+      setProviderError('Firebase authentication is not configured. Please use email/password login instead.');
+      return;
+    }
     if (authAttemptRef.current || authBusy) return;
     authAttemptRef.current = true;
     setProviderBusy('google');
@@ -72,6 +83,10 @@ export const AuthPage: React.FC<{ mode: 'login' | 'register' }> = ({ mode }) => 
   };
 
   const handlePhoneStart = async () => {
+    if (!firebaseEnabled) {
+      setProviderError('Firebase authentication is not configured. Please use email/password login instead.');
+      return;
+    }
     if (!phone.trim() || authAttemptRef.current || authBusy) return;
     authAttemptRef.current = true;
     setOtpBusy(true);
@@ -132,10 +147,10 @@ export const AuthPage: React.FC<{ mode: 'login' | 'register' }> = ({ mode }) => 
     <div className="bg-white dark:bg-neutral-900 border dark:border-neutral-800 rounded-3xl p-7 space-y-4 shadow-sm">
       <h1 className="text-2xl font-black">{mode === 'login' ? 'Welcome back' : 'Create your account'}</h1>
       <div className="space-y-2">
-        <button type="button" disabled={authBusy} onClick={handleGoogle} className="w-full rounded-xl border border-neutral-300 px-3 py-3 font-semibold disabled:opacity-60">{providerBusy === 'google' ? 'Please wait…' : 'Continue with Google'}</button>
+        <button type="button" disabled={authBusy || !firebaseEnabled} onClick={handleGoogle} className="w-full rounded-xl border border-neutral-300 px-3 py-3 font-semibold disabled:opacity-60">{providerBusy === 'google' ? 'Please wait…' : firebaseEnabled ? 'Continue with Google' : 'Google sign-in unavailable'}</button>
         <div className="rounded-2xl border border-neutral-200 p-3 space-y-3">
           <input minLength={10} maxLength={20} autoComplete="tel" value={phone} onChange={event => setPhone(event.target.value)} placeholder="Mobile number" className="w-full p-3 rounded-xl border dark:bg-neutral-800" />
-          {!otpSent ? <button type="button" disabled={authBusy} onClick={handlePhoneStart} className="w-full rounded-xl bg-neutral-950 px-3 py-3 font-semibold text-white disabled:opacity-60">{otpBusy ? 'Sending OTP…' : 'Continue with Mobile'}</button> : <>
+          {!otpSent ? <button type="button" disabled={authBusy || !firebaseEnabled} onClick={handlePhoneStart} className="w-full rounded-xl bg-neutral-950 px-3 py-3 font-semibold text-white disabled:opacity-60">{otpBusy ? 'Sending OTP…' : firebaseEnabled ? 'Continue with Mobile' : 'Mobile OTP unavailable'}</button> : <>
             <p className="text-xs text-neutral-500">Code sent to {phone.replace(/(\d{2})\d+(\d{2})$/, '$1******$2')}</p>
             <input inputMode="numeric" autoComplete="one-time-code" pattern="[0-9]{6}" maxLength={6} value={otpCode} onChange={event => setOtpCode(event.target.value.replace(/\D/g, ''))} placeholder="Enter OTP" className="w-full p-3 rounded-xl border dark:bg-neutral-800" />
             <button type="button" disabled={authBusy || otpCode.length !== 6} onClick={handlePhoneConfirm} className="w-full rounded-xl bg-lime-600 px-3 py-3 font-semibold text-white disabled:opacity-60">{providerBusy === 'phone' ? 'Verifying…' : 'Verify OTP'}</button>
