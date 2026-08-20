@@ -31,7 +31,8 @@ export const ProductDetail: React.FC = () => {
   useEffect(() => {
     if (!slug) return;
     setLoading(true);
-    productRepository.getProductBySlug(slug).then(p => {
+    productRepository.getAllProducts().then(all => {
+      const p = all.find(item => item.slug === slug || item.id === slug) || null;
       if (p) {
         setProduct(p);
         setSelectedImage(p.images[0] || p.thumbnail);
@@ -41,11 +42,8 @@ export const ProductDetail: React.FC = () => {
           setSelectedColour(firstInStock.colourName);
         }
       }
+      setRelatedProducts(all.filter(item => item.id !== p?.id).slice(0, 4));
       setLoading(false);
-    });
-
-    productRepository.getAllProducts().then(all => {
-      setRelatedProducts(all.slice(0, 4));
     });
   }, [slug]);
 

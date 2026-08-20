@@ -3,7 +3,9 @@ from __future__ import annotations
 import importlib.util
 import sqlite3
 import tempfile
+import threading
 import unittest
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 from cryptography.fernet import Fernet
@@ -13,6 +15,12 @@ SPEC = importlib.util.spec_from_file_location("styledash_security", ROOT / "scri
 assert SPEC and SPEC.loader
 SECURITY = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(SECURITY)
+AUDIT_SPEC = importlib.util.spec_from_file_location(
+    "audit_identity_duplicates", ROOT / "scripts" / "audit_identity_duplicates.py"
+)
+assert AUDIT_SPEC and AUDIT_SPEC.loader
+AUDIT = importlib.util.module_from_spec(AUDIT_SPEC)
+AUDIT_SPEC.loader.exec_module(AUDIT)
 
 
 class FederatedAuthTests(unittest.TestCase):
@@ -83,19 +91,73 @@ class FederatedAuthTests(unittest.TestCase):
         self.assertNotEqual(login_at, "stale")
         self.assertNotEqual(last_used_at, "stale")
 
-    def test_verified_google_email_links_existing_password_customer(self):
-        existing, _raw, _csrf = self.store.register({
+    def test_concurrent_returning_google_login_reuses_uid_and_email(self):
+        token = self.google("google-concurrent", "Concurrent@Example.Test")
+        with ThreadPoolExecutor(max_workers=6) as pool:
+            results = list(pool.map(
+                lambda _index: self.store.federated_session("google", {"idToken": token}),
+                range(6),
+            ))
+        self.assertEqual(len({result[0]["id"] for result in results}), 1)
+        self.assertEqual(sum(int(result[3]) for result in results), 1)
+        with self.store.connect() as db:
+            self.assertEqual(db.execute("SELECT COUNT(*) FROM users").fetchone()[0], 1)
+            self.assertEqual(db.execute("SELECT COUNT(*) FROM customer_auth_identities").fetchone()[0], 1)
+            self.assertEqual(
+                db.execute("SELECT normalized_email FROM users").fetchone()[0],
+                "concurrent@example.test",
+            )
+
+    def test_verified_google_email_requires_authenticated_linking(self):
+        existing, raw, _csrf = self.store.register({
             "name": "Password Customer",
             "email": "link@example.test",
             "password": "long test password 123",
         })
         token = self.google("google-link", "LINK@example.test")
-        linked, _raw2, _csrf2, created = self.store.federated_session("google", {"idToken": token})
-        self.assertFalse(created)
+        with self.assertRaises(SECURITY.SecurityError) as conflict:
+            self.store.federated_session("google", {"idToken": token})
+        self.assertEqual((conflict.exception.status, conflict.exception.code), (409, "account_link_required"))
+        linked = self.store.link_federated_identity(raw, "google", {"idToken": token})
         self.assertEqual(linked["id"], existing["id"])
+        returning, _raw2, _csrf2, created = self.store.federated_session("google", {"idToken": token})
+        self.assertFalse(created)
+        self.assertEqual(returning["id"], existing["id"])
         with self.store.connect() as db:
             self.assertEqual(db.execute("SELECT COUNT(*) FROM users").fetchone()[0], 1)
             self.assertEqual(db.execute("SELECT COUNT(*) FROM customer_auth_identities").fetchone()[0], 1)
+
+    def test_google_email_conflict_cannot_be_linked_from_another_customer(self):
+        owner, _owner_raw, _csrf = self.store.register({
+            "name": "Email Owner", "email": "owner@example.test", "password": "long owner password 123",
+        })
+        other, other_raw, _csrf2 = self.store.register({
+            "name": "Other Customer", "email": "other@example.test", "password": "long other password 123",
+        })
+        token = self.google("owner-google", "OWNER@example.test")
+        with self.assertRaises(SECURITY.SecurityError) as conflict:
+            self.store.link_federated_identity(other_raw, "google", {"idToken": token})
+        self.assertEqual(conflict.exception.code, "account_link_required")
+        with self.store.connect() as db:
+            self.assertEqual(db.execute("SELECT COUNT(*) FROM customer_auth_identities").fetchone()[0], 0)
+            self.assertEqual(db.execute("SELECT COUNT(*) FROM users").fetchone()[0], 2)
+        self.assertNotEqual(owner["id"], other["id"])
+
+    def test_google_email_link_reserves_email_against_later_registration(self):
+        _owner, raw, _csrf = self.store.register({
+            "name": "Cross Email Owner", "email": "primary@example.test",
+            "password": "long primary password 123",
+        })
+        token = self.google("cross-email-google", "google-alias@example.test")
+        self.store.link_federated_identity(raw, "google", {"idToken": token})
+        with self.assertRaises(SECURITY.SecurityError) as duplicate:
+            self.store.register({
+                "name": "Duplicate Alias", "email": "GOOGLE-ALIAS@example.test",
+                "password": "long duplicate alias password 123",
+            })
+        self.assertEqual((duplicate.exception.status, duplicate.exception.code), (409, "email_exists"))
+        with self.store.connect() as db:
+            self.assertEqual(db.execute("SELECT COUNT(*) FROM users").fetchone()[0], 1)
 
     def test_unverified_google_email_never_creates_or_links(self):
         token = self.google("google-unverified", "unverified@example.test", verified=False)
@@ -129,6 +191,19 @@ class FederatedAuthTests(unittest.TestCase):
         self.assertEqual((identity["provider"], identity["provider_subject"]), ("phone", "phone-1"))
         self.assertIsNone(identity["verified_email"])
         self.assertEqual(identity["verified_phone"], "+919876543210")
+        with self.store.connect() as db:
+            with self.assertRaises(sqlite3.IntegrityError):
+                db.execute(
+                    "INSERT INTO users(id,email,normalized_email,password_hash,name,phone,normalized_phone,"
+                    "created_at,updated_at,password_changed_at) VALUES(?,?,?,?,?,?,?,?,?,?)",
+                    ("usr_duplicate", None, None, None, "Duplicate", "+919876543210", "+919876543210", "x", "x", "x"),
+                )
+            with self.assertRaises(sqlite3.IntegrityError):
+                db.execute(
+                    "INSERT INTO customer_auth_identities(id,user_id,provider,provider_subject,verified_phone,"
+                    "created_at,last_used_at) VALUES(?,?,?,?,?,?,?)",
+                    ("cai_duplicate", first["id"], "phone", "phone-other", "+919876543210", "x", "x"),
+                )
 
     def test_malformed_nested_firebase_claim_fails_closed(self):
         token = self.add_claim("malformed-firebase", uid="malformed-firebase", firebase="phone")
@@ -180,15 +255,111 @@ class FederatedAuthTests(unittest.TestCase):
         with self.store.connect() as db:
             self.assertEqual(db.execute("SELECT COUNT(*) FROM customer_auth_identities").fetchone()[0], 0)
 
-    def test_verified_phone_collision_fails_closed(self):
+    def test_new_firebase_uid_for_verified_phone_reuses_linked_customer(self):
         first_token = self.phone("phone-a", "09876543210")
-        self.store.federated_session("phone", {"idToken": first_token})
+        first, _raw, _csrf, created = self.store.federated_session("phone", {"idToken": first_token})
         second_token = self.phone("phone-b", "+919876543210")
-        with self.assertRaises(SECURITY.SecurityError) as caught:
-            self.store.federated_session("phone", {"idToken": second_token})
-        self.assertEqual(caught.exception.code, "identity_already_linked")
+        second, _raw2, _csrf2, created_again = self.store.federated_session(
+            "phone", {"idToken": second_token}
+        )
+        self.assertTrue(created)
+        self.assertFalse(created_again)
+        self.assertEqual(second["id"], first["id"])
         with self.store.connect() as db:
             self.assertEqual(db.execute("SELECT COUNT(*) FROM users").fetchone()[0], 1)
+            self.assertEqual(db.execute("SELECT COUNT(*) FROM customer_auth_identities").fetchone()[0], 1)
+            identity = db.execute(
+                "SELECT provider_subject,verified_phone FROM customer_auth_identities"
+            ).fetchone()
+        self.assertEqual((identity["provider_subject"], identity["verified_phone"]), (
+            "phone-b", "+919876543210",
+        ))
+
+    def test_concurrent_replacement_phone_uids_never_duplicate_customer(self):
+        original = self.phone("phone-original", "+919876543210")
+        user, _raw, _csrf, _created = self.store.federated_session("phone", {"idToken": original})
+        replacements = [
+            self.phone(f"phone-replacement-{index}", "+919876543210") for index in range(6)
+        ]
+        with ThreadPoolExecutor(max_workers=6) as pool:
+            results = list(pool.map(
+                lambda token: self.store.federated_session("phone", {"idToken": token}),
+                replacements,
+            ))
+        self.assertEqual({result[0]["id"] for result in results}, {user["id"]})
+        self.assertFalse(any(result[3] for result in results))
+        with self.store.connect() as db:
+            self.assertEqual(db.execute("SELECT COUNT(*) FROM users").fetchone()[0], 1)
+            self.assertEqual(db.execute("SELECT COUNT(*) FROM customer_auth_identities").fetchone()[0], 1)
+
+    def test_existing_phone_uid_can_change_number_without_taking_another_customer(self):
+        token = self.phone("phone-change", "+919876543210")
+        user, _raw, _csrf, _created = self.store.federated_session("phone", {"idToken": token})
+        self.claims[token]["phone_number"] = "+919876543211"
+        changed, _raw2, _csrf2, created_again = self.store.federated_session(
+            "phone", {"idToken": token}
+        )
+        self.assertEqual(changed["id"], user["id"])
+        self.assertFalse(created_again)
+        self.assertEqual(changed["phone"], "+919876543211")
+
+        self.store.register({
+            "name": "Other Phone", "email": "other-phone@example.test",
+            "password": "long other phone password 123", "phone": "+919876543212",
+        })
+        self.claims[token]["phone_number"] = "+919876543212"
+        with self.assertRaises(SECURITY.SecurityError) as collision:
+            self.store.federated_session("phone", {"idToken": token})
+        self.assertEqual(collision.exception.code, "identity_already_linked")
+        self.assertEqual(self.store.profile(user["id"])["phone"], "+919876543211")
+
+    def test_equivalent_phone_formats_and_concurrent_login_create_one_customer(self):
+        formats = [
+            "9876543210", "09876543210", "91 9876543210", "+91 9876543210", "+919876543210",
+        ]
+        self.assertEqual(
+            {SECURITY.normalize_indian_phone(value) for value in formats},
+            {"+919876543210"},
+        )
+        token = self.phone("phone-concurrent", formats[-1])
+        with ThreadPoolExecutor(max_workers=6) as pool:
+            results = list(pool.map(
+                lambda _index: self.store.federated_session("phone", {"idToken": token}),
+                range(6),
+            ))
+        self.assertEqual(len({result[0]["id"] for result in results}), 1)
+        self.assertEqual(sum(int(result[3]) for result in results), 1)
+        with self.store.connect() as db:
+            self.assertEqual(db.execute("SELECT COUNT(*) FROM users").fetchone()[0], 1)
+            self.assertEqual(db.execute("SELECT COUNT(*) FROM customer_auth_identities").fetchone()[0], 1)
+            self.assertEqual(db.execute("SELECT COUNT(*) FROM sessions").fetchone()[0], 6)
+
+    def test_password_registration_phone_is_canonical_and_unique(self):
+        first, _raw, _csrf = self.store.register({
+            "name": "Phone Owner", "email": "phone-owner@example.test",
+            "password": "long phone owner password 123", "phone": "09876543210",
+        })
+        self.assertEqual(first["phone"], "+919876543210")
+        with self.assertRaises(SECURITY.SecurityError) as duplicate:
+            self.store.register({
+                "name": "Duplicate Phone", "email": "duplicate-phone@example.test",
+                "password": "long duplicate password 123", "phone": "+91 9876543210",
+            })
+        self.assertEqual((duplicate.exception.status, duplicate.exception.code), (409, "phone_exists"))
+        phone_token = self.phone("phone-needs-link", "+919876543210")
+        with self.assertRaises(SECURITY.SecurityError) as link_required:
+            self.store.federated_session("phone", {"idToken": phone_token})
+        self.assertEqual(link_required.exception.code, "account_link_required")
+        with self.store.connect() as db:
+            self.assertEqual(db.execute("SELECT COUNT(*) FROM users").fetchone()[0], 1)
+
+    def test_linked_mobile_cannot_be_changed_without_new_linking_proof(self):
+        token = self.phone("phone-profile", "+919876543210")
+        user, _raw, _csrf, _created = self.store.federated_session("phone", {"idToken": token})
+        with self.assertRaises(SECURITY.SecurityError) as caught:
+            self.store.update_profile(user["id"], {"phone": "+919999999999"})
+        self.assertEqual(caught.exception.code, "phone_verification_required")
+        self.assertEqual(self.store.profile(user["id"])["phone"], "+919876543210")
 
     def test_provider_mismatch_and_invalid_tokens_create_nothing(self):
         google_token = self.google("google-mismatch", "mismatch@example.test")
@@ -229,6 +400,129 @@ class FederatedAuthTests(unittest.TestCase):
             self.assertEqual(db.execute("SELECT id FROM users").fetchone()[0], user["id"])
             self.assertEqual(db.execute("PRAGMA integrity_check").fetchone()[0], "ok")
         self.assertTrue(raw)
+
+    def test_identity_migration_aborts_without_mutation_on_duplicate_normalized_phones(self):
+        legacy_path = Path(self.temporary.name) / "duplicate-phones.db"
+        legacy = sqlite3.connect(legacy_path)
+        legacy.executescript(
+            """
+            CREATE TABLE schema_migrations(version INTEGER PRIMARY KEY, applied_at TEXT NOT NULL);
+            INSERT INTO schema_migrations VALUES(1,'2026-01-01');
+            INSERT INTO schema_migrations VALUES(2,'2026-01-01');
+            INSERT INTO schema_migrations VALUES(3,'2026-01-01');
+            INSERT INTO schema_migrations VALUES(4,'2026-01-01');
+            INSERT INTO schema_migrations VALUES(5,'2026-01-01');
+            CREATE TABLE users(
+              id TEXT PRIMARY KEY, email TEXT, password_hash TEXT, name TEXT NOT NULL, phone TEXT,
+              role TEXT NOT NULL DEFAULT 'customer', is_active INTEGER NOT NULL DEFAULT 1,
+              email_verified INTEGER NOT NULL DEFAULT 0, email_verified_at TEXT,
+              created_at TEXT NOT NULL, updated_at TEXT NOT NULL, password_changed_at TEXT NOT NULL,
+              last_login_at TEXT
+            );
+            INSERT INTO users VALUES('usr_a','a@example.test','hash','A','9876543210','customer',1,0,NULL,'x','x','x',NULL);
+            INSERT INTO users VALUES('usr_b','b@example.test','hash','B','+91 9876543210','customer',1,0,NULL,'x','x','x',NULL);
+            CREATE TABLE customer_auth_identities(
+              id TEXT PRIMARY KEY, user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+              provider TEXT NOT NULL CHECK(provider IN ('google','phone')), provider_subject TEXT NOT NULL,
+              verified_email TEXT, verified_phone TEXT, created_at TEXT NOT NULL, last_used_at TEXT NOT NULL,
+              UNIQUE(provider,provider_subject)
+            );
+            """
+        )
+        legacy.commit()
+        legacy.close()
+        with self.assertRaisesRegex(RuntimeError, "duplicate normalized customer phones"):
+            SECURITY.SecurityStore(legacy_path, Fernet.generate_key().decode())
+        check = sqlite3.connect(legacy_path)
+        columns = {row[1] for row in check.execute("PRAGMA table_info(users)")}
+        self.assertNotIn("normalized_phone", columns)
+        self.assertEqual(check.execute("SELECT MAX(version) FROM schema_migrations").fetchone()[0], 5)
+        self.assertEqual(check.execute("SELECT COUNT(*) FROM users").fetchone()[0], 2)
+        self.assertEqual(check.execute("PRAGMA integrity_check").fetchone()[0], "ok")
+        check.close()
+        audit = AUDIT.audit(legacy_path)
+        self.assertFalse(audit["safeToMigrate"])
+        self.assertEqual(len(audit["duplicateNormalizedPhones"]), 1)
+        self.assertNotIn("9876543210", str(audit))
+
+    def test_redacted_identity_audit_accepts_clean_database(self):
+        self.store.register({
+            "name": "Audit Customer", "email": "audit@example.test",
+            "password": "long audit password 123", "phone": "+919876543210",
+        })
+        audit = AUDIT.audit(self.path)
+        self.assertTrue(audit["safeToMigrate"])
+        self.assertEqual(audit["databaseIntegrity"], "ok")
+        self.assertEqual(audit["foreignKeyViolations"], 0)
+        self.assertNotIn("audit@example.test", str(audit))
+        self.assertNotIn("+919876543210", str(audit))
+
+    def test_concurrent_security_store_startup_applies_identity_migration_once(self):
+        legacy_path = Path(self.temporary.name) / "concurrent-v5.db"
+        legacy = sqlite3.connect(legacy_path)
+        legacy.executescript(
+            """
+            CREATE TABLE schema_migrations(version INTEGER PRIMARY KEY, applied_at TEXT NOT NULL);
+            INSERT INTO schema_migrations VALUES(1,'2026-01-01');
+            INSERT INTO schema_migrations VALUES(2,'2026-01-01');
+            INSERT INTO schema_migrations VALUES(3,'2026-01-01');
+            INSERT INTO schema_migrations VALUES(4,'2026-01-01');
+            INSERT INTO schema_migrations VALUES(5,'2026-01-01');
+            CREATE TABLE users(
+              id TEXT PRIMARY KEY, email TEXT, password_hash TEXT, name TEXT NOT NULL, phone TEXT,
+              role TEXT NOT NULL DEFAULT 'customer', is_active INTEGER NOT NULL DEFAULT 1,
+              email_verified INTEGER NOT NULL DEFAULT 0, email_verified_at TEXT,
+              created_at TEXT NOT NULL, updated_at TEXT NOT NULL, password_changed_at TEXT NOT NULL,
+              last_login_at TEXT
+            );
+            INSERT INTO users VALUES(
+              'usr_concurrent','Concurrent@Example.Test',NULL,'Concurrent','91 9876543210',
+              'customer',1,1,'2026-01-01','x','x','x',NULL
+            );
+            CREATE TABLE customer_auth_identities(
+              id TEXT PRIMARY KEY, user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+              provider TEXT NOT NULL CHECK(provider IN ('google','phone')), provider_subject TEXT NOT NULL,
+              verified_email TEXT, verified_phone TEXT, created_at TEXT NOT NULL, last_used_at TEXT NOT NULL,
+              UNIQUE(provider,provider_subject)
+            );
+            INSERT INTO customer_auth_identities VALUES(
+              'cai_concurrent','usr_concurrent','phone','phone-concurrent-v5',NULL,
+              '09876543210','x','x'
+            );
+            """
+        )
+        legacy.commit()
+        legacy.close()
+
+        barrier = threading.Barrier(2)
+        key = Fernet.generate_key().decode()
+
+        def start_store(_index: int):
+            barrier.wait()
+            return SECURITY.SecurityStore(legacy_path, key)
+
+        with ThreadPoolExecutor(max_workers=2) as pool:
+            stores = list(pool.map(start_store, range(2)))
+        self.assertEqual(len(stores), 2)
+        with stores[0].connect() as db:
+            self.assertEqual(
+                db.execute("SELECT COUNT(*) FROM schema_migrations WHERE version=6").fetchone()[0],
+                1,
+            )
+            self.assertEqual(db.execute("PRAGMA integrity_check").fetchone()[0], "ok")
+            self.assertEqual(len(db.execute("PRAGMA foreign_key_check").fetchall()), 0)
+            user = db.execute(
+                "SELECT normalized_email,normalized_phone FROM users WHERE id='usr_concurrent'"
+            ).fetchone()
+            self.assertEqual(
+                (user["normalized_email"], user["normalized_phone"]),
+                ("concurrent@example.test", "+919876543210"),
+            )
+            index_names = {
+                row["name"] for row in db.execute("PRAGMA index_list(users)").fetchall()
+            }
+            self.assertIn("users_normalized_email_unique_idx", index_names)
+            self.assertIn("users_normalized_phone_unique_idx", index_names)
 
 
 if __name__ == "__main__":

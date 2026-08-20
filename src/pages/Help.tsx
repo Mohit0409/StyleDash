@@ -9,8 +9,13 @@ export const Help = () => (
   <div className="max-w-3xl mx-auto p-8 space-y-6">
     <SEO title="Help & Support - StyleDash" />
     <h1 className="text-3xl font-black">Help and customer support</h1>
+    <nav aria-label="Help topics" className="flex flex-wrap gap-3 text-xs font-bold">
+      <Link className="underline" to="#contact-styledash">Contact</Link>
+      <Link className="underline" to="#payments">Payments</Link>
+      <Link className="underline" to="#grievance-contact">Grievances</Link>
+    </nav>
 
-    <section className="space-y-2">
+    <section id="contact-styledash" className="scroll-mt-32 space-y-2">
       <h2 className="font-black">Contact StyleDash</h2>
       <p className="text-sm text-neutral-600">
         Email:{' '}
@@ -38,7 +43,7 @@ export const Help = () => (
       </p>
     </section>
 
-    <section className="space-y-2">
+    <section id="payments" className="scroll-mt-32 space-y-2">
       <h2 className="font-black">Order help</h2>
       <p className="text-sm text-neutral-600">
         Sign in and open{' '}
@@ -81,7 +86,7 @@ export const Help = () => (
       </p>
     </section>
 
-    <section className="rounded-xl bg-neutral-100 p-4 text-sm text-neutral-700 space-y-1">
+    <section id="grievance-contact" className="scroll-mt-32 rounded-xl bg-neutral-100 p-4 text-sm text-neutral-700 space-y-1">
       <h2 className="font-black text-neutral-900">Grievance contact</h2>
       <p>Grievance officer: {CONFIG.LEGAL.GRIEVANCE_OFFICER}</p>
       <p>

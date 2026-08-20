@@ -8,6 +8,7 @@ import json
 import re
 import secrets
 import sqlite3
+import time
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Callable
@@ -146,7 +147,19 @@ class SecurityStore:
 
     def _migrate(self) -> None:
         with self.connect() as db:
-            mode = db.execute("PRAGMA journal_mode=WAL").fetchone()[0]
+            # SQLite's busy timeout is not consistently honored while two
+            # processes negotiate journal_mode at the same instant.  Retry
+            # only the explicit lock condition within the existing five-
+            # second database timeout; all other operational errors surface.
+            wal_deadline = time.monotonic() + 5
+            while True:
+                try:
+                    mode = db.execute("PRAGMA journal_mode=WAL").fetchone()[0]
+                    break
+                except sqlite3.OperationalError as exc:
+                    if "locked" not in str(exc).casefold() or time.monotonic() >= wal_deadline:
+                        raise
+                    time.sleep(0.025)
             if str(mode).lower() != "wal":
                 raise RuntimeError("SQLite WAL mode is unavailable")
             db.executescript(
@@ -308,6 +321,124 @@ class SecurityStore:
                 "INSERT OR IGNORE INTO schema_migrations(version,applied_at) VALUES(5,?)",
                 (iso(utc_now()),),
             )
+
+            # Migration 6: persist canonical identity keys and enforce them at
+            # the database boundary.  The preflight deliberately fails rather
+            # than guessing how to merge legacy customers.  Because the whole
+            # migration is transactional, a conflict leaves the v5 schema and
+            # every customer row unchanged for manual remediation.
+            migration_versions = {
+                row["version"] for row in db.execute("SELECT version FROM schema_migrations")
+            }
+            if 6 not in migration_versions:
+                db.execute("BEGIN IMMEDIATE")
+                # Public and private services start independently against the
+                # same SQLite file.  Another process may have completed v6
+                # while this connection waited for the write lock, so the
+                # authoritative version check must happen after BEGIN
+                # IMMEDIATE, not only before it.
+                if db.execute(
+                    "SELECT 1 FROM schema_migrations WHERE version=6"
+                ).fetchone():
+                    db.rollback()
+                    self._secure_files()
+                    return
+                users = db.execute("SELECT id,email,phone FROM users").fetchall()
+                normalized_users: dict[str, tuple[str | None, str | None]] = {}
+                email_owners: dict[str, str] = {}
+                phone_owners: dict[str, str] = {}
+                try:
+                    for user in users:
+                        normalized_email = normalize_email(user["email"]) if user["email"] is not None else None
+                        normalized_phone = normalize_indian_phone(user["phone"]) if user["phone"] else None
+                        if normalized_email is not None:
+                            owner = email_owners.setdefault(normalized_email, user["id"])
+                            if owner != user["id"]:
+                                raise RuntimeError("duplicate normalized customer emails require remediation")
+                        if normalized_phone is not None:
+                            owner = phone_owners.setdefault(normalized_phone, user["id"])
+                            if owner != user["id"]:
+                                raise RuntimeError("duplicate normalized customer phones require remediation")
+                        normalized_users[user["id"]] = (normalized_email, normalized_phone)
+
+                    identity_emails: dict[str, str] = {}
+                    identity_phones: dict[str, str] = {}
+                    canonical_identities: list[tuple[str | None, str | None, str]] = []
+                    identities = db.execute(
+                        "SELECT id,user_id,provider,verified_email,verified_phone FROM customer_auth_identities"
+                    ).fetchall()
+                    for identity in identities:
+                        verified_email = None
+                        verified_phone = None
+                        if identity["provider"] == "google":
+                            verified_email = normalize_email(identity["verified_email"])
+                            existing_identity = identity_emails.setdefault(verified_email, identity["id"])
+                            if existing_identity != identity["id"]:
+                                raise RuntimeError("conflicting Google email identities require remediation")
+                            user_email = email_owners.get(verified_email)
+                            if user_email is not None and user_email != identity["user_id"]:
+                                raise RuntimeError("Google identity conflicts with another customer email")
+                        elif identity["provider"] == "phone":
+                            verified_phone = normalize_indian_phone(identity["verified_phone"])
+                            existing_identity = identity_phones.setdefault(verified_phone, identity["id"])
+                            if existing_identity != identity["id"]:
+                                raise RuntimeError("conflicting mobile identities require remediation")
+                            user_phone = phone_owners.get(verified_phone)
+                            if user_phone is not None and user_phone != identity["user_id"]:
+                                raise RuntimeError("mobile identity conflicts with another customer phone")
+                            current_email, current_phone = normalized_users[identity["user_id"]]
+                            if current_phone is None:
+                                normalized_users[identity["user_id"]] = (current_email, verified_phone)
+                                phone_owners[verified_phone] = identity["user_id"]
+                            elif current_phone != verified_phone:
+                                raise RuntimeError("customer mobile identity does not match the customer phone")
+                        canonical_identities.append((verified_email, verified_phone, identity["id"]))
+                except SecurityError as exc:
+                    raise RuntimeError("invalid legacy customer identity requires remediation") from exc
+
+                user_columns = {
+                    row["name"] for row in db.execute("PRAGMA table_info(users)").fetchall()
+                }
+                if "normalized_email" not in user_columns:
+                    db.execute("ALTER TABLE users ADD COLUMN normalized_email TEXT")
+                if "normalized_phone" not in user_columns:
+                    db.execute("ALTER TABLE users ADD COLUMN normalized_phone TEXT")
+                for user_id, (normalized_email, normalized_phone) in normalized_users.items():
+                    db.execute(
+                        "UPDATE users SET email=COALESCE(?,email),phone=COALESCE(?,phone),"
+                        "normalized_email=?,normalized_phone=? WHERE id=?",
+                        (normalized_email, normalized_phone, normalized_email, normalized_phone, user_id),
+                    )
+                for verified_email, verified_phone, identity_id in canonical_identities:
+                    db.execute(
+                        "UPDATE customer_auth_identities SET verified_email=?,verified_phone=? WHERE id=?",
+                        (verified_email, verified_phone, identity_id),
+                    )
+                db.execute(
+                    "CREATE UNIQUE INDEX users_normalized_email_unique_idx "
+                    "ON users(normalized_email) WHERE normalized_email IS NOT NULL"
+                )
+                db.execute(
+                    "CREATE UNIQUE INDEX users_normalized_phone_unique_idx "
+                    "ON users(normalized_phone) WHERE normalized_phone IS NOT NULL"
+                )
+                db.execute(
+                    "CREATE UNIQUE INDEX customer_auth_phone_unique_idx "
+                    "ON customer_auth_identities(verified_phone) "
+                    "WHERE provider='phone' AND verified_phone IS NOT NULL"
+                )
+                db.execute(
+                    "CREATE UNIQUE INDEX customer_auth_google_email_unique_idx "
+                    "ON customer_auth_identities(verified_email) "
+                    "WHERE provider='google' AND verified_email IS NOT NULL"
+                )
+                db.execute(
+                    "INSERT INTO schema_migrations(version,applied_at) VALUES(6,?)",
+                    (iso(utc_now()),),
+                )
+                if db.execute("PRAGMA foreign_key_check").fetchall():
+                    raise RuntimeError("identity uniqueness migration failed foreign key check")
+                db.commit()
         self._secure_files()
 
     def _secure_files(self) -> None:
@@ -359,23 +490,41 @@ class SecurityStore:
             raise SecurityError(400, f"Password must be {PASSWORD_MIN}–{PASSWORD_MAX} characters.", "weak_password")
         name = clean_text(payload.get("name"), "name", 2, 80)
         phone_value = payload.get("phone")
-        phone = clean_text(phone_value, "phone", 10, 20) if phone_value else None
+        phone = normalize_indian_phone(phone_value) if phone_value else None
         now = iso(utc_now())
         user_id = "usr_" + secrets.token_hex(12)
         encoded = self.passwords.hash(password)
         with self.connect() as db:
             try:
                 db.execute("BEGIN IMMEDIATE")
+                if db.execute(
+                    "SELECT 1 FROM users WHERE normalized_email=?", (email,)
+                ).fetchone():
+                    raise SecurityError(409, "An account with this email already exists.", "email_exists")
+                if db.execute(
+                    "SELECT 1 FROM customer_auth_identities "
+                    "WHERE provider='google' AND verified_email=?",
+                    (email,),
+                ).fetchone():
+                    raise SecurityError(409, "An account with this email already exists.", "email_exists")
+                if phone and db.execute(
+                    "SELECT 1 FROM users WHERE normalized_phone=?", (phone,)
+                ).fetchone():
+                    raise SecurityError(409, "An account with this mobile number already exists.", "phone_exists")
                 db.execute(
-                    "INSERT INTO users(id,email,password_hash,name,phone,created_at,updated_at,password_changed_at) VALUES(?,?,?,?,?,?,?,?)",
-                    (user_id, email, encoded, name, phone, now, now, now),
+                    "INSERT INTO users(id,email,normalized_email,password_hash,name,phone,normalized_phone,"
+                    "created_at,updated_at,password_changed_at) VALUES(?,?,?,?,?,?,?,?,?,?)",
+                    (user_id, email, email, encoded, name, phone, phone, now, now, now),
                 )
                 user = db.execute("SELECT * FROM users WHERE id=?", (user_id,)).fetchone()
                 raw, csrf = self._new_session(db, user)
                 db.commit()
+            except SecurityError:
+                db.rollback()
+                raise
             except sqlite3.IntegrityError:
                 db.rollback()
-                raise SecurityError(409, "An account with this email already exists.", "email_exists") from None
+                raise SecurityError(409, "An account with these details already exists.", "identity_exists") from None
         self._secure_files()
         return self.safe_user(user), raw, csrf
 
@@ -393,7 +542,7 @@ class SecurityStore:
             ).fetchone()[0]
             if failures >= 8:
                 raise SecurityError(429, "Too many login attempts. Please wait and try again.", "login_rate_limited")
-            user = db.execute("SELECT * FROM users WHERE email=?", (email,)).fetchone()
+            user = db.execute("SELECT * FROM users WHERE normalized_email=?", (email,)).fetchone()
             valid = False
             if user is not None and user["is_active"] and user["role"] == "customer" and user["password_hash"]:
                 try:
@@ -476,6 +625,12 @@ class SecurityStore:
         uid = claims.get("uid") or claims.get("sub")
         if not isinstance(uid, str) or not uid:
             raise SecurityError(401, "Unable to complete sign in. Please try again.", "identity_verification_failed")
+        verified_phone_claim = None
+        if provider == "phone":
+            try:
+                verified_phone_claim = normalize_indian_phone(claims.get("phone_number"))
+            except SecurityError:
+                raise SecurityError(400, "Unable to complete sign in with mobile.", "phone_required") from None
         now = iso(utc_now())
         try:
             with self.connect() as db:
@@ -489,6 +644,31 @@ class SecurityStore:
                     user = db.execute("SELECT * FROM users WHERE id=?", (identity["user_id"],)).fetchone()
                     if user is None or not user["is_active"] or user["role"] != "customer":
                         raise SecurityError(401, "Unable to complete sign in. Please try again.", "identity_verification_failed")
+                    if provider == "phone" and identity["verified_phone"] != verified_phone_claim:
+                        phone_identity = db.execute(
+                            "SELECT user_id FROM customer_auth_identities "
+                            "WHERE provider='phone' AND verified_phone=? AND id<>?",
+                            (verified_phone_claim, identity["id"]),
+                        ).fetchone()
+                        phone_owner = db.execute(
+                            "SELECT id FROM users WHERE normalized_phone=? AND id<>?",
+                            (verified_phone_claim, user["id"]),
+                        ).fetchone()
+                        if phone_identity is not None or phone_owner is not None:
+                            raise SecurityError(
+                                409,
+                                "This mobile number is already linked.",
+                                "identity_already_linked",
+                            )
+                        db.execute(
+                            "UPDATE customer_auth_identities SET verified_phone=? WHERE id=?",
+                            (verified_phone_claim, identity["id"]),
+                        )
+                        db.execute(
+                            "UPDATE users SET phone=?,normalized_phone=?,updated_at=? WHERE id=?",
+                            (verified_phone_claim, verified_phone_claim, now, user["id"]),
+                        )
+                        user = db.execute("SELECT * FROM users WHERE id=?", (user["id"],)).fetchone()
                     db.execute(
                         "UPDATE customer_auth_identities SET last_used_at=? WHERE id=?", (now, identity["id"])
                     )
@@ -544,27 +724,82 @@ class SecurityStore:
                 raise SecurityError(400, "Unable to link mobile securely.", "phone_required") from None
         now = iso(utc_now())
         with self.connect() as db:
-            db.execute("BEGIN IMMEDIATE")
-            collision = db.execute(
-                "SELECT * FROM customer_auth_identities WHERE provider=? AND provider_subject=?",
-                (provider, uid),
-            ).fetchone()
-            if collision and collision["user_id"] != current["id"]:
-                raise SecurityError(409, "This identity is already linked.", "identity_already_linked")
-            if provider == "phone":
-                collision = db.execute(
-                    "SELECT * FROM customer_auth_identities WHERE provider='phone' AND verified_phone=?",
-                    (verified_phone,),
+            try:
+                db.execute("BEGIN IMMEDIATE")
+                subject_identity = db.execute(
+                    "SELECT * FROM customer_auth_identities WHERE provider=? AND provider_subject=?",
+                    (provider, uid),
                 ).fetchone()
-            if collision and collision["user_id"] != current["id"]:
-                raise SecurityError(409, "This mobile number is already linked.", "identity_already_linked")
-            if not collision:
-                db.execute(
-                    "INSERT INTO customer_auth_identities(id,user_id,provider,provider_subject,verified_email,verified_phone,created_at,last_used_at) "
-                    "VALUES(?,?,?,?,?,?,?,?)",
-                    ("cai_" + secrets.token_hex(12), current["id"], provider, uid, verified_email, verified_phone, now, now),
-                )
-            db.commit()
+                if subject_identity and subject_identity["user_id"] != current["id"]:
+                    raise SecurityError(409, "This identity is already linked.", "identity_already_linked")
+                if provider == "google":
+                    email_owner = db.execute(
+                        "SELECT id FROM users WHERE normalized_email=?", (verified_email,)
+                    ).fetchone()
+                    if email_owner and email_owner["id"] != current["id"]:
+                        raise SecurityError(
+                            409,
+                            "An account already uses this email. Sign in to that account before linking Google.",
+                            "account_link_required",
+                        )
+                    matching_identity = db.execute(
+                        "SELECT * FROM customer_auth_identities "
+                        "WHERE provider='google' AND verified_email=?",
+                        (verified_email,),
+                    ).fetchone()
+                else:
+                    phone_owner = db.execute(
+                        "SELECT id FROM users WHERE normalized_phone=?", (verified_phone,)
+                    ).fetchone()
+                    if phone_owner and phone_owner["id"] != current["id"]:
+                        raise SecurityError(
+                            409,
+                            "An account already uses this mobile number. Sign in to that account before linking it.",
+                            "account_link_required",
+                        )
+                    matching_identity = db.execute(
+                        "SELECT * FROM customer_auth_identities "
+                        "WHERE provider='phone' AND verified_phone=?",
+                        (verified_phone,),
+                    ).fetchone()
+                if matching_identity and (
+                    matching_identity["user_id"] != current["id"]
+                    or matching_identity["provider_subject"] != uid
+                ):
+                    raise SecurityError(409, "This identity is already linked.", "identity_already_linked")
+                if subject_identity is None:
+                    db.execute(
+                        "INSERT INTO customer_auth_identities(id,user_id,provider,provider_subject,"
+                        "verified_email,verified_phone,created_at,last_used_at) VALUES(?,?,?,?,?,?,?,?)",
+                        (
+                            "cai_" + secrets.token_hex(12), current["id"], provider, uid,
+                            verified_email, verified_phone, now, now,
+                        ),
+                    )
+                else:
+                    db.execute(
+                        "UPDATE customer_auth_identities SET verified_email=?,verified_phone=?,last_used_at=? "
+                        "WHERE id=?",
+                        (verified_email, verified_phone, now, subject_identity["id"]),
+                    )
+                if provider == "google":
+                    db.execute(
+                        "UPDATE users SET email=COALESCE(email,?),normalized_email=COALESCE(normalized_email,?),"
+                        "email_verified=1,email_verified_at=COALESCE(email_verified_at,?),updated_at=? WHERE id=?",
+                        (verified_email, verified_email, now, now, current["id"]),
+                    )
+                else:
+                    db.execute(
+                        "UPDATE users SET phone=?,normalized_phone=?,updated_at=? WHERE id=?",
+                        (verified_phone, verified_phone, now, current["id"]),
+                    )
+                db.commit()
+            except SecurityError:
+                db.rollback()
+                raise
+            except sqlite3.IntegrityError:
+                db.rollback()
+                raise SecurityError(409, "This identity is already linked.", "identity_already_linked") from None
         return self.profile(current["id"])
 
     def _google_identity(
@@ -573,27 +808,36 @@ class SecurityStore:
         if claims.get("email_verified") is not True or not isinstance(claims.get("email"), str) or not claims.get("email"):
             raise SecurityError(400, "Unable to complete sign in with Google.", "google_email_required")
         email = normalize_email(claims["email"])
-        existing = db.execute("SELECT * FROM users WHERE email=?", (email,)).fetchone()
+        existing = db.execute("SELECT * FROM users WHERE normalized_email=?", (email,)).fetchone()
         created = False
         if existing is not None:
             if not existing["is_active"] or existing["role"] != "customer":
                 raise SecurityError(401, "Unable to complete sign in. Please try again.", "identity_verification_failed")
-            user_id = existing["id"]
-            if not existing["email_verified_at"]:
-                db.execute(
-                    "UPDATE users SET email_verified=1,email_verified_at=?,updated_at=? WHERE id=?",
-                    (now, now, user_id),
-                )
-        else:
-            raw_name = claims.get("name")
-            name = clean_text(raw_name, "name", 1, 80) if isinstance(raw_name, str) and raw_name.strip() else email.split("@", 1)[0][:80]
-            user_id = "usr_" + secrets.token_hex(12)
-            db.execute(
-                "INSERT INTO users(id,email,password_hash,name,phone,created_at,updated_at,password_changed_at,"
-                "email_verified,email_verified_at) VALUES(?,?,?,?,?,?,?,?,1,?)",
-                (user_id, email, None, name, None, now, now, now, now),
+            raise SecurityError(
+                409,
+                "An account already uses this email. Sign in to that account and link Google securely.",
+                "account_link_required",
             )
-            created = True
+        existing_identity = db.execute(
+            "SELECT 1 FROM customer_auth_identities WHERE provider='google' AND verified_email=?",
+            (email,),
+        ).fetchone()
+        if existing_identity is not None:
+            raise SecurityError(
+                409,
+                "An account already uses this email. Sign in to that account and link Google securely.",
+                "account_link_required",
+            )
+        raw_name = claims.get("name")
+        name = clean_text(raw_name, "name", 1, 80) if isinstance(raw_name, str) and raw_name.strip() else email.split("@", 1)[0][:80]
+        user_id = "usr_" + secrets.token_hex(12)
+        db.execute(
+            "INSERT INTO users(id,email,normalized_email,password_hash,name,phone,normalized_phone,"
+            "created_at,updated_at,password_changed_at,email_verified,email_verified_at) "
+            "VALUES(?,?,?,?,?,?,?,?,?,?,1,?)",
+            (user_id, email, email, None, name, None, None, now, now, now, now),
+        )
+        created = True
         db.execute(
             "INSERT INTO customer_auth_identities(id,user_id,provider,provider_subject,verified_email,created_at,last_used_at) "
             "VALUES(?,?,?,?,?,?,?)",
@@ -620,16 +864,32 @@ class SecurityStore:
             user = db.execute("SELECT * FROM users WHERE id=?", (existing["user_id"],)).fetchone()
             if user is None or not user["is_active"] or user["role"] != "customer":
                 raise SecurityError(401, "Unable to complete sign in. Please try again.", "identity_verification_failed")
-            raise SecurityError(409, "This mobile identity is already linked to another sign-in.", "identity_already_linked")
-        # Deliberately never matched against the free-text `phone` column on
-        # password accounts: that field is unverified user input and linking
-        # against it would let anyone claim another customer's account by
-        # typing their number and later verifying it themselves.
+            # Firebase OTP proves control of the canonical number.  If
+            # Firebase has issued a replacement UID for the same number,
+            # rotate the provider subject on the one existing identity rather
+            # than rejecting the customer or creating a duplicate user.
+            db.execute(
+                "UPDATE customer_auth_identities SET provider_subject=?,last_used_at=? WHERE id=?",
+                (uid, now, existing["id"]),
+            )
+            return user, False
+        phone_owner = db.execute(
+            "SELECT id FROM users WHERE normalized_phone=?", (phone,)
+        ).fetchone()
+        if phone_owner is not None:
+            raise SecurityError(
+                409,
+                "An account already uses this mobile number. Sign in to that account and link mobile securely.",
+                "account_link_required",
+            )
+        # A password account with this canonical phone is never auto-linked:
+        # the caller must authenticate that account and use the explicit link
+        # endpoint, proving control of both the StyleDash session and OTP.
         user_id = "usr_" + secrets.token_hex(12)
         db.execute(
-            "INSERT INTO users(id,email,password_hash,name,phone,created_at,updated_at,password_changed_at) "
-            "VALUES(?,?,?,?,?,?,?,?)",
-            (user_id, None, None, "", phone, now, now, now),
+            "INSERT INTO users(id,email,normalized_email,password_hash,name,phone,normalized_phone,"
+            "created_at,updated_at,password_changed_at) VALUES(?,?,?,?,?,?,?,?,?,?)",
+            (user_id, None, None, None, "", phone, phone, now, now, now),
         )
         db.execute(
             "INSERT INTO customer_auth_identities(id,user_id,provider,provider_subject,verified_phone,created_at,last_used_at) "
@@ -687,7 +947,7 @@ class SecurityStore:
         reset_id: str | None = None
         with self.connect() as db:
             user = db.execute(
-                "SELECT id,email FROM users WHERE email=? AND is_active=1 AND role='customer' AND password_hash IS NOT NULL",
+                "SELECT id,email FROM users WHERE normalized_email=? AND is_active=1 AND role='customer' AND password_hash IS NOT NULL",
                 (email,),
             ).fetchone()
             if user is None:
@@ -843,10 +1103,13 @@ class SecurityStore:
             raise SecurityError(400, "Unsupported profile field.", "invalid_profile")
         updates = []
         values: list[Any] = []
+        normalized_profile_phone: str | None = None
         if "name" in payload:
             updates.append("name=?"); values.append(clean_text(payload["name"], "name", 2, 80))
         if "phone" in payload:
-            updates.append("phone=?"); values.append(clean_text(payload["phone"], "phone", 10, 20))
+            normalized_profile_phone = normalize_indian_phone(payload["phone"])
+            updates.extend(("phone=?", "normalized_phone=?"))
+            values.extend((normalized_profile_phone, normalized_profile_phone))
         addresses = payload.get("addresses") if "addresses" in payload else None
         if addresses is not None and (not isinstance(addresses, list) or len(addresses) > 10):
             raise SecurityError(400, "Invalid saved addresses.", "invalid_profile")
@@ -875,17 +1138,44 @@ class SecurityStore:
             raise SecurityError(400, "No profile changes supplied.", "invalid_profile")
         now = iso(utc_now())
         with self.connect() as db:
-            db.execute("BEGIN IMMEDIATE")
-            if updates:
-                updates.append("updated_at=?"); values.append(now); values.append(user_id)
-                db.execute(f"UPDATE users SET {','.join(updates)} WHERE id=?", values)
-            if addresses is not None:
-                db.execute("DELETE FROM user_addresses WHERE user_id=?", (user_id,))
-                db.executemany(
-                    "INSERT INTO user_addresses(id,user_id,name,phone,street,city,state,pincode,address_type,is_default,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)",
-                    [(item["id"], user_id, item["name"], item["phone"], item["street"], item["city"], item["state"], item["pincode"], item["type"], int(item["default"]), now, now) for item in cleaned_addresses],
-                )
-            db.commit()
+            try:
+                db.execute("BEGIN IMMEDIATE")
+                if normalized_profile_phone is not None:
+                    phone_identity = db.execute(
+                        "SELECT verified_phone FROM customer_auth_identities "
+                        "WHERE user_id=? AND provider='phone'",
+                        (user_id,),
+                    ).fetchone()
+                    if phone_identity and phone_identity["verified_phone"] != normalized_profile_phone:
+                        raise SecurityError(
+                            409,
+                            "Verify a new mobile number before changing it.",
+                            "phone_verification_required",
+                        )
+                    phone_owner = db.execute(
+                        "SELECT id FROM users WHERE normalized_phone=?", (normalized_profile_phone,)
+                    ).fetchone()
+                    if phone_owner and phone_owner["id"] != user_id:
+                        raise SecurityError(
+                            409,
+                            "An account with this mobile number already exists.",
+                            "phone_exists",
+                        )
+                if updates:
+                    updates.append("updated_at=?"); values.append(now); values.append(user_id)
+                    db.execute(f"UPDATE users SET {','.join(updates)} WHERE id=?", values)
+                if addresses is not None:
+                    db.execute("DELETE FROM user_addresses WHERE user_id=?", (user_id,))
+                    db.executemany(
+                        "INSERT INTO user_addresses(id,user_id,name,phone,street,city,state,pincode,address_type,is_default,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)",
+                        [(item["id"], user_id, item["name"], item["phone"], item["street"], item["city"], item["state"], item["pincode"], item["type"], int(item["default"]), now, now) for item in cleaned_addresses],
+                    )
+                db.commit()
+            except (SecurityError, sqlite3.IntegrityError) as exc:
+                db.rollback()
+                if isinstance(exc, SecurityError):
+                    raise
+                raise SecurityError(409, "An account with this mobile number already exists.", "phone_exists") from None
         return self.profile(user_id)
 
     def health(self) -> bool:

@@ -85,6 +85,21 @@ class PaymentServiceTests(unittest.TestCase):
             callback()
         self.assertEqual(caught.exception.code, code)
 
+    def test_catalog_refresh_does_not_take_payment_state_file_lock(self) -> None:
+        class ForbiddenStateLock:
+            def __enter__(self):
+                raise AssertionError("catalog refresh entered the payment-state lock")
+
+            def __exit__(self, *_args):
+                return False
+
+        original = self.service.store.lock
+        self.service.store.lock = ForbiddenStateLock()
+        try:
+            self.service.refresh_shop_products()
+        finally:
+            self.service.store.lock = original
+
     def create_payment(self, key: str, **payload_overrides):
         return self.service.create_razorpay_order(self.payload(**payload_overrides), key)
 
@@ -1891,6 +1906,237 @@ class HttpApiTests(unittest.TestCase):
         with response:
             return response.status, json.load(response), response.headers
 
+    def patch_json(self, path: str, payload: dict, headers: dict | None = None):
+        request = urllib.request.Request(
+            f"{self.base_url}{path}", data=json.dumps(payload).encode(),
+            headers={"Content-Type": "application/json", **(headers or {})}, method="PATCH",
+        )
+        try:
+            response = urllib.request.urlopen(request)
+        except urllib.error.HTTPError as error:
+            body = json.loads(error.read()); status = error.code; response_headers = error.headers; error.close()
+            return status, body, response_headers
+        with response:
+            return response.status, json.load(response), response.headers
+
+    def test_shop_draft_approval_publication_inventory_and_checkout_contract(self) -> None:
+        status, registered, headers = self.post_json(
+            "/api/auth/register",
+            {
+                "name": "Shop HTTP Owner",
+                "email": "shop-http-owner@example.test",
+                "password": "very secure shop http password 123",
+                "phone": "9876543210",
+            },
+        )
+        self.assertEqual(status, 201)
+        session_headers = {
+            "Cookie": headers["Set-Cookie"].split(";", 1)[0],
+            "X-CSRF-Token": registered["csrfToken"],
+            "Origin": "https://styledash.test",
+        }
+        status, anonymous, _headers = self.get_json("/api/vendor-applications/me")
+        self.assertEqual((status, anonymous["code"]), (401, "authentication_required"))
+
+        status, created, _headers = self.post_json(
+            "/api/vendor-applications", {"shopName": "HTTP Draft Shop"}, session_headers
+        )
+        self.assertEqual(status, 201)
+        self.assertEqual(created["application"]["status"], "DRAFT")
+        application_id = created["application"]["id"]
+        status, fetched, _headers = self.get_json(
+            "/api/vendor-applications/me", {"Cookie": session_headers["Cookie"]}
+        )
+        self.assertEqual((status, fetched["application"]["id"]), (200, application_id))
+        status, missing_csrf, _headers = self.patch_json(
+            "/api/vendor-applications/me", {"ownerName": "Shop HTTP Owner"},
+            {"Cookie": session_headers["Cookie"], "Origin": "https://styledash.test"},
+        )
+        self.assertEqual((status, missing_csrf["code"]), (403, "csrf_failed"))
+        complete = {
+            "shopName": "HTTP Draft Shop",
+            "ownerName": "Shop HTTP Owner",
+            "category": "Clothing & Fashion",
+            "description": "A complete HTTP shop application for integration coverage.",
+            "address": "12 Main Market Road",
+            "city": "Neemuch",
+            "state": "Madhya Pradesh",
+            "pincode": "458441",
+        }
+        status, updated, _headers = self.patch_json(
+            "/api/vendor-applications/me", complete, session_headers
+        )
+        self.assertEqual((status, updated["application"]["status"]), (200, "DRAFT"))
+        status, submitted, _headers = self.post_json(
+            "/api/vendor-applications/me/submit", {}, session_headers
+        )
+        self.assertEqual((status, submitted["application"]["status"]), (200, "SUBMITTED"))
+
+        with self.service.security.connect() as db:
+            db.execute(
+                "CREATE TABLE IF NOT EXISTS admin_users("
+                "id TEXT PRIMARY KEY,is_active INTEGER NOT NULL DEFAULT 1)"
+            )
+            db.execute("INSERT INTO admin_users(id,is_active) VALUES('http-admin',1)")
+        self.service.shops.admin_transition_application(
+            "http-admin", application_id, "UNDER_REVIEW"
+        )
+        self.service.shops.admin_transition_application(
+            "http-admin", application_id, "APPROVED"
+        )
+        self.service.shops.admin_transition_application(
+            "http-admin", application_id, "ACTIVE"
+        )
+        product_payload = {
+            "name": "HTTP Published Kurta",
+            "description": "A reviewed local cotton kurta available through the HTTP catalogue.",
+            "brand": "HTTP Local Loom",
+            "department": "women",
+            "category": "Clothing & Fashion",
+            "pricePaise": 159900,
+            "originalPricePaise": 179900,
+            "inventory": 8,
+            "imageUrls": ["https://images.example.test/http-kurta.jpg"],
+            "attributes": {"material": "Cotton"},
+            "size": "M",
+            "colourName": "Blue",
+            "colourHex": "#0000FF",
+        }
+        status, product_response, _headers = self.post_json(
+            "/api/shop-products", product_payload, session_headers
+        )
+        self.assertEqual(status, 201)
+        product_id = product_response["product"]["id"]
+        status, product_submitted, _headers = self.post_json(
+            f"/api/shop-products/{product_id}/submit", {}, session_headers
+        )
+        self.assertEqual((status, product_submitted["product"]["status"]), (200, "SUBMITTED"))
+        status, public_before, _headers = self.get_json("/api/shop-products/published")
+        self.assertEqual((status, public_before["products"]), (200, []))
+        for target in ("UNDER_REVIEW", "APPROVED", "PUBLISHED"):
+            self.service.shops.admin_transition_product("http-admin", product_id, target)
+
+        status, public_after, _headers = self.get_json("/api/shop-products/published")
+        self.assertEqual(status, 200)
+        self.assertEqual([item["id"] for item in public_after["products"]], [product_id])
+        public_product = public_after["products"][0]
+        self.assertNotIn("submittedByUserId", public_product)
+        self.assertNotIn("registeredEmail", public_product)
+        variant_id = public_product["variants"][0]["id"]
+        status, availability, _headers = self.get_json(
+            f"/api/inventory/availability?variantId={variant_id}"
+        )
+        self.assertEqual(status, 200)
+        self.assertTrue(availability["availability"][0]["available"])
+
+        cod_headers = {
+            **session_headers,
+            "Idempotency-Key": "shop-http-cod-001",
+        }
+        status, placed, _headers = self.post_json(
+            "/api/place-cod-order",
+            {
+                "items": [{"productId": product_id, "variantId": variant_id, "quantity": 1}],
+                "address": {
+                    "name": "Shop HTTP Owner",
+                    "phone": "9876543210",
+                    "street": "12 Main Market Road",
+                    "city": "Neemuch",
+                    "pincode": "458441",
+                },
+                "deliveryMethod": "express",
+                "paymentMethod": "cod",
+            },
+            cod_headers,
+        )
+        self.assertEqual(status, 201)
+        self.assertEqual(placed["order"]["items"][0]["productId"], product_id)
+        self.service.shops.admin_transition_product("http-admin", product_id, "APPROVED")
+        status, public_unpublished, _headers = self.get_json("/api/shop-products/published")
+        self.assertEqual(public_unpublished["products"], [])
+        inactive = next(
+            item for item in self.service.shops.payment_catalog_products() if item["id"] == product_id
+        )
+        self.assertFalse(inactive["active"])
+        status, unavailable, _headers = self.post_json(
+            "/api/place-cod-order",
+            {
+                "items": [{"productId": product_id, "variantId": variant_id, "quantity": 1}],
+                "address": {
+                    "name": "Shop HTTP Owner",
+                    "phone": "9876543210",
+                    "street": "12 Main Market Road",
+                    "city": "Neemuch",
+                    "pincode": "458441",
+                },
+                "deliveryMethod": "express",
+                "paymentMethod": "cod",
+            },
+            {**session_headers, "Idempotency-Key": "shop-http-cod-002"},
+        )
+        self.assertEqual((status, unavailable["code"]), (422, "invalid_product"))
+
+    def test_federated_link_http_requires_csrf_and_rejects_linked_subject(self) -> None:
+        status, registered, headers = self.post_json(
+            "/api/auth/register",
+            {
+                "name": "Link HTTP Owner",
+                "email": "link-http-owner@example.test",
+                "password": "very secure link http password 123",
+                "phone": "9876543212",
+            },
+        )
+        self.assertEqual(status, 201)
+        cookie = headers["Set-Cookie"].split(";", 1)[0]
+        google_token = "google-link-http-token-0001"
+        self.firebase_claims[google_token] = {
+            "uid": "google-link-http-uid-1",
+            "email": "link-http-owner@example.test",
+            "email_verified": True,
+            "firebase": {"sign_in_provider": "google.com"},
+        }
+        status, missing, _headers = self.post_json(
+            "/api/auth/federated/google/link", {"idToken": google_token}, {"Cookie": cookie}
+        )
+        self.assertEqual((status, missing["code"]), (403, "csrf_failed"))
+        status, invalid, _headers = self.post_json(
+            "/api/auth/federated/google/link",
+            {"idToken": google_token},
+            {"Cookie": cookie, "X-CSRF-Token": "invalid", "Origin": "https://styledash.test"},
+        )
+        self.assertEqual((status, invalid["code"]), (403, "csrf_failed"))
+        valid_headers = {
+            "Cookie": cookie,
+            "X-CSRF-Token": registered["csrfToken"],
+            "Origin": "https://styledash.test",
+        }
+        status, linked, _headers = self.post_json(
+            "/api/auth/federated/google/link", {"idToken": google_token}, valid_headers
+        )
+        self.assertEqual(status, 200)
+        self.assertEqual(linked["profile"]["id"], registered["user"]["id"])
+
+        status, second, second_headers = self.post_json(
+            "/api/auth/register",
+            {
+                "name": "Link HTTP Other",
+                "email": "link-http-other@example.test",
+                "password": "very secure other link password 123",
+                "phone": "9876543213",
+            },
+        )
+        self.assertEqual(status, 201)
+        status, conflict, _headers = self.post_json(
+            "/api/auth/federated/link/google",
+            {"idToken": google_token},
+            {
+                "Cookie": second_headers["Set-Cookie"].split(";", 1)[0],
+                "X-CSRF-Token": second["csrfToken"],
+                "Origin": "https://styledash.test",
+            },
+        )
+        self.assertEqual((status, conflict["code"]), (409, "identity_already_linked"))
+
     def test_public_serviceability_endpoint_is_read_only_and_safe(self) -> None:
         state_before = json.loads(json.dumps(self.service.store.state))
 
@@ -2466,7 +2712,7 @@ class HttpApiTests(unittest.TestCase):
             ).fetchone()
 
         self.assertIsNotNone(row)
-        self.assertEqual(row["status"], "pending")
+        self.assertEqual(row["status"], "SUBMITTED")
 
 
     def test_auth_cookie_csrf_public_admin_absent_and_server_user_ownership(self) -> None:
@@ -2562,6 +2808,38 @@ class HttpApiTests(unittest.TestCase):
         )
         self.assertEqual(me_status, 200)
         self.assertEqual(me_body["user"]["phone"], "+919999999999")
+
+        replacement_phone_token = "phone-http-replacement-token-" + ("r" * 24)
+        self.firebase_claims[replacement_phone_token] = {
+            "uid": "firebase-phone-http-replacement-uid",
+            "email": None,
+            "phone_number": "+919999999999",
+            "firebase": {"sign_in_provider": "phone"},
+        }
+        replacement_status, replacement_body, replacement_headers = self.post_json(
+            "/api/auth/federated/phone", {"idToken": replacement_phone_token}
+        )
+        self.assertEqual(replacement_status, 200)
+        self.assertEqual(replacement_body["user"]["id"], phone_body["user"]["id"])
+        self.assertTrue(replacement_body["csrfToken"])
+        self.assertNotEqual(
+            replacement_headers["Set-Cookie"].split(";", 1)[0], phone_cookie
+        )
+        with self.service.security.connect() as db:
+            self.assertEqual(
+                db.execute(
+                    "SELECT COUNT(*) FROM customer_auth_identities "
+                    "WHERE provider='phone'"
+                ).fetchone()[0],
+                1,
+            )
+            self.assertEqual(
+                db.execute(
+                    "SELECT provider_subject FROM customer_auth_identities "
+                    "WHERE provider='phone'"
+                ).fetchone()[0],
+                "firebase-phone-http-replacement-uid",
+            )
 
         google_token = "google-http-token-" + ("y" * 24)
         self.firebase_claims[google_token] = {
@@ -2665,7 +2943,7 @@ class HttpApiTests(unittest.TestCase):
         self.assertEqual((status, forged_registration["code"]), (400, "invalid_registration"))
         status, owner, owner_headers = self.post_json("/api/auth/register", {
             "name": "HTTP Payment Owner", "email": "HTTP-PAYMENT-OWNER@EXAMPLE.TEST",
-            "password": "long payment owner password 123", "phone": "9999999999",
+            "password": "long payment owner password 123", "phone": "9888888888",
         })
         self.assertEqual(status, 201)
         self.assertFalse(owner["user"]["emailVerified"])

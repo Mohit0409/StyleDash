@@ -45,7 +45,7 @@ export const Stores: React.FC = () => {
         {stores.map(store => (
           <div key={store.id} className="group bg-white dark:bg-neutral-900 rounded-3xl border border-neutral-200 dark:border-neutral-800 overflow-hidden shadow-sm hover:shadow-xl transition-all duration-300 flex flex-col">
             <div className="relative aspect-[16/9] bg-neutral-100 dark:bg-neutral-800 overflow-hidden">
-              <img src={store.bannerImage} alt={store.storeName} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+              <img src={store.bannerImage} alt={store.storeName} loading="lazy" decoding="async" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
               <div className="absolute top-3 left-3 bg-neutral-950/80 backdrop-blur-md text-white text-[10px] font-black px-2.5 py-1 rounded-full border border-neutral-700">
                 {store.category}
               </div>

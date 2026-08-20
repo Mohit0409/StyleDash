@@ -1,15 +1,18 @@
 import React, { useEffect, useState } from 'react';
 import { Heart, LogOut, Package, Save } from 'lucide-react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { SEO } from '../components/SEO';
 import { useAuth } from '../context/AuthContext';
 import { authApi } from '../services/authApi';
 import { profileApi } from '../services/businessApi';
 import { ApiError } from '../services/apiClient';
+import { safeLocalReturnPath } from '../utils/navigation';
 
 export const Profile: React.FC = () => {
   const { user, logout, refresh } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
+  const returnPath = safeLocalReturnPath((location.state as { from?: string } | null)?.from, '');
   const address = user?.addresses?.find(item => item.isDefault) || user?.addresses?.[0];
   const [name, setName] = useState(user?.name || '');
   const [phone, setPhone] = useState(user?.phone || '');
@@ -37,6 +40,7 @@ export const Profile: React.FC = () => {
         addresses: street || pincode ? [{ name, phone, street, city, state: 'Madhya Pradesh', pincode, type: 'home', isDefault: true }] : [],
       });
       await refresh(); setMessage('Profile and delivery address saved.');
+      if (returnPath && returnPath !== '/profile') navigate(returnPath, { replace: true });
     } catch (cause) { setError(cause instanceof ApiError ? cause.message : 'Profile could not be saved.'); }
     finally { setSaving(false); }
   };

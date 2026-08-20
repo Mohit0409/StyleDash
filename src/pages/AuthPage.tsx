@@ -2,13 +2,16 @@ import React, { useEffect, useRef, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { SEO } from '../components/SEO';
 import { useAuth } from '../context/AuthContext';
-import { clearPhoneVerification, normalizeIndianPhone, signInWithGoogleProvider, startPhoneVerification, verifyPhoneCode, type PhoneVerificationSession } from '../services/firebaseClient';
+import type { PhoneVerificationSession } from '../services/firebaseClient';
+import { safeLocalReturnPath } from '../utils/navigation';
+
+const getFirebaseClient = () => import('../services/firebaseClient');
 
 export const AuthPage: React.FC<{ mode: 'login' | 'register' }> = ({ mode }) => {
   const { login, register, federatedLogin, error, loading } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
-  const destination = (location.state as { from?: string } | null)?.from || '/profile';
+  const destination = safeLocalReturnPath((location.state as { from?: string } | null)?.from);
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
   const [email, setEmail] = useState('');
@@ -31,7 +34,8 @@ export const AuthPage: React.FC<{ mode: 'login' | 'register' }> = ({ mode }) => 
   }, [resendIn]);
 
   useEffect(() => () => {
-    void clearPhoneVerification(phoneSessionRef.current ?? undefined);
+    const session = phoneSessionRef.current;
+    if (session) void getFirebaseClient().then(({ clearPhoneVerification }) => clearPhoneVerification(session));
   }, []);
 
   const submit = async (event: React.FormEvent) => {
@@ -55,6 +59,7 @@ export const AuthPage: React.FC<{ mode: 'login' | 'register' }> = ({ mode }) => 
     setProviderBusy('google');
     setProviderError('');
     try {
+      const { signInWithGoogleProvider } = await getFirebaseClient();
       const idToken = await signInWithGoogleProvider();
       const success = await federatedLogin('google', idToken);
       if (success) navigate(destination, { replace: true });
@@ -72,6 +77,7 @@ export const AuthPage: React.FC<{ mode: 'login' | 'register' }> = ({ mode }) => 
     setOtpBusy(true);
     setProviderError('');
     try {
+      const { clearPhoneVerification, normalizeIndianPhone, startPhoneVerification } = await getFirebaseClient();
       normalizeIndianPhone(phone);
       await clearPhoneVerification(phoneSessionRef.current ?? undefined);
       phoneSessionRef.current = null;
@@ -97,6 +103,7 @@ export const AuthPage: React.FC<{ mode: 'login' | 'register' }> = ({ mode }) => 
     setProviderBusy('phone');
     setProviderError('');
     try {
+      const { clearPhoneVerification, verifyPhoneCode } = await getFirebaseClient();
       const idToken = await verifyPhoneCode(phoneSession, otpCode);
       const success = await federatedLogin('phone', idToken);
       if (success) {
@@ -114,6 +121,7 @@ export const AuthPage: React.FC<{ mode: 'login' | 'register' }> = ({ mode }) => 
   };
 
   const changePhone = async () => {
+    const { clearPhoneVerification } = await getFirebaseClient();
     await clearPhoneVerification(phoneSessionRef.current ?? undefined);
     phoneSessionRef.current = null;
     setPhoneSession(null); setOtpSent(false); setOtpCode(''); setResendIn(0); setProviderError('');

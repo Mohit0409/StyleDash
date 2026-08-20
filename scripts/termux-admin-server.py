@@ -7,6 +7,7 @@ import argparse
 import importlib.util
 import json
 import os
+import sqlite3
 from http import HTTPStatus
 from http.cookies import SimpleCookie
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -21,6 +22,11 @@ try:
 except ModuleNotFoundError:
     from scripts.styledash_admin import ADMIN_COOKIE, CHALLENGE_COOKIE, AdminStore
     from scripts.styledash_security import SecurityError, iso, utc_now
+
+try:
+    from styledash_shops import ShopWorkflow
+except ModuleNotFoundError:
+    from scripts.styledash_shops import ShopWorkflow
 
 try:
     from styledash_notify import owner_notifier
@@ -111,9 +117,18 @@ class AdminApplication:
     def __init__(self, database: Path, encryption_key: str, catalog: Path, settings: Path, data_dir: Path) -> None:
         public = load_public_module()
         self.identity = AdminStore(database, encryption_key)
+        probe = sqlite3.connect(database)
+        try:
+            has_customers = probe.execute(
+                "SELECT 1 FROM sqlite_master WHERE type='table' AND name='users'"
+            ).fetchone() is not None
+        finally:
+            probe.close()
+        self.shops = ShopWorkflow(database) if has_customers else None
         self.payments = public.PaymentService(
             catalog, settings, data_dir, key_id="", key_secret="", webhook_secret="",
             mode=os.environ.get("RAZORPAY_MODE", "test"), gateway=None,
+            shop_workflow=self.shops,
         )
 
     def list_orders(self, query: str = "") -> list[dict[str, Any]]:
@@ -497,6 +512,13 @@ class AdminHandler(BaseHTTPRequestHandler):
     def _admin(self) -> tuple[dict[str, Any], Any]:
         return self.application.identity.authenticate(self._cookie(ADMIN_COOKIE))
 
+    def _shops(self) -> ShopWorkflow:
+        if self.application.shops is None:
+            raise SecurityError(
+                503, "Shop administration is unavailable.", "shop_service_unavailable"
+            )
+        return self.application.shops
+
     def _csrf(self) -> None:
         if not self._origin_allowed():
             raise SecurityError(403, "Administrator request origin is not allowed.", "admin_invalid_origin")
@@ -556,7 +578,11 @@ class AdminHandler(BaseHTTPRequestHandler):
                 self._admin(); order_id = unquote(path.removeprefix("/api/admin/orders/"))
                 self._json(200, {"success": True, "order": self.application.get_order(order_id)}); return
             if path == "/api/admin/vendors":
-                self._admin(); self._json(200, {"success": True, "applications": self.application.identity.vendor_applications()}); return
+                admin, _session = self._admin()
+                self._json(200, {"success": True, "applications": self._shops().admin_list_applications(admin["id"])}); return
+            if path == "/api/admin/shop-products":
+                admin, _session = self._admin()
+                self._json(200, {"success": True, "products": self._shops().admin_list_products(admin["id"])}); return
             if path == "/api/admin/inventory":
                 self._admin(); query = self._query(); needle = query.get("q", [""])[0]; low = query.get("low", ["0"])[0] == "1"
                 self._json(200, {"success": True, "inventory": self.application.inventory(needle, low)}); return
@@ -605,8 +631,18 @@ class AdminHandler(BaseHTTPRequestHandler):
                 self._json(200, {"success": True, "order": result}); return
             if path.startswith("/api/admin/vendors/"):
                 application_id = unquote(path.removeprefix("/api/admin/vendors/"))
-                result = self.application.identity.review_vendor(admin["id"], application_id, payload.get("status"))
+                result = self._shops().admin_transition_application(
+                    admin["id"], application_id, payload.get("status"), payload.get("reason")
+                )
+                self.payments.refresh_shop_products()
                 self._json(200, {"success": True, "application": result}); return
+            if path.startswith("/api/admin/shop-products/"):
+                product_id = unquote(path.removeprefix("/api/admin/shop-products/"))
+                result = self._shops().admin_transition_product(
+                    admin["id"], product_id, payload.get("status"), payload.get("reason")
+                )
+                self.payments.refresh_shop_products()
+                self._json(200, {"success": True, "product": result}); return
             if path.startswith("/api/admin/inventory/"):
                 variant_id = unquote(path.removeprefix("/api/admin/inventory/"))
                 result = self.application.adjust_inventory(admin["id"], variant_id, payload.get("delta"))

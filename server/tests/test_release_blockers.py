@@ -293,7 +293,25 @@ class DeploymentAndTaxTests(unittest.TestCase):
             text.index("empty Firebase web configuration"),
             text.index("PRAGMA integrity_check"),
         )
+        self.assertLess(
+            text.index("missing a complete Firebase web configuration"),
+            text.index("PRAGMA integrity_check"),
+        )
+        self.assertLess(
+            text.index("Firebase browser and server project IDs do not match"),
+            text.index("PRAGMA integrity_check"),
+        )
+        self.assertIn('firebase_assets=("$STAGE"/dist/assets/*.js)', text)
+        self.assertNotIn('auth_assets=("$STAGE"/dist/assets/AuthPage-*.js)', text)
+        self.assertIn(
+            'grep -Fq "projectId:\\"$STYLEDASH_FIREBASE_PROJECT_ID\\\"" "${firebase_assets[@]}"',
+            text,
+        )
         self.assertLess(text.index("PRAGMA integrity_check"), text.index('bash "$BACKUP_SCRIPT"'))
+        self.assertLess(
+            text.index('audit_identity_duplicates.py" "$LIVE_DB"'),
+            text.index('bash "$BACKUP_SCRIPT"'),
+        )
         self.assertLess(text.index('bash "$BACKUP_SCRIPT"'), text.index('if [ -d "$HOME/server/assets" ]'))
         self.assertLess(text.index("printf 'rollback=%s"), text.index('if [ -d "$HOME/server/assets" ]'))
         self.assertIn(
@@ -316,6 +334,20 @@ class DeploymentAndTaxTests(unittest.TestCase):
             'install -m 600 "$STAGE/scripts/styledash_firebase.py" "$HOME/server/styledash_firebase.py"',
             text,
         )
+        self.assertIn(
+            'install -m 600 "$STAGE/scripts/styledash_shops.py" "$HOME/server/styledash_shops.py"',
+            text,
+        )
+        self.assertIn(
+            'install -m 600 "$STAGE/scripts/styledash_shops.py" "$HOME/admin/styledash_shops.py"',
+            text,
+        )
+        self.assertIn(
+            'install -m 600 "$STAGE/scripts/audit_identity_duplicates.py" "$HOME/server/audit_identity_duplicates.py"',
+            text,
+        )
+        self.assertIn("styledash_migrations=ok", text)
+        self.assertIn("duplicate applications exist for", text)
         self.assertIn(
             "from styledash_firebase import _initialize_app",
             text,

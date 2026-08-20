@@ -86,6 +86,12 @@ Object.assign(env, {
 
 // A Windows venv launcher can outlive a force-stopped Node wrapper. Keep the
 // real Python server tied to this launcher's lifetime as a final safety net.
+//
+// NOTE: on Windows, os.kill(pid, 0) does not check liveness like POSIX signal
+// 0 — it maps to CTRL_C_EVENT and calls GenerateConsoleCtrlEvent, which sends
+// a real Ctrl+C to this process's own console on every poll. That previously
+// crashed the server moments after startup. Use OpenProcess/GetExitCodeProcess
+// on Windows instead, and keep the POSIX no-op signal check elsewhere.
 const parentWatchRunner = `
 import os, runpy, sys, threading, time
 
@@ -93,12 +99,37 @@ parent_pid = int(sys.argv[1])
 server_path = sys.argv[2]
 sys.argv = sys.argv[2:]
 
+if sys.platform == 'win32':
+    import ctypes
+
+    PROCESS_QUERY_LIMITED_INFORMATION = 0x1000
+    STILL_ACTIVE = 259
+
+    def parent_alive():
+        handle = ctypes.windll.kernel32.OpenProcess(
+            PROCESS_QUERY_LIMITED_INFORMATION, False, parent_pid
+        )
+        if not handle:
+            return False
+        try:
+            exit_code = ctypes.c_ulong()
+            if not ctypes.windll.kernel32.GetExitCodeProcess(handle, ctypes.byref(exit_code)):
+                return False
+            return exit_code.value == STILL_ACTIVE
+        finally:
+            ctypes.windll.kernel32.CloseHandle(handle)
+else:
+    def parent_alive():
+        try:
+            os.kill(parent_pid, 0)
+            return True
+        except OSError:
+            return False
+
 def stop_with_parent():
     while True:
         time.sleep(0.25)
-        try:
-            os.kill(parent_pid, 0)
-        except OSError:
+        if not parent_alive():
             os._exit(0)
 
 threading.Thread(target=stop_with_parent, daemon=True).start()

@@ -310,7 +310,7 @@ class SecurityStoreTests(unittest.TestCase):
             self.assertEqual(db.execute("PRAGMA foreign_keys").fetchone()[0], 1)
             self.assertEqual(db.execute("PRAGMA journal_mode").fetchone()[0], "wal")
             self.assertEqual(db.execute("PRAGMA integrity_check").fetchone()[0], "ok")
-            self.assertEqual(db.execute("SELECT MAX(version) FROM schema_migrations").fetchone()[0], 5)
+            self.assertEqual(db.execute("SELECT MAX(version) FROM schema_migrations").fetchone()[0], 6)
             backup_path = Path(self.temporary.name) / "backup.db"
             backup = sqlite3.connect(backup_path)
             db.backup(backup)
@@ -352,12 +352,14 @@ class SecurityStoreTests(unittest.TestCase):
             columns = {row["name"] for row in db.execute("PRAGMA table_info(users)")}
             self.assertIn("email_verified_at", columns)
             self.assertIn("last_login_at", columns)
+            self.assertIn("normalized_email", columns)
+            self.assertIn("normalized_phone", columns)
             row = db.execute(
                 "SELECT email,email_verified,email_verified_at FROM users WHERE id='usr_legacy'"
             ).fetchone()
             self.assertEqual((row["email"], row["email_verified"]), ("legacy-owner@example.test", 1))
             self.assertIsNone(row["email_verified_at"])
-            self.assertEqual(db.execute("SELECT MAX(version) FROM schema_migrations").fetchone()[0], 5)
+            self.assertEqual(db.execute("SELECT MAX(version) FROM schema_migrations").fetchone()[0], 6)
             self.assertEqual(db.execute("PRAGMA integrity_check").fetchone()[0], "ok")
         self.assertFalse(migrated.profile("usr_legacy")["emailVerified"])
 
@@ -369,6 +371,10 @@ class SecurityStoreTests(unittest.TestCase):
             )
             self.assertEqual(
                 db.execute("SELECT COUNT(*) FROM schema_migrations WHERE version=5").fetchone()[0],
+                1,
+            )
+            self.assertEqual(
+                db.execute("SELECT COUNT(*) FROM schema_migrations WHERE version=6").fetchone()[0],
                 1,
             )
             self.assertEqual(db.execute("PRAGMA integrity_check").fetchone()[0], "ok")

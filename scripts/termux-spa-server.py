@@ -35,6 +35,11 @@ except ModuleNotFoundError:  # Repository test import path.
     from scripts.styledash_security import COOKIE_NAME, SecurityError, SecurityStore, normalize_email, token_hash
 
 try:
+    from styledash_shops import ShopWorkflow
+except ModuleNotFoundError:  # Repository test import path.
+    from scripts.styledash_shops import ShopWorkflow
+
+try:
     from styledash_mail import PasswordResetDeliveryQueue, SmtpPasswordResetSender
 except ModuleNotFoundError:  # Repository test import path.
     from scripts.styledash_mail import PasswordResetDeliveryQueue, SmtpPasswordResetSender
@@ -401,12 +406,15 @@ class PaymentService:
         mode: str | None = None,
         gateway: Any | None = None,
         security_store: SecurityStore | None = None,
+        shop_workflow: ShopWorkflow | None = None,
         payment_test_enabled: bool | None = None,
         payment_test_allowed_emails: set[str] | None = None,
     ) -> None:
         catalog = json.loads(catalog_path.read_text(encoding="utf-8"))
         settings = json.loads(settings_path.read_text(encoding="utf-8"))
-        self.products = {item["id"]: item for item in catalog}
+        self._products_lock = threading.RLock()
+        self._static_products = {item["id"]: item for item in catalog}
+        self.products = dict(self._static_products)
         self.settings = settings
         self.mode = (mode or os.environ.get("RAZORPAY_MODE", "test")).strip().lower()
         if self.mode not in ("test", "live"):
@@ -424,6 +432,10 @@ class PaymentService:
             self.gateway = RazorpayGateway(self.key_id, self.key_secret)
         self.store = JsonStateStore(data_directory / "orders.json")
         self.security = security_store
+        self.shops = shop_workflow
+        if self.shops is None and security_store is not None:
+            self.shops = ShopWorkflow(security_store.path)
+        self.refresh_shop_products()
 
         configured_pincodes = os.environ.get("STYLEDASH_SUPPORTED_PINCODES", "")
         if configured_pincodes.strip():
@@ -453,6 +465,23 @@ class PaymentService:
         if self.security is not None:
             result["database"] = "ok" if self.security.health() else "error"
         return result
+
+    def refresh_shop_products(self) -> None:
+        """Atomically refresh DB-backed products without rewriting catalog JSON.
+
+        All shop submissions remain in the authoritative map. Non-published or
+        suspended entries are retained with active=false so historic order
+        inventory can still be finalized or released safely.
+        """
+        dynamic = self.shops.payment_catalog_products() if self.shops is not None else []
+        snapshot = dict(self._static_products)
+        snapshot.update({product["id"]: product for product in dynamic})
+        with self._products_lock:
+            self.products = snapshot
+
+    def product_snapshot(self) -> dict[str, dict[str, Any]]:
+        with self._products_lock:
+            return self.products
 
     def is_serviceable_pincode(self, pincode: str) -> bool:
         return _is_six_ascii_digits(pincode) and pincode in self.supported_pincodes
@@ -511,10 +540,12 @@ class PaymentService:
         ):
             raise ApiError(HTTPStatus.BAD_REQUEST, "Invalid product option.", "invalid_variant")
 
+        self.refresh_shop_products()
+        products = self.product_snapshot()
         availability: list[dict[str, Any]] = []
         with self.store.lock:
             state = self.store.state
-            for product in self.products.values():
+            for product in products.values():
                 if not product.get("active"):
                     continue
                 for variant in product["variants"]:
@@ -552,6 +583,8 @@ class PaymentService:
         }
 
     def calculate_order(self, payload: dict[str, Any]) -> dict[str, Any]:
+        self.refresh_shop_products()
+        products = self.product_snapshot()
         if not isinstance(payload, dict):
             raise ApiError(HTTPStatus.BAD_REQUEST, "A JSON object is required.", "malformed_request")
         items = payload.get("items")
@@ -585,9 +618,9 @@ class PaymentService:
                 product_id = item.get("productId")
                 variant_id = item.get("variantId")
                 quantity = item.get("quantity")
-                if not isinstance(product_id, str) or product_id not in self.products:
+                if not isinstance(product_id, str) or product_id not in products:
                     raise ApiError(HTTPStatus.UNPROCESSABLE_ENTITY, "A product is unavailable.", "invalid_product")
-                product = self.products[product_id]
+                product = products[product_id]
                 if not product.get("active"):
                     raise ApiError(HTTPStatus.UNPROCESSABLE_ENTITY, "A product is unavailable.", "invalid_product")
                 variant = next(
@@ -953,6 +986,7 @@ class PaymentService:
     ) -> bool:
         """Commit all requested inventory or none of it."""
 
+        products = self.product_snapshot()
         checked: list[
             tuple[
                 dict[str, Any],
@@ -966,7 +1000,7 @@ class PaymentService:
             if not isinstance(item, dict):
                 return False
 
-            product = self.products.get(item.get("productId"))
+            product = products.get(item.get("productId"))
 
             if not isinstance(product, dict):
                 return False
@@ -1051,9 +1085,10 @@ class PaymentService:
         if committed is not True:
             return False
 
+        products = self.product_snapshot()
         restored: list[tuple[str, int, int]] = []
         for item in order.get("items", []):
-            product = self.products.get(item.get("productId"))
+            product = products.get(item.get("productId"))
             if not isinstance(product, dict):
                 raise ApiError(HTTPStatus.CONFLICT, "Inventory could not be released safely.", "inventory_release_failed")
             variant = next(
@@ -1807,6 +1842,15 @@ class StyleDashRequestHandler(SimpleHTTPRequestHandler):
             raise SecurityError(HTTPStatus.SERVICE_UNAVAILABLE, "Authentication is unavailable.", "authentication_unavailable")
         return self.payment_service.security
 
+    def _shops(self) -> ShopWorkflow:
+        if self.payment_service.shops is None:
+            raise SecurityError(
+                HTTPStatus.SERVICE_UNAVAILABLE,
+                "Shop applications are unavailable.",
+                "shop_service_unavailable",
+            )
+        return self.payment_service.shops
+
     def _session_token(self) -> str | None:
         cookie = SimpleCookie()
         try:
@@ -1924,6 +1968,13 @@ class StyleDashRequestHandler(SimpleHTTPRequestHandler):
                     raise ApiError(HTTPStatus.BAD_REQUEST, "Invalid product option.", "invalid_variant")
                 self._json_response(HTTPStatus.OK, self.payment_service.public_inventory_availability(variant_id))
                 return
+            if path == "/api/shop-products/published":
+                self._rate_limit(path, 60)
+                self._json_response(
+                    HTTPStatus.OK,
+                    {"success": True, "products": self._shops().list_published_products()},
+                )
+                return
             if path == f"/api/payment-test-product/{PAYMENT_TEST_PRODUCT_SLUG}":
                 self._rate_limit(path, 30)
                 user = self._payment_test_user()
@@ -1943,6 +1994,20 @@ class StyleDashRequestHandler(SimpleHTTPRequestHandler):
             if path == "/api/profile":
                 user, _session = self._current_user()
                 self._json_response(HTTPStatus.OK, {"success": True, "profile": self._security().profile(user["id"])})
+                return
+            if path == "/api/vendor-applications/me":
+                user, _session = self._current_user()
+                self._json_response(
+                    HTTPStatus.OK,
+                    {"success": True, "application": self._shops().get_application(user["id"])},
+                )
+                return
+            if path == "/api/shop-products":
+                user, _session = self._current_user()
+                self._json_response(
+                    HTTPStatus.OK,
+                    {"success": True, "products": self._shops().list_products(user["id"])},
+                )
                 return
             if path.startswith("/api/orders/"):
                 user, _session = self._current_user()
@@ -2124,14 +2189,20 @@ class StyleDashRequestHandler(SimpleHTTPRequestHandler):
                     headers={"Set-Cookie": self._security().cookie(raw)},
                 )
                 return
-            if path in ("/api/auth/federated/link/google", "/api/auth/federated/link/phone"):
+            if path in (
+                "/api/auth/federated/google/link",
+                "/api/auth/federated/phone/link",
+                "/api/auth/federated/link/google",
+                "/api/auth/federated/link/phone",
+            ):
                 self._rate_limit(path, 10)
                 raw = self._session_token()
                 self._security().verify_csrf(raw, self.headers.get("X-CSRF-Token"))
-                provider = "google" if path.endswith("google") else "phone"
-                self._security().link_federated_identity(raw or "", provider, self._read_json())
-                current, _session = self._current_user()
-                self._json_response(HTTPStatus.OK, {"success": True, "profile": self._security().profile(current["id"])})
+                provider = "google" if "/google" in path else "phone"
+                profile = self._security().link_federated_identity(
+                    raw or "", provider, self._read_json()
+                )
+                self._json_response(HTTPStatus.OK, {"success": True, "profile": profile})
                 return
             if path == "/api/auth/password-reset/request":
                 payload = self._read_json()
@@ -2159,48 +2230,83 @@ class StyleDashRequestHandler(SimpleHTTPRequestHandler):
                 self._rate_limit(path, 5)
                 user, _session = self._current_user()
                 self._csrf()
-
                 vendor_payload = self._read_json()
-
-                result = self._security().create_vendor_application(
-                    user["id"],
-                    vendor_payload,
+                legacy_submit = "email" in vendor_payload or "phone" in vendor_payload
+                safe_payload = {
+                    key: value
+                    for key, value in vendor_payload.items()
+                    if key not in {"email", "phone"}
+                }
+                if "storeName" in safe_payload and "shopName" not in safe_payload:
+                    safe_payload["shopName"] = safe_payload.pop("storeName")
+                if legacy_submit:
+                    # The original form represented an immediate submission
+                    # and was Neemuch-only. Preserve that behavior while the
+                    # new UI uses explicit draft + submit endpoints.
+                    safe_payload.setdefault("city", "Neemuch")
+                    safe_payload.setdefault("state", "Madhya Pradesh")
+                result = self._shops().create_draft(user["id"], safe_payload)
+                if legacy_submit:
+                    result = self._shops().submit_application(user["id"])
+                    owner_notifier().send(
+                        event="vendor_application",
+                        title="New Vendor Application",
+                        message=(
+                            f"Application: {result.get('id') or '-'}\n"
+                            f"Store: {' '.join(str(result.get('shopName') or '-').split())[:100]}\n"
+                            f"Category: {' '.join(str(result.get('category') or '-').split())[:80]}\n"
+                            "Status: Submitted"
+                        ),
+                        priority=5,
+                        tags=["briefcase"],
+                    )
+                self._json_response(
+                    HTTPStatus.CREATED,
+                    {"success": True, "application": result},
                 )
-
-                # The application is already durably stored at this point.
-                # Flatten whitespace so user-controlled text cannot make the
-                # notification confusing or inject extra visual lines.
-                store_name = " ".join(
-                    str(
-                        vendor_payload.get("storeName") or "-"
-                    ).split()
-                )[:100]
-
-                category = " ".join(
-                    str(
-                        vendor_payload.get("category") or "-"
-                    ).split()
-                )[:80]
-
+                return
+            if path == "/api/vendor-applications/me/submit":
+                self._rate_limit(path, 5)
+                user, _session = self._current_user()
+                self._csrf()
+                result = self._shops().submit_application(user["id"])
                 owner_notifier().send(
                     event="vendor_application",
                     title="New Vendor Application",
                     message=(
                         f"Application: {result.get('id') or '-'}\n"
-                        f"Store: {store_name}\n"
-                        f"Category: {category}\n"
-                        f"Status: Pending"
+                        f"Store: {' '.join(str(result.get('shopName') or '-').split())[:100]}\n"
+                        f"Category: {' '.join(str(result.get('category') or '-').split())[:80]}\n"
+                        "Status: Submitted"
                     ),
                     priority=5,
                     tags=["briefcase"],
                 )
-
                 self._json_response(
-                    HTTPStatus.CREATED,
-                    {
-                        "success": True,
-                        "application": result,
-                    },
+                    HTTPStatus.OK, {"success": True, "application": result}
+                )
+                return
+            if path == "/api/shop-products":
+                self._rate_limit(path, 10)
+                user, _session = self._current_user()
+                self._csrf()
+                result = self._shops().create_product_draft(user["id"], self._read_json())
+                self._json_response(
+                    HTTPStatus.CREATED, {"success": True, "product": result}
+                )
+                return
+            if path.startswith("/api/shop-products/") and path.endswith("/submit"):
+                self._rate_limit("/api/shop-products/submit", 10)
+                user, _session = self._current_user()
+                self._csrf()
+                product_id = unquote(
+                    path.removeprefix("/api/shop-products/").removesuffix("/submit")
+                )
+                if not product_id or "/" in product_id:
+                    raise SecurityError(404, "Product submission not found.", "product_not_found")
+                result = self._shops().submit_product(user["id"], product_id)
+                self._json_response(
+                    HTTPStatus.OK, {"success": True, "product": result}
                 )
                 return
             if path.startswith(API_PREFIX):
@@ -2244,6 +2350,27 @@ class StyleDashRequestHandler(SimpleHTTPRequestHandler):
                 self._csrf()
                 profile = self._security().update_profile(user["id"], self._read_json())
                 self._json_response(HTTPStatus.OK, {"success": True, "profile": profile})
+                return
+            if path == "/api/vendor-applications/me":
+                self._rate_limit(path, 20)
+                user, _session = self._current_user()
+                self._csrf()
+                application = self._shops().update_draft(user["id"], self._read_json())
+                self._json_response(
+                    HTTPStatus.OK, {"success": True, "application": application}
+                )
+                return
+            if path.startswith("/api/shop-products/"):
+                self._rate_limit("/api/shop-products", 20)
+                user, _session = self._current_user()
+                self._csrf()
+                product_id = unquote(path.removeprefix("/api/shop-products/"))
+                if not product_id or "/" in product_id:
+                    raise SecurityError(404, "Product submission not found.", "product_not_found")
+                product = self._shops().update_product_draft(
+                    user["id"], product_id, self._read_json()
+                )
+                self._json_response(HTTPStatus.OK, {"success": True, "product": product})
                 return
             self._json_response(HTTPStatus.METHOD_NOT_ALLOWED, {"success": False, "error": "Method not allowed.", "code": "method_not_allowed"})
         except ApiError as error:

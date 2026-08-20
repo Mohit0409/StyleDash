@@ -19,14 +19,25 @@ if [ ! -f "$STAGE/scripts/styledash_firebase.py" ]; then
   echo "release is missing styledash_firebase.py; deployment aborted" >&2
   exit 1
 fi
-auth_assets=("$STAGE"/dist/assets/AuthPage-*.js)
-if [ ! -f "${auth_assets[0]}" ]; then
-  echo "release is missing the authentication frontend asset; deployment aborted" >&2
+if [ ! -f "$STAGE/scripts/styledash_shops.py" ] || \
+   [ ! -f "$STAGE/scripts/audit_identity_duplicates.py" ]; then
+  echo "release is missing shop or identity-migration safety modules; deployment aborted" >&2
+  exit 1
+fi
+firebase_assets=("$STAGE"/dist/assets/*.js)
+if [ ! -f "${firebase_assets[0]}" ]; then
+  echo "release is missing frontend JavaScript assets; deployment aborted" >&2
   exit 1
 fi
 for empty_firebase_field in 'apiKey:""' 'authDomain:""' 'projectId:""' 'appId:""'; do
-  if grep -Fq "$empty_firebase_field" "${auth_assets[@]}"; then
+  if grep -Fq "$empty_firebase_field" "${firebase_assets[@]}"; then
     echo "release contains an empty Firebase web configuration; deployment aborted" >&2
+    exit 1
+  fi
+done
+for firebase_field in apiKey authDomain projectId appId; do
+  if ! grep -Ehq "$firebase_field:\"[^\"]+\"" "${firebase_assets[@]}"; then
+    echo "release is missing a complete Firebase web configuration; deployment aborted" >&2
     exit 1
   fi
 done
@@ -48,6 +59,10 @@ set -a
 set +a
 : "${STYLEDASH_FIREBASE_PROJECT_ID:?Firebase project ID is not configured}"
 : "${STYLEDASH_FIREBASE_CREDENTIALS:?Firebase credentials path is not configured}"
+if ! grep -Fq "projectId:\"$STYLEDASH_FIREBASE_PROJECT_ID\"" "${firebase_assets[@]}"; then
+  echo "Firebase browser and server project IDs do not match; deployment aborted" >&2
+  exit 1
+fi
 case "$STYLEDASH_FIREBASE_CREDENTIALS" in
   /*) ;;
   *) echo "Firebase credentials path must be absolute; deployment aborted" >&2; exit 1 ;;
@@ -76,11 +91,28 @@ import sqlite3, sys
 connection = sqlite3.connect(sys.argv[1])
 try:
     result = connection.execute("PRAGMA integrity_check").fetchone()[0]
+    has_vendors = connection.execute(
+        "SELECT 1 FROM sqlite_master WHERE type='table' AND name='vendor_applications'"
+    ).fetchone()
+    duplicate_shop_accounts = 0
+    if has_vendors:
+        duplicate_shop_accounts = connection.execute(
+            "SELECT COUNT(*) FROM ("
+            "SELECT submitted_by_user_id FROM vendor_applications "
+            "GROUP BY submitted_by_user_id HAVING COUNT(*)>1)"
+        ).fetchone()[0]
 finally:
     connection.close()
 if result != "ok":
     raise SystemExit("Live SQLite integrity check failed; deployment aborted")
+if duplicate_shop_accounts:
+    raise SystemExit(
+        f"Shop migration blocked: duplicate applications exist for "
+        f"{duplicate_shop_accounts} customer account(s)"
+    )
 PY
+  PYTHONPATH="$STAGE/scripts${PYTHONPATH:+:$PYTHONPATH}" \
+    python3 "$STAGE/scripts/audit_identity_duplicates.py" "$LIVE_DB"
 fi
 
 if [ -f "$LIVE_STATE" ]; then
@@ -135,6 +167,8 @@ cp -a "$STAGE/dist/." "$HOME/server/"
 install -m 755 "$STAGE/scripts/termux-spa-server.py" "$HOME/server/serve.py"
 install -m 600 "$STAGE/scripts/styledash_security.py" "$HOME/server/styledash_security.py"
 install -m 600 "$STAGE/scripts/styledash_firebase.py" "$HOME/server/styledash_firebase.py"
+install -m 600 "$STAGE/scripts/styledash_shops.py" "$HOME/server/styledash_shops.py"
+install -m 600 "$STAGE/scripts/audit_identity_duplicates.py" "$HOME/server/audit_identity_duplicates.py"
 install -m 600 "$STAGE/scripts/styledash_mail.py" "$HOME/server/styledash_mail.py"
 install -m 600 "$STAGE/scripts/styledash_notify.py" "$HOME/server/styledash_notify.py"
 mkdir -p "$HOME/admin/admin" "$HOME/admin/tools"
@@ -144,6 +178,7 @@ chmod 700 "$HOME/admin" "$HOME/admin/admin" "$HOME/admin/tools"
 install -m 600 "$STAGE/scripts/termux-admin-server.py" "$HOME/admin/serve.py"
 install -m 600 "$STAGE/scripts/styledash_admin.py" "$HOME/admin/styledash_admin.py"
 install -m 600 "$STAGE/scripts/styledash_security.py" "$HOME/admin/styledash_security.py"
+install -m 600 "$STAGE/scripts/styledash_shops.py" "$HOME/admin/styledash_shops.py"
 install -m 600 "$STAGE/server/admin/index.html" "$HOME/admin/admin/index.html"
 install -m 600 "$STAGE/server/admin/admin.css" "$HOME/admin/admin/admin.css"
 install -m 600 "$STAGE/server/admin/admin.js" "$HOME/admin/admin/admin.js"
@@ -192,6 +227,23 @@ fi
 "$HOME/bin/start-styledash-admin"
 python3 -c 'import razorpay; print("razorpay_sdk=ok")'
 PYTHONPATH="$HOME/server${PYTHONPATH:+:$PYTHONPATH}" python3 -c 'import firebase_admin, styledash_firebase; print("firebase_sdk=ok")'
+PYTHONPATH="$HOME/server${PYTHONPATH:+:$PYTHONPATH}" python3 "$HOME/server/audit_identity_duplicates.py" "$LIVE_DB"
+python3 - "$LIVE_DB" <<'PY'
+import sqlite3, sys
+connection = sqlite3.connect(sys.argv[1])
+try:
+    identity_versions = {row[0] for row in connection.execute("SELECT version FROM schema_migrations")}
+    shop_versions = {row[0] for row in connection.execute("SELECT version FROM shop_schema_migrations")}
+    integrity = connection.execute("PRAGMA integrity_check").fetchone()[0]
+    foreign_keys = connection.execute("PRAGMA foreign_key_check").fetchall()
+finally:
+    connection.close()
+if 6 not in identity_versions or not {1, 2}.issubset(shop_versions):
+    raise SystemExit("StyleDash schema migrations are incomplete")
+if integrity != "ok" or foreign_keys:
+    raise SystemExit("StyleDash post-migration database validation failed")
+print("styledash_migrations=ok")
+PY
 printf 'backup=%s\n' "$BACKUP"
 printf 'health='
 curl -fsS http://127.0.0.1:8080/api/health
