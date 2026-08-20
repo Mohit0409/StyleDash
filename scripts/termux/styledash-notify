@@ -1,0 +1,43 @@
+#!/data/data/com.termux/files/usr/bin/bash
+set -eu
+
+if [ "$#" -lt 3 ] || [ "$#" -gt 5 ]; then
+  echo "usage: styledash-notify EVENT TITLE MESSAGE [PRIORITY] [TAG1,TAG2]" >&2
+  exit 2
+fi
+
+EVENT="$1"
+TITLE="$2"
+MESSAGE="$3"
+PRIORITY="${4:-4}"
+TAGS="${5:-warning}"
+SECRETS_FILE="$HOME/.config/styledash/secrets.env"
+
+if [ ! -f "$SECRETS_FILE" ] || [ ! -f "$HOME/server/styledash_notify.py" ]; then
+  exit 0
+fi
+
+set -a
+. "$SECRETS_FILE"
+set +a
+export STYLEDASH_NTFY_BACKGROUND=0
+
+PYTHONPATH="$HOME/server${PYTHONPATH:+:$PYTHONPATH}" \
+python3 - "$EVENT" "$TITLE" "$MESSAGE" "$PRIORITY" "$TAGS" <<'PY'
+import sys
+
+from styledash_notify import owner_notifier
+
+event, title, message, priority, tags = sys.argv[1:]
+notifier = owner_notifier()
+if not notifier.configured:
+    raise SystemExit(0)
+sent = notifier.send(
+    event=event,
+    title=title,
+    message=message,
+    priority=int(priority),
+    tags=[tag.strip() for tag in tags.split(",") if tag.strip()],
+)
+raise SystemExit(0 if sent else 1)
+PY

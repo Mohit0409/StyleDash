@@ -1,34 +1,132 @@
 #!/data/data/com.termux/files/usr/bin/bash
 set -eu
+
+LOCAL_ONLY=false
+if [ "${1:-}" = "--local-only" ]; then
+  LOCAL_ONLY=true
+  shift
+fi
+if [ "$#" -ne 0 ]; then
+  echo "usage: backup-styledash-data [--local-only]" >&2
+  exit 2
+fi
+
 DATA_ROOT="$HOME/.local/share/styledash"
 BACKUP_ROOT="$DATA_ROOT/backups"
 DB="$DATA_ROOT/styledash.db"
 STATE="$DATA_ROOT/runtime/orders.json"
-mkdir -p "$BACKUP_ROOT"
+PRIVATE_CONFIG_DIR="$HOME/.config/styledash"
+SECRETS_FILE="$PRIVATE_CONFIG_DIR/secrets.env"
+RUN_DIR="$HOME/run"
+
+mkdir -p "$BACKUP_ROOT" "$RUN_DIR"
 chmod 700 "$BACKUP_ROOT"
+
+if [ -f "$SECRETS_FILE" ]; then
+  set -a
+  . "$SECRETS_FILE"
+  set +a
+fi
+
+enabled() {
+  case "$(printf '%s' "${1:-}" | tr '[:upper:]' '[:lower:]')" in
+    1|true|yes|on) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
 stamp="$(date -u +%Y%m%dT%H%M%SZ)"
 target="$BACKUP_ROOT/$stamp"
-mkdir -p "$target"; chmod 700 "$target"
+mkdir -p "$target"
+chmod 700 "$target"
+
 if [ -f "$DB" ]; then
   python3 - "$DB" "$target/styledash.db" <<'PY'
-import sqlite3, sys
-source=sqlite3.connect(sys.argv[1]); target=sqlite3.connect(sys.argv[2]); source.backup(target); target.close(); source.close()
-check=sqlite3.connect(sys.argv[2]); integrity=check.execute("PRAGMA integrity_check").fetchone()[0]; check.close()
-if integrity != "ok": raise SystemExit("SQLite backup integrity check failed")
+import sqlite3
+import sys
+
+source = sqlite3.connect(sys.argv[1])
+target = sqlite3.connect(sys.argv[2])
+try:
+    source.backup(target)
+finally:
+    target.close()
+    source.close()
+
+check = sqlite3.connect(sys.argv[2])
+try:
+    integrity = check.execute("PRAGMA integrity_check").fetchone()[0]
+finally:
+    check.close()
+if integrity != "ok":
+    raise SystemExit("SQLite backup integrity check failed")
 PY
   chmod 600 "$target/styledash.db"
 fi
-if [ -f "$STATE" ]; then cp -p "$STATE" "$target/orders.json"; chmod 600 "$target/orders.json"; fi
+
+if [ -f "$STATE" ]; then
+  cp -p "$STATE" "$target/orders.json"
+  chmod 600 "$target/orders.json"
+fi
+
 python3 - "$BACKUP_ROOT" <<'PY'
 from pathlib import Path
-import re, shutil, sys
+import re
+import shutil
+import sys
+
 root = Path(sys.argv[1]).resolve()
 pattern = re.compile(r"^\d{8}T\d{6}Z$")
-backups = sorted((path for path in root.iterdir() if path.is_dir() and pattern.fullmatch(path.name)), reverse=True)
+backups = sorted(
+    (
+        path
+        for path in root.iterdir()
+        if path.is_dir() and pattern.fullmatch(path.name)
+    ),
+    reverse=True,
+)
 for path in backups[14:]:
     resolved = path.resolve()
     if resolved.parent != root:
         raise SystemExit("Refusing unsafe backup retention target")
     shutil.rmtree(resolved)
 PY
+
+printf '%s\n' "$stamp" > "$RUN_DIR/styledash-last-local-backup"
+chmod 600 "$RUN_DIR/styledash-last-local-backup"
+
+if [ "$LOCAL_ONLY" = false ]; then
+  remote="${STYLEDASH_BACKUP_REMOTE:-}"
+  require_remote="${STYLEDASH_REQUIRE_OFFDEVICE_BACKUP:-false}"
+
+  if [ -n "$remote" ]; then
+    case "$remote" in
+      *:*) ;;
+      *)
+        echo "STYLEDASH_BACKUP_REMOTE must be an rclone remote:path" >&2
+        exit 1
+        ;;
+    esac
+    if ! command -v rclone >/dev/null 2>&1; then
+      echo "rclone is required for configured off-device backups" >&2
+      exit 1
+    fi
+
+    remote_target="${remote%/}/$stamp"
+    rclone copy "$target" "$remote_target" \
+      --immutable \
+      --create-empty-src-dirs
+    rclone check "$target" "$remote_target" \
+      --one-way \
+      --download
+
+    printf '%s\n' "$stamp" > "$RUN_DIR/styledash-last-offdevice-backup"
+    chmod 600 "$RUN_DIR/styledash-last-offdevice-backup"
+    echo "Off-device StyleDash backup verified: $stamp"
+  elif enabled "$require_remote"; then
+    echo "Off-device backup is required but STYLEDASH_BACKUP_REMOTE is not configured" >&2
+    exit 1
+  fi
+fi
+
 echo "Private StyleDash backup completed: $stamp"

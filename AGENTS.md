@@ -39,8 +39,8 @@ Production architecture:
 - online backups
 - server-authoritative orders, prices, inventory, and payments
 
-The production branch is `feature/styledash-fashion-commerce` unless the
-repository owner explicitly changes it.
+The production branch is `main` unless the repository owner explicitly
+changes it.
 
 Do not reintroduce Firebase as an authoritative system.
 
