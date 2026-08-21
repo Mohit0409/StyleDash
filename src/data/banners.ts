@@ -3,10 +3,10 @@ import { AdSlot } from '../types';
 export const BANNERS: AdSlot[] = [
   {
     id: 'banner-1',
-    title: 'Flat 50% Off on Summer Streetwear Collection',
+    title: 'Summer Streetwear Collection ? Shop Current Deals',
     type: 'banner',
     imageUrl: 'https://images.unsplash.com/photo-1483985988355-763728e1935b?auto=format&fit=crop&w=1200&q=80',
-    targetUrl: '/sale',
+    targetUrl: '/products?filter=sale',
     vendorId: 'v-urban-style',
     impressions: 1240,
     clicks: 185,

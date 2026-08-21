@@ -166,7 +166,7 @@ export const FilterSidebar: React.FC<FilterSidebarProps> = ({
             <div>
               <div className="flex items-center justify-between mb-6">
                 <span className="font-extrabold text-lg text-neutral-900 dark:text-white">Filter & Sort</span>
-                <button onClick={onCloseMobile} className="p-2 rounded-full hover:bg-neutral-100 dark:hover:bg-neutral-800">
+                <button aria-label="Close filters" onClick={onCloseMobile} className="p-2 rounded-full hover:bg-neutral-100 dark:hover:bg-neutral-800">
                   <X className="w-5 h-5" />
                 </button>
               </div>

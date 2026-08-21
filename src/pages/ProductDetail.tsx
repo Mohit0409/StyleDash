@@ -142,13 +142,15 @@ export const ProductDetail: React.FC = () => {
             <p className="text-xs text-neutral-500 mt-2">{product.shortDescription}</p>
 
             {/* Rating */}
-            <div className="flex items-center gap-2 mt-3 text-xs font-bold text-amber-500">
-              <div className="flex items-center gap-1 bg-amber-50 dark:bg-amber-950/40 px-2.5 py-1 rounded-full border border-amber-200 dark:border-amber-800">
-                <Star className="w-3.5 h-3.5 fill-amber-400" />
-                <span>{product.rating}</span>
+            {product.reviewCount > 0 && (
+              <div className="flex items-center gap-2 mt-3 text-xs font-bold text-amber-500">
+                <div className="flex items-center gap-1 bg-amber-50 dark:bg-amber-950/40 px-2.5 py-1 rounded-full border border-amber-200 dark:border-amber-800">
+                  <Star className="w-3.5 h-3.5 fill-amber-400" />
+                  <span>{product.rating}</span>
+                </div>
+                <span className="text-neutral-400">({product.reviewCount} customer reviews)</span>
               </div>
-              <span className="text-neutral-400">({product.reviewCount} customer reviews)</span>
-            </div>
+            )}
           </div>
 
           {/* Pricing */}
@@ -210,6 +212,8 @@ export const ProductDetail: React.FC = () => {
 
             <button
               onClick={() => toggleWishlist(product.id)}
+              aria-label={isWishlisted ? `Remove ${product.name} from wishlist` : `Add ${product.name} to wishlist`}
+              aria-pressed={isWishlisted}
               className="p-4 rounded-2xl border border-neutral-300 dark:border-neutral-700 hover:bg-neutral-100 dark:hover:bg-neutral-800"
             >
               <Heart className={`w-5 h-5 ${isWishlisted ? 'fill-rose-500 text-rose-500' : ''}`} />

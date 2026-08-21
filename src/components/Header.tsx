@@ -116,6 +116,7 @@ export const Header: React.FC<{ onOpenCart: () => void; onOpenLocation: () => vo
 
             <button
               onClick={onOpenCart}
+              aria-label={`Open cart, ${totalItemsCount} ${totalItemsCount === 1 ? 'item' : 'items'}`}
               className="flex items-center gap-2 bg-neutral-950 dark:bg-lime-400 text-white dark:text-neutral-950 px-4 py-2 rounded-full font-bold text-sm shadow-md hover:bg-neutral-800 dark:hover:bg-lime-300 transition-all transform active:scale-95"
             >
               <ShoppingBag className="w-4 h-4" />

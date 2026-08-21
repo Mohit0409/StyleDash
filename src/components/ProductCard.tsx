@@ -52,6 +52,8 @@ export const ProductCard: React.FC<{ product: Product; onQuickView?: (p: Product
           e.stopPropagation();
           toggleWishlist(product.id);
         }}
+        aria-label={isWishlisted ? `Remove ${product.name} from wishlist` : `Add ${product.name} to wishlist`}
+        aria-pressed={isWishlisted}
         className="absolute top-3 right-3 z-10 p-2 bg-white/80 dark:bg-neutral-800/80 backdrop-blur-md rounded-full shadow-md text-neutral-700 dark:text-neutral-200 hover:scale-110 transition-transform"
       >
         <Heart className={`w-4 h-4 ${isWishlisted ? 'fill-rose-500 text-rose-500' : ''}`} />
@@ -95,9 +97,11 @@ export const ProductCard: React.FC<{ product: Product; onQuickView?: (p: Product
         <div>
           <div className="flex items-center justify-between text-xs text-neutral-500 mb-1">
             <span className="font-bold text-neutral-800 dark:text-neutral-200 uppercase tracking-wider">{product.brand}</span>
-            <span className="flex items-center gap-1 text-amber-500 font-semibold">
-              <Star className="w-3 h-3 fill-amber-400" /> {product.rating} ({product.reviewCount})
-            </span>
+            {product.reviewCount > 0 && (
+              <span className="flex items-center gap-1 text-amber-500 font-semibold">
+                <Star className="w-3 h-3 fill-amber-400" /> {product.rating} ({product.reviewCount})
+              </span>
+            )}
           </div>
 
           <Link to={`/product/${product.slug}`} className="block">
