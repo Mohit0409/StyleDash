@@ -1810,6 +1810,9 @@ class StyleDashRequestHandler(SimpleHTTPRequestHandler):
     rate_limiter = RateLimiter()
 
     def end_headers(self) -> None:
+        path = urlsplit(self.path).path
+        if path.startswith("/assets/"):
+            self.send_header("Cache-Control", "public, max-age=31536000, immutable")
         self.send_header("X-Content-Type-Options", "nosniff")
         self.send_header("Referrer-Policy", "strict-origin-when-cross-origin")
         self.send_header("X-Frame-Options", "SAMEORIGIN")

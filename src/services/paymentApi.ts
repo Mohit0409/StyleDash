@@ -116,6 +116,34 @@ export interface RazorpayInstance {
 
 export type RazorpayConstructor = new (options: RazorpayOptions) => RazorpayInstance;
 
+const RAZORPAY_CHECKOUT_SRC = 'https://checkout.razorpay.com/v1/checkout.js';
+let razorpayLoader: Promise<RazorpayConstructor> | null = null;
+
+async function loadRazorpayCheckout(): Promise<RazorpayConstructor> {
+  const existing = (window as unknown as { Razorpay?: RazorpayConstructor }).Razorpay;
+  if (existing) return existing;
+  if (!razorpayLoader) {
+    razorpayLoader = new Promise((resolve, reject) => {
+      const script = document.createElement('script');
+      script.src = RAZORPAY_CHECKOUT_SRC;
+      script.async = true;
+      script.onload = () => {
+        const Constructor = (window as unknown as { Razorpay?: RazorpayConstructor }).Razorpay;
+        if (Constructor) resolve(Constructor);
+        else reject(new PaymentApiError('Razorpay Checkout could not be loaded.', 'checkout_unavailable'));
+      };
+      script.onerror = () => reject(new PaymentApiError('Razorpay Checkout could not be loaded.', 'checkout_unavailable'));
+      document.head.appendChild(script);
+    });
+  }
+  try {
+    return await razorpayLoader;
+  } catch (error) {
+    razorpayLoader = null;
+    throw error;
+  }
+}
+
 export class PaymentApiError extends Error {
   code: string;
   status: number;
@@ -174,16 +202,13 @@ export function verifyPayment(
   return postJson('/api/verify-payment', { ...response, styleDashOrderId }, undefined, fetcher);
 }
 
-export function openRazorpayCheckout(
+export async function openRazorpayCheckout(
   order: CreatePaymentOrderResponse,
   customer: { name: string; email?: string; phone: string },
   paymentMethod: 'upi' | 'card',
   Constructor?: RazorpayConstructor,
 ): Promise<RazorpaySuccessResponse> {
-  const RazorpayCheckout = Constructor || (window as unknown as { Razorpay?: RazorpayConstructor }).Razorpay;
-  if (!RazorpayCheckout) {
-    return Promise.reject(new PaymentApiError('Razorpay Checkout could not be loaded.', 'checkout_unavailable'));
-  }
+  const RazorpayCheckout = Constructor || await loadRazorpayCheckout();
 
   return new Promise((resolve, reject) => {
     let settled = false;
