@@ -49,12 +49,16 @@ export const StoreDetail: React.FC = () => {
 
       {/* Store Cover Banner */}
       <div className="relative rounded-3xl overflow-hidden aspect-[21/9] bg-neutral-900 border border-neutral-200 dark:border-neutral-800 shadow-xl">
-        <img src={store.bannerImage} alt={store.storeName} className="w-full h-full object-cover opacity-60" />
+        {store.bannerImage ? (
+          <img src={store.bannerImage} alt={store.storeName} className="w-full h-full object-cover opacity-60" />
+        ) : (
+          <div className="absolute inset-0 flex items-center justify-center bg-neutral-800"><StoreIcon className="w-20 h-20 text-neutral-600" /></div>
+        )}
         <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/40 to-transparent flex flex-col justify-end p-6 sm:p-10 space-y-2 text-white">
           <div className="flex items-center gap-2">
             <span className="px-3 py-1 bg-lime-400 text-neutral-950 text-xs font-black rounded-full uppercase">{store.category}</span>
             <span className="flex items-center gap-1 text-xs font-bold text-amber-400 bg-black/60 backdrop-blur-md px-2.5 py-1 rounded-full border border-amber-500/30">
-              <Star className="w-3.5 h-3.5 fill-amber-400" /> {store.rating} ({store.reviewCount} ratings)
+              <Star className="w-3.5 h-3.5 fill-amber-400" /> {store.rating && store.reviewCount ? `${store.rating} (${store.reviewCount} ratings)` : 'New store'}
             </span>
           </div>
           <h1 className="text-2xl sm:text-4xl font-black">{store.storeName}</h1>

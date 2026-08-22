@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { clearCsrfToken, setCsrfToken } from '../services/apiClient';
-import { shopProductApi, vendorApplicationApi } from '../services/businessApi';
+import { publicStoreApi, shopProductApi, vendorApplicationApi } from '../services/businessApi';
 
 const application = {
   id: 'shop-1',
@@ -20,6 +20,17 @@ const application = {
 const jsonResponse = (body: unknown, status = 200) => new Response(JSON.stringify(body), {
   status,
   headers: { 'Content-Type': 'application/json' },
+});
+
+describe('public store API', () => {
+  afterEach(() => { vi.restoreAllMocks(); });
+
+  it('loads active public stores from the server feed', async () => {
+    const store = { id: 'shop-live-1', slug: 'local-shop-shop-live-1', storeName: 'Live Shop', category: 'Clothing & Fashion', description: 'Live local shop', address: 'Main market', city: 'Neemuch', pincode: '458441', deliveryMinutes: 60, active: true, approved: true, createdAt: '2026-08-22T00:00:00Z' };
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(jsonResponse({ success: true, stores: [store] }));
+    await expect(publicStoreApi.active()).resolves.toEqual([store]);
+    expect(fetchSpy).toHaveBeenCalledWith('/api/stores/active', expect.objectContaining({ credentials: 'include' }));
+  });
 });
 
 describe('seller product submission API', () => {

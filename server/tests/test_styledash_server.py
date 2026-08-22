@@ -2037,6 +2037,16 @@ class HttpApiTests(unittest.TestCase):
         public_product = public_after["products"][0]
         self.assertNotIn("submittedByUserId", public_product)
         self.assertNotIn("registeredEmail", public_product)
+        status, stores_response, _headers = self.get_json("/api/stores/active")
+        self.assertEqual(status, 200)
+        self.assertEqual([store["id"] for store in stores_response["stores"]], [application_id])
+        public_store = stores_response["stores"][0]
+        self.assertEqual(public_store["slug"], public_product["storeSlug"])
+        self.assertEqual(public_store["storeName"], complete["shopName"])
+        self.assertEqual(public_store["bannerImage"], product_payload["imageUrls"][0])
+        self.assertNotIn("registeredEmail", public_store)
+        self.assertNotIn("registeredMobile", public_store)
+        self.assertNotIn("businessInformation", public_store)
         variant_id = public_product["variants"][0]["id"]
         status, availability, _headers = self.get_json(
             f"/api/inventory/availability?variantId={variant_id}"

@@ -542,6 +542,57 @@ class AdminHttpTests(unittest.TestCase):
         status, body, _headers = self.request("/api/admin/logout", {}, headers={"X-CSRF-Token": csrf}, method="POST")
         self.assertEqual(status, 200)
 
+    def test_shop_transition_success_does_not_depend_on_admin_catalog_refresh(self):
+        customers = SECURITY.SecurityStore(self.database, self.key)
+        user, _raw, _csrf = customers.register({
+            "name": "Seller Test", "email": "seller-transition@example.test",
+            "password": "long seller password 123", "phone": "9999999998",
+        })
+        shops = ADMIN_SERVER.ShopWorkflow(self.database)
+        application = shops.create_draft(user["id"], {
+            "shopName": "Transition Shop", "ownerName": "Seller Test",
+            "category": "Clothing & Fashion", "description": "A complete local shop description.",
+            "address": "123 Main Market", "city": "Neemuch",
+            "state": "Madhya Pradesh", "pincode": "458441",
+        })
+        shops.submit_application(user["id"])
+
+        self.request("/api/admin/login", {"username": "local-owner", "password": "long administrator password 123"}, method="POST")
+        status, body, _headers = self.request("/api/admin/totp", {"code": pyotp.TOTP(self.secret).now()}, method="POST")
+        self.assertEqual(status, 200)
+        csrf = body["csrfToken"]
+        app = self.server.RequestHandlerClass.application
+        with patch.object(app.payments, "refresh_shop_products", side_effect=RuntimeError("refresh must not run")) as refresh:
+            status, body, _headers = self.request(
+                f"/api/admin/vendors/{application['id']}", {"status": "UNDER_REVIEW", "reason": None},
+                headers={"X-CSRF-Token": csrf}, method="PATCH",
+            )
+        self.assertEqual((status, body["application"]["status"]), (200, "UNDER_REVIEW"))
+        refresh.assert_not_called()
+
+        for target in ("APPROVED", "ACTIVE"):
+            status, body, _headers = self.request(
+                f"/api/admin/vendors/{application['id']}", {"status": target, "reason": None},
+                headers={"X-CSRF-Token": csrf}, method="PATCH",
+            )
+            self.assertEqual((status, body["application"]["status"]), (200, target))
+
+        product = shops.create_product_draft(user["id"], {
+            "name": "Transition Tee", "description": "A reviewed transition product for handler coverage.",
+            "brand": "Local", "department": "men", "category": "Clothing & Fashion",
+            "pricePaise": 50000, "originalPricePaise": 60000, "inventory": 3,
+            "size": "M", "colourName": "Black", "colourHex": "#000000",
+            "imageUrls": ["https://example.test/transition.jpg"], "attributes": {},
+        })
+        shops.submit_product(user["id"], product["id"])
+        with patch.object(app.payments, "refresh_shop_products", side_effect=RuntimeError("refresh must not run")) as refresh:
+            status, body, _headers = self.request(
+                f"/api/admin/shop-products/{product['id']}", {"status": "UNDER_REVIEW", "reason": None},
+                headers={"X-CSRF-Token": csrf}, method="PATCH",
+            )
+        self.assertEqual((status, body["product"]["status"]), (200, "UNDER_REVIEW"))
+        refresh.assert_not_called()
+
     def test_non_loopback_bind_refused(self):
         with self.assertRaises(RuntimeError):
             ADMIN_SERVER.create_admin_server("0.0.0.0", 0, self.database, self.key, ROOT / "server/payment-data/catalog.json", ROOT / "server/payment-data/settings.json", self.root / "data2", ROOT / "server/admin", self.root / "backups")

@@ -1,6 +1,6 @@
 import { apiFetch, apiJson } from './apiClient';
 import { ServerOrder } from './paymentApi';
-import { Product, UserProfile } from '../types';
+import { Product, UserProfile, VendorStore } from '../types';
 
 export const orderApi = {
   async mine(): Promise<ServerOrder[]> {
@@ -57,6 +57,12 @@ export const vendorApplicationApi = {
   },
   async submit(): Promise<ShopApplication> {
     return (await apiJson<{ success: true; application: ShopApplication }>('/api/vendor-applications/me/submit', 'POST', {})).application;
+  },
+};
+
+export const publicStoreApi = {
+  async active(): Promise<VendorStore[]> {
+    return (await apiFetch<{ success: true; stores: VendorStore[] }>('/api/stores/active')).stores;
   },
 };
 
