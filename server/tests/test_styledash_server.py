@@ -1800,10 +1800,25 @@ class HttpApiTests(unittest.TestCase):
     def test_health_and_security_headers(self) -> None:
         with urllib.request.urlopen(f"{self.base_url}/api/health") as response:
             payload = json.load(response)
-            self.assertEqual(payload, {"status": "ok", "service": "StyleDash", "paymentMode": "test", "database": "ok"})
+            self.assertEqual(payload, {"status": "ok", "service": "StyleDash", "database": "ok"})
+            self.assertNotIn("paymentMode", payload)
             self.assertEqual(response.headers["X-Content-Type-Options"], "nosniff")
             self.assertEqual(response.headers["Referrer-Policy"], "strict-origin-when-cross-origin")
             self.assertIn("checkout.razorpay.com", response.headers["Content-Security-Policy"])
+
+    def test_public_robots_and_sitemap_use_configured_origin(self) -> None:
+        with urllib.request.urlopen(f"{self.base_url}/robots.txt") as response:
+            body = response.read().decode("utf-8")
+            self.assertEqual(response.headers.get_content_type(), "text/plain")
+            self.assertIn("User-agent: *", body)
+            self.assertIn("Sitemap: https://styledash.test/sitemap.xml", body)
+
+        with urllib.request.urlopen(f"{self.base_url}/sitemap.xml") as response:
+            body = response.read().decode("utf-8")
+            self.assertEqual(response.headers.get_content_type(), "application/xml")
+            self.assertIn("<loc>https://styledash.test/</loc>", body)
+            self.assertIn("<loc>https://styledash.test/products</loc>", body)
+            self.assertIn("https://styledash.test/product/", body)
 
     def test_malformed_json_returns_safe_400(self) -> None:
         request = urllib.request.Request(

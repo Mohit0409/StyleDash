@@ -36,7 +36,10 @@ export const Help = () => (
         </a>
       </p>
       <p className="text-sm text-neutral-600">
-        Support hours: {CONFIG.LEGAL.SUPPORT_HOURS}
+        General customer support hours: {CONFIG.LEGAL.SUPPORT_HOURS}
+      </p>
+      <p className="text-sm text-neutral-600">
+        Return and size-exchange desk hours: {CONFIG.LEGAL.RETURN_SUPPORT_HOURS}
       </p>
       <p className="text-sm text-neutral-600">
         Business address: {CONFIG.LEGAL.ADDRESS}

@@ -18,7 +18,7 @@ export const Categories: React.FC = () => {
               {cat.subcategories.map(sub => (
                 <Link
                   key={sub}
-                  to={`/products?dept=${cat.department}`}
+                  to={`/products?dept=${encodeURIComponent(cat.department)}&category=${encodeURIComponent(cat.name)}&subcategory=${encodeURIComponent(sub)}`}
                   className="px-2.5 py-1 rounded-lg bg-neutral-100 dark:bg-neutral-800 text-neutral-700 dark:text-neutral-300 text-xs font-bold hover:bg-lime-400 hover:text-neutral-950 transition-colors"
                 >
                   {sub}

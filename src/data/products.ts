@@ -34,28 +34,9 @@ export const PRODUCTS: Product[] = [
       "https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?auto=format&fit=crop&w=800&q=80"
     ],
     "thumbnail": "https://images.unsplash.com/photo-1576995853123-5a10305d93c0?auto=format&fit=crop&w=800&q=80",
-    "rating": 4.0,
-    "reviewCount": 38,
-    "reviews": [
-      {
-        "id": "rev-sd-prod-001-1",
-        "userName": "Aman Sharma",
-        "rating": 5,
-        "title": "Great quality and fast delivery!",
-        "comment": "Delivered in Neemuch within 45 minutes! Quality is top notch.",
-        "createdAt": "2026-07-28",
-        "verifiedPurchase": true
-      },
-      {
-        "id": "rev-sd-prod-001-2",
-        "userName": "Priya Verma",
-        "rating": 4,
-        "title": "Nice fit and comfortable material",
-        "comment": "The fabric is very soft. True to size.",
-        "createdAt": "2026-07-29",
-        "verifiedPurchase": true
-      }
-    ],
+    "rating": 0,
+    "reviewCount": 0,
+    "reviews": [],
     "variants": [
       {
         "id": "sd-prod-001-var-1",
@@ -215,28 +196,9 @@ export const PRODUCTS: Product[] = [
       "https://images.unsplash.com/photo-1529374255404-311a2a4f1fd9?auto=format&fit=crop&w=800&q=80"
     ],
     "thumbnail": "https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?auto=format&fit=crop&w=800&q=80",
-    "rating": 4.1,
-    "reviewCount": 51,
-    "reviews": [
-      {
-        "id": "rev-sd-prod-002-1",
-        "userName": "Aman Sharma",
-        "rating": 5,
-        "title": "Great quality and fast delivery!",
-        "comment": "Delivered in Neemuch within 45 minutes! Quality is top notch.",
-        "createdAt": "2026-07-28",
-        "verifiedPurchase": true
-      },
-      {
-        "id": "rev-sd-prod-002-2",
-        "userName": "Priya Verma",
-        "rating": 4,
-        "title": "Nice fit and comfortable material",
-        "comment": "The fabric is very soft. True to size.",
-        "createdAt": "2026-07-29",
-        "verifiedPurchase": true
-      }
-    ],
+    "rating": 0,
+    "reviewCount": 0,
+    "reviews": [],
     "variants": [
       {
         "id": "sd-prod-002-var-1",
@@ -396,28 +358,9 @@ export const PRODUCTS: Product[] = [
       "https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&w=800&q=80"
     ],
     "thumbnail": "https://images.unsplash.com/photo-1529374255404-311a2a4f1fd9?auto=format&fit=crop&w=800&q=80",
-    "rating": 4.2,
-    "reviewCount": 64,
-    "reviews": [
-      {
-        "id": "rev-sd-prod-003-1",
-        "userName": "Aman Sharma",
-        "rating": 5,
-        "title": "Great quality and fast delivery!",
-        "comment": "Delivered in Neemuch within 45 minutes! Quality is top notch.",
-        "createdAt": "2026-07-28",
-        "verifiedPurchase": true
-      },
-      {
-        "id": "rev-sd-prod-003-2",
-        "userName": "Priya Verma",
-        "rating": 4,
-        "title": "Nice fit and comfortable material",
-        "comment": "The fabric is very soft. True to size.",
-        "createdAt": "2026-07-29",
-        "verifiedPurchase": true
-      }
-    ],
+    "rating": 0,
+    "reviewCount": 0,
+    "reviews": [],
     "variants": [
       {
         "id": "sd-prod-003-var-1",
@@ -577,28 +520,9 @@ export const PRODUCTS: Product[] = [
       "https://images.unsplash.com/photo-1521572267360-ee0c2909d518?auto=format&fit=crop&w=800&q=80"
     ],
     "thumbnail": "https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&w=800&q=80",
-    "rating": 4.3,
-    "reviewCount": 77,
-    "reviews": [
-      {
-        "id": "rev-sd-prod-004-1",
-        "userName": "Aman Sharma",
-        "rating": 5,
-        "title": "Great quality and fast delivery!",
-        "comment": "Delivered in Neemuch within 45 minutes! Quality is top notch.",
-        "createdAt": "2026-07-28",
-        "verifiedPurchase": true
-      },
-      {
-        "id": "rev-sd-prod-004-2",
-        "userName": "Priya Verma",
-        "rating": 4,
-        "title": "Nice fit and comfortable material",
-        "comment": "The fabric is very soft. True to size.",
-        "createdAt": "2026-07-29",
-        "verifiedPurchase": true
-      }
-    ],
+    "rating": 0,
+    "reviewCount": 0,
+    "reviews": [],
     "variants": [
       {
         "id": "sd-prod-004-var-1",
@@ -758,28 +682,9 @@ export const PRODUCTS: Product[] = [
       "https://images.unsplash.com/photo-1503342217505-b0a15ec3261c?auto=format&fit=crop&w=800&q=80"
     ],
     "thumbnail": "https://images.unsplash.com/photo-1521572267360-ee0c2909d518?auto=format&fit=crop&w=800&q=80",
-    "rating": 4.4,
-    "reviewCount": 90,
-    "reviews": [
-      {
-        "id": "rev-sd-prod-005-1",
-        "userName": "Aman Sharma",
-        "rating": 5,
-        "title": "Great quality and fast delivery!",
-        "comment": "Delivered in Neemuch within 45 minutes! Quality is top notch.",
-        "createdAt": "2026-07-28",
-        "verifiedPurchase": true
-      },
-      {
-        "id": "rev-sd-prod-005-2",
-        "userName": "Priya Verma",
-        "rating": 4,
-        "title": "Nice fit and comfortable material",
-        "comment": "The fabric is very soft. True to size.",
-        "createdAt": "2026-07-29",
-        "verifiedPurchase": true
-      }
-    ],
+    "rating": 0,
+    "reviewCount": 0,
+    "reviews": [],
     "variants": [
       {
         "id": "sd-prod-005-var-1",
@@ -939,28 +844,9 @@ export const PRODUCTS: Product[] = [
       "https://images.unsplash.com/photo-1576995853123-5a10305d93c0?auto=format&fit=crop&w=800&q=80"
     ],
     "thumbnail": "https://images.unsplash.com/photo-1503342217505-b0a15ec3261c?auto=format&fit=crop&w=800&q=80",
-    "rating": 4.5,
-    "reviewCount": 103,
-    "reviews": [
-      {
-        "id": "rev-sd-prod-006-1",
-        "userName": "Aman Sharma",
-        "rating": 5,
-        "title": "Great quality and fast delivery!",
-        "comment": "Delivered in Neemuch within 45 minutes! Quality is top notch.",
-        "createdAt": "2026-07-28",
-        "verifiedPurchase": true
-      },
-      {
-        "id": "rev-sd-prod-006-2",
-        "userName": "Priya Verma",
-        "rating": 4,
-        "title": "Nice fit and comfortable material",
-        "comment": "The fabric is very soft. True to size.",
-        "createdAt": "2026-07-29",
-        "verifiedPurchase": true
-      }
-    ],
+    "rating": 0,
+    "reviewCount": 0,
+    "reviews": [],
     "variants": [
       {
         "id": "sd-prod-006-var-1",
@@ -1120,28 +1006,9 @@ export const PRODUCTS: Product[] = [
       "https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?auto=format&fit=crop&w=800&q=80"
     ],
     "thumbnail": "https://images.unsplash.com/photo-1576995853123-5a10305d93c0?auto=format&fit=crop&w=800&q=80",
-    "rating": 4.6,
-    "reviewCount": 116,
-    "reviews": [
-      {
-        "id": "rev-sd-prod-007-1",
-        "userName": "Aman Sharma",
-        "rating": 5,
-        "title": "Great quality and fast delivery!",
-        "comment": "Delivered in Neemuch within 45 minutes! Quality is top notch.",
-        "createdAt": "2026-07-28",
-        "verifiedPurchase": true
-      },
-      {
-        "id": "rev-sd-prod-007-2",
-        "userName": "Priya Verma",
-        "rating": 4,
-        "title": "Nice fit and comfortable material",
-        "comment": "The fabric is very soft. True to size.",
-        "createdAt": "2026-07-29",
-        "verifiedPurchase": true
-      }
-    ],
+    "rating": 0,
+    "reviewCount": 0,
+    "reviews": [],
     "variants": [
       {
         "id": "sd-prod-007-var-1",
@@ -1301,28 +1168,9 @@ export const PRODUCTS: Product[] = [
       "https://images.unsplash.com/photo-1529374255404-311a2a4f1fd9?auto=format&fit=crop&w=800&q=80"
     ],
     "thumbnail": "https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?auto=format&fit=crop&w=800&q=80",
-    "rating": 4.7,
-    "reviewCount": 129,
-    "reviews": [
-      {
-        "id": "rev-sd-prod-008-1",
-        "userName": "Aman Sharma",
-        "rating": 5,
-        "title": "Great quality and fast delivery!",
-        "comment": "Delivered in Neemuch within 45 minutes! Quality is top notch.",
-        "createdAt": "2026-07-28",
-        "verifiedPurchase": true
-      },
-      {
-        "id": "rev-sd-prod-008-2",
-        "userName": "Priya Verma",
-        "rating": 4,
-        "title": "Nice fit and comfortable material",
-        "comment": "The fabric is very soft. True to size.",
-        "createdAt": "2026-07-29",
-        "verifiedPurchase": true
-      }
-    ],
+    "rating": 0,
+    "reviewCount": 0,
+    "reviews": [],
     "variants": [
       {
         "id": "sd-prod-008-var-1",
@@ -1482,28 +1330,9 @@ export const PRODUCTS: Product[] = [
       "https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&w=800&q=80"
     ],
     "thumbnail": "https://images.unsplash.com/photo-1529374255404-311a2a4f1fd9?auto=format&fit=crop&w=800&q=80",
-    "rating": 4.8,
-    "reviewCount": 142,
-    "reviews": [
-      {
-        "id": "rev-sd-prod-009-1",
-        "userName": "Aman Sharma",
-        "rating": 5,
-        "title": "Great quality and fast delivery!",
-        "comment": "Delivered in Neemuch within 45 minutes! Quality is top notch.",
-        "createdAt": "2026-07-28",
-        "verifiedPurchase": true
-      },
-      {
-        "id": "rev-sd-prod-009-2",
-        "userName": "Priya Verma",
-        "rating": 4,
-        "title": "Nice fit and comfortable material",
-        "comment": "The fabric is very soft. True to size.",
-        "createdAt": "2026-07-29",
-        "verifiedPurchase": true
-      }
-    ],
+    "rating": 0,
+    "reviewCount": 0,
+    "reviews": [],
     "variants": [
       {
         "id": "sd-prod-009-var-1",
@@ -1663,28 +1492,9 @@ export const PRODUCTS: Product[] = [
       "https://images.unsplash.com/photo-1521572267360-ee0c2909d518?auto=format&fit=crop&w=800&q=80"
     ],
     "thumbnail": "https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&w=800&q=80",
-    "rating": 4.9,
-    "reviewCount": 155,
-    "reviews": [
-      {
-        "id": "rev-sd-prod-010-1",
-        "userName": "Aman Sharma",
-        "rating": 5,
-        "title": "Great quality and fast delivery!",
-        "comment": "Delivered in Neemuch within 45 minutes! Quality is top notch.",
-        "createdAt": "2026-07-28",
-        "verifiedPurchase": true
-      },
-      {
-        "id": "rev-sd-prod-010-2",
-        "userName": "Priya Verma",
-        "rating": 4,
-        "title": "Nice fit and comfortable material",
-        "comment": "The fabric is very soft. True to size.",
-        "createdAt": "2026-07-29",
-        "verifiedPurchase": true
-      }
-    ],
+    "rating": 0,
+    "reviewCount": 0,
+    "reviews": [],
     "variants": [
       {
         "id": "sd-prod-010-var-1",
@@ -1844,28 +1654,9 @@ export const PRODUCTS: Product[] = [
       "https://images.unsplash.com/photo-1503342217505-b0a15ec3261c?auto=format&fit=crop&w=800&q=80"
     ],
     "thumbnail": "https://images.unsplash.com/photo-1521572267360-ee0c2909d518?auto=format&fit=crop&w=800&q=80",
-    "rating": 3.8,
-    "reviewCount": 168,
-    "reviews": [
-      {
-        "id": "rev-sd-prod-011-1",
-        "userName": "Aman Sharma",
-        "rating": 5,
-        "title": "Great quality and fast delivery!",
-        "comment": "Delivered in Neemuch within 45 minutes! Quality is top notch.",
-        "createdAt": "2026-07-28",
-        "verifiedPurchase": true
-      },
-      {
-        "id": "rev-sd-prod-011-2",
-        "userName": "Priya Verma",
-        "rating": 4,
-        "title": "Nice fit and comfortable material",
-        "comment": "The fabric is very soft. True to size.",
-        "createdAt": "2026-07-29",
-        "verifiedPurchase": true
-      }
-    ],
+    "rating": 0,
+    "reviewCount": 0,
+    "reviews": [],
     "variants": [
       {
         "id": "sd-prod-011-var-1",
@@ -2025,28 +1816,9 @@ export const PRODUCTS: Product[] = [
       "https://images.unsplash.com/photo-1576995853123-5a10305d93c0?auto=format&fit=crop&w=800&q=80"
     ],
     "thumbnail": "https://images.unsplash.com/photo-1503342217505-b0a15ec3261c?auto=format&fit=crop&w=800&q=80",
-    "rating": 3.9,
-    "reviewCount": 181,
-    "reviews": [
-      {
-        "id": "rev-sd-prod-012-1",
-        "userName": "Aman Sharma",
-        "rating": 5,
-        "title": "Great quality and fast delivery!",
-        "comment": "Delivered in Neemuch within 45 minutes! Quality is top notch.",
-        "createdAt": "2026-07-28",
-        "verifiedPurchase": true
-      },
-      {
-        "id": "rev-sd-prod-012-2",
-        "userName": "Priya Verma",
-        "rating": 4,
-        "title": "Nice fit and comfortable material",
-        "comment": "The fabric is very soft. True to size.",
-        "createdAt": "2026-07-29",
-        "verifiedPurchase": true
-      }
-    ],
+    "rating": 0,
+    "reviewCount": 0,
+    "reviews": [],
     "variants": [
       {
         "id": "sd-prod-012-var-1",
@@ -2206,28 +1978,9 @@ export const PRODUCTS: Product[] = [
       "https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?auto=format&fit=crop&w=800&q=80"
     ],
     "thumbnail": "https://images.unsplash.com/photo-1576995853123-5a10305d93c0?auto=format&fit=crop&w=800&q=80",
-    "rating": 4.0,
-    "reviewCount": 14,
-    "reviews": [
-      {
-        "id": "rev-sd-prod-013-1",
-        "userName": "Aman Sharma",
-        "rating": 5,
-        "title": "Great quality and fast delivery!",
-        "comment": "Delivered in Neemuch within 45 minutes! Quality is top notch.",
-        "createdAt": "2026-07-28",
-        "verifiedPurchase": true
-      },
-      {
-        "id": "rev-sd-prod-013-2",
-        "userName": "Priya Verma",
-        "rating": 4,
-        "title": "Nice fit and comfortable material",
-        "comment": "The fabric is very soft. True to size.",
-        "createdAt": "2026-07-29",
-        "verifiedPurchase": true
-      }
-    ],
+    "rating": 0,
+    "reviewCount": 0,
+    "reviews": [],
     "variants": [
       {
         "id": "sd-prod-013-var-1",
@@ -2387,28 +2140,9 @@ export const PRODUCTS: Product[] = [
       "https://images.unsplash.com/photo-1529374255404-311a2a4f1fd9?auto=format&fit=crop&w=800&q=80"
     ],
     "thumbnail": "https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?auto=format&fit=crop&w=800&q=80",
-    "rating": 4.1,
-    "reviewCount": 27,
-    "reviews": [
-      {
-        "id": "rev-sd-prod-014-1",
-        "userName": "Aman Sharma",
-        "rating": 5,
-        "title": "Great quality and fast delivery!",
-        "comment": "Delivered in Neemuch within 45 minutes! Quality is top notch.",
-        "createdAt": "2026-07-28",
-        "verifiedPurchase": true
-      },
-      {
-        "id": "rev-sd-prod-014-2",
-        "userName": "Priya Verma",
-        "rating": 4,
-        "title": "Nice fit and comfortable material",
-        "comment": "The fabric is very soft. True to size.",
-        "createdAt": "2026-07-29",
-        "verifiedPurchase": true
-      }
-    ],
+    "rating": 0,
+    "reviewCount": 0,
+    "reviews": [],
     "variants": [
       {
         "id": "sd-prod-014-var-1",
@@ -2568,28 +2302,9 @@ export const PRODUCTS: Product[] = [
       "https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&w=800&q=80"
     ],
     "thumbnail": "https://images.unsplash.com/photo-1529374255404-311a2a4f1fd9?auto=format&fit=crop&w=800&q=80",
-    "rating": 4.2,
-    "reviewCount": 40,
-    "reviews": [
-      {
-        "id": "rev-sd-prod-015-1",
-        "userName": "Aman Sharma",
-        "rating": 5,
-        "title": "Great quality and fast delivery!",
-        "comment": "Delivered in Neemuch within 45 minutes! Quality is top notch.",
-        "createdAt": "2026-07-28",
-        "verifiedPurchase": true
-      },
-      {
-        "id": "rev-sd-prod-015-2",
-        "userName": "Priya Verma",
-        "rating": 4,
-        "title": "Nice fit and comfortable material",
-        "comment": "The fabric is very soft. True to size.",
-        "createdAt": "2026-07-29",
-        "verifiedPurchase": true
-      }
-    ],
+    "rating": 0,
+    "reviewCount": 0,
+    "reviews": [],
     "variants": [
       {
         "id": "sd-prod-015-var-1",
@@ -2749,28 +2464,9 @@ export const PRODUCTS: Product[] = [
       "https://images.unsplash.com/photo-1521572267360-ee0c2909d518?auto=format&fit=crop&w=800&q=80"
     ],
     "thumbnail": "https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&w=800&q=80",
-    "rating": 4.3,
-    "reviewCount": 53,
-    "reviews": [
-      {
-        "id": "rev-sd-prod-016-1",
-        "userName": "Aman Sharma",
-        "rating": 5,
-        "title": "Great quality and fast delivery!",
-        "comment": "Delivered in Neemuch within 45 minutes! Quality is top notch.",
-        "createdAt": "2026-07-28",
-        "verifiedPurchase": true
-      },
-      {
-        "id": "rev-sd-prod-016-2",
-        "userName": "Priya Verma",
-        "rating": 4,
-        "title": "Nice fit and comfortable material",
-        "comment": "The fabric is very soft. True to size.",
-        "createdAt": "2026-07-29",
-        "verifiedPurchase": true
-      }
-    ],
+    "rating": 0,
+    "reviewCount": 0,
+    "reviews": [],
     "variants": [
       {
         "id": "sd-prod-016-var-1",
@@ -2930,28 +2626,9 @@ export const PRODUCTS: Product[] = [
       "https://images.unsplash.com/photo-1503342217505-b0a15ec3261c?auto=format&fit=crop&w=800&q=80"
     ],
     "thumbnail": "https://images.unsplash.com/photo-1521572267360-ee0c2909d518?auto=format&fit=crop&w=800&q=80",
-    "rating": 4.4,
-    "reviewCount": 66,
-    "reviews": [
-      {
-        "id": "rev-sd-prod-017-1",
-        "userName": "Aman Sharma",
-        "rating": 5,
-        "title": "Great quality and fast delivery!",
-        "comment": "Delivered in Neemuch within 45 minutes! Quality is top notch.",
-        "createdAt": "2026-07-28",
-        "verifiedPurchase": true
-      },
-      {
-        "id": "rev-sd-prod-017-2",
-        "userName": "Priya Verma",
-        "rating": 4,
-        "title": "Nice fit and comfortable material",
-        "comment": "The fabric is very soft. True to size.",
-        "createdAt": "2026-07-29",
-        "verifiedPurchase": true
-      }
-    ],
+    "rating": 0,
+    "reviewCount": 0,
+    "reviews": [],
     "variants": [
       {
         "id": "sd-prod-017-var-1",
@@ -3111,28 +2788,9 @@ export const PRODUCTS: Product[] = [
       "https://images.unsplash.com/photo-1576995853123-5a10305d93c0?auto=format&fit=crop&w=800&q=80"
     ],
     "thumbnail": "https://images.unsplash.com/photo-1503342217505-b0a15ec3261c?auto=format&fit=crop&w=800&q=80",
-    "rating": 4.5,
-    "reviewCount": 79,
-    "reviews": [
-      {
-        "id": "rev-sd-prod-018-1",
-        "userName": "Aman Sharma",
-        "rating": 5,
-        "title": "Great quality and fast delivery!",
-        "comment": "Delivered in Neemuch within 45 minutes! Quality is top notch.",
-        "createdAt": "2026-07-28",
-        "verifiedPurchase": true
-      },
-      {
-        "id": "rev-sd-prod-018-2",
-        "userName": "Priya Verma",
-        "rating": 4,
-        "title": "Nice fit and comfortable material",
-        "comment": "The fabric is very soft. True to size.",
-        "createdAt": "2026-07-29",
-        "verifiedPurchase": true
-      }
-    ],
+    "rating": 0,
+    "reviewCount": 0,
+    "reviews": [],
     "variants": [
       {
         "id": "sd-prod-018-var-1",
@@ -3292,28 +2950,9 @@ export const PRODUCTS: Product[] = [
       "https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?auto=format&fit=crop&w=800&q=80"
     ],
     "thumbnail": "https://images.unsplash.com/photo-1576995853123-5a10305d93c0?auto=format&fit=crop&w=800&q=80",
-    "rating": 4.6,
-    "reviewCount": 92,
-    "reviews": [
-      {
-        "id": "rev-sd-prod-019-1",
-        "userName": "Aman Sharma",
-        "rating": 5,
-        "title": "Great quality and fast delivery!",
-        "comment": "Delivered in Neemuch within 45 minutes! Quality is top notch.",
-        "createdAt": "2026-07-28",
-        "verifiedPurchase": true
-      },
-      {
-        "id": "rev-sd-prod-019-2",
-        "userName": "Priya Verma",
-        "rating": 4,
-        "title": "Nice fit and comfortable material",
-        "comment": "The fabric is very soft. True to size.",
-        "createdAt": "2026-07-29",
-        "verifiedPurchase": true
-      }
-    ],
+    "rating": 0,
+    "reviewCount": 0,
+    "reviews": [],
     "variants": [
       {
         "id": "sd-prod-019-var-1",
@@ -3473,28 +3112,9 @@ export const PRODUCTS: Product[] = [
       "https://images.unsplash.com/photo-1529374255404-311a2a4f1fd9?auto=format&fit=crop&w=800&q=80"
     ],
     "thumbnail": "https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?auto=format&fit=crop&w=800&q=80",
-    "rating": 4.7,
-    "reviewCount": 105,
-    "reviews": [
-      {
-        "id": "rev-sd-prod-020-1",
-        "userName": "Aman Sharma",
-        "rating": 5,
-        "title": "Great quality and fast delivery!",
-        "comment": "Delivered in Neemuch within 45 minutes! Quality is top notch.",
-        "createdAt": "2026-07-28",
-        "verifiedPurchase": true
-      },
-      {
-        "id": "rev-sd-prod-020-2",
-        "userName": "Priya Verma",
-        "rating": 4,
-        "title": "Nice fit and comfortable material",
-        "comment": "The fabric is very soft. True to size.",
-        "createdAt": "2026-07-29",
-        "verifiedPurchase": true
-      }
-    ],
+    "rating": 0,
+    "reviewCount": 0,
+    "reviews": [],
     "variants": [
       {
         "id": "sd-prod-020-var-1",
@@ -3654,28 +3274,9 @@ export const PRODUCTS: Product[] = [
       "https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&w=800&q=80"
     ],
     "thumbnail": "https://images.unsplash.com/photo-1529374255404-311a2a4f1fd9?auto=format&fit=crop&w=800&q=80",
-    "rating": 4.8,
-    "reviewCount": 118,
-    "reviews": [
-      {
-        "id": "rev-sd-prod-021-1",
-        "userName": "Aman Sharma",
-        "rating": 5,
-        "title": "Great quality and fast delivery!",
-        "comment": "Delivered in Neemuch within 45 minutes! Quality is top notch.",
-        "createdAt": "2026-07-28",
-        "verifiedPurchase": true
-      },
-      {
-        "id": "rev-sd-prod-021-2",
-        "userName": "Priya Verma",
-        "rating": 4,
-        "title": "Nice fit and comfortable material",
-        "comment": "The fabric is very soft. True to size.",
-        "createdAt": "2026-07-29",
-        "verifiedPurchase": true
-      }
-    ],
+    "rating": 0,
+    "reviewCount": 0,
+    "reviews": [],
     "variants": [
       {
         "id": "sd-prod-021-var-1",
@@ -3835,28 +3436,9 @@ export const PRODUCTS: Product[] = [
       "https://images.unsplash.com/photo-1521572267360-ee0c2909d518?auto=format&fit=crop&w=800&q=80"
     ],
     "thumbnail": "https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&w=800&q=80",
-    "rating": 4.9,
-    "reviewCount": 131,
-    "reviews": [
-      {
-        "id": "rev-sd-prod-022-1",
-        "userName": "Aman Sharma",
-        "rating": 5,
-        "title": "Great quality and fast delivery!",
-        "comment": "Delivered in Neemuch within 45 minutes! Quality is top notch.",
-        "createdAt": "2026-07-28",
-        "verifiedPurchase": true
-      },
-      {
-        "id": "rev-sd-prod-022-2",
-        "userName": "Priya Verma",
-        "rating": 4,
-        "title": "Nice fit and comfortable material",
-        "comment": "The fabric is very soft. True to size.",
-        "createdAt": "2026-07-29",
-        "verifiedPurchase": true
-      }
-    ],
+    "rating": 0,
+    "reviewCount": 0,
+    "reviews": [],
     "variants": [
       {
         "id": "sd-prod-022-var-1",
@@ -4016,28 +3598,9 @@ export const PRODUCTS: Product[] = [
       "https://images.unsplash.com/photo-1503342217505-b0a15ec3261c?auto=format&fit=crop&w=800&q=80"
     ],
     "thumbnail": "https://images.unsplash.com/photo-1521572267360-ee0c2909d518?auto=format&fit=crop&w=800&q=80",
-    "rating": 3.8,
-    "reviewCount": 144,
-    "reviews": [
-      {
-        "id": "rev-sd-prod-023-1",
-        "userName": "Aman Sharma",
-        "rating": 5,
-        "title": "Great quality and fast delivery!",
-        "comment": "Delivered in Neemuch within 45 minutes! Quality is top notch.",
-        "createdAt": "2026-07-28",
-        "verifiedPurchase": true
-      },
-      {
-        "id": "rev-sd-prod-023-2",
-        "userName": "Priya Verma",
-        "rating": 4,
-        "title": "Nice fit and comfortable material",
-        "comment": "The fabric is very soft. True to size.",
-        "createdAt": "2026-07-29",
-        "verifiedPurchase": true
-      }
-    ],
+    "rating": 0,
+    "reviewCount": 0,
+    "reviews": [],
     "variants": [
       {
         "id": "sd-prod-023-var-1",
@@ -4197,28 +3760,9 @@ export const PRODUCTS: Product[] = [
       "https://images.unsplash.com/photo-1576995853123-5a10305d93c0?auto=format&fit=crop&w=800&q=80"
     ],
     "thumbnail": "https://images.unsplash.com/photo-1503342217505-b0a15ec3261c?auto=format&fit=crop&w=800&q=80",
-    "rating": 3.9,
-    "reviewCount": 157,
-    "reviews": [
-      {
-        "id": "rev-sd-prod-024-1",
-        "userName": "Aman Sharma",
-        "rating": 5,
-        "title": "Great quality and fast delivery!",
-        "comment": "Delivered in Neemuch within 45 minutes! Quality is top notch.",
-        "createdAt": "2026-07-28",
-        "verifiedPurchase": true
-      },
-      {
-        "id": "rev-sd-prod-024-2",
-        "userName": "Priya Verma",
-        "rating": 4,
-        "title": "Nice fit and comfortable material",
-        "comment": "The fabric is very soft. True to size.",
-        "createdAt": "2026-07-29",
-        "verifiedPurchase": true
-      }
-    ],
+    "rating": 0,
+    "reviewCount": 0,
+    "reviews": [],
     "variants": [
       {
         "id": "sd-prod-024-var-1",
@@ -4378,28 +3922,9 @@ export const PRODUCTS: Product[] = [
       "https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?auto=format&fit=crop&w=800&q=80"
     ],
     "thumbnail": "https://images.unsplash.com/photo-1576995853123-5a10305d93c0?auto=format&fit=crop&w=800&q=80",
-    "rating": 4.0,
-    "reviewCount": 170,
-    "reviews": [
-      {
-        "id": "rev-sd-prod-025-1",
-        "userName": "Aman Sharma",
-        "rating": 5,
-        "title": "Great quality and fast delivery!",
-        "comment": "Delivered in Neemuch within 45 minutes! Quality is top notch.",
-        "createdAt": "2026-07-28",
-        "verifiedPurchase": true
-      },
-      {
-        "id": "rev-sd-prod-025-2",
-        "userName": "Priya Verma",
-        "rating": 4,
-        "title": "Nice fit and comfortable material",
-        "comment": "The fabric is very soft. True to size.",
-        "createdAt": "2026-07-29",
-        "verifiedPurchase": true
-      }
-    ],
+    "rating": 0,
+    "reviewCount": 0,
+    "reviews": [],
     "variants": [
       {
         "id": "sd-prod-025-var-1",
@@ -4559,28 +4084,9 @@ export const PRODUCTS: Product[] = [
       "https://images.unsplash.com/photo-1529374255404-311a2a4f1fd9?auto=format&fit=crop&w=800&q=80"
     ],
     "thumbnail": "https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?auto=format&fit=crop&w=800&q=80",
-    "rating": 4.1,
-    "reviewCount": 183,
-    "reviews": [
-      {
-        "id": "rev-sd-prod-026-1",
-        "userName": "Aman Sharma",
-        "rating": 5,
-        "title": "Great quality and fast delivery!",
-        "comment": "Delivered in Neemuch within 45 minutes! Quality is top notch.",
-        "createdAt": "2026-07-28",
-        "verifiedPurchase": true
-      },
-      {
-        "id": "rev-sd-prod-026-2",
-        "userName": "Priya Verma",
-        "rating": 4,
-        "title": "Nice fit and comfortable material",
-        "comment": "The fabric is very soft. True to size.",
-        "createdAt": "2026-07-29",
-        "verifiedPurchase": true
-      }
-    ],
+    "rating": 0,
+    "reviewCount": 0,
+    "reviews": [],
     "variants": [
       {
         "id": "sd-prod-026-var-1",
@@ -4740,28 +4246,9 @@ export const PRODUCTS: Product[] = [
       "https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&w=800&q=80"
     ],
     "thumbnail": "https://images.unsplash.com/photo-1529374255404-311a2a4f1fd9?auto=format&fit=crop&w=800&q=80",
-    "rating": 4.2,
-    "reviewCount": 16,
-    "reviews": [
-      {
-        "id": "rev-sd-prod-027-1",
-        "userName": "Aman Sharma",
-        "rating": 5,
-        "title": "Great quality and fast delivery!",
-        "comment": "Delivered in Neemuch within 45 minutes! Quality is top notch.",
-        "createdAt": "2026-07-28",
-        "verifiedPurchase": true
-      },
-      {
-        "id": "rev-sd-prod-027-2",
-        "userName": "Priya Verma",
-        "rating": 4,
-        "title": "Nice fit and comfortable material",
-        "comment": "The fabric is very soft. True to size.",
-        "createdAt": "2026-07-29",
-        "verifiedPurchase": true
-      }
-    ],
+    "rating": 0,
+    "reviewCount": 0,
+    "reviews": [],
     "variants": [
       {
         "id": "sd-prod-027-var-1",
@@ -4921,28 +4408,9 @@ export const PRODUCTS: Product[] = [
       "https://images.unsplash.com/photo-1521572267360-ee0c2909d518?auto=format&fit=crop&w=800&q=80"
     ],
     "thumbnail": "https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&w=800&q=80",
-    "rating": 4.3,
-    "reviewCount": 29,
-    "reviews": [
-      {
-        "id": "rev-sd-prod-028-1",
-        "userName": "Aman Sharma",
-        "rating": 5,
-        "title": "Great quality and fast delivery!",
-        "comment": "Delivered in Neemuch within 45 minutes! Quality is top notch.",
-        "createdAt": "2026-07-28",
-        "verifiedPurchase": true
-      },
-      {
-        "id": "rev-sd-prod-028-2",
-        "userName": "Priya Verma",
-        "rating": 4,
-        "title": "Nice fit and comfortable material",
-        "comment": "The fabric is very soft. True to size.",
-        "createdAt": "2026-07-29",
-        "verifiedPurchase": true
-      }
-    ],
+    "rating": 0,
+    "reviewCount": 0,
+    "reviews": [],
     "variants": [
       {
         "id": "sd-prod-028-var-1",
@@ -5102,28 +4570,9 @@ export const PRODUCTS: Product[] = [
       "https://images.unsplash.com/photo-1503342217505-b0a15ec3261c?auto=format&fit=crop&w=800&q=80"
     ],
     "thumbnail": "https://images.unsplash.com/photo-1521572267360-ee0c2909d518?auto=format&fit=crop&w=800&q=80",
-    "rating": 4.4,
-    "reviewCount": 42,
-    "reviews": [
-      {
-        "id": "rev-sd-prod-029-1",
-        "userName": "Aman Sharma",
-        "rating": 5,
-        "title": "Great quality and fast delivery!",
-        "comment": "Delivered in Neemuch within 45 minutes! Quality is top notch.",
-        "createdAt": "2026-07-28",
-        "verifiedPurchase": true
-      },
-      {
-        "id": "rev-sd-prod-029-2",
-        "userName": "Priya Verma",
-        "rating": 4,
-        "title": "Nice fit and comfortable material",
-        "comment": "The fabric is very soft. True to size.",
-        "createdAt": "2026-07-29",
-        "verifiedPurchase": true
-      }
-    ],
+    "rating": 0,
+    "reviewCount": 0,
+    "reviews": [],
     "variants": [
       {
         "id": "sd-prod-029-var-1",
@@ -5283,28 +4732,9 @@ export const PRODUCTS: Product[] = [
       "https://images.unsplash.com/photo-1576995853123-5a10305d93c0?auto=format&fit=crop&w=800&q=80"
     ],
     "thumbnail": "https://images.unsplash.com/photo-1503342217505-b0a15ec3261c?auto=format&fit=crop&w=800&q=80",
-    "rating": 4.5,
-    "reviewCount": 55,
-    "reviews": [
-      {
-        "id": "rev-sd-prod-030-1",
-        "userName": "Aman Sharma",
-        "rating": 5,
-        "title": "Great quality and fast delivery!",
-        "comment": "Delivered in Neemuch within 45 minutes! Quality is top notch.",
-        "createdAt": "2026-07-28",
-        "verifiedPurchase": true
-      },
-      {
-        "id": "rev-sd-prod-030-2",
-        "userName": "Priya Verma",
-        "rating": 4,
-        "title": "Nice fit and comfortable material",
-        "comment": "The fabric is very soft. True to size.",
-        "createdAt": "2026-07-29",
-        "verifiedPurchase": true
-      }
-    ],
+    "rating": 0,
+    "reviewCount": 0,
+    "reviews": [],
     "variants": [
       {
         "id": "sd-prod-030-var-1",
@@ -5464,28 +4894,9 @@ export const PRODUCTS: Product[] = [
       "https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?auto=format&fit=crop&w=800&q=80"
     ],
     "thumbnail": "https://images.unsplash.com/photo-1576995853123-5a10305d93c0?auto=format&fit=crop&w=800&q=80",
-    "rating": 4.6,
-    "reviewCount": 68,
-    "reviews": [
-      {
-        "id": "rev-sd-prod-031-1",
-        "userName": "Aman Sharma",
-        "rating": 5,
-        "title": "Great quality and fast delivery!",
-        "comment": "Delivered in Neemuch within 45 minutes! Quality is top notch.",
-        "createdAt": "2026-07-28",
-        "verifiedPurchase": true
-      },
-      {
-        "id": "rev-sd-prod-031-2",
-        "userName": "Priya Verma",
-        "rating": 4,
-        "title": "Nice fit and comfortable material",
-        "comment": "The fabric is very soft. True to size.",
-        "createdAt": "2026-07-29",
-        "verifiedPurchase": true
-      }
-    ],
+    "rating": 0,
+    "reviewCount": 0,
+    "reviews": [],
     "variants": [
       {
         "id": "sd-prod-031-var-1",
@@ -5645,28 +5056,9 @@ export const PRODUCTS: Product[] = [
       "https://images.unsplash.com/photo-1529374255404-311a2a4f1fd9?auto=format&fit=crop&w=800&q=80"
     ],
     "thumbnail": "https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?auto=format&fit=crop&w=800&q=80",
-    "rating": 4.7,
-    "reviewCount": 81,
-    "reviews": [
-      {
-        "id": "rev-sd-prod-032-1",
-        "userName": "Aman Sharma",
-        "rating": 5,
-        "title": "Great quality and fast delivery!",
-        "comment": "Delivered in Neemuch within 45 minutes! Quality is top notch.",
-        "createdAt": "2026-07-28",
-        "verifiedPurchase": true
-      },
-      {
-        "id": "rev-sd-prod-032-2",
-        "userName": "Priya Verma",
-        "rating": 4,
-        "title": "Nice fit and comfortable material",
-        "comment": "The fabric is very soft. True to size.",
-        "createdAt": "2026-07-29",
-        "verifiedPurchase": true
-      }
-    ],
+    "rating": 0,
+    "reviewCount": 0,
+    "reviews": [],
     "variants": [
       {
         "id": "sd-prod-032-var-1",
@@ -5826,28 +5218,9 @@ export const PRODUCTS: Product[] = [
       "https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&w=800&q=80"
     ],
     "thumbnail": "https://images.unsplash.com/photo-1529374255404-311a2a4f1fd9?auto=format&fit=crop&w=800&q=80",
-    "rating": 4.8,
-    "reviewCount": 94,
-    "reviews": [
-      {
-        "id": "rev-sd-prod-033-1",
-        "userName": "Aman Sharma",
-        "rating": 5,
-        "title": "Great quality and fast delivery!",
-        "comment": "Delivered in Neemuch within 45 minutes! Quality is top notch.",
-        "createdAt": "2026-07-28",
-        "verifiedPurchase": true
-      },
-      {
-        "id": "rev-sd-prod-033-2",
-        "userName": "Priya Verma",
-        "rating": 4,
-        "title": "Nice fit and comfortable material",
-        "comment": "The fabric is very soft. True to size.",
-        "createdAt": "2026-07-29",
-        "verifiedPurchase": true
-      }
-    ],
+    "rating": 0,
+    "reviewCount": 0,
+    "reviews": [],
     "variants": [
       {
         "id": "sd-prod-033-var-1",
@@ -6007,28 +5380,9 @@ export const PRODUCTS: Product[] = [
       "https://images.unsplash.com/photo-1521572267360-ee0c2909d518?auto=format&fit=crop&w=800&q=80"
     ],
     "thumbnail": "https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&w=800&q=80",
-    "rating": 4.9,
-    "reviewCount": 107,
-    "reviews": [
-      {
-        "id": "rev-sd-prod-034-1",
-        "userName": "Aman Sharma",
-        "rating": 5,
-        "title": "Great quality and fast delivery!",
-        "comment": "Delivered in Neemuch within 45 minutes! Quality is top notch.",
-        "createdAt": "2026-07-28",
-        "verifiedPurchase": true
-      },
-      {
-        "id": "rev-sd-prod-034-2",
-        "userName": "Priya Verma",
-        "rating": 4,
-        "title": "Nice fit and comfortable material",
-        "comment": "The fabric is very soft. True to size.",
-        "createdAt": "2026-07-29",
-        "verifiedPurchase": true
-      }
-    ],
+    "rating": 0,
+    "reviewCount": 0,
+    "reviews": [],
     "variants": [
       {
         "id": "sd-prod-034-var-1",
@@ -6188,28 +5542,9 @@ export const PRODUCTS: Product[] = [
       "https://images.unsplash.com/photo-1503342217505-b0a15ec3261c?auto=format&fit=crop&w=800&q=80"
     ],
     "thumbnail": "https://images.unsplash.com/photo-1521572267360-ee0c2909d518?auto=format&fit=crop&w=800&q=80",
-    "rating": 3.8,
-    "reviewCount": 120,
-    "reviews": [
-      {
-        "id": "rev-sd-prod-035-1",
-        "userName": "Aman Sharma",
-        "rating": 5,
-        "title": "Great quality and fast delivery!",
-        "comment": "Delivered in Neemuch within 45 minutes! Quality is top notch.",
-        "createdAt": "2026-07-28",
-        "verifiedPurchase": true
-      },
-      {
-        "id": "rev-sd-prod-035-2",
-        "userName": "Priya Verma",
-        "rating": 4,
-        "title": "Nice fit and comfortable material",
-        "comment": "The fabric is very soft. True to size.",
-        "createdAt": "2026-07-29",
-        "verifiedPurchase": true
-      }
-    ],
+    "rating": 0,
+    "reviewCount": 0,
+    "reviews": [],
     "variants": [
       {
         "id": "sd-prod-035-var-1",
@@ -6369,28 +5704,9 @@ export const PRODUCTS: Product[] = [
       "https://images.unsplash.com/photo-1576995853123-5a10305d93c0?auto=format&fit=crop&w=800&q=80"
     ],
     "thumbnail": "https://images.unsplash.com/photo-1503342217505-b0a15ec3261c?auto=format&fit=crop&w=800&q=80",
-    "rating": 3.9,
-    "reviewCount": 133,
-    "reviews": [
-      {
-        "id": "rev-sd-prod-036-1",
-        "userName": "Aman Sharma",
-        "rating": 5,
-        "title": "Great quality and fast delivery!",
-        "comment": "Delivered in Neemuch within 45 minutes! Quality is top notch.",
-        "createdAt": "2026-07-28",
-        "verifiedPurchase": true
-      },
-      {
-        "id": "rev-sd-prod-036-2",
-        "userName": "Priya Verma",
-        "rating": 4,
-        "title": "Nice fit and comfortable material",
-        "comment": "The fabric is very soft. True to size.",
-        "createdAt": "2026-07-29",
-        "verifiedPurchase": true
-      }
-    ],
+    "rating": 0,
+    "reviewCount": 0,
+    "reviews": [],
     "variants": [
       {
         "id": "sd-prod-036-var-1",
@@ -6550,28 +5866,9 @@ export const PRODUCTS: Product[] = [
       "https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?auto=format&fit=crop&w=800&q=80"
     ],
     "thumbnail": "https://images.unsplash.com/photo-1576995853123-5a10305d93c0?auto=format&fit=crop&w=800&q=80",
-    "rating": 4.0,
-    "reviewCount": 146,
-    "reviews": [
-      {
-        "id": "rev-sd-prod-037-1",
-        "userName": "Aman Sharma",
-        "rating": 5,
-        "title": "Great quality and fast delivery!",
-        "comment": "Delivered in Neemuch within 45 minutes! Quality is top notch.",
-        "createdAt": "2026-07-28",
-        "verifiedPurchase": true
-      },
-      {
-        "id": "rev-sd-prod-037-2",
-        "userName": "Priya Verma",
-        "rating": 4,
-        "title": "Nice fit and comfortable material",
-        "comment": "The fabric is very soft. True to size.",
-        "createdAt": "2026-07-29",
-        "verifiedPurchase": true
-      }
-    ],
+    "rating": 0,
+    "reviewCount": 0,
+    "reviews": [],
     "variants": [
       {
         "id": "sd-prod-037-var-1",
@@ -6731,28 +6028,9 @@ export const PRODUCTS: Product[] = [
       "https://images.unsplash.com/photo-1529374255404-311a2a4f1fd9?auto=format&fit=crop&w=800&q=80"
     ],
     "thumbnail": "https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?auto=format&fit=crop&w=800&q=80",
-    "rating": 4.1,
-    "reviewCount": 159,
-    "reviews": [
-      {
-        "id": "rev-sd-prod-038-1",
-        "userName": "Aman Sharma",
-        "rating": 5,
-        "title": "Great quality and fast delivery!",
-        "comment": "Delivered in Neemuch within 45 minutes! Quality is top notch.",
-        "createdAt": "2026-07-28",
-        "verifiedPurchase": true
-      },
-      {
-        "id": "rev-sd-prod-038-2",
-        "userName": "Priya Verma",
-        "rating": 4,
-        "title": "Nice fit and comfortable material",
-        "comment": "The fabric is very soft. True to size.",
-        "createdAt": "2026-07-29",
-        "verifiedPurchase": true
-      }
-    ],
+    "rating": 0,
+    "reviewCount": 0,
+    "reviews": [],
     "variants": [
       {
         "id": "sd-prod-038-var-1",
@@ -6912,28 +6190,9 @@ export const PRODUCTS: Product[] = [
       "https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&w=800&q=80"
     ],
     "thumbnail": "https://images.unsplash.com/photo-1529374255404-311a2a4f1fd9?auto=format&fit=crop&w=800&q=80",
-    "rating": 4.2,
-    "reviewCount": 172,
-    "reviews": [
-      {
-        "id": "rev-sd-prod-039-1",
-        "userName": "Aman Sharma",
-        "rating": 5,
-        "title": "Great quality and fast delivery!",
-        "comment": "Delivered in Neemuch within 45 minutes! Quality is top notch.",
-        "createdAt": "2026-07-28",
-        "verifiedPurchase": true
-      },
-      {
-        "id": "rev-sd-prod-039-2",
-        "userName": "Priya Verma",
-        "rating": 4,
-        "title": "Nice fit and comfortable material",
-        "comment": "The fabric is very soft. True to size.",
-        "createdAt": "2026-07-29",
-        "verifiedPurchase": true
-      }
-    ],
+    "rating": 0,
+    "reviewCount": 0,
+    "reviews": [],
     "variants": [
       {
         "id": "sd-prod-039-var-1",
@@ -7093,28 +6352,9 @@ export const PRODUCTS: Product[] = [
       "https://images.unsplash.com/photo-1521572267360-ee0c2909d518?auto=format&fit=crop&w=800&q=80"
     ],
     "thumbnail": "https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&w=800&q=80",
-    "rating": 4.3,
-    "reviewCount": 185,
-    "reviews": [
-      {
-        "id": "rev-sd-prod-040-1",
-        "userName": "Aman Sharma",
-        "rating": 5,
-        "title": "Great quality and fast delivery!",
-        "comment": "Delivered in Neemuch within 45 minutes! Quality is top notch.",
-        "createdAt": "2026-07-28",
-        "verifiedPurchase": true
-      },
-      {
-        "id": "rev-sd-prod-040-2",
-        "userName": "Priya Verma",
-        "rating": 4,
-        "title": "Nice fit and comfortable material",
-        "comment": "The fabric is very soft. True to size.",
-        "createdAt": "2026-07-29",
-        "verifiedPurchase": true
-      }
-    ],
+    "rating": 0,
+    "reviewCount": 0,
+    "reviews": [],
     "variants": [
       {
         "id": "sd-prod-040-var-1",
@@ -7274,28 +6514,9 @@ export const PRODUCTS: Product[] = [
       "https://images.unsplash.com/photo-1503342217505-b0a15ec3261c?auto=format&fit=crop&w=800&q=80"
     ],
     "thumbnail": "https://images.unsplash.com/photo-1521572267360-ee0c2909d518?auto=format&fit=crop&w=800&q=80",
-    "rating": 4.4,
-    "reviewCount": 18,
-    "reviews": [
-      {
-        "id": "rev-sd-prod-041-1",
-        "userName": "Aman Sharma",
-        "rating": 5,
-        "title": "Great quality and fast delivery!",
-        "comment": "Delivered in Neemuch within 45 minutes! Quality is top notch.",
-        "createdAt": "2026-07-28",
-        "verifiedPurchase": true
-      },
-      {
-        "id": "rev-sd-prod-041-2",
-        "userName": "Priya Verma",
-        "rating": 4,
-        "title": "Nice fit and comfortable material",
-        "comment": "The fabric is very soft. True to size.",
-        "createdAt": "2026-07-29",
-        "verifiedPurchase": true
-      }
-    ],
+    "rating": 0,
+    "reviewCount": 0,
+    "reviews": [],
     "variants": [
       {
         "id": "sd-prod-041-var-1",
@@ -7455,28 +6676,9 @@ export const PRODUCTS: Product[] = [
       "https://images.unsplash.com/photo-1576995853123-5a10305d93c0?auto=format&fit=crop&w=800&q=80"
     ],
     "thumbnail": "https://images.unsplash.com/photo-1503342217505-b0a15ec3261c?auto=format&fit=crop&w=800&q=80",
-    "rating": 4.5,
-    "reviewCount": 31,
-    "reviews": [
-      {
-        "id": "rev-sd-prod-042-1",
-        "userName": "Aman Sharma",
-        "rating": 5,
-        "title": "Great quality and fast delivery!",
-        "comment": "Delivered in Neemuch within 45 minutes! Quality is top notch.",
-        "createdAt": "2026-07-28",
-        "verifiedPurchase": true
-      },
-      {
-        "id": "rev-sd-prod-042-2",
-        "userName": "Priya Verma",
-        "rating": 4,
-        "title": "Nice fit and comfortable material",
-        "comment": "The fabric is very soft. True to size.",
-        "createdAt": "2026-07-29",
-        "verifiedPurchase": true
-      }
-    ],
+    "rating": 0,
+    "reviewCount": 0,
+    "reviews": [],
     "variants": [
       {
         "id": "sd-prod-042-var-1",
@@ -7636,28 +6838,9 @@ export const PRODUCTS: Product[] = [
       "https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?auto=format&fit=crop&w=800&q=80"
     ],
     "thumbnail": "https://images.unsplash.com/photo-1576995853123-5a10305d93c0?auto=format&fit=crop&w=800&q=80",
-    "rating": 4.6,
-    "reviewCount": 44,
-    "reviews": [
-      {
-        "id": "rev-sd-prod-043-1",
-        "userName": "Aman Sharma",
-        "rating": 5,
-        "title": "Great quality and fast delivery!",
-        "comment": "Delivered in Neemuch within 45 minutes! Quality is top notch.",
-        "createdAt": "2026-07-28",
-        "verifiedPurchase": true
-      },
-      {
-        "id": "rev-sd-prod-043-2",
-        "userName": "Priya Verma",
-        "rating": 4,
-        "title": "Nice fit and comfortable material",
-        "comment": "The fabric is very soft. True to size.",
-        "createdAt": "2026-07-29",
-        "verifiedPurchase": true
-      }
-    ],
+    "rating": 0,
+    "reviewCount": 0,
+    "reviews": [],
     "variants": [
       {
         "id": "sd-prod-043-var-1",
@@ -7817,28 +7000,9 @@ export const PRODUCTS: Product[] = [
       "https://images.unsplash.com/photo-1529374255404-311a2a4f1fd9?auto=format&fit=crop&w=800&q=80"
     ],
     "thumbnail": "https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?auto=format&fit=crop&w=800&q=80",
-    "rating": 4.7,
-    "reviewCount": 57,
-    "reviews": [
-      {
-        "id": "rev-sd-prod-044-1",
-        "userName": "Aman Sharma",
-        "rating": 5,
-        "title": "Great quality and fast delivery!",
-        "comment": "Delivered in Neemuch within 45 minutes! Quality is top notch.",
-        "createdAt": "2026-07-28",
-        "verifiedPurchase": true
-      },
-      {
-        "id": "rev-sd-prod-044-2",
-        "userName": "Priya Verma",
-        "rating": 4,
-        "title": "Nice fit and comfortable material",
-        "comment": "The fabric is very soft. True to size.",
-        "createdAt": "2026-07-29",
-        "verifiedPurchase": true
-      }
-    ],
+    "rating": 0,
+    "reviewCount": 0,
+    "reviews": [],
     "variants": [
       {
         "id": "sd-prod-044-var-1",
@@ -7998,28 +7162,9 @@ export const PRODUCTS: Product[] = [
       "https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&w=800&q=80"
     ],
     "thumbnail": "https://images.unsplash.com/photo-1529374255404-311a2a4f1fd9?auto=format&fit=crop&w=800&q=80",
-    "rating": 4.8,
-    "reviewCount": 70,
-    "reviews": [
-      {
-        "id": "rev-sd-prod-045-1",
-        "userName": "Aman Sharma",
-        "rating": 5,
-        "title": "Great quality and fast delivery!",
-        "comment": "Delivered in Neemuch within 45 minutes! Quality is top notch.",
-        "createdAt": "2026-07-28",
-        "verifiedPurchase": true
-      },
-      {
-        "id": "rev-sd-prod-045-2",
-        "userName": "Priya Verma",
-        "rating": 4,
-        "title": "Nice fit and comfortable material",
-        "comment": "The fabric is very soft. True to size.",
-        "createdAt": "2026-07-29",
-        "verifiedPurchase": true
-      }
-    ],
+    "rating": 0,
+    "reviewCount": 0,
+    "reviews": [],
     "variants": [
       {
         "id": "sd-prod-045-var-1",
@@ -8179,28 +7324,9 @@ export const PRODUCTS: Product[] = [
       "https://images.unsplash.com/photo-1521572267360-ee0c2909d518?auto=format&fit=crop&w=800&q=80"
     ],
     "thumbnail": "https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&w=800&q=80",
-    "rating": 4.9,
-    "reviewCount": 83,
-    "reviews": [
-      {
-        "id": "rev-sd-prod-046-1",
-        "userName": "Aman Sharma",
-        "rating": 5,
-        "title": "Great quality and fast delivery!",
-        "comment": "Delivered in Neemuch within 45 minutes! Quality is top notch.",
-        "createdAt": "2026-07-28",
-        "verifiedPurchase": true
-      },
-      {
-        "id": "rev-sd-prod-046-2",
-        "userName": "Priya Verma",
-        "rating": 4,
-        "title": "Nice fit and comfortable material",
-        "comment": "The fabric is very soft. True to size.",
-        "createdAt": "2026-07-29",
-        "verifiedPurchase": true
-      }
-    ],
+    "rating": 0,
+    "reviewCount": 0,
+    "reviews": [],
     "variants": [
       {
         "id": "sd-prod-046-var-1",
@@ -8360,28 +7486,9 @@ export const PRODUCTS: Product[] = [
       "https://images.unsplash.com/photo-1503342217505-b0a15ec3261c?auto=format&fit=crop&w=800&q=80"
     ],
     "thumbnail": "https://images.unsplash.com/photo-1521572267360-ee0c2909d518?auto=format&fit=crop&w=800&q=80",
-    "rating": 3.8,
-    "reviewCount": 96,
-    "reviews": [
-      {
-        "id": "rev-sd-prod-047-1",
-        "userName": "Aman Sharma",
-        "rating": 5,
-        "title": "Great quality and fast delivery!",
-        "comment": "Delivered in Neemuch within 45 minutes! Quality is top notch.",
-        "createdAt": "2026-07-28",
-        "verifiedPurchase": true
-      },
-      {
-        "id": "rev-sd-prod-047-2",
-        "userName": "Priya Verma",
-        "rating": 4,
-        "title": "Nice fit and comfortable material",
-        "comment": "The fabric is very soft. True to size.",
-        "createdAt": "2026-07-29",
-        "verifiedPurchase": true
-      }
-    ],
+    "rating": 0,
+    "reviewCount": 0,
+    "reviews": [],
     "variants": [
       {
         "id": "sd-prod-047-var-1",
@@ -8541,28 +7648,9 @@ export const PRODUCTS: Product[] = [
       "https://images.unsplash.com/photo-1576995853123-5a10305d93c0?auto=format&fit=crop&w=800&q=80"
     ],
     "thumbnail": "https://images.unsplash.com/photo-1503342217505-b0a15ec3261c?auto=format&fit=crop&w=800&q=80",
-    "rating": 3.9,
-    "reviewCount": 109,
-    "reviews": [
-      {
-        "id": "rev-sd-prod-048-1",
-        "userName": "Aman Sharma",
-        "rating": 5,
-        "title": "Great quality and fast delivery!",
-        "comment": "Delivered in Neemuch within 45 minutes! Quality is top notch.",
-        "createdAt": "2026-07-28",
-        "verifiedPurchase": true
-      },
-      {
-        "id": "rev-sd-prod-048-2",
-        "userName": "Priya Verma",
-        "rating": 4,
-        "title": "Nice fit and comfortable material",
-        "comment": "The fabric is very soft. True to size.",
-        "createdAt": "2026-07-29",
-        "verifiedPurchase": true
-      }
-    ],
+    "rating": 0,
+    "reviewCount": 0,
+    "reviews": [],
     "variants": [
       {
         "id": "sd-prod-048-var-1",
@@ -8722,28 +7810,9 @@ export const PRODUCTS: Product[] = [
       "https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?auto=format&fit=crop&w=800&q=80"
     ],
     "thumbnail": "https://images.unsplash.com/photo-1576995853123-5a10305d93c0?auto=format&fit=crop&w=800&q=80",
-    "rating": 4.0,
-    "reviewCount": 122,
-    "reviews": [
-      {
-        "id": "rev-sd-prod-049-1",
-        "userName": "Aman Sharma",
-        "rating": 5,
-        "title": "Great quality and fast delivery!",
-        "comment": "Delivered in Neemuch within 45 minutes! Quality is top notch.",
-        "createdAt": "2026-07-28",
-        "verifiedPurchase": true
-      },
-      {
-        "id": "rev-sd-prod-049-2",
-        "userName": "Priya Verma",
-        "rating": 4,
-        "title": "Nice fit and comfortable material",
-        "comment": "The fabric is very soft. True to size.",
-        "createdAt": "2026-07-29",
-        "verifiedPurchase": true
-      }
-    ],
+    "rating": 0,
+    "reviewCount": 0,
+    "reviews": [],
     "variants": [
       {
         "id": "sd-prod-049-var-1",
@@ -8903,28 +7972,9 @@ export const PRODUCTS: Product[] = [
       "https://images.unsplash.com/photo-1529374255404-311a2a4f1fd9?auto=format&fit=crop&w=800&q=80"
     ],
     "thumbnail": "https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?auto=format&fit=crop&w=800&q=80",
-    "rating": 4.1,
-    "reviewCount": 135,
-    "reviews": [
-      {
-        "id": "rev-sd-prod-050-1",
-        "userName": "Aman Sharma",
-        "rating": 5,
-        "title": "Great quality and fast delivery!",
-        "comment": "Delivered in Neemuch within 45 minutes! Quality is top notch.",
-        "createdAt": "2026-07-28",
-        "verifiedPurchase": true
-      },
-      {
-        "id": "rev-sd-prod-050-2",
-        "userName": "Priya Verma",
-        "rating": 4,
-        "title": "Nice fit and comfortable material",
-        "comment": "The fabric is very soft. True to size.",
-        "createdAt": "2026-07-29",
-        "verifiedPurchase": true
-      }
-    ],
+    "rating": 0,
+    "reviewCount": 0,
+    "reviews": [],
     "variants": [
       {
         "id": "sd-prod-050-var-1",
@@ -9084,28 +8134,9 @@ export const PRODUCTS: Product[] = [
       "https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&w=800&q=80"
     ],
     "thumbnail": "https://images.unsplash.com/photo-1529374255404-311a2a4f1fd9?auto=format&fit=crop&w=800&q=80",
-    "rating": 4.2,
-    "reviewCount": 148,
-    "reviews": [
-      {
-        "id": "rev-sd-prod-051-1",
-        "userName": "Aman Sharma",
-        "rating": 5,
-        "title": "Great quality and fast delivery!",
-        "comment": "Delivered in Neemuch within 45 minutes! Quality is top notch.",
-        "createdAt": "2026-07-28",
-        "verifiedPurchase": true
-      },
-      {
-        "id": "rev-sd-prod-051-2",
-        "userName": "Priya Verma",
-        "rating": 4,
-        "title": "Nice fit and comfortable material",
-        "comment": "The fabric is very soft. True to size.",
-        "createdAt": "2026-07-29",
-        "verifiedPurchase": true
-      }
-    ],
+    "rating": 0,
+    "reviewCount": 0,
+    "reviews": [],
     "variants": [
       {
         "id": "sd-prod-051-var-1",
@@ -9265,28 +8296,9 @@ export const PRODUCTS: Product[] = [
       "https://images.unsplash.com/photo-1521572267360-ee0c2909d518?auto=format&fit=crop&w=800&q=80"
     ],
     "thumbnail": "https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&w=800&q=80",
-    "rating": 4.3,
-    "reviewCount": 161,
-    "reviews": [
-      {
-        "id": "rev-sd-prod-052-1",
-        "userName": "Aman Sharma",
-        "rating": 5,
-        "title": "Great quality and fast delivery!",
-        "comment": "Delivered in Neemuch within 45 minutes! Quality is top notch.",
-        "createdAt": "2026-07-28",
-        "verifiedPurchase": true
-      },
-      {
-        "id": "rev-sd-prod-052-2",
-        "userName": "Priya Verma",
-        "rating": 4,
-        "title": "Nice fit and comfortable material",
-        "comment": "The fabric is very soft. True to size.",
-        "createdAt": "2026-07-29",
-        "verifiedPurchase": true
-      }
-    ],
+    "rating": 0,
+    "reviewCount": 0,
+    "reviews": [],
     "variants": [
       {
         "id": "sd-prod-052-var-1",
@@ -9446,28 +8458,9 @@ export const PRODUCTS: Product[] = [
       "https://images.unsplash.com/photo-1503342217505-b0a15ec3261c?auto=format&fit=crop&w=800&q=80"
     ],
     "thumbnail": "https://images.unsplash.com/photo-1521572267360-ee0c2909d518?auto=format&fit=crop&w=800&q=80",
-    "rating": 4.4,
-    "reviewCount": 174,
-    "reviews": [
-      {
-        "id": "rev-sd-prod-053-1",
-        "userName": "Aman Sharma",
-        "rating": 5,
-        "title": "Great quality and fast delivery!",
-        "comment": "Delivered in Neemuch within 45 minutes! Quality is top notch.",
-        "createdAt": "2026-07-28",
-        "verifiedPurchase": true
-      },
-      {
-        "id": "rev-sd-prod-053-2",
-        "userName": "Priya Verma",
-        "rating": 4,
-        "title": "Nice fit and comfortable material",
-        "comment": "The fabric is very soft. True to size.",
-        "createdAt": "2026-07-29",
-        "verifiedPurchase": true
-      }
-    ],
+    "rating": 0,
+    "reviewCount": 0,
+    "reviews": [],
     "variants": [
       {
         "id": "sd-prod-053-var-1",
@@ -9627,28 +8620,9 @@ export const PRODUCTS: Product[] = [
       "https://images.unsplash.com/photo-1576995853123-5a10305d93c0?auto=format&fit=crop&w=800&q=80"
     ],
     "thumbnail": "https://images.unsplash.com/photo-1503342217505-b0a15ec3261c?auto=format&fit=crop&w=800&q=80",
-    "rating": 4.5,
-    "reviewCount": 187,
-    "reviews": [
-      {
-        "id": "rev-sd-prod-054-1",
-        "userName": "Aman Sharma",
-        "rating": 5,
-        "title": "Great quality and fast delivery!",
-        "comment": "Delivered in Neemuch within 45 minutes! Quality is top notch.",
-        "createdAt": "2026-07-28",
-        "verifiedPurchase": true
-      },
-      {
-        "id": "rev-sd-prod-054-2",
-        "userName": "Priya Verma",
-        "rating": 4,
-        "title": "Nice fit and comfortable material",
-        "comment": "The fabric is very soft. True to size.",
-        "createdAt": "2026-07-29",
-        "verifiedPurchase": true
-      }
-    ],
+    "rating": 0,
+    "reviewCount": 0,
+    "reviews": [],
     "variants": [
       {
         "id": "sd-prod-054-var-1",
@@ -9808,28 +8782,9 @@ export const PRODUCTS: Product[] = [
       "https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?auto=format&fit=crop&w=800&q=80"
     ],
     "thumbnail": "https://images.unsplash.com/photo-1576995853123-5a10305d93c0?auto=format&fit=crop&w=800&q=80",
-    "rating": 4.6,
-    "reviewCount": 20,
-    "reviews": [
-      {
-        "id": "rev-sd-prod-055-1",
-        "userName": "Aman Sharma",
-        "rating": 5,
-        "title": "Great quality and fast delivery!",
-        "comment": "Delivered in Neemuch within 45 minutes! Quality is top notch.",
-        "createdAt": "2026-07-28",
-        "verifiedPurchase": true
-      },
-      {
-        "id": "rev-sd-prod-055-2",
-        "userName": "Priya Verma",
-        "rating": 4,
-        "title": "Nice fit and comfortable material",
-        "comment": "The fabric is very soft. True to size.",
-        "createdAt": "2026-07-29",
-        "verifiedPurchase": true
-      }
-    ],
+    "rating": 0,
+    "reviewCount": 0,
+    "reviews": [],
     "variants": [
       {
         "id": "sd-prod-055-var-1",
@@ -9989,28 +8944,9 @@ export const PRODUCTS: Product[] = [
       "https://images.unsplash.com/photo-1529374255404-311a2a4f1fd9?auto=format&fit=crop&w=800&q=80"
     ],
     "thumbnail": "https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?auto=format&fit=crop&w=800&q=80",
-    "rating": 4.7,
-    "reviewCount": 33,
-    "reviews": [
-      {
-        "id": "rev-sd-prod-056-1",
-        "userName": "Aman Sharma",
-        "rating": 5,
-        "title": "Great quality and fast delivery!",
-        "comment": "Delivered in Neemuch within 45 minutes! Quality is top notch.",
-        "createdAt": "2026-07-28",
-        "verifiedPurchase": true
-      },
-      {
-        "id": "rev-sd-prod-056-2",
-        "userName": "Priya Verma",
-        "rating": 4,
-        "title": "Nice fit and comfortable material",
-        "comment": "The fabric is very soft. True to size.",
-        "createdAt": "2026-07-29",
-        "verifiedPurchase": true
-      }
-    ],
+    "rating": 0,
+    "reviewCount": 0,
+    "reviews": [],
     "variants": [
       {
         "id": "sd-prod-056-var-1",
@@ -10170,28 +9106,9 @@ export const PRODUCTS: Product[] = [
       "https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&w=800&q=80"
     ],
     "thumbnail": "https://images.unsplash.com/photo-1529374255404-311a2a4f1fd9?auto=format&fit=crop&w=800&q=80",
-    "rating": 4.8,
-    "reviewCount": 46,
-    "reviews": [
-      {
-        "id": "rev-sd-prod-057-1",
-        "userName": "Aman Sharma",
-        "rating": 5,
-        "title": "Great quality and fast delivery!",
-        "comment": "Delivered in Neemuch within 45 minutes! Quality is top notch.",
-        "createdAt": "2026-07-28",
-        "verifiedPurchase": true
-      },
-      {
-        "id": "rev-sd-prod-057-2",
-        "userName": "Priya Verma",
-        "rating": 4,
-        "title": "Nice fit and comfortable material",
-        "comment": "The fabric is very soft. True to size.",
-        "createdAt": "2026-07-29",
-        "verifiedPurchase": true
-      }
-    ],
+    "rating": 0,
+    "reviewCount": 0,
+    "reviews": [],
     "variants": [
       {
         "id": "sd-prod-057-var-1",
@@ -10351,28 +9268,9 @@ export const PRODUCTS: Product[] = [
       "https://images.unsplash.com/photo-1521572267360-ee0c2909d518?auto=format&fit=crop&w=800&q=80"
     ],
     "thumbnail": "https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&w=800&q=80",
-    "rating": 4.9,
-    "reviewCount": 59,
-    "reviews": [
-      {
-        "id": "rev-sd-prod-058-1",
-        "userName": "Aman Sharma",
-        "rating": 5,
-        "title": "Great quality and fast delivery!",
-        "comment": "Delivered in Neemuch within 45 minutes! Quality is top notch.",
-        "createdAt": "2026-07-28",
-        "verifiedPurchase": true
-      },
-      {
-        "id": "rev-sd-prod-058-2",
-        "userName": "Priya Verma",
-        "rating": 4,
-        "title": "Nice fit and comfortable material",
-        "comment": "The fabric is very soft. True to size.",
-        "createdAt": "2026-07-29",
-        "verifiedPurchase": true
-      }
-    ],
+    "rating": 0,
+    "reviewCount": 0,
+    "reviews": [],
     "variants": [
       {
         "id": "sd-prod-058-var-1",
@@ -10532,28 +9430,9 @@ export const PRODUCTS: Product[] = [
       "https://images.unsplash.com/photo-1503342217505-b0a15ec3261c?auto=format&fit=crop&w=800&q=80"
     ],
     "thumbnail": "https://images.unsplash.com/photo-1521572267360-ee0c2909d518?auto=format&fit=crop&w=800&q=80",
-    "rating": 3.8,
-    "reviewCount": 72,
-    "reviews": [
-      {
-        "id": "rev-sd-prod-059-1",
-        "userName": "Aman Sharma",
-        "rating": 5,
-        "title": "Great quality and fast delivery!",
-        "comment": "Delivered in Neemuch within 45 minutes! Quality is top notch.",
-        "createdAt": "2026-07-28",
-        "verifiedPurchase": true
-      },
-      {
-        "id": "rev-sd-prod-059-2",
-        "userName": "Priya Verma",
-        "rating": 4,
-        "title": "Nice fit and comfortable material",
-        "comment": "The fabric is very soft. True to size.",
-        "createdAt": "2026-07-29",
-        "verifiedPurchase": true
-      }
-    ],
+    "rating": 0,
+    "reviewCount": 0,
+    "reviews": [],
     "variants": [
       {
         "id": "sd-prod-059-var-1",
@@ -10713,28 +9592,9 @@ export const PRODUCTS: Product[] = [
       "https://images.unsplash.com/photo-1576995853123-5a10305d93c0?auto=format&fit=crop&w=800&q=80"
     ],
     "thumbnail": "https://images.unsplash.com/photo-1503342217505-b0a15ec3261c?auto=format&fit=crop&w=800&q=80",
-    "rating": 3.9,
-    "reviewCount": 85,
-    "reviews": [
-      {
-        "id": "rev-sd-prod-060-1",
-        "userName": "Aman Sharma",
-        "rating": 5,
-        "title": "Great quality and fast delivery!",
-        "comment": "Delivered in Neemuch within 45 minutes! Quality is top notch.",
-        "createdAt": "2026-07-28",
-        "verifiedPurchase": true
-      },
-      {
-        "id": "rev-sd-prod-060-2",
-        "userName": "Priya Verma",
-        "rating": 4,
-        "title": "Nice fit and comfortable material",
-        "comment": "The fabric is very soft. True to size.",
-        "createdAt": "2026-07-29",
-        "verifiedPurchase": true
-      }
-    ],
+    "rating": 0,
+    "reviewCount": 0,
+    "reviews": [],
     "variants": [
       {
         "id": "sd-prod-060-var-1",
@@ -10894,28 +9754,9 @@ export const PRODUCTS: Product[] = [
       "https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?auto=format&fit=crop&w=800&q=80"
     ],
     "thumbnail": "https://images.unsplash.com/photo-1576995853123-5a10305d93c0?auto=format&fit=crop&w=800&q=80",
-    "rating": 4.0,
-    "reviewCount": 98,
-    "reviews": [
-      {
-        "id": "rev-sd-prod-061-1",
-        "userName": "Aman Sharma",
-        "rating": 5,
-        "title": "Great quality and fast delivery!",
-        "comment": "Delivered in Neemuch within 45 minutes! Quality is top notch.",
-        "createdAt": "2026-07-28",
-        "verifiedPurchase": true
-      },
-      {
-        "id": "rev-sd-prod-061-2",
-        "userName": "Priya Verma",
-        "rating": 4,
-        "title": "Nice fit and comfortable material",
-        "comment": "The fabric is very soft. True to size.",
-        "createdAt": "2026-07-29",
-        "verifiedPurchase": true
-      }
-    ],
+    "rating": 0,
+    "reviewCount": 0,
+    "reviews": [],
     "variants": [
       {
         "id": "sd-prod-061-var-1",
@@ -11075,28 +9916,9 @@ export const PRODUCTS: Product[] = [
       "https://images.unsplash.com/photo-1529374255404-311a2a4f1fd9?auto=format&fit=crop&w=800&q=80"
     ],
     "thumbnail": "https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?auto=format&fit=crop&w=800&q=80",
-    "rating": 4.1,
-    "reviewCount": 111,
-    "reviews": [
-      {
-        "id": "rev-sd-prod-062-1",
-        "userName": "Aman Sharma",
-        "rating": 5,
-        "title": "Great quality and fast delivery!",
-        "comment": "Delivered in Neemuch within 45 minutes! Quality is top notch.",
-        "createdAt": "2026-07-28",
-        "verifiedPurchase": true
-      },
-      {
-        "id": "rev-sd-prod-062-2",
-        "userName": "Priya Verma",
-        "rating": 4,
-        "title": "Nice fit and comfortable material",
-        "comment": "The fabric is very soft. True to size.",
-        "createdAt": "2026-07-29",
-        "verifiedPurchase": true
-      }
-    ],
+    "rating": 0,
+    "reviewCount": 0,
+    "reviews": [],
     "variants": [
       {
         "id": "sd-prod-062-var-1",
@@ -11256,28 +10078,9 @@ export const PRODUCTS: Product[] = [
       "https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&w=800&q=80"
     ],
     "thumbnail": "https://images.unsplash.com/photo-1529374255404-311a2a4f1fd9?auto=format&fit=crop&w=800&q=80",
-    "rating": 4.2,
-    "reviewCount": 124,
-    "reviews": [
-      {
-        "id": "rev-sd-prod-063-1",
-        "userName": "Aman Sharma",
-        "rating": 5,
-        "title": "Great quality and fast delivery!",
-        "comment": "Delivered in Neemuch within 45 minutes! Quality is top notch.",
-        "createdAt": "2026-07-28",
-        "verifiedPurchase": true
-      },
-      {
-        "id": "rev-sd-prod-063-2",
-        "userName": "Priya Verma",
-        "rating": 4,
-        "title": "Nice fit and comfortable material",
-        "comment": "The fabric is very soft. True to size.",
-        "createdAt": "2026-07-29",
-        "verifiedPurchase": true
-      }
-    ],
+    "rating": 0,
+    "reviewCount": 0,
+    "reviews": [],
     "variants": [
       {
         "id": "sd-prod-063-var-1",
@@ -11437,28 +10240,9 @@ export const PRODUCTS: Product[] = [
       "https://images.unsplash.com/photo-1521572267360-ee0c2909d518?auto=format&fit=crop&w=800&q=80"
     ],
     "thumbnail": "https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&w=800&q=80",
-    "rating": 4.3,
-    "reviewCount": 137,
-    "reviews": [
-      {
-        "id": "rev-sd-prod-064-1",
-        "userName": "Aman Sharma",
-        "rating": 5,
-        "title": "Great quality and fast delivery!",
-        "comment": "Delivered in Neemuch within 45 minutes! Quality is top notch.",
-        "createdAt": "2026-07-28",
-        "verifiedPurchase": true
-      },
-      {
-        "id": "rev-sd-prod-064-2",
-        "userName": "Priya Verma",
-        "rating": 4,
-        "title": "Nice fit and comfortable material",
-        "comment": "The fabric is very soft. True to size.",
-        "createdAt": "2026-07-29",
-        "verifiedPurchase": true
-      }
-    ],
+    "rating": 0,
+    "reviewCount": 0,
+    "reviews": [],
     "variants": [
       {
         "id": "sd-prod-064-var-1",
@@ -11618,28 +10402,9 @@ export const PRODUCTS: Product[] = [
       "https://images.unsplash.com/photo-1503342217505-b0a15ec3261c?auto=format&fit=crop&w=800&q=80"
     ],
     "thumbnail": "https://images.unsplash.com/photo-1521572267360-ee0c2909d518?auto=format&fit=crop&w=800&q=80",
-    "rating": 4.4,
-    "reviewCount": 150,
-    "reviews": [
-      {
-        "id": "rev-sd-prod-065-1",
-        "userName": "Aman Sharma",
-        "rating": 5,
-        "title": "Great quality and fast delivery!",
-        "comment": "Delivered in Neemuch within 45 minutes! Quality is top notch.",
-        "createdAt": "2026-07-28",
-        "verifiedPurchase": true
-      },
-      {
-        "id": "rev-sd-prod-065-2",
-        "userName": "Priya Verma",
-        "rating": 4,
-        "title": "Nice fit and comfortable material",
-        "comment": "The fabric is very soft. True to size.",
-        "createdAt": "2026-07-29",
-        "verifiedPurchase": true
-      }
-    ],
+    "rating": 0,
+    "reviewCount": 0,
+    "reviews": [],
     "variants": [
       {
         "id": "sd-prod-065-var-1",
@@ -11799,28 +10564,9 @@ export const PRODUCTS: Product[] = [
       "https://images.unsplash.com/photo-1576995853123-5a10305d93c0?auto=format&fit=crop&w=800&q=80"
     ],
     "thumbnail": "https://images.unsplash.com/photo-1503342217505-b0a15ec3261c?auto=format&fit=crop&w=800&q=80",
-    "rating": 4.5,
-    "reviewCount": 163,
-    "reviews": [
-      {
-        "id": "rev-sd-prod-066-1",
-        "userName": "Aman Sharma",
-        "rating": 5,
-        "title": "Great quality and fast delivery!",
-        "comment": "Delivered in Neemuch within 45 minutes! Quality is top notch.",
-        "createdAt": "2026-07-28",
-        "verifiedPurchase": true
-      },
-      {
-        "id": "rev-sd-prod-066-2",
-        "userName": "Priya Verma",
-        "rating": 4,
-        "title": "Nice fit and comfortable material",
-        "comment": "The fabric is very soft. True to size.",
-        "createdAt": "2026-07-29",
-        "verifiedPurchase": true
-      }
-    ],
+    "rating": 0,
+    "reviewCount": 0,
+    "reviews": [],
     "variants": [
       {
         "id": "sd-prod-066-var-1",
@@ -11980,28 +10726,9 @@ export const PRODUCTS: Product[] = [
       "https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?auto=format&fit=crop&w=800&q=80"
     ],
     "thumbnail": "https://images.unsplash.com/photo-1576995853123-5a10305d93c0?auto=format&fit=crop&w=800&q=80",
-    "rating": 4.6,
-    "reviewCount": 176,
-    "reviews": [
-      {
-        "id": "rev-sd-prod-067-1",
-        "userName": "Aman Sharma",
-        "rating": 5,
-        "title": "Great quality and fast delivery!",
-        "comment": "Delivered in Neemuch within 45 minutes! Quality is top notch.",
-        "createdAt": "2026-07-28",
-        "verifiedPurchase": true
-      },
-      {
-        "id": "rev-sd-prod-067-2",
-        "userName": "Priya Verma",
-        "rating": 4,
-        "title": "Nice fit and comfortable material",
-        "comment": "The fabric is very soft. True to size.",
-        "createdAt": "2026-07-29",
-        "verifiedPurchase": true
-      }
-    ],
+    "rating": 0,
+    "reviewCount": 0,
+    "reviews": [],
     "variants": [
       {
         "id": "sd-prod-067-var-1",
@@ -12161,28 +10888,9 @@ export const PRODUCTS: Product[] = [
       "https://images.unsplash.com/photo-1529374255404-311a2a4f1fd9?auto=format&fit=crop&w=800&q=80"
     ],
     "thumbnail": "https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?auto=format&fit=crop&w=800&q=80",
-    "rating": 4.7,
-    "reviewCount": 189,
-    "reviews": [
-      {
-        "id": "rev-sd-prod-068-1",
-        "userName": "Aman Sharma",
-        "rating": 5,
-        "title": "Great quality and fast delivery!",
-        "comment": "Delivered in Neemuch within 45 minutes! Quality is top notch.",
-        "createdAt": "2026-07-28",
-        "verifiedPurchase": true
-      },
-      {
-        "id": "rev-sd-prod-068-2",
-        "userName": "Priya Verma",
-        "rating": 4,
-        "title": "Nice fit and comfortable material",
-        "comment": "The fabric is very soft. True to size.",
-        "createdAt": "2026-07-29",
-        "verifiedPurchase": true
-      }
-    ],
+    "rating": 0,
+    "reviewCount": 0,
+    "reviews": [],
     "variants": [
       {
         "id": "sd-prod-068-var-1",
@@ -12342,28 +11050,9 @@ export const PRODUCTS: Product[] = [
       "https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&w=800&q=80"
     ],
     "thumbnail": "https://images.unsplash.com/photo-1529374255404-311a2a4f1fd9?auto=format&fit=crop&w=800&q=80",
-    "rating": 4.8,
-    "reviewCount": 22,
-    "reviews": [
-      {
-        "id": "rev-sd-prod-069-1",
-        "userName": "Aman Sharma",
-        "rating": 5,
-        "title": "Great quality and fast delivery!",
-        "comment": "Delivered in Neemuch within 45 minutes! Quality is top notch.",
-        "createdAt": "2026-07-28",
-        "verifiedPurchase": true
-      },
-      {
-        "id": "rev-sd-prod-069-2",
-        "userName": "Priya Verma",
-        "rating": 4,
-        "title": "Nice fit and comfortable material",
-        "comment": "The fabric is very soft. True to size.",
-        "createdAt": "2026-07-29",
-        "verifiedPurchase": true
-      }
-    ],
+    "rating": 0,
+    "reviewCount": 0,
+    "reviews": [],
     "variants": [
       {
         "id": "sd-prod-069-var-1",
@@ -12523,28 +11212,9 @@ export const PRODUCTS: Product[] = [
       "https://images.unsplash.com/photo-1521572267360-ee0c2909d518?auto=format&fit=crop&w=800&q=80"
     ],
     "thumbnail": "https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&w=800&q=80",
-    "rating": 4.9,
-    "reviewCount": 35,
-    "reviews": [
-      {
-        "id": "rev-sd-prod-070-1",
-        "userName": "Aman Sharma",
-        "rating": 5,
-        "title": "Great quality and fast delivery!",
-        "comment": "Delivered in Neemuch within 45 minutes! Quality is top notch.",
-        "createdAt": "2026-07-28",
-        "verifiedPurchase": true
-      },
-      {
-        "id": "rev-sd-prod-070-2",
-        "userName": "Priya Verma",
-        "rating": 4,
-        "title": "Nice fit and comfortable material",
-        "comment": "The fabric is very soft. True to size.",
-        "createdAt": "2026-07-29",
-        "verifiedPurchase": true
-      }
-    ],
+    "rating": 0,
+    "reviewCount": 0,
+    "reviews": [],
     "variants": [
       {
         "id": "sd-prod-070-var-1",
@@ -12704,28 +11374,9 @@ export const PRODUCTS: Product[] = [
       "https://images.unsplash.com/photo-1503342217505-b0a15ec3261c?auto=format&fit=crop&w=800&q=80"
     ],
     "thumbnail": "https://images.unsplash.com/photo-1521572267360-ee0c2909d518?auto=format&fit=crop&w=800&q=80",
-    "rating": 3.8,
-    "reviewCount": 48,
-    "reviews": [
-      {
-        "id": "rev-sd-prod-071-1",
-        "userName": "Aman Sharma",
-        "rating": 5,
-        "title": "Great quality and fast delivery!",
-        "comment": "Delivered in Neemuch within 45 minutes! Quality is top notch.",
-        "createdAt": "2026-07-28",
-        "verifiedPurchase": true
-      },
-      {
-        "id": "rev-sd-prod-071-2",
-        "userName": "Priya Verma",
-        "rating": 4,
-        "title": "Nice fit and comfortable material",
-        "comment": "The fabric is very soft. True to size.",
-        "createdAt": "2026-07-29",
-        "verifiedPurchase": true
-      }
-    ],
+    "rating": 0,
+    "reviewCount": 0,
+    "reviews": [],
     "variants": [
       {
         "id": "sd-prod-071-var-1",
@@ -12885,28 +11536,9 @@ export const PRODUCTS: Product[] = [
       "https://images.unsplash.com/photo-1576995853123-5a10305d93c0?auto=format&fit=crop&w=800&q=80"
     ],
     "thumbnail": "https://images.unsplash.com/photo-1503342217505-b0a15ec3261c?auto=format&fit=crop&w=800&q=80",
-    "rating": 3.9,
-    "reviewCount": 61,
-    "reviews": [
-      {
-        "id": "rev-sd-prod-072-1",
-        "userName": "Aman Sharma",
-        "rating": 5,
-        "title": "Great quality and fast delivery!",
-        "comment": "Delivered in Neemuch within 45 minutes! Quality is top notch.",
-        "createdAt": "2026-07-28",
-        "verifiedPurchase": true
-      },
-      {
-        "id": "rev-sd-prod-072-2",
-        "userName": "Priya Verma",
-        "rating": 4,
-        "title": "Nice fit and comfortable material",
-        "comment": "The fabric is very soft. True to size.",
-        "createdAt": "2026-07-29",
-        "verifiedPurchase": true
-      }
-    ],
+    "rating": 0,
+    "reviewCount": 0,
+    "reviews": [],
     "variants": [
       {
         "id": "sd-prod-072-var-1",
@@ -13066,28 +11698,9 @@ export const PRODUCTS: Product[] = [
       "https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?auto=format&fit=crop&w=800&q=80"
     ],
     "thumbnail": "https://images.unsplash.com/photo-1576995853123-5a10305d93c0?auto=format&fit=crop&w=800&q=80",
-    "rating": 4.0,
-    "reviewCount": 74,
-    "reviews": [
-      {
-        "id": "rev-sd-prod-073-1",
-        "userName": "Aman Sharma",
-        "rating": 5,
-        "title": "Great quality and fast delivery!",
-        "comment": "Delivered in Neemuch within 45 minutes! Quality is top notch.",
-        "createdAt": "2026-07-28",
-        "verifiedPurchase": true
-      },
-      {
-        "id": "rev-sd-prod-073-2",
-        "userName": "Priya Verma",
-        "rating": 4,
-        "title": "Nice fit and comfortable material",
-        "comment": "The fabric is very soft. True to size.",
-        "createdAt": "2026-07-29",
-        "verifiedPurchase": true
-      }
-    ],
+    "rating": 0,
+    "reviewCount": 0,
+    "reviews": [],
     "variants": [
       {
         "id": "sd-prod-073-var-1",
@@ -13247,28 +11860,9 @@ export const PRODUCTS: Product[] = [
       "https://images.unsplash.com/photo-1529374255404-311a2a4f1fd9?auto=format&fit=crop&w=800&q=80"
     ],
     "thumbnail": "https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?auto=format&fit=crop&w=800&q=80",
-    "rating": 4.1,
-    "reviewCount": 87,
-    "reviews": [
-      {
-        "id": "rev-sd-prod-074-1",
-        "userName": "Aman Sharma",
-        "rating": 5,
-        "title": "Great quality and fast delivery!",
-        "comment": "Delivered in Neemuch within 45 minutes! Quality is top notch.",
-        "createdAt": "2026-07-28",
-        "verifiedPurchase": true
-      },
-      {
-        "id": "rev-sd-prod-074-2",
-        "userName": "Priya Verma",
-        "rating": 4,
-        "title": "Nice fit and comfortable material",
-        "comment": "The fabric is very soft. True to size.",
-        "createdAt": "2026-07-29",
-        "verifiedPurchase": true
-      }
-    ],
+    "rating": 0,
+    "reviewCount": 0,
+    "reviews": [],
     "variants": [
       {
         "id": "sd-prod-074-var-1",
@@ -13428,28 +12022,9 @@ export const PRODUCTS: Product[] = [
       "https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&w=800&q=80"
     ],
     "thumbnail": "https://images.unsplash.com/photo-1529374255404-311a2a4f1fd9?auto=format&fit=crop&w=800&q=80",
-    "rating": 4.2,
-    "reviewCount": 100,
-    "reviews": [
-      {
-        "id": "rev-sd-prod-075-1",
-        "userName": "Aman Sharma",
-        "rating": 5,
-        "title": "Great quality and fast delivery!",
-        "comment": "Delivered in Neemuch within 45 minutes! Quality is top notch.",
-        "createdAt": "2026-07-28",
-        "verifiedPurchase": true
-      },
-      {
-        "id": "rev-sd-prod-075-2",
-        "userName": "Priya Verma",
-        "rating": 4,
-        "title": "Nice fit and comfortable material",
-        "comment": "The fabric is very soft. True to size.",
-        "createdAt": "2026-07-29",
-        "verifiedPurchase": true
-      }
-    ],
+    "rating": 0,
+    "reviewCount": 0,
+    "reviews": [],
     "variants": [
       {
         "id": "sd-prod-075-var-1",
@@ -13609,28 +12184,9 @@ export const PRODUCTS: Product[] = [
       "https://images.unsplash.com/photo-1521572267360-ee0c2909d518?auto=format&fit=crop&w=800&q=80"
     ],
     "thumbnail": "https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&w=800&q=80",
-    "rating": 4.3,
-    "reviewCount": 113,
-    "reviews": [
-      {
-        "id": "rev-sd-prod-076-1",
-        "userName": "Aman Sharma",
-        "rating": 5,
-        "title": "Great quality and fast delivery!",
-        "comment": "Delivered in Neemuch within 45 minutes! Quality is top notch.",
-        "createdAt": "2026-07-28",
-        "verifiedPurchase": true
-      },
-      {
-        "id": "rev-sd-prod-076-2",
-        "userName": "Priya Verma",
-        "rating": 4,
-        "title": "Nice fit and comfortable material",
-        "comment": "The fabric is very soft. True to size.",
-        "createdAt": "2026-07-29",
-        "verifiedPurchase": true
-      }
-    ],
+    "rating": 0,
+    "reviewCount": 0,
+    "reviews": [],
     "variants": [
       {
         "id": "sd-prod-076-var-1",
@@ -13790,28 +12346,9 @@ export const PRODUCTS: Product[] = [
       "https://images.unsplash.com/photo-1503342217505-b0a15ec3261c?auto=format&fit=crop&w=800&q=80"
     ],
     "thumbnail": "https://images.unsplash.com/photo-1521572267360-ee0c2909d518?auto=format&fit=crop&w=800&q=80",
-    "rating": 4.4,
-    "reviewCount": 126,
-    "reviews": [
-      {
-        "id": "rev-sd-prod-077-1",
-        "userName": "Aman Sharma",
-        "rating": 5,
-        "title": "Great quality and fast delivery!",
-        "comment": "Delivered in Neemuch within 45 minutes! Quality is top notch.",
-        "createdAt": "2026-07-28",
-        "verifiedPurchase": true
-      },
-      {
-        "id": "rev-sd-prod-077-2",
-        "userName": "Priya Verma",
-        "rating": 4,
-        "title": "Nice fit and comfortable material",
-        "comment": "The fabric is very soft. True to size.",
-        "createdAt": "2026-07-29",
-        "verifiedPurchase": true
-      }
-    ],
+    "rating": 0,
+    "reviewCount": 0,
+    "reviews": [],
     "variants": [
       {
         "id": "sd-prod-077-var-1",
@@ -13971,28 +12508,9 @@ export const PRODUCTS: Product[] = [
       "https://images.unsplash.com/photo-1576995853123-5a10305d93c0?auto=format&fit=crop&w=800&q=80"
     ],
     "thumbnail": "https://images.unsplash.com/photo-1503342217505-b0a15ec3261c?auto=format&fit=crop&w=800&q=80",
-    "rating": 4.5,
-    "reviewCount": 139,
-    "reviews": [
-      {
-        "id": "rev-sd-prod-078-1",
-        "userName": "Aman Sharma",
-        "rating": 5,
-        "title": "Great quality and fast delivery!",
-        "comment": "Delivered in Neemuch within 45 minutes! Quality is top notch.",
-        "createdAt": "2026-07-28",
-        "verifiedPurchase": true
-      },
-      {
-        "id": "rev-sd-prod-078-2",
-        "userName": "Priya Verma",
-        "rating": 4,
-        "title": "Nice fit and comfortable material",
-        "comment": "The fabric is very soft. True to size.",
-        "createdAt": "2026-07-29",
-        "verifiedPurchase": true
-      }
-    ],
+    "rating": 0,
+    "reviewCount": 0,
+    "reviews": [],
     "variants": [
       {
         "id": "sd-prod-078-var-1",
@@ -14152,28 +12670,9 @@ export const PRODUCTS: Product[] = [
       "https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?auto=format&fit=crop&w=800&q=80"
     ],
     "thumbnail": "https://images.unsplash.com/photo-1576995853123-5a10305d93c0?auto=format&fit=crop&w=800&q=80",
-    "rating": 4.6,
-    "reviewCount": 152,
-    "reviews": [
-      {
-        "id": "rev-sd-prod-079-1",
-        "userName": "Aman Sharma",
-        "rating": 5,
-        "title": "Great quality and fast delivery!",
-        "comment": "Delivered in Neemuch within 45 minutes! Quality is top notch.",
-        "createdAt": "2026-07-28",
-        "verifiedPurchase": true
-      },
-      {
-        "id": "rev-sd-prod-079-2",
-        "userName": "Priya Verma",
-        "rating": 4,
-        "title": "Nice fit and comfortable material",
-        "comment": "The fabric is very soft. True to size.",
-        "createdAt": "2026-07-29",
-        "verifiedPurchase": true
-      }
-    ],
+    "rating": 0,
+    "reviewCount": 0,
+    "reviews": [],
     "variants": [
       {
         "id": "sd-prod-079-var-1",
@@ -14333,28 +12832,9 @@ export const PRODUCTS: Product[] = [
       "https://images.unsplash.com/photo-1529374255404-311a2a4f1fd9?auto=format&fit=crop&w=800&q=80"
     ],
     "thumbnail": "https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?auto=format&fit=crop&w=800&q=80",
-    "rating": 4.7,
-    "reviewCount": 165,
-    "reviews": [
-      {
-        "id": "rev-sd-prod-080-1",
-        "userName": "Aman Sharma",
-        "rating": 5,
-        "title": "Great quality and fast delivery!",
-        "comment": "Delivered in Neemuch within 45 minutes! Quality is top notch.",
-        "createdAt": "2026-07-28",
-        "verifiedPurchase": true
-      },
-      {
-        "id": "rev-sd-prod-080-2",
-        "userName": "Priya Verma",
-        "rating": 4,
-        "title": "Nice fit and comfortable material",
-        "comment": "The fabric is very soft. True to size.",
-        "createdAt": "2026-07-29",
-        "verifiedPurchase": true
-      }
-    ],
+    "rating": 0,
+    "reviewCount": 0,
+    "reviews": [],
     "variants": [
       {
         "id": "sd-prod-080-var-1",
@@ -14514,28 +12994,9 @@ export const PRODUCTS: Product[] = [
       "https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&w=800&q=80"
     ],
     "thumbnail": "https://images.unsplash.com/photo-1529374255404-311a2a4f1fd9?auto=format&fit=crop&w=800&q=80",
-    "rating": 4.8,
-    "reviewCount": 178,
-    "reviews": [
-      {
-        "id": "rev-sd-prod-081-1",
-        "userName": "Aman Sharma",
-        "rating": 5,
-        "title": "Great quality and fast delivery!",
-        "comment": "Delivered in Neemuch within 45 minutes! Quality is top notch.",
-        "createdAt": "2026-07-28",
-        "verifiedPurchase": true
-      },
-      {
-        "id": "rev-sd-prod-081-2",
-        "userName": "Priya Verma",
-        "rating": 4,
-        "title": "Nice fit and comfortable material",
-        "comment": "The fabric is very soft. True to size.",
-        "createdAt": "2026-07-29",
-        "verifiedPurchase": true
-      }
-    ],
+    "rating": 0,
+    "reviewCount": 0,
+    "reviews": [],
     "variants": [
       {
         "id": "sd-prod-081-var-1",
@@ -14695,28 +13156,9 @@ export const PRODUCTS: Product[] = [
       "https://images.unsplash.com/photo-1521572267360-ee0c2909d518?auto=format&fit=crop&w=800&q=80"
     ],
     "thumbnail": "https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&w=800&q=80",
-    "rating": 4.9,
-    "reviewCount": 191,
-    "reviews": [
-      {
-        "id": "rev-sd-prod-082-1",
-        "userName": "Aman Sharma",
-        "rating": 5,
-        "title": "Great quality and fast delivery!",
-        "comment": "Delivered in Neemuch within 45 minutes! Quality is top notch.",
-        "createdAt": "2026-07-28",
-        "verifiedPurchase": true
-      },
-      {
-        "id": "rev-sd-prod-082-2",
-        "userName": "Priya Verma",
-        "rating": 4,
-        "title": "Nice fit and comfortable material",
-        "comment": "The fabric is very soft. True to size.",
-        "createdAt": "2026-07-29",
-        "verifiedPurchase": true
-      }
-    ],
+    "rating": 0,
+    "reviewCount": 0,
+    "reviews": [],
     "variants": [
       {
         "id": "sd-prod-082-var-1",
@@ -14876,28 +13318,9 @@ export const PRODUCTS: Product[] = [
       "https://images.unsplash.com/photo-1503342217505-b0a15ec3261c?auto=format&fit=crop&w=800&q=80"
     ],
     "thumbnail": "https://images.unsplash.com/photo-1521572267360-ee0c2909d518?auto=format&fit=crop&w=800&q=80",
-    "rating": 3.8,
-    "reviewCount": 24,
-    "reviews": [
-      {
-        "id": "rev-sd-prod-083-1",
-        "userName": "Aman Sharma",
-        "rating": 5,
-        "title": "Great quality and fast delivery!",
-        "comment": "Delivered in Neemuch within 45 minutes! Quality is top notch.",
-        "createdAt": "2026-07-28",
-        "verifiedPurchase": true
-      },
-      {
-        "id": "rev-sd-prod-083-2",
-        "userName": "Priya Verma",
-        "rating": 4,
-        "title": "Nice fit and comfortable material",
-        "comment": "The fabric is very soft. True to size.",
-        "createdAt": "2026-07-29",
-        "verifiedPurchase": true
-      }
-    ],
+    "rating": 0,
+    "reviewCount": 0,
+    "reviews": [],
     "variants": [
       {
         "id": "sd-prod-083-var-1",
@@ -15057,28 +13480,9 @@ export const PRODUCTS: Product[] = [
       "https://images.unsplash.com/photo-1576995853123-5a10305d93c0?auto=format&fit=crop&w=800&q=80"
     ],
     "thumbnail": "https://images.unsplash.com/photo-1503342217505-b0a15ec3261c?auto=format&fit=crop&w=800&q=80",
-    "rating": 3.9,
-    "reviewCount": 37,
-    "reviews": [
-      {
-        "id": "rev-sd-prod-084-1",
-        "userName": "Aman Sharma",
-        "rating": 5,
-        "title": "Great quality and fast delivery!",
-        "comment": "Delivered in Neemuch within 45 minutes! Quality is top notch.",
-        "createdAt": "2026-07-28",
-        "verifiedPurchase": true
-      },
-      {
-        "id": "rev-sd-prod-084-2",
-        "userName": "Priya Verma",
-        "rating": 4,
-        "title": "Nice fit and comfortable material",
-        "comment": "The fabric is very soft. True to size.",
-        "createdAt": "2026-07-29",
-        "verifiedPurchase": true
-      }
-    ],
+    "rating": 0,
+    "reviewCount": 0,
+    "reviews": [],
     "variants": [
       {
         "id": "sd-prod-084-var-1",
@@ -15238,28 +13642,9 @@ export const PRODUCTS: Product[] = [
       "https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?auto=format&fit=crop&w=800&q=80"
     ],
     "thumbnail": "https://images.unsplash.com/photo-1576995853123-5a10305d93c0?auto=format&fit=crop&w=800&q=80",
-    "rating": 4.0,
-    "reviewCount": 50,
-    "reviews": [
-      {
-        "id": "rev-sd-prod-085-1",
-        "userName": "Aman Sharma",
-        "rating": 5,
-        "title": "Great quality and fast delivery!",
-        "comment": "Delivered in Neemuch within 45 minutes! Quality is top notch.",
-        "createdAt": "2026-07-28",
-        "verifiedPurchase": true
-      },
-      {
-        "id": "rev-sd-prod-085-2",
-        "userName": "Priya Verma",
-        "rating": 4,
-        "title": "Nice fit and comfortable material",
-        "comment": "The fabric is very soft. True to size.",
-        "createdAt": "2026-07-29",
-        "verifiedPurchase": true
-      }
-    ],
+    "rating": 0,
+    "reviewCount": 0,
+    "reviews": [],
     "variants": [
       {
         "id": "sd-prod-085-var-1",
@@ -15419,28 +13804,9 @@ export const PRODUCTS: Product[] = [
       "https://images.unsplash.com/photo-1529374255404-311a2a4f1fd9?auto=format&fit=crop&w=800&q=80"
     ],
     "thumbnail": "https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?auto=format&fit=crop&w=800&q=80",
-    "rating": 4.1,
-    "reviewCount": 63,
-    "reviews": [
-      {
-        "id": "rev-sd-prod-086-1",
-        "userName": "Aman Sharma",
-        "rating": 5,
-        "title": "Great quality and fast delivery!",
-        "comment": "Delivered in Neemuch within 45 minutes! Quality is top notch.",
-        "createdAt": "2026-07-28",
-        "verifiedPurchase": true
-      },
-      {
-        "id": "rev-sd-prod-086-2",
-        "userName": "Priya Verma",
-        "rating": 4,
-        "title": "Nice fit and comfortable material",
-        "comment": "The fabric is very soft. True to size.",
-        "createdAt": "2026-07-29",
-        "verifiedPurchase": true
-      }
-    ],
+    "rating": 0,
+    "reviewCount": 0,
+    "reviews": [],
     "variants": [
       {
         "id": "sd-prod-086-var-1",
@@ -15600,28 +13966,9 @@ export const PRODUCTS: Product[] = [
       "https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&w=800&q=80"
     ],
     "thumbnail": "https://images.unsplash.com/photo-1529374255404-311a2a4f1fd9?auto=format&fit=crop&w=800&q=80",
-    "rating": 4.2,
-    "reviewCount": 76,
-    "reviews": [
-      {
-        "id": "rev-sd-prod-087-1",
-        "userName": "Aman Sharma",
-        "rating": 5,
-        "title": "Great quality and fast delivery!",
-        "comment": "Delivered in Neemuch within 45 minutes! Quality is top notch.",
-        "createdAt": "2026-07-28",
-        "verifiedPurchase": true
-      },
-      {
-        "id": "rev-sd-prod-087-2",
-        "userName": "Priya Verma",
-        "rating": 4,
-        "title": "Nice fit and comfortable material",
-        "comment": "The fabric is very soft. True to size.",
-        "createdAt": "2026-07-29",
-        "verifiedPurchase": true
-      }
-    ],
+    "rating": 0,
+    "reviewCount": 0,
+    "reviews": [],
     "variants": [
       {
         "id": "sd-prod-087-var-1",
@@ -15781,28 +14128,9 @@ export const PRODUCTS: Product[] = [
       "https://images.unsplash.com/photo-1521572267360-ee0c2909d518?auto=format&fit=crop&w=800&q=80"
     ],
     "thumbnail": "https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&w=800&q=80",
-    "rating": 4.3,
-    "reviewCount": 89,
-    "reviews": [
-      {
-        "id": "rev-sd-prod-088-1",
-        "userName": "Aman Sharma",
-        "rating": 5,
-        "title": "Great quality and fast delivery!",
-        "comment": "Delivered in Neemuch within 45 minutes! Quality is top notch.",
-        "createdAt": "2026-07-28",
-        "verifiedPurchase": true
-      },
-      {
-        "id": "rev-sd-prod-088-2",
-        "userName": "Priya Verma",
-        "rating": 4,
-        "title": "Nice fit and comfortable material",
-        "comment": "The fabric is very soft. True to size.",
-        "createdAt": "2026-07-29",
-        "verifiedPurchase": true
-      }
-    ],
+    "rating": 0,
+    "reviewCount": 0,
+    "reviews": [],
     "variants": [
       {
         "id": "sd-prod-088-var-1",
@@ -15962,28 +14290,9 @@ export const PRODUCTS: Product[] = [
       "https://images.unsplash.com/photo-1503342217505-b0a15ec3261c?auto=format&fit=crop&w=800&q=80"
     ],
     "thumbnail": "https://images.unsplash.com/photo-1521572267360-ee0c2909d518?auto=format&fit=crop&w=800&q=80",
-    "rating": 4.4,
-    "reviewCount": 102,
-    "reviews": [
-      {
-        "id": "rev-sd-prod-089-1",
-        "userName": "Aman Sharma",
-        "rating": 5,
-        "title": "Great quality and fast delivery!",
-        "comment": "Delivered in Neemuch within 45 minutes! Quality is top notch.",
-        "createdAt": "2026-07-28",
-        "verifiedPurchase": true
-      },
-      {
-        "id": "rev-sd-prod-089-2",
-        "userName": "Priya Verma",
-        "rating": 4,
-        "title": "Nice fit and comfortable material",
-        "comment": "The fabric is very soft. True to size.",
-        "createdAt": "2026-07-29",
-        "verifiedPurchase": true
-      }
-    ],
+    "rating": 0,
+    "reviewCount": 0,
+    "reviews": [],
     "variants": [
       {
         "id": "sd-prod-089-var-1",
@@ -16143,28 +14452,9 @@ export const PRODUCTS: Product[] = [
       "https://images.unsplash.com/photo-1576995853123-5a10305d93c0?auto=format&fit=crop&w=800&q=80"
     ],
     "thumbnail": "https://images.unsplash.com/photo-1503342217505-b0a15ec3261c?auto=format&fit=crop&w=800&q=80",
-    "rating": 4.5,
-    "reviewCount": 115,
-    "reviews": [
-      {
-        "id": "rev-sd-prod-090-1",
-        "userName": "Aman Sharma",
-        "rating": 5,
-        "title": "Great quality and fast delivery!",
-        "comment": "Delivered in Neemuch within 45 minutes! Quality is top notch.",
-        "createdAt": "2026-07-28",
-        "verifiedPurchase": true
-      },
-      {
-        "id": "rev-sd-prod-090-2",
-        "userName": "Priya Verma",
-        "rating": 4,
-        "title": "Nice fit and comfortable material",
-        "comment": "The fabric is very soft. True to size.",
-        "createdAt": "2026-07-29",
-        "verifiedPurchase": true
-      }
-    ],
+    "rating": 0,
+    "reviewCount": 0,
+    "reviews": [],
     "variants": [
       {
         "id": "sd-prod-090-var-1",
@@ -16324,28 +14614,9 @@ export const PRODUCTS: Product[] = [
       "https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?auto=format&fit=crop&w=800&q=80"
     ],
     "thumbnail": "https://images.unsplash.com/photo-1576995853123-5a10305d93c0?auto=format&fit=crop&w=800&q=80",
-    "rating": 4.6,
-    "reviewCount": 128,
-    "reviews": [
-      {
-        "id": "rev-sd-prod-091-1",
-        "userName": "Aman Sharma",
-        "rating": 5,
-        "title": "Great quality and fast delivery!",
-        "comment": "Delivered in Neemuch within 45 minutes! Quality is top notch.",
-        "createdAt": "2026-07-28",
-        "verifiedPurchase": true
-      },
-      {
-        "id": "rev-sd-prod-091-2",
-        "userName": "Priya Verma",
-        "rating": 4,
-        "title": "Nice fit and comfortable material",
-        "comment": "The fabric is very soft. True to size.",
-        "createdAt": "2026-07-29",
-        "verifiedPurchase": true
-      }
-    ],
+    "rating": 0,
+    "reviewCount": 0,
+    "reviews": [],
     "variants": [
       {
         "id": "sd-prod-091-var-1",
@@ -16505,28 +14776,9 @@ export const PRODUCTS: Product[] = [
       "https://images.unsplash.com/photo-1529374255404-311a2a4f1fd9?auto=format&fit=crop&w=800&q=80"
     ],
     "thumbnail": "https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?auto=format&fit=crop&w=800&q=80",
-    "rating": 4.7,
-    "reviewCount": 141,
-    "reviews": [
-      {
-        "id": "rev-sd-prod-092-1",
-        "userName": "Aman Sharma",
-        "rating": 5,
-        "title": "Great quality and fast delivery!",
-        "comment": "Delivered in Neemuch within 45 minutes! Quality is top notch.",
-        "createdAt": "2026-07-28",
-        "verifiedPurchase": true
-      },
-      {
-        "id": "rev-sd-prod-092-2",
-        "userName": "Priya Verma",
-        "rating": 4,
-        "title": "Nice fit and comfortable material",
-        "comment": "The fabric is very soft. True to size.",
-        "createdAt": "2026-07-29",
-        "verifiedPurchase": true
-      }
-    ],
+    "rating": 0,
+    "reviewCount": 0,
+    "reviews": [],
     "variants": [
       {
         "id": "sd-prod-092-var-1",
@@ -16686,28 +14938,9 @@ export const PRODUCTS: Product[] = [
       "https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&w=800&q=80"
     ],
     "thumbnail": "https://images.unsplash.com/photo-1529374255404-311a2a4f1fd9?auto=format&fit=crop&w=800&q=80",
-    "rating": 4.8,
-    "reviewCount": 154,
-    "reviews": [
-      {
-        "id": "rev-sd-prod-093-1",
-        "userName": "Aman Sharma",
-        "rating": 5,
-        "title": "Great quality and fast delivery!",
-        "comment": "Delivered in Neemuch within 45 minutes! Quality is top notch.",
-        "createdAt": "2026-07-28",
-        "verifiedPurchase": true
-      },
-      {
-        "id": "rev-sd-prod-093-2",
-        "userName": "Priya Verma",
-        "rating": 4,
-        "title": "Nice fit and comfortable material",
-        "comment": "The fabric is very soft. True to size.",
-        "createdAt": "2026-07-29",
-        "verifiedPurchase": true
-      }
-    ],
+    "rating": 0,
+    "reviewCount": 0,
+    "reviews": [],
     "variants": [
       {
         "id": "sd-prod-093-var-1",
@@ -16867,28 +15100,9 @@ export const PRODUCTS: Product[] = [
       "https://images.unsplash.com/photo-1521572267360-ee0c2909d518?auto=format&fit=crop&w=800&q=80"
     ],
     "thumbnail": "https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&w=800&q=80",
-    "rating": 4.9,
-    "reviewCount": 167,
-    "reviews": [
-      {
-        "id": "rev-sd-prod-094-1",
-        "userName": "Aman Sharma",
-        "rating": 5,
-        "title": "Great quality and fast delivery!",
-        "comment": "Delivered in Neemuch within 45 minutes! Quality is top notch.",
-        "createdAt": "2026-07-28",
-        "verifiedPurchase": true
-      },
-      {
-        "id": "rev-sd-prod-094-2",
-        "userName": "Priya Verma",
-        "rating": 4,
-        "title": "Nice fit and comfortable material",
-        "comment": "The fabric is very soft. True to size.",
-        "createdAt": "2026-07-29",
-        "verifiedPurchase": true
-      }
-    ],
+    "rating": 0,
+    "reviewCount": 0,
+    "reviews": [],
     "variants": [
       {
         "id": "sd-prod-094-var-1",
@@ -17048,28 +15262,9 @@ export const PRODUCTS: Product[] = [
       "https://images.unsplash.com/photo-1503342217505-b0a15ec3261c?auto=format&fit=crop&w=800&q=80"
     ],
     "thumbnail": "https://images.unsplash.com/photo-1521572267360-ee0c2909d518?auto=format&fit=crop&w=800&q=80",
-    "rating": 3.8,
-    "reviewCount": 180,
-    "reviews": [
-      {
-        "id": "rev-sd-prod-095-1",
-        "userName": "Aman Sharma",
-        "rating": 5,
-        "title": "Great quality and fast delivery!",
-        "comment": "Delivered in Neemuch within 45 minutes! Quality is top notch.",
-        "createdAt": "2026-07-28",
-        "verifiedPurchase": true
-      },
-      {
-        "id": "rev-sd-prod-095-2",
-        "userName": "Priya Verma",
-        "rating": 4,
-        "title": "Nice fit and comfortable material",
-        "comment": "The fabric is very soft. True to size.",
-        "createdAt": "2026-07-29",
-        "verifiedPurchase": true
-      }
-    ],
+    "rating": 0,
+    "reviewCount": 0,
+    "reviews": [],
     "variants": [
       {
         "id": "sd-prod-095-var-1",
@@ -17229,28 +15424,9 @@ export const PRODUCTS: Product[] = [
       "https://images.unsplash.com/photo-1576995853123-5a10305d93c0?auto=format&fit=crop&w=800&q=80"
     ],
     "thumbnail": "https://images.unsplash.com/photo-1503342217505-b0a15ec3261c?auto=format&fit=crop&w=800&q=80",
-    "rating": 3.9,
-    "reviewCount": 13,
-    "reviews": [
-      {
-        "id": "rev-sd-prod-096-1",
-        "userName": "Aman Sharma",
-        "rating": 5,
-        "title": "Great quality and fast delivery!",
-        "comment": "Delivered in Neemuch within 45 minutes! Quality is top notch.",
-        "createdAt": "2026-07-28",
-        "verifiedPurchase": true
-      },
-      {
-        "id": "rev-sd-prod-096-2",
-        "userName": "Priya Verma",
-        "rating": 4,
-        "title": "Nice fit and comfortable material",
-        "comment": "The fabric is very soft. True to size.",
-        "createdAt": "2026-07-29",
-        "verifiedPurchase": true
-      }
-    ],
+    "rating": 0,
+    "reviewCount": 0,
+    "reviews": [],
     "variants": [
       {
         "id": "sd-prod-096-var-1",
@@ -17410,28 +15586,9 @@ export const PRODUCTS: Product[] = [
       "https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?auto=format&fit=crop&w=800&q=80"
     ],
     "thumbnail": "https://images.unsplash.com/photo-1576995853123-5a10305d93c0?auto=format&fit=crop&w=800&q=80",
-    "rating": 4.0,
-    "reviewCount": 26,
-    "reviews": [
-      {
-        "id": "rev-sd-prod-097-1",
-        "userName": "Aman Sharma",
-        "rating": 5,
-        "title": "Great quality and fast delivery!",
-        "comment": "Delivered in Neemuch within 45 minutes! Quality is top notch.",
-        "createdAt": "2026-07-28",
-        "verifiedPurchase": true
-      },
-      {
-        "id": "rev-sd-prod-097-2",
-        "userName": "Priya Verma",
-        "rating": 4,
-        "title": "Nice fit and comfortable material",
-        "comment": "The fabric is very soft. True to size.",
-        "createdAt": "2026-07-29",
-        "verifiedPurchase": true
-      }
-    ],
+    "rating": 0,
+    "reviewCount": 0,
+    "reviews": [],
     "variants": [
       {
         "id": "sd-prod-097-var-1",
@@ -17591,28 +15748,9 @@ export const PRODUCTS: Product[] = [
       "https://images.unsplash.com/photo-1529374255404-311a2a4f1fd9?auto=format&fit=crop&w=800&q=80"
     ],
     "thumbnail": "https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?auto=format&fit=crop&w=800&q=80",
-    "rating": 4.1,
-    "reviewCount": 39,
-    "reviews": [
-      {
-        "id": "rev-sd-prod-098-1",
-        "userName": "Aman Sharma",
-        "rating": 5,
-        "title": "Great quality and fast delivery!",
-        "comment": "Delivered in Neemuch within 45 minutes! Quality is top notch.",
-        "createdAt": "2026-07-28",
-        "verifiedPurchase": true
-      },
-      {
-        "id": "rev-sd-prod-098-2",
-        "userName": "Priya Verma",
-        "rating": 4,
-        "title": "Nice fit and comfortable material",
-        "comment": "The fabric is very soft. True to size.",
-        "createdAt": "2026-07-29",
-        "verifiedPurchase": true
-      }
-    ],
+    "rating": 0,
+    "reviewCount": 0,
+    "reviews": [],
     "variants": [
       {
         "id": "sd-prod-098-var-1",
@@ -17772,28 +15910,9 @@ export const PRODUCTS: Product[] = [
       "https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&w=800&q=80"
     ],
     "thumbnail": "https://images.unsplash.com/photo-1529374255404-311a2a4f1fd9?auto=format&fit=crop&w=800&q=80",
-    "rating": 4.2,
-    "reviewCount": 52,
-    "reviews": [
-      {
-        "id": "rev-sd-prod-099-1",
-        "userName": "Aman Sharma",
-        "rating": 5,
-        "title": "Great quality and fast delivery!",
-        "comment": "Delivered in Neemuch within 45 minutes! Quality is top notch.",
-        "createdAt": "2026-07-28",
-        "verifiedPurchase": true
-      },
-      {
-        "id": "rev-sd-prod-099-2",
-        "userName": "Priya Verma",
-        "rating": 4,
-        "title": "Nice fit and comfortable material",
-        "comment": "The fabric is very soft. True to size.",
-        "createdAt": "2026-07-29",
-        "verifiedPurchase": true
-      }
-    ],
+    "rating": 0,
+    "reviewCount": 0,
+    "reviews": [],
     "variants": [
       {
         "id": "sd-prod-099-var-1",
@@ -17953,28 +16072,9 @@ export const PRODUCTS: Product[] = [
       "https://images.unsplash.com/photo-1521572267360-ee0c2909d518?auto=format&fit=crop&w=800&q=80"
     ],
     "thumbnail": "https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&w=800&q=80",
-    "rating": 4.3,
-    "reviewCount": 65,
-    "reviews": [
-      {
-        "id": "rev-sd-prod-100-1",
-        "userName": "Aman Sharma",
-        "rating": 5,
-        "title": "Great quality and fast delivery!",
-        "comment": "Delivered in Neemuch within 45 minutes! Quality is top notch.",
-        "createdAt": "2026-07-28",
-        "verifiedPurchase": true
-      },
-      {
-        "id": "rev-sd-prod-100-2",
-        "userName": "Priya Verma",
-        "rating": 4,
-        "title": "Nice fit and comfortable material",
-        "comment": "The fabric is very soft. True to size.",
-        "createdAt": "2026-07-29",
-        "verifiedPurchase": true
-      }
-    ],
+    "rating": 0,
+    "reviewCount": 0,
+    "reviews": [],
     "variants": [
       {
         "id": "sd-prod-100-var-1",
@@ -18134,28 +16234,9 @@ export const PRODUCTS: Product[] = [
       "https://images.unsplash.com/photo-1503342217505-b0a15ec3261c?auto=format&fit=crop&w=800&q=80"
     ],
     "thumbnail": "https://images.unsplash.com/photo-1521572267360-ee0c2909d518?auto=format&fit=crop&w=800&q=80",
-    "rating": 4.4,
-    "reviewCount": 78,
-    "reviews": [
-      {
-        "id": "rev-sd-prod-101-1",
-        "userName": "Aman Sharma",
-        "rating": 5,
-        "title": "Great quality and fast delivery!",
-        "comment": "Delivered in Neemuch within 45 minutes! Quality is top notch.",
-        "createdAt": "2026-07-28",
-        "verifiedPurchase": true
-      },
-      {
-        "id": "rev-sd-prod-101-2",
-        "userName": "Priya Verma",
-        "rating": 4,
-        "title": "Nice fit and comfortable material",
-        "comment": "The fabric is very soft. True to size.",
-        "createdAt": "2026-07-29",
-        "verifiedPurchase": true
-      }
-    ],
+    "rating": 0,
+    "reviewCount": 0,
+    "reviews": [],
     "variants": [
       {
         "id": "sd-prod-101-var-1",
@@ -18315,28 +16396,9 @@ export const PRODUCTS: Product[] = [
       "https://images.unsplash.com/photo-1576995853123-5a10305d93c0?auto=format&fit=crop&w=800&q=80"
     ],
     "thumbnail": "https://images.unsplash.com/photo-1503342217505-b0a15ec3261c?auto=format&fit=crop&w=800&q=80",
-    "rating": 4.5,
-    "reviewCount": 91,
-    "reviews": [
-      {
-        "id": "rev-sd-prod-102-1",
-        "userName": "Aman Sharma",
-        "rating": 5,
-        "title": "Great quality and fast delivery!",
-        "comment": "Delivered in Neemuch within 45 minutes! Quality is top notch.",
-        "createdAt": "2026-07-28",
-        "verifiedPurchase": true
-      },
-      {
-        "id": "rev-sd-prod-102-2",
-        "userName": "Priya Verma",
-        "rating": 4,
-        "title": "Nice fit and comfortable material",
-        "comment": "The fabric is very soft. True to size.",
-        "createdAt": "2026-07-29",
-        "verifiedPurchase": true
-      }
-    ],
+    "rating": 0,
+    "reviewCount": 0,
+    "reviews": [],
     "variants": [
       {
         "id": "sd-prod-102-var-1",
@@ -18496,28 +16558,9 @@ export const PRODUCTS: Product[] = [
       "https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?auto=format&fit=crop&w=800&q=80"
     ],
     "thumbnail": "https://images.unsplash.com/photo-1576995853123-5a10305d93c0?auto=format&fit=crop&w=800&q=80",
-    "rating": 4.6,
-    "reviewCount": 104,
-    "reviews": [
-      {
-        "id": "rev-sd-prod-103-1",
-        "userName": "Aman Sharma",
-        "rating": 5,
-        "title": "Great quality and fast delivery!",
-        "comment": "Delivered in Neemuch within 45 minutes! Quality is top notch.",
-        "createdAt": "2026-07-28",
-        "verifiedPurchase": true
-      },
-      {
-        "id": "rev-sd-prod-103-2",
-        "userName": "Priya Verma",
-        "rating": 4,
-        "title": "Nice fit and comfortable material",
-        "comment": "The fabric is very soft. True to size.",
-        "createdAt": "2026-07-29",
-        "verifiedPurchase": true
-      }
-    ],
+    "rating": 0,
+    "reviewCount": 0,
+    "reviews": [],
     "variants": [
       {
         "id": "sd-prod-103-var-1",
@@ -18677,28 +16720,9 @@ export const PRODUCTS: Product[] = [
       "https://images.unsplash.com/photo-1529374255404-311a2a4f1fd9?auto=format&fit=crop&w=800&q=80"
     ],
     "thumbnail": "https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?auto=format&fit=crop&w=800&q=80",
-    "rating": 4.7,
-    "reviewCount": 117,
-    "reviews": [
-      {
-        "id": "rev-sd-prod-104-1",
-        "userName": "Aman Sharma",
-        "rating": 5,
-        "title": "Great quality and fast delivery!",
-        "comment": "Delivered in Neemuch within 45 minutes! Quality is top notch.",
-        "createdAt": "2026-07-28",
-        "verifiedPurchase": true
-      },
-      {
-        "id": "rev-sd-prod-104-2",
-        "userName": "Priya Verma",
-        "rating": 4,
-        "title": "Nice fit and comfortable material",
-        "comment": "The fabric is very soft. True to size.",
-        "createdAt": "2026-07-29",
-        "verifiedPurchase": true
-      }
-    ],
+    "rating": 0,
+    "reviewCount": 0,
+    "reviews": [],
     "variants": [
       {
         "id": "sd-prod-104-var-1",
@@ -18858,28 +16882,9 @@ export const PRODUCTS: Product[] = [
       "https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&w=800&q=80"
     ],
     "thumbnail": "https://images.unsplash.com/photo-1529374255404-311a2a4f1fd9?auto=format&fit=crop&w=800&q=80",
-    "rating": 4.8,
-    "reviewCount": 130,
-    "reviews": [
-      {
-        "id": "rev-sd-prod-105-1",
-        "userName": "Aman Sharma",
-        "rating": 5,
-        "title": "Great quality and fast delivery!",
-        "comment": "Delivered in Neemuch within 45 minutes! Quality is top notch.",
-        "createdAt": "2026-07-28",
-        "verifiedPurchase": true
-      },
-      {
-        "id": "rev-sd-prod-105-2",
-        "userName": "Priya Verma",
-        "rating": 4,
-        "title": "Nice fit and comfortable material",
-        "comment": "The fabric is very soft. True to size.",
-        "createdAt": "2026-07-29",
-        "verifiedPurchase": true
-      }
-    ],
+    "rating": 0,
+    "reviewCount": 0,
+    "reviews": [],
     "variants": [
       {
         "id": "sd-prod-105-var-1",
@@ -19039,28 +17044,9 @@ export const PRODUCTS: Product[] = [
       "https://images.unsplash.com/photo-1521572267360-ee0c2909d518?auto=format&fit=crop&w=800&q=80"
     ],
     "thumbnail": "https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&w=800&q=80",
-    "rating": 4.9,
-    "reviewCount": 143,
-    "reviews": [
-      {
-        "id": "rev-sd-prod-106-1",
-        "userName": "Aman Sharma",
-        "rating": 5,
-        "title": "Great quality and fast delivery!",
-        "comment": "Delivered in Neemuch within 45 minutes! Quality is top notch.",
-        "createdAt": "2026-07-28",
-        "verifiedPurchase": true
-      },
-      {
-        "id": "rev-sd-prod-106-2",
-        "userName": "Priya Verma",
-        "rating": 4,
-        "title": "Nice fit and comfortable material",
-        "comment": "The fabric is very soft. True to size.",
-        "createdAt": "2026-07-29",
-        "verifiedPurchase": true
-      }
-    ],
+    "rating": 0,
+    "reviewCount": 0,
+    "reviews": [],
     "variants": [
       {
         "id": "sd-prod-106-var-1",
@@ -19220,28 +17206,9 @@ export const PRODUCTS: Product[] = [
       "https://images.unsplash.com/photo-1503342217505-b0a15ec3261c?auto=format&fit=crop&w=800&q=80"
     ],
     "thumbnail": "https://images.unsplash.com/photo-1521572267360-ee0c2909d518?auto=format&fit=crop&w=800&q=80",
-    "rating": 3.8,
-    "reviewCount": 156,
-    "reviews": [
-      {
-        "id": "rev-sd-prod-107-1",
-        "userName": "Aman Sharma",
-        "rating": 5,
-        "title": "Great quality and fast delivery!",
-        "comment": "Delivered in Neemuch within 45 minutes! Quality is top notch.",
-        "createdAt": "2026-07-28",
-        "verifiedPurchase": true
-      },
-      {
-        "id": "rev-sd-prod-107-2",
-        "userName": "Priya Verma",
-        "rating": 4,
-        "title": "Nice fit and comfortable material",
-        "comment": "The fabric is very soft. True to size.",
-        "createdAt": "2026-07-29",
-        "verifiedPurchase": true
-      }
-    ],
+    "rating": 0,
+    "reviewCount": 0,
+    "reviews": [],
     "variants": [
       {
         "id": "sd-prod-107-var-1",
@@ -19401,28 +17368,9 @@ export const PRODUCTS: Product[] = [
       "https://images.unsplash.com/photo-1576995853123-5a10305d93c0?auto=format&fit=crop&w=800&q=80"
     ],
     "thumbnail": "https://images.unsplash.com/photo-1503342217505-b0a15ec3261c?auto=format&fit=crop&w=800&q=80",
-    "rating": 3.9,
-    "reviewCount": 169,
-    "reviews": [
-      {
-        "id": "rev-sd-prod-108-1",
-        "userName": "Aman Sharma",
-        "rating": 5,
-        "title": "Great quality and fast delivery!",
-        "comment": "Delivered in Neemuch within 45 minutes! Quality is top notch.",
-        "createdAt": "2026-07-28",
-        "verifiedPurchase": true
-      },
-      {
-        "id": "rev-sd-prod-108-2",
-        "userName": "Priya Verma",
-        "rating": 4,
-        "title": "Nice fit and comfortable material",
-        "comment": "The fabric is very soft. True to size.",
-        "createdAt": "2026-07-29",
-        "verifiedPurchase": true
-      }
-    ],
+    "rating": 0,
+    "reviewCount": 0,
+    "reviews": [],
     "variants": [
       {
         "id": "sd-prod-108-var-1",
@@ -19582,28 +17530,9 @@ export const PRODUCTS: Product[] = [
       "https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?auto=format&fit=crop&w=800&q=80"
     ],
     "thumbnail": "https://images.unsplash.com/photo-1576995853123-5a10305d93c0?auto=format&fit=crop&w=800&q=80",
-    "rating": 4.0,
-    "reviewCount": 182,
-    "reviews": [
-      {
-        "id": "rev-sd-prod-109-1",
-        "userName": "Aman Sharma",
-        "rating": 5,
-        "title": "Great quality and fast delivery!",
-        "comment": "Delivered in Neemuch within 45 minutes! Quality is top notch.",
-        "createdAt": "2026-07-28",
-        "verifiedPurchase": true
-      },
-      {
-        "id": "rev-sd-prod-109-2",
-        "userName": "Priya Verma",
-        "rating": 4,
-        "title": "Nice fit and comfortable material",
-        "comment": "The fabric is very soft. True to size.",
-        "createdAt": "2026-07-29",
-        "verifiedPurchase": true
-      }
-    ],
+    "rating": 0,
+    "reviewCount": 0,
+    "reviews": [],
     "variants": [
       {
         "id": "sd-prod-109-var-1",
@@ -19763,28 +17692,9 @@ export const PRODUCTS: Product[] = [
       "https://images.unsplash.com/photo-1529374255404-311a2a4f1fd9?auto=format&fit=crop&w=800&q=80"
     ],
     "thumbnail": "https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?auto=format&fit=crop&w=800&q=80",
-    "rating": 4.1,
-    "reviewCount": 15,
-    "reviews": [
-      {
-        "id": "rev-sd-prod-110-1",
-        "userName": "Aman Sharma",
-        "rating": 5,
-        "title": "Great quality and fast delivery!",
-        "comment": "Delivered in Neemuch within 45 minutes! Quality is top notch.",
-        "createdAt": "2026-07-28",
-        "verifiedPurchase": true
-      },
-      {
-        "id": "rev-sd-prod-110-2",
-        "userName": "Priya Verma",
-        "rating": 4,
-        "title": "Nice fit and comfortable material",
-        "comment": "The fabric is very soft. True to size.",
-        "createdAt": "2026-07-29",
-        "verifiedPurchase": true
-      }
-    ],
+    "rating": 0,
+    "reviewCount": 0,
+    "reviews": [],
     "variants": [
       {
         "id": "sd-prod-110-var-1",
@@ -19944,28 +17854,9 @@ export const PRODUCTS: Product[] = [
       "https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&w=800&q=80"
     ],
     "thumbnail": "https://images.unsplash.com/photo-1529374255404-311a2a4f1fd9?auto=format&fit=crop&w=800&q=80",
-    "rating": 4.2,
-    "reviewCount": 28,
-    "reviews": [
-      {
-        "id": "rev-sd-prod-111-1",
-        "userName": "Aman Sharma",
-        "rating": 5,
-        "title": "Great quality and fast delivery!",
-        "comment": "Delivered in Neemuch within 45 minutes! Quality is top notch.",
-        "createdAt": "2026-07-28",
-        "verifiedPurchase": true
-      },
-      {
-        "id": "rev-sd-prod-111-2",
-        "userName": "Priya Verma",
-        "rating": 4,
-        "title": "Nice fit and comfortable material",
-        "comment": "The fabric is very soft. True to size.",
-        "createdAt": "2026-07-29",
-        "verifiedPurchase": true
-      }
-    ],
+    "rating": 0,
+    "reviewCount": 0,
+    "reviews": [],
     "variants": [
       {
         "id": "sd-prod-111-var-1",
@@ -20045,28 +17936,9 @@ export const PRODUCTS: Product[] = [
       "https://images.unsplash.com/photo-1521572267360-ee0c2909d518?auto=format&fit=crop&w=800&q=80"
     ],
     "thumbnail": "https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&w=800&q=80",
-    "rating": 4.3,
-    "reviewCount": 41,
-    "reviews": [
-      {
-        "id": "rev-sd-prod-112-1",
-        "userName": "Aman Sharma",
-        "rating": 5,
-        "title": "Great quality and fast delivery!",
-        "comment": "Delivered in Neemuch within 45 minutes! Quality is top notch.",
-        "createdAt": "2026-07-28",
-        "verifiedPurchase": true
-      },
-      {
-        "id": "rev-sd-prod-112-2",
-        "userName": "Priya Verma",
-        "rating": 4,
-        "title": "Nice fit and comfortable material",
-        "comment": "The fabric is very soft. True to size.",
-        "createdAt": "2026-07-29",
-        "verifiedPurchase": true
-      }
-    ],
+    "rating": 0,
+    "reviewCount": 0,
+    "reviews": [],
     "variants": [
       {
         "id": "sd-prod-112-var-1",
@@ -20146,28 +18018,9 @@ export const PRODUCTS: Product[] = [
       "https://images.unsplash.com/photo-1503342217505-b0a15ec3261c?auto=format&fit=crop&w=800&q=80"
     ],
     "thumbnail": "https://images.unsplash.com/photo-1521572267360-ee0c2909d518?auto=format&fit=crop&w=800&q=80",
-    "rating": 4.4,
-    "reviewCount": 54,
-    "reviews": [
-      {
-        "id": "rev-sd-prod-113-1",
-        "userName": "Aman Sharma",
-        "rating": 5,
-        "title": "Great quality and fast delivery!",
-        "comment": "Delivered in Neemuch within 45 minutes! Quality is top notch.",
-        "createdAt": "2026-07-28",
-        "verifiedPurchase": true
-      },
-      {
-        "id": "rev-sd-prod-113-2",
-        "userName": "Priya Verma",
-        "rating": 4,
-        "title": "Nice fit and comfortable material",
-        "comment": "The fabric is very soft. True to size.",
-        "createdAt": "2026-07-29",
-        "verifiedPurchase": true
-      }
-    ],
+    "rating": 0,
+    "reviewCount": 0,
+    "reviews": [],
     "variants": [
       {
         "id": "sd-prod-113-var-1",
@@ -20247,28 +18100,9 @@ export const PRODUCTS: Product[] = [
       "https://images.unsplash.com/photo-1576995853123-5a10305d93c0?auto=format&fit=crop&w=800&q=80"
     ],
     "thumbnail": "https://images.unsplash.com/photo-1503342217505-b0a15ec3261c?auto=format&fit=crop&w=800&q=80",
-    "rating": 4.5,
-    "reviewCount": 67,
-    "reviews": [
-      {
-        "id": "rev-sd-prod-114-1",
-        "userName": "Aman Sharma",
-        "rating": 5,
-        "title": "Great quality and fast delivery!",
-        "comment": "Delivered in Neemuch within 45 minutes! Quality is top notch.",
-        "createdAt": "2026-07-28",
-        "verifiedPurchase": true
-      },
-      {
-        "id": "rev-sd-prod-114-2",
-        "userName": "Priya Verma",
-        "rating": 4,
-        "title": "Nice fit and comfortable material",
-        "comment": "The fabric is very soft. True to size.",
-        "createdAt": "2026-07-29",
-        "verifiedPurchase": true
-      }
-    ],
+    "rating": 0,
+    "reviewCount": 0,
+    "reviews": [],
     "variants": [
       {
         "id": "sd-prod-114-var-1",
@@ -20348,28 +18182,9 @@ export const PRODUCTS: Product[] = [
       "https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?auto=format&fit=crop&w=800&q=80"
     ],
     "thumbnail": "https://images.unsplash.com/photo-1576995853123-5a10305d93c0?auto=format&fit=crop&w=800&q=80",
-    "rating": 4.6,
-    "reviewCount": 80,
-    "reviews": [
-      {
-        "id": "rev-sd-prod-115-1",
-        "userName": "Aman Sharma",
-        "rating": 5,
-        "title": "Great quality and fast delivery!",
-        "comment": "Delivered in Neemuch within 45 minutes! Quality is top notch.",
-        "createdAt": "2026-07-28",
-        "verifiedPurchase": true
-      },
-      {
-        "id": "rev-sd-prod-115-2",
-        "userName": "Priya Verma",
-        "rating": 4,
-        "title": "Nice fit and comfortable material",
-        "comment": "The fabric is very soft. True to size.",
-        "createdAt": "2026-07-29",
-        "verifiedPurchase": true
-      }
-    ],
+    "rating": 0,
+    "reviewCount": 0,
+    "reviews": [],
     "variants": [
       {
         "id": "sd-prod-115-var-1",
@@ -20449,28 +18264,9 @@ export const PRODUCTS: Product[] = [
       "https://images.unsplash.com/photo-1529374255404-311a2a4f1fd9?auto=format&fit=crop&w=800&q=80"
     ],
     "thumbnail": "https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?auto=format&fit=crop&w=800&q=80",
-    "rating": 4.7,
-    "reviewCount": 93,
-    "reviews": [
-      {
-        "id": "rev-sd-prod-116-1",
-        "userName": "Aman Sharma",
-        "rating": 5,
-        "title": "Great quality and fast delivery!",
-        "comment": "Delivered in Neemuch within 45 minutes! Quality is top notch.",
-        "createdAt": "2026-07-28",
-        "verifiedPurchase": true
-      },
-      {
-        "id": "rev-sd-prod-116-2",
-        "userName": "Priya Verma",
-        "rating": 4,
-        "title": "Nice fit and comfortable material",
-        "comment": "The fabric is very soft. True to size.",
-        "createdAt": "2026-07-29",
-        "verifiedPurchase": true
-      }
-    ],
+    "rating": 0,
+    "reviewCount": 0,
+    "reviews": [],
     "variants": [
       {
         "id": "sd-prod-116-var-1",
@@ -20550,28 +18346,9 @@ export const PRODUCTS: Product[] = [
       "https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&w=800&q=80"
     ],
     "thumbnail": "https://images.unsplash.com/photo-1529374255404-311a2a4f1fd9?auto=format&fit=crop&w=800&q=80",
-    "rating": 4.8,
-    "reviewCount": 106,
-    "reviews": [
-      {
-        "id": "rev-sd-prod-117-1",
-        "userName": "Aman Sharma",
-        "rating": 5,
-        "title": "Great quality and fast delivery!",
-        "comment": "Delivered in Neemuch within 45 minutes! Quality is top notch.",
-        "createdAt": "2026-07-28",
-        "verifiedPurchase": true
-      },
-      {
-        "id": "rev-sd-prod-117-2",
-        "userName": "Priya Verma",
-        "rating": 4,
-        "title": "Nice fit and comfortable material",
-        "comment": "The fabric is very soft. True to size.",
-        "createdAt": "2026-07-29",
-        "verifiedPurchase": true
-      }
-    ],
+    "rating": 0,
+    "reviewCount": 0,
+    "reviews": [],
     "variants": [
       {
         "id": "sd-prod-117-var-1",
@@ -20651,28 +18428,9 @@ export const PRODUCTS: Product[] = [
       "https://images.unsplash.com/photo-1521572267360-ee0c2909d518?auto=format&fit=crop&w=800&q=80"
     ],
     "thumbnail": "https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&w=800&q=80",
-    "rating": 4.9,
-    "reviewCount": 119,
-    "reviews": [
-      {
-        "id": "rev-sd-prod-118-1",
-        "userName": "Aman Sharma",
-        "rating": 5,
-        "title": "Great quality and fast delivery!",
-        "comment": "Delivered in Neemuch within 45 minutes! Quality is top notch.",
-        "createdAt": "2026-07-28",
-        "verifiedPurchase": true
-      },
-      {
-        "id": "rev-sd-prod-118-2",
-        "userName": "Priya Verma",
-        "rating": 4,
-        "title": "Nice fit and comfortable material",
-        "comment": "The fabric is very soft. True to size.",
-        "createdAt": "2026-07-29",
-        "verifiedPurchase": true
-      }
-    ],
+    "rating": 0,
+    "reviewCount": 0,
+    "reviews": [],
     "variants": [
       {
         "id": "sd-prod-118-var-1",
@@ -20752,28 +18510,9 @@ export const PRODUCTS: Product[] = [
       "https://images.unsplash.com/photo-1503342217505-b0a15ec3261c?auto=format&fit=crop&w=800&q=80"
     ],
     "thumbnail": "https://images.unsplash.com/photo-1521572267360-ee0c2909d518?auto=format&fit=crop&w=800&q=80",
-    "rating": 3.8,
-    "reviewCount": 132,
-    "reviews": [
-      {
-        "id": "rev-sd-prod-119-1",
-        "userName": "Aman Sharma",
-        "rating": 5,
-        "title": "Great quality and fast delivery!",
-        "comment": "Delivered in Neemuch within 45 minutes! Quality is top notch.",
-        "createdAt": "2026-07-28",
-        "verifiedPurchase": true
-      },
-      {
-        "id": "rev-sd-prod-119-2",
-        "userName": "Priya Verma",
-        "rating": 4,
-        "title": "Nice fit and comfortable material",
-        "comment": "The fabric is very soft. True to size.",
-        "createdAt": "2026-07-29",
-        "verifiedPurchase": true
-      }
-    ],
+    "rating": 0,
+    "reviewCount": 0,
+    "reviews": [],
     "variants": [
       {
         "id": "sd-prod-119-var-1",
@@ -20853,28 +18592,9 @@ export const PRODUCTS: Product[] = [
       "https://images.unsplash.com/photo-1576995853123-5a10305d93c0?auto=format&fit=crop&w=800&q=80"
     ],
     "thumbnail": "https://images.unsplash.com/photo-1503342217505-b0a15ec3261c?auto=format&fit=crop&w=800&q=80",
-    "rating": 3.9,
-    "reviewCount": 145,
-    "reviews": [
-      {
-        "id": "rev-sd-prod-120-1",
-        "userName": "Aman Sharma",
-        "rating": 5,
-        "title": "Great quality and fast delivery!",
-        "comment": "Delivered in Neemuch within 45 minutes! Quality is top notch.",
-        "createdAt": "2026-07-28",
-        "verifiedPurchase": true
-      },
-      {
-        "id": "rev-sd-prod-120-2",
-        "userName": "Priya Verma",
-        "rating": 4,
-        "title": "Nice fit and comfortable material",
-        "comment": "The fabric is very soft. True to size.",
-        "createdAt": "2026-07-29",
-        "verifiedPurchase": true
-      }
-    ],
+    "rating": 0,
+    "reviewCount": 0,
+    "reviews": [],
     "variants": [
       {
         "id": "sd-prod-120-var-1",
@@ -20954,28 +18674,9 @@ export const PRODUCTS: Product[] = [
       "https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?auto=format&fit=crop&w=800&q=80"
     ],
     "thumbnail": "https://images.unsplash.com/photo-1576995853123-5a10305d93c0?auto=format&fit=crop&w=800&q=80",
-    "rating": 4.0,
-    "reviewCount": 158,
-    "reviews": [
-      {
-        "id": "rev-sd-prod-121-1",
-        "userName": "Aman Sharma",
-        "rating": 5,
-        "title": "Great quality and fast delivery!",
-        "comment": "Delivered in Neemuch within 45 minutes! Quality is top notch.",
-        "createdAt": "2026-07-28",
-        "verifiedPurchase": true
-      },
-      {
-        "id": "rev-sd-prod-121-2",
-        "userName": "Priya Verma",
-        "rating": 4,
-        "title": "Nice fit and comfortable material",
-        "comment": "The fabric is very soft. True to size.",
-        "createdAt": "2026-07-29",
-        "verifiedPurchase": true
-      }
-    ],
+    "rating": 0,
+    "reviewCount": 0,
+    "reviews": [],
     "variants": [
       {
         "id": "sd-prod-121-var-1",
@@ -21055,28 +18756,9 @@ export const PRODUCTS: Product[] = [
       "https://images.unsplash.com/photo-1529374255404-311a2a4f1fd9?auto=format&fit=crop&w=800&q=80"
     ],
     "thumbnail": "https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?auto=format&fit=crop&w=800&q=80",
-    "rating": 4.1,
-    "reviewCount": 171,
-    "reviews": [
-      {
-        "id": "rev-sd-prod-122-1",
-        "userName": "Aman Sharma",
-        "rating": 5,
-        "title": "Great quality and fast delivery!",
-        "comment": "Delivered in Neemuch within 45 minutes! Quality is top notch.",
-        "createdAt": "2026-07-28",
-        "verifiedPurchase": true
-      },
-      {
-        "id": "rev-sd-prod-122-2",
-        "userName": "Priya Verma",
-        "rating": 4,
-        "title": "Nice fit and comfortable material",
-        "comment": "The fabric is very soft. True to size.",
-        "createdAt": "2026-07-29",
-        "verifiedPurchase": true
-      }
-    ],
+    "rating": 0,
+    "reviewCount": 0,
+    "reviews": [],
     "variants": [
       {
         "id": "sd-prod-122-var-1",
@@ -21156,28 +18838,9 @@ export const PRODUCTS: Product[] = [
       "https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&w=800&q=80"
     ],
     "thumbnail": "https://images.unsplash.com/photo-1529374255404-311a2a4f1fd9?auto=format&fit=crop&w=800&q=80",
-    "rating": 4.2,
-    "reviewCount": 184,
-    "reviews": [
-      {
-        "id": "rev-sd-prod-123-1",
-        "userName": "Aman Sharma",
-        "rating": 5,
-        "title": "Great quality and fast delivery!",
-        "comment": "Delivered in Neemuch within 45 minutes! Quality is top notch.",
-        "createdAt": "2026-07-28",
-        "verifiedPurchase": true
-      },
-      {
-        "id": "rev-sd-prod-123-2",
-        "userName": "Priya Verma",
-        "rating": 4,
-        "title": "Nice fit and comfortable material",
-        "comment": "The fabric is very soft. True to size.",
-        "createdAt": "2026-07-29",
-        "verifiedPurchase": true
-      }
-    ],
+    "rating": 0,
+    "reviewCount": 0,
+    "reviews": [],
     "variants": [
       {
         "id": "sd-prod-123-var-1",
@@ -21257,28 +18920,9 @@ export const PRODUCTS: Product[] = [
       "https://images.unsplash.com/photo-1521572267360-ee0c2909d518?auto=format&fit=crop&w=800&q=80"
     ],
     "thumbnail": "https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&w=800&q=80",
-    "rating": 4.3,
-    "reviewCount": 17,
-    "reviews": [
-      {
-        "id": "rev-sd-prod-124-1",
-        "userName": "Aman Sharma",
-        "rating": 5,
-        "title": "Great quality and fast delivery!",
-        "comment": "Delivered in Neemuch within 45 minutes! Quality is top notch.",
-        "createdAt": "2026-07-28",
-        "verifiedPurchase": true
-      },
-      {
-        "id": "rev-sd-prod-124-2",
-        "userName": "Priya Verma",
-        "rating": 4,
-        "title": "Nice fit and comfortable material",
-        "comment": "The fabric is very soft. True to size.",
-        "createdAt": "2026-07-29",
-        "verifiedPurchase": true
-      }
-    ],
+    "rating": 0,
+    "reviewCount": 0,
+    "reviews": [],
     "variants": [
       {
         "id": "sd-prod-124-var-1",
@@ -21358,28 +19002,9 @@ export const PRODUCTS: Product[] = [
       "https://images.unsplash.com/photo-1503342217505-b0a15ec3261c?auto=format&fit=crop&w=800&q=80"
     ],
     "thumbnail": "https://images.unsplash.com/photo-1521572267360-ee0c2909d518?auto=format&fit=crop&w=800&q=80",
-    "rating": 4.4,
-    "reviewCount": 30,
-    "reviews": [
-      {
-        "id": "rev-sd-prod-125-1",
-        "userName": "Aman Sharma",
-        "rating": 5,
-        "title": "Great quality and fast delivery!",
-        "comment": "Delivered in Neemuch within 45 minutes! Quality is top notch.",
-        "createdAt": "2026-07-28",
-        "verifiedPurchase": true
-      },
-      {
-        "id": "rev-sd-prod-125-2",
-        "userName": "Priya Verma",
-        "rating": 4,
-        "title": "Nice fit and comfortable material",
-        "comment": "The fabric is very soft. True to size.",
-        "createdAt": "2026-07-29",
-        "verifiedPurchase": true
-      }
-    ],
+    "rating": 0,
+    "reviewCount": 0,
+    "reviews": [],
     "variants": [
       {
         "id": "sd-prod-125-var-1",

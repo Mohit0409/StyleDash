@@ -15,6 +15,8 @@ export const Products: React.FC = () => {
 
   // Search parameters state
   const department = searchParams.get('dept') || 'all';
+  const category = searchParams.get('category') || 'all';
+  const subcategory = searchParams.get('subcategory') || 'all';
   const brand = searchParams.get('brand') || 'all';
   const size = searchParams.get('size') || 'all';
   const maxPrice = Number(searchParams.get('maxPrice')) || 4999;
@@ -46,6 +48,8 @@ export const Products: React.FC = () => {
   // Filter products logic
   const filteredProducts = products.filter(p => {
     if (department !== 'all' && p.department !== department) return false;
+    if (category !== 'all' && p.category !== category) return false;
+    if (subcategory !== 'all' && p.subcategory !== subcategory) return false;
     if (brand !== 'all' && p.brand !== brand) return false;
     if (size !== 'all' && !p.variants.some(v => v.size === size && v.available === true)) return false;
     if (p.price > maxPrice) return false;
@@ -105,8 +109,8 @@ export const Products: React.FC = () => {
         <FilterSidebar
           department={department}
           setDepartment={(d) => updateParam('dept', d)}
-          category=""
-          setCategory={() => {}}
+          category={category}
+          setCategory={(c) => updateParam('category', c)}
           brand={brand}
           setBrand={(b) => updateParam('brand', b)}
           size={size}
