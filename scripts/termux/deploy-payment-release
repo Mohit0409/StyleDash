@@ -269,9 +269,12 @@ printf 'health='
 curl -fsS http://127.0.0.1:8080/api/health
 printf '\nfrontend='
 if curl -fsS http://127.0.0.1:8080/ | grep -Fq checkout.razorpay.com; then
-  echo razorpay-script-present
+  echo razorpay-global-preload-unexpected
+  exit 1
+elif grep -FRq 'https://checkout.razorpay.com/v1/checkout.js' "$HOME/server/assets"; then
+  echo razorpay-lazy-load-ok
 else
-  echo razorpay-script-missing
+  echo razorpay-lazy-loader-missing
   exit 1
 fi
 "$HOME/bin/styledash-notify" release_deployed "StyleDash release deployed" "The production release passed local post-deploy health validation." 3 white_check_mark || true

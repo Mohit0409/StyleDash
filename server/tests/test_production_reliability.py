@@ -83,6 +83,10 @@ class ProductionReliabilityTests(unittest.TestCase):
             '"$HOME/bin/styledash-notify"',
             script,
         )
+        self.assertIn("razorpay-global-preload-unexpected", script)
+        self.assertIn("razorpay-lazy-load-ok", script)
+        self.assertIn("https://checkout.razorpay.com/v1/checkout.js", script)
+        self.assertNotIn("razorpay-script-missing", script)
 
     def test_repository_production_branch_is_main(self) -> None:
         agents = self.read("AGENTS.md")
