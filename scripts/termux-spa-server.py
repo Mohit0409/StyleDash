@@ -534,12 +534,20 @@ class PaymentService:
     def _inventory(self, state: dict[str, Any], variant: dict[str, Any]) -> int:
         return int(state["inventory"].get(variant["id"], variant["stock"]))
 
-    def public_inventory_availability(self, variant_id: Any = None) -> dict[str, Any]:
+    def public_inventory_availability(self, variant_id: Any = None, product_ids: Any = None) -> dict[str, Any]:
         """Return only customer-safe, current availability for active catalog variants."""
         if variant_id is not None and (
             not isinstance(variant_id, str) or not variant_id or len(variant_id) > 128
         ):
             raise ApiError(HTTPStatus.BAD_REQUEST, "Invalid product option.", "invalid_variant")
+        if product_ids is not None and (
+            not isinstance(product_ids, list) or not product_ids or len(product_ids) > 32
+            or any(not isinstance(product_id, str) or not product_id or len(product_id) > 128 for product_id in product_ids)
+        ):
+            raise ApiError(HTTPStatus.BAD_REQUEST, "Invalid product selection.", "invalid_product")
+        if variant_id is not None and product_ids is not None:
+            raise ApiError(HTTPStatus.BAD_REQUEST, "Choose one inventory filter.", "invalid_inventory_filter")
+        product_filter = set(product_ids) if product_ids is not None else None
 
         self.refresh_shop_products()
         products = self.product_snapshot()
@@ -547,7 +555,7 @@ class PaymentService:
         with self.store.lock:
             state = self.store.state
             for product in products.values():
-                if not product.get("active"):
+                if not product.get("active") or (product_filter is not None and product["id"] not in product_filter):
                     continue
                 for variant in product["variants"]:
                     if variant_id is not None and variant["id"] != variant_id:
@@ -2020,10 +2028,15 @@ class StyleDashRequestHandler(SimpleHTTPRequestHandler):
                 self._rate_limit(path, 60)
                 query = parse_qs(parsed.query, keep_blank_values=True)
                 variant_values = query.get("variantId", [])
+                product_values = query.get("productId", [])
                 variant_id = variant_values[0] if len(variant_values) == 1 else None
+                product_ids = product_values or None
                 if len(variant_values) > 1:
                     raise ApiError(HTTPStatus.BAD_REQUEST, "Invalid product option.", "invalid_variant")
-                self._json_response(HTTPStatus.OK, self.payment_service.public_inventory_availability(variant_id))
+                self._json_response(
+                    HTTPStatus.OK,
+                    self.payment_service.public_inventory_availability(variant_id, product_ids),
+                )
                 return
             if path == "/api/shop-products/published":
                 self._rate_limit(path, 60)

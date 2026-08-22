@@ -60,9 +60,7 @@ const getPublishedShopProducts = async (): Promise<Product[]> => {
   return publishedShopRequest;
 };
 
-const getCatalogue = async (): Promise<Product[]> => {
-  const staticProducts = PRODUCTS.map(normalizeStoreMetadata);
-  const shopProducts = await getPublishedShopProducts();
+const mergeCatalogue = (staticProducts: Product[], shopProducts: Product[]): Product[] => {
   const seenIds = new Set(staticProducts.map(product => product.id));
   const seenSlugs = new Set(staticProducts.map(product => product.slug));
   return staticProducts.concat(shopProducts.filter(product => {
@@ -73,7 +71,42 @@ const getCatalogue = async (): Promise<Product[]> => {
   }));
 };
 
+const getCatalogue = async (): Promise<Product[]> => mergeCatalogue(
+  PRODUCTS.map(normalizeStoreMetadata),
+  await getPublishedShopProducts(),
+);
+
+
+const selectHomepageProducts = (products: Product[]): Product[] => {
+  const selectedIds = new Set<string>();
+  const sections = [
+    products.filter(product => product.newArrival).slice(0, 8),
+    products.filter(product => product.trending).slice(0, 8),
+    products.filter(product => product.expressDelivery).slice(0, 8),
+    products.filter(product => product.price <= 499).slice(0, 8),
+  ];
+  sections.flat().forEach(product => selectedIds.add(product.id));
+  return products.filter(product => selectedIds.has(product.id));
+};
+
+const withHomepageAvailability = async (products: Product[]): Promise<Product[]> => {
+  try {
+    const { availability } = await inventoryRepository.getAvailabilityForProducts(products.map(product => product.id));
+    const byVariantId = new Map(availability.map(item => [item.variantId, item.available]));
+    return products.map(product => ({ ...product, variants: product.variants.map(variant => ({
+      ...variant, available: byVariantId.get(variant.id) === true,
+    })) }));
+  } catch {
+    return products.map(product => ({ ...product, variants: product.variants.map(variant => ({ ...variant, available: false })) }));
+  }
+};
+
 export const productRepository = {
+  async getHomepageProducts(): Promise<Product[]> {
+    const products = selectHomepageProducts(await getCatalogue());
+    return withHomepageAvailability(products);
+  },
+
   async getAllProducts(): Promise<Product[]> {
     // Start both public requests together; availability remains fail-closed.
     if (!availabilityRequest) availabilityRequest = inventoryRepository.getAvailability();
