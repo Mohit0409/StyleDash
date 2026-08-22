@@ -56,8 +56,9 @@ export const Returns = () => (
         wrong, damaged, defective, or not as ordered.
       </p>
       <p className="text-sm text-neutral-600">
-        Return and exchange assistance is handled during{' '}
-        {CONFIG.LEGAL.RETURN_SUPPORT_HOURS}. Requests may still be emailed
+        The dedicated return and size-exchange desk is handled during{' '}
+        {CONFIG.LEGAL.RETURN_SUPPORT_HOURS}. General customer support remains
+        available during {CONFIG.LEGAL.SUPPORT_HOURS}. Requests may still be emailed
         outside those hours and will be reviewed during support hours.
       </p>
     </section>

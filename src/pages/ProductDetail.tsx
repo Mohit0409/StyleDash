@@ -90,7 +90,29 @@ export const ProductDetail: React.FC = () => {
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-12">
-      <SEO title={`${product.name} - ${product.brand} | StyleDash`} description={product.shortDescription} />
+      <SEO
+        title={`${product.name} - ${product.brand} | StyleDash`}
+        description={product.shortDescription}
+        image={product.images[0] || product.thumbnail}
+        type="product"
+        jsonLd={{
+          '@context': 'https://schema.org',
+          '@type': 'Product',
+          name: product.name,
+          description: product.shortDescription,
+          image: product.images,
+          sku: product.id,
+          brand: { '@type': 'Brand', name: product.brand },
+          offers: {
+            '@type': 'Offer',
+            priceCurrency: 'INR',
+            price: product.price,
+            availability: product.variants.some(variant => variant.available === true)
+              ? 'https://schema.org/InStock'
+              : 'https://schema.org/OutOfStock',
+          },
+        }}
+      />
 
       {/* Breadcrumbs */}
       <nav className="text-xs font-medium text-neutral-500 flex items-center gap-2">
@@ -234,7 +256,7 @@ export const ProductDetail: React.FC = () => {
             <p><strong>Material:</strong> {product.material}</p>
             {product.fit && <p><strong>Fit:</strong> {product.fit}</p>}
             <p><strong>Care Instructions:</strong> {product.careInstructions.join(', ')}</p>
-            <p><strong>Returns:</strong> {product.returnWindowDays}-Day Easy Doorstep Exchange</p>
+            <p><strong>Exchange:</strong> {product.returnWindowDays}-Day Size Exchange on eligible items; conditions and pickup charges may apply.</p>
           </div>
         </div>
       </div>

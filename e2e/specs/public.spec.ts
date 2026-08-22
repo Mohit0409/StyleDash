@@ -119,3 +119,39 @@ test('wishlist icon buttons expose accessible names', async ({ page }) => {
     page.getByRole('button', { name: 'Add Pure Cotton Oversized Graphic Tee to wishlist' }).first(),
   ).toBeVisible();
 });
+
+test('public SEO exposes canonical and social metadata without query duplication', async ({ page }) => {
+  await page.goto('/products?dept=men&sort=price-asc');
+
+  await expect(page.locator('link[rel="canonical"]')).toHaveAttribute('href', /\/products$/);
+  await expect(page.locator('meta[property="og:url"]')).toHaveAttribute('content', /\/products$/);
+  await expect(page.locator('meta[property="og:title"]')).toHaveAttribute('content', /StyleDash/);
+  await expect(page.locator('meta[name="twitter:card"]')).toHaveAttribute('content', 'summary');
+});
+
+test('product detail exposes product social metadata and structured data', async ({ page }) => {
+  await page.goto('/product/pure-cotton-oversized-graphic-tee-sd-prod-001');
+
+  await expect(page.locator('meta[property="og:type"]')).toHaveAttribute('content', 'product');
+  await expect(page.locator('meta[property="og:image"]')).toHaveAttribute('content', /^https:\/\//);
+  const jsonLd = JSON.parse(await page.locator('#styledash-seo-jsonld').textContent() || '{}');
+  expect(jsonLd['@type']).toBe('Product');
+  expect(jsonLd.name).toBe('Pure Cotton Oversized Graphic Tee');
+  expect(jsonLd.offers.priceCurrency).toBe('INR');
+  expect(jsonLd.aggregateRating).toBeUndefined();
+});
+
+test('robots and sitemap expose only intended public discovery metadata', async ({ request }) => {
+  const robots = await request.get('/robots.txt');
+  expect(robots.ok()).toBeTruthy();
+  expect(await robots.text()).toContain('Sitemap:');
+
+  const sitemap = await request.get('/sitemap.xml');
+  expect(sitemap.ok()).toBeTruthy();
+  const xml = await sitemap.text();
+  expect(xml).toContain('/product/pure-cotton-oversized-graphic-tee-sd-prod-001');
+  expect(xml).not.toContain('/admin');
+  expect(xml).not.toContain('/api/');
+  expect(xml).not.toContain('/profile');
+  expect(xml).not.toContain('/checkout');
+});

@@ -23,6 +23,7 @@ from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Any, Callable
 from urllib.parse import parse_qs, unquote, urlsplit
+from xml.sax.saxutils import escape as xml_escape
 
 try:
     import fcntl
@@ -461,7 +462,7 @@ class PaymentService:
             raise RuntimeError("STYLEDASH_TEST_PRODUCT_ALLOWED_EMAILS contains an invalid email address") from None
 
     def health(self) -> dict[str, str]:
-        result = {"status": "ok", "service": "StyleDash", "paymentMode": self.mode}
+        result = {"status": "ok", "service": "StyleDash"}
         if self.security is not None:
             result["database"] = "ok" if self.security.health() else "error"
         return result
@@ -1831,6 +1832,53 @@ class StyleDashRequestHandler(SimpleHTTPRequestHandler):
         if not head_only:
             self.wfile.write(encoded)
 
+    def _text_response(
+        self, status: int, body: str, content_type: str, *, head_only: bool = False,
+    ) -> None:
+        encoded = body.encode("utf-8")
+        self.send_response(status)
+        self.send_header("Content-Type", content_type)
+        self.send_header("Content-Length", str(len(encoded)))
+        self.send_header("Cache-Control", "public, max-age=300")
+        self.end_headers()
+        if not head_only:
+            self.wfile.write(encoded)
+
+    @staticmethod
+    def _public_origin() -> str:
+        return os.environ.get("STYLEDASH_PUBLIC_ORIGIN", "").rstrip("/")
+
+    def _robots_body(self) -> str:
+        origin = self._public_origin()
+        lines = ["User-agent: *", "Allow: /"]
+        if origin:
+            lines.append(f"Sitemap: {origin}/sitemap.xml")
+        return "\n".join(lines) + "\n"
+
+    def _sitemap_body(self) -> str:
+        origin = self._public_origin()
+        if not origin:
+            raise ApiError(HTTPStatus.SERVICE_UNAVAILABLE, "Sitemap is unavailable.", "sitemap_unavailable")
+        paths = [
+            "/", "/products", "/categories", "/stores", "/help",
+            "/returns", "/privacy", "/terms",
+        ]
+        product_paths = [
+            f"/product/{product['slug']}"
+            for product in self.payment_service.product_snapshot().values()
+            if product.get("active") is True and isinstance(product.get("slug"), str)
+        ]
+        urls = paths + sorted(set(product_paths))
+        items = "".join(
+            f"  <url><loc>{xml_escape(origin + path)}</loc></url>\n"
+            for path in urls
+        )
+        return (
+            '<?xml version="1.0" encoding="UTF-8"?>\n'
+            '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n'
+            f"{items}</urlset>\n"
+        )
+
     def _error_response(self, error: ApiError) -> None:
         self._json_response(error.status, {"success": False, "error": error.message, "code": error.code})
 
@@ -1949,6 +1997,12 @@ class StyleDashRequestHandler(SimpleHTTPRequestHandler):
                 self._payment_test_user()
                 super().do_GET()
                 return
+            if path == "/robots.txt":
+                self._text_response(HTTPStatus.OK, self._robots_body(), "text/plain; charset=utf-8")
+                return
+            if path == "/sitemap.xml":
+                self._text_response(HTTPStatus.OK, self._sitemap_body(), "application/xml; charset=utf-8")
+                return
             if path == "/api/health":
                 self._json_response(HTTPStatus.OK, self.payment_service.health())
                 return
@@ -2038,6 +2092,17 @@ class StyleDashRequestHandler(SimpleHTTPRequestHandler):
                 self._json_response(HTTPStatus.NOT_FOUND, {"success": False, "error": "Not found.", "code": "not_found"}, head_only=True)
                 return
             super().do_HEAD()
+            return
+        if path == "/robots.txt":
+            self._text_response(HTTPStatus.OK, self._robots_body(), "text/plain; charset=utf-8", head_only=True)
+            return
+        if path == "/sitemap.xml":
+            try:
+                body = self._sitemap_body()
+            except ApiError as error:
+                self._json_response(error.status, {"success": False, "error": error.message, "code": error.code}, head_only=True)
+                return
+            self._text_response(HTTPStatus.OK, body, "application/xml; charset=utf-8", head_only=True)
             return
         if path == "/api/health":
             self._json_response(HTTPStatus.OK, self.payment_service.health(), head_only=True)
