@@ -2204,6 +2204,23 @@ class HttpApiTests(unittest.TestCase):
         self.assertEqual(status, 200)
         self.assertFalse(changed["availability"][0]["available"])
 
+        status, batch, _headers = self.get_json(
+            "/api/inventory/availability?productId=sd-prod-001&productId=missing-product"
+        )
+        self.assertEqual(status, 200)
+        self.assertGreater(len(batch["availability"]), 1)
+        self.assertTrue(all(item["productId"] == "sd-prod-001" for item in batch["availability"]))
+        self.assertIn("sd-prod-001-var-2", {item["variantId"] for item in batch["availability"]})
+        self.assertNotIn("stock", json.dumps(batch))
+
+        too_many = "&".join(f"productId=p{index}" for index in range(33))
+        status, invalid_products, _headers = self.get_json(f"/api/inventory/availability?{too_many}")
+        self.assertEqual((status, invalid_products["code"]), (400, "invalid_product"))
+        status, mixed, _headers = self.get_json(
+            "/api/inventory/availability?variantId=sd-prod-001-var-2&productId=sd-prod-001"
+        )
+        self.assertEqual((status, mixed["code"]), (400, "invalid_inventory_filter"))
+
         status, invalid, _headers = self.get_json("/api/inventory/availability?variantId=&variantId=duplicate")
         self.assertEqual((status, invalid["code"]), (400, "invalid_variant"))
         status, _body, _headers = self.post_json("/api/inventory/availability", {})

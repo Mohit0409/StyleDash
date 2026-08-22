@@ -27,6 +27,24 @@ describe('authoritative inventory repository', () => {
     expect(fetcher).toHaveBeenCalledWith('/api/inventory/availability?variantId=sd-prod-001-var-2', expect.any(Object));
   });
 
+  it('batches homepage availability by product id without requesting the full inventory payload', async () => {
+    vi.spyOn(Date, 'now').mockReturnValue(0);
+    const fetcher = vi.fn<typeof fetch>(async input => String(input) === '/api/shop-products/published'
+      ? productsResponse()
+      : response([]));
+    vi.stubGlobal('fetch', fetcher);
+
+    const products = await productRepository.getHomepageProducts();
+    const inventoryCall = fetcher.mock.calls.find(([input]) => String(input).startsWith('/api/inventory/availability?productId='));
+    expect(inventoryCall).toBeDefined();
+    const requestUrl = new URL(String(inventoryCall?.[0]), 'https://styledash.test');
+    const requestedProductIds = requestUrl.searchParams.getAll('productId');
+    expect(requestedProductIds.length).toBe(products.length);
+    expect(new Set(requestedProductIds).size).toBe(requestedProductIds.length);
+    expect(requestedProductIds.length).toBeLessThanOrEqual(32);
+    expect(fetcher.mock.calls.some(([input]) => String(input) === '/api/inventory/availability')).toBe(false);
+  });
+
   it('deduplicates concurrent public catalogue and availability requests', async () => {
     const fetcher = vi.fn<typeof fetch>(async input => String(input) === '/api/shop-products/published'
       ? productsResponse()

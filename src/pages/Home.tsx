@@ -14,7 +14,7 @@ export const Home: React.FC = () => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    productRepository.getAllProducts().then(data => {
+    productRepository.getHomepageProducts().then(data => {
       setProducts(data);
       setLoading(false);
     });
