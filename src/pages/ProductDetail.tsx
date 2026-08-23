@@ -91,7 +91,7 @@ export const ProductDetail: React.FC = () => {
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-12">
       <SEO
-        title={`${product.name} - ${product.brand} | StyleDash`}
+        title={`${product.name}${product.brand ? ` - ${product.brand}` : ""} | StyleDash`}
         description={product.shortDescription}
         image={product.images[0] || product.thumbnail}
         type="product"
@@ -102,7 +102,7 @@ export const ProductDetail: React.FC = () => {
           description: product.shortDescription,
           image: product.images,
           sku: product.id,
-          brand: { '@type': 'Brand', name: product.brand },
+          brand: product.brand ? { '@type': 'Brand', name: product.brand } : undefined,
           offers: {
             '@type': 'Offer',
             priceCurrency: 'INR',
@@ -159,7 +159,9 @@ export const ProductDetail: React.FC = () => {
         {/* Product Details & Actions */}
         <div className="space-y-6">
           <div>
-            <span className="text-xs font-black uppercase tracking-widest text-lime-600 dark:text-lime-400">{product.brand}</span>
+            {product.brand && (
+              <span className="text-xs font-black uppercase tracking-widest text-lime-600 dark:text-lime-400">{product.brand}</span>
+            )}
             <h1 className="text-2xl sm:text-3xl font-black text-neutral-900 dark:text-white mt-1">{product.name}</h1>
             <p className="text-xs text-neutral-500 mt-2">{product.shortDescription}</p>
 

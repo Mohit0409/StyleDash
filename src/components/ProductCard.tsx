@@ -96,7 +96,9 @@ export const ProductCard: React.FC<{ product: Product; onQuickView?: (p: Product
       <div className="p-4 flex-1 flex flex-col justify-between">
         <div>
           <div className="flex items-center justify-between text-xs text-neutral-500 mb-1">
-            <span className="font-bold text-neutral-800 dark:text-neutral-200 uppercase tracking-wider">{product.brand}</span>
+            {product.brand && (
+              <span className="font-bold text-neutral-800 dark:text-neutral-200 uppercase tracking-wider">{product.brand}</span>
+            )}
             {product.reviewCount > 0 && (
               <span className="flex items-center gap-1 text-amber-500 font-semibold">
                 <Star className="w-3 h-3 fill-amber-400" /> {product.rating} ({product.reviewCount})

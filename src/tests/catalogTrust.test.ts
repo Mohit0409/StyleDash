@@ -9,4 +9,8 @@ describe('catalog trust signals', () => {
       expect(product.rating).toBe(0);
     }
   });
+  it('does not expose placeholder brand values', () => {
+    expect(PRODUCTS.some(product => product.brand.trim().toLowerCase() === 'wrong')).toBe(false);
+  });
+
 });

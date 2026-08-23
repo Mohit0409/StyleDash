@@ -5,7 +5,7 @@ import { vendorRepository } from '../repositories/vendorRepository';
 afterEach(() => { vi.restoreAllMocks(); });
 
 describe('vendor repository', () => {
-  it('merges ACTIVE server stores and resolves their storefront slug', async () => {
+  it('uses ACTIVE server stores as the only public source and resolves their storefront slug', async () => {
     const liveStore = {
       id: 'application-live-1', slug: 'local-shop-ation-live-1', storeName: 'Royals',
       category: 'Clothing & Fashion' as const, description: 'A real approved local shop.',
@@ -15,9 +15,14 @@ describe('vendor repository', () => {
     vi.spyOn(publicStoreApi, 'active').mockResolvedValue([liveStore]);
 
     const stores = await vendorRepository.getAllStores();
-    expect(stores.some(store => store.id === liveStore.id)).toBe(true);
+    expect(stores).toEqual([liveStore]);
     await expect(vendorRepository.getStoreBySlug(liveStore.slug)).resolves.toMatchObject({
       id: liveStore.id, storeName: 'Royals', active: true, approved: true,
     });
+  });
+
+  it('fails closed when the active-store API is unavailable', async () => {
+    vi.spyOn(publicStoreApi, 'active').mockRejectedValue(new Error('offline'));
+    await expect(vendorRepository.getAllStores()).resolves.toEqual([]);
   });
 });
