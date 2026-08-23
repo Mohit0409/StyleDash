@@ -13,13 +13,25 @@ LAST_BACKUP_FILE="$RUN_DIR/styledash-last-backup-date"
 LAST_BACKUP_ATTEMPT_FILE="$RUN_DIR/styledash-last-backup-attempt"
 BACKUP_RETRY_SECONDS=3600
 
+LAST_RECOVERY_FILE="$RUN_DIR/styledash-last-recovery-week"
+LAST_RECOVERY_ATTEMPT_FILE="$RUN_DIR/styledash-last-recovery-attempt"
+RECOVERY_RETRY_SECONDS=3600
+
 mkdir -p "$RUN_DIR" "$LOG_DIR"
 
 if [ -s "$PID_FILE" ] && kill -0 "$(cat "$PID_FILE")" 2>/dev/null; then
   exit 0
 fi
 printf '%s\n' "$$" > "$PID_FILE"
-trap 'rm -f "$PID_FILE"' EXIT INT TERM
+
+cleanup() {
+  if [ -s "$PID_FILE" ] && [ "$(cat "$PID_FILE" 2>/dev/null)" = "$$" ]; then
+    rm -f "$PID_FILE"
+  fi
+}
+
+trap cleanup EXIT
+trap 'exit 0' INT TERM
 
 notify() {
   if [ -x "$HOME/bin/styledash-notify" ]; then
@@ -42,6 +54,7 @@ ngrok_process_ok() {
 public_unhealthy=0
 admin_unhealthy=0
 backup_failed=0
+recovery_backup_failed=0
 ngrok_failures=0
 ngrok_unhealthy=0
 public_failures=0
@@ -113,6 +126,55 @@ while true; do
         notify backup_failed "StyleDash backup failed" "The scheduled production backup failed; the watchdog will retry after its cooldown." 5 warning
       fi
       backup_failed=1
+    fi
+  fi
+
+  # Weekly full disaster-recovery bundle.
+  # %G-%V is ISO year + ISO week, so exactly one successful run per week.
+  recovery_week="$(date -u +%G-%V)"
+  previous_recovery_week=''
+  if [ -s "$LAST_RECOVERY_FILE" ]; then
+    previous_recovery_week="$(cat "$LAST_RECOVERY_FILE" 2>/dev/null || true)"
+  fi
+
+  recovery_last_attempt=0
+  if [ -s "$LAST_RECOVERY_ATTEMPT_FILE" ]; then
+    recovery_last_attempt="$(cat "$LAST_RECOVERY_ATTEMPT_FILE" 2>/dev/null || printf '0')"
+  fi
+  case "$recovery_last_attempt" in
+    ''|*[!0-9]*) recovery_last_attempt=0 ;;
+  esac
+
+  now_epoch="$(date +%s)"
+
+  if [ "$previous_recovery_week" != "$recovery_week" ] &&
+     [ $((now_epoch - recovery_last_attempt)) -ge "$RECOVERY_RETRY_SECONDS" ]; then
+
+    printf '%s\n' "$now_epoch" > "$LAST_RECOVERY_ATTEMPT_FILE"
+
+    if "$HOME/bin/backup-styledash-recovery" >> "$LOG_FILE" 2>&1; then
+      printf '%s\n' "$recovery_week" > "$LAST_RECOVERY_FILE"
+
+      if [ "$recovery_backup_failed" -eq 1 ]; then
+        notify recovery_backup_recovered \
+          "StyleDash recovery backup recovered" \
+          "The weekly full disaster-recovery backup completed successfully." \
+          3 white_check_mark
+      fi
+
+      recovery_backup_failed=0
+      echo "$(date -Iseconds) weekly full recovery backup verified" >> "$LOG_FILE"
+    else
+      echo "$(date -Iseconds) weekly full recovery backup failed; watchdog will retry after cooldown" >> "$LOG_FILE"
+
+      if [ "$recovery_backup_failed" -eq 0 ]; then
+        notify recovery_backup_failed \
+          "StyleDash recovery backup failed" \
+          "The weekly full disaster-recovery backup failed; the watchdog will retry after its cooldown." \
+          5 warning
+      fi
+
+      recovery_backup_failed=1
     fi
   fi
 

@@ -54,6 +54,25 @@ class ProductionReliabilityTests(unittest.TestCase):
         self.assertIn('rclone check "$target" "$remote_target"', script)
         self.assertIn("--download", script)
         self.assertIn("--local-only", script)
+        self.assertIn("STYLEDASH_BACKUP_REMOTE_SECONDARY", script)
+        self.assertIn('rclone copy "$target" "$secondary_target"', script)
+        self.assertIn('rclone check "$target" "$secondary_target"', script)
+        self.assertIn("styledash-last-secondary-backup", script)
+
+    def test_full_recovery_bundle_is_encrypted_verified_and_offdevice(self) -> None:
+        script = self.read("scripts/termux/backup-styledash-recovery")
+        self.assertIn("openssl enc -aes-256-cbc", script)
+        self.assertIn("-pbkdf2", script)
+        self.assertIn("sha256sum -c SHA256SUMS", script)
+        self.assertIn("STYLEDASH_RECOVERY_WINDOWS_HOST", script)
+        self.assertIn("STYLEDASH_RECOVERY_WINDOWS_PASSWORD_FILE", script)
+        self.assertIn("STYLEDASH_RECOVERY_REMOTE_PRIMARY", script)
+        self.assertIn("STYLEDASH_RECOVERY_REMOTE_SECONDARY", script)
+        self.assertIn("umask 077", script)
+        self.assertIn('rm -f "$ARCHIVE"', script)
+        self.assertIn("SUCCESS=1", script)
+        self.assertNotIn("100.106.126.74", script)
+        self.assertNotIn(r"C:\\Users\\", script)
 
     def test_watchdog_checks_and_notifies_both_services(self) -> None:
         script = self.read("scripts/termux/styledash-health")
@@ -62,6 +81,10 @@ class ProductionReliabilityTests(unittest.TestCase):
         self.assertIn("public_restart_failed", script)
         self.assertIn("admin_restart_failed", script)
         self.assertIn("backup_failed", script)
+        self.assertIn("LAST_RECOVERY_FILE", script)
+        self.assertIn("RECOVERY_RETRY_SECONDS", script)
+        self.assertIn('"$HOME/bin/backup-styledash-recovery"', script)
+        self.assertIn("recovery_backup_failed", script)
 
     def test_rollback_preserves_live_database_history(self) -> None:
         script = self.read("scripts/termux/rollback-payment-release")
@@ -81,6 +104,11 @@ class ProductionReliabilityTests(unittest.TestCase):
         self.assertIn(
             'install -m 755 "$STAGE/scripts/termux/styledash-notify" '
             '"$HOME/bin/styledash-notify"',
+            script,
+        )
+        self.assertIn(
+            'install -m 700 "$STAGE/scripts/termux/backup-styledash-recovery" '
+            '"$HOME/bin/backup-styledash-recovery"',
             script,
         )
         self.assertIn("razorpay-global-preload-unexpected", script)

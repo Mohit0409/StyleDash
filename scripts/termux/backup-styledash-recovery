@@ -1,0 +1,202 @@
+#!/data/data/com.termux/files/usr/bin/bash
+set -euo pipefail
+umask 077
+
+RUN_DIR="$HOME/run"
+OUT="$HOME/.local/share/styledash/recovery"
+PRIVATE_CONFIG_DIR="$HOME/.config/styledash"
+SECRETS_FILE="$PRIVATE_CONFIG_DIR/secrets.env"
+if [ -f "$SECRETS_FILE" ]; then
+  set -a
+  . "$SECRETS_FILE"
+  set +a
+fi
+
+WINDOWS_HOST="${STYLEDASH_RECOVERY_WINDOWS_HOST:-}"
+WINDOWS_USER="${STYLEDASH_RECOVERY_WINDOWS_USER:-}"
+WINDOWS_KEY="${STYLEDASH_RECOVERY_WINDOWS_KEY:-$HOME/.ssh/styledash_backup_ed25519}"
+WINDOWS_PASSWORD_FILE="${STYLEDASH_RECOVERY_WINDOWS_PASSWORD_FILE:-}"
+PRIMARY_REMOTE="${STYLEDASH_RECOVERY_REMOTE_PRIMARY:-styledash-crypt:StyleDash/recovery}"
+SECONDARY_REMOTE="${STYLEDASH_RECOVERY_REMOTE_SECONDARY:-windows-backup:StyleDash-Disaster-Recovery/recovery}"
+
+: "${WINDOWS_HOST:?STYLEDASH_RECOVERY_WINDOWS_HOST is not configured}"
+: "${WINDOWS_USER:?STYLEDASH_RECOVERY_WINDOWS_USER is not configured}"
+: "${WINDOWS_PASSWORD_FILE:?STYLEDASH_RECOVERY_WINDOWS_PASSWORD_FILE is not configured}"
+[ -r "$WINDOWS_KEY" ] || { echo "Configured recovery Windows SSH key is not readable" >&2; exit 1; }
+
+STAMP="$(date -u +%Y%m%dT%H%M%SZ)"
+WORK="$HOME/.cache/styledash-recovery-$STAMP"
+VERIFY="$HOME/.cache/styledash-verify-$STAMP"
+ARCHIVE="$OUT/styledash-full-recovery-$STAMP.tar.gz.enc"
+NAME="$(basename "$ARCHIVE")"
+SUCCESS=0
+
+cleanup() {
+  unset RECOVERY_PASSWORD 2>/dev/null || true
+  rm -rf "$WORK" "$VERIFY"
+  if [ "$SUCCESS" -ne 1 ] && [ -f "$ARCHIVE" ]; then
+    rm -f "$ARCHIVE"
+  fi
+}
+trap cleanup EXIT
+trap 'exit 130' INT
+trap 'exit 143' TERM
+
+mkdir -p \
+  "$WORK/home" \
+  "$WORK/config" \
+  "$WORK/termux" \
+  "$WORK/ssh" \
+  "$WORK/system" \
+  "$OUT" \
+  "$VERIFY"
+
+chmod 700 "$WORK" "$VERIFY" "$OUT"
+
+echo "$(date -Iseconds) building StyleDash recovery bundle"
+
+cp -a "$HOME/server" "$WORK/home/"
+cp -a "$HOME/admin" "$WORK/home/"
+cp -a "$HOME/bin" "$WORK/home/"
+cp -a "$HOME/.termux/boot" "$WORK/termux/"
+mkdir -p "$WORK/config/styledash"
+tar -C "$HOME/.config/styledash" \
+  --exclude='disabled-services' \
+  --exclude='disabled-services/*' \
+  -cf - . | tar -C "$WORK/config/styledash" -xf -
+cp -a "$HOME/.config/rclone/rclone.conf" "$WORK/config/rclone.conf"
+mkdir -p "$WORK/termux/services"
+
+# Copy service definitions, but exclude transient runit supervise state.
+tar -C "$PREFIX/var/service" \
+  --exclude='*/supervise' \
+  --exclude='*/supervise/*' \
+  --exclude='*/log/supervise' \
+  --exclude='*/log/supervise/*' \
+  --exclude='*/log/run' \
+  -cf - . | tar -C "$WORK/termux/services" -xf -
+
+cp -a "$HOME/.ssh/authorized_keys" "$WORK/ssh/"
+cp -a "$HOME/.ssh/styledash_backup_ed25519.pub" "$WORK/ssh/"
+
+pkg list-installed > "$WORK/system/termux-packages.txt"
+uname -a > "$WORK/system/uname.txt"
+python3 --version > "$WORK/system/python-version.txt" 2>&1 || true
+node --version > "$WORK/system/node-version.txt" 2>&1 || true
+rclone version > "$WORK/system/rclone-version.txt" 2>&1 || true
+openssl version > "$WORK/system/openssl-version.txt"
+
+cat > "$WORK/RESTORE-NOTES.txt" <<'NOTES'
+StyleDash disaster-recovery bundle.
+
+Restore sequence:
+1. Install Termux and required packages.
+2. Decrypt and extract this recovery archive.
+3. Restore server, admin, bin, configuration and boot files.
+4. Restore newest styledash.db and orders.json from the separate data backup.
+5. Generate a new phone-to-Windows backup SSH key.
+6. Restore/start Termux services.
+7. Verify /api/health before exposing the public tunnel.
+
+The old phone-to-Windows PRIVATE SSH key is intentionally not included.
+NOTES
+
+(
+  cd "$WORK"
+  find . -type f ! -name SHA256SUMS -print0 |
+    sort -z |
+    xargs -0 sha256sum
+) > "$WORK/SHA256SUMS"
+
+RECOVERY_PASSWORD="$(
+  ssh -i "$WINDOWS_KEY" \
+    "$WINDOWS_USER@$WINDOWS_HOST" \
+    "type $WINDOWS_PASSWORD_FILE"
+)"
+
+[ "${#RECOVERY_PASSWORD}" -eq 44 ] || {
+  echo "Recovery password retrieval failed" >&2
+  exit 1
+}
+
+export RECOVERY_PASSWORD
+
+tar -C "$WORK" -czf - . |
+  openssl enc -aes-256-cbc \
+    -salt \
+    -pbkdf2 \
+    -iter 600000 \
+    -md sha256 \
+    -pass env:RECOVERY_PASSWORD \
+    -out "$ARCHIVE"
+
+chmod 600 "$ARCHIVE"
+
+openssl enc -d -aes-256-cbc \
+  -pbkdf2 \
+  -iter 600000 \
+  -md sha256 \
+  -pass env:RECOVERY_PASSWORD \
+  -in "$ARCHIVE" |
+  tar -xzf - -C "$VERIFY"
+
+(
+  cd "$VERIFY"
+  sha256sum -c SHA256SUMS >/dev/null
+)
+
+HASH="$(sha256sum "$ARCHIVE" | awk '{print $1}')"
+
+rclone copyto \
+  "$ARCHIVE" \
+  "${SECONDARY_REMOTE%/}/$NAME"
+
+rclone check \
+  "$OUT" \
+  "$SECONDARY_REMOTE" \
+  --include "$NAME" \
+  --one-way \
+  --download
+
+rclone copyto \
+  "$ARCHIVE" \
+  "${PRIMARY_REMOTE%/}/$NAME"
+
+rclone check \
+  "$OUT" \
+  "$PRIMARY_REMOTE" \
+  --include "$NAME" \
+  --one-way \
+  --download
+
+printf '%s  %s\n' "$HASH" "$NAME" |
+  ssh -i "$WINDOWS_KEY" \
+    "$WINDOWS_USER@$WINDOWS_HOST" \
+    "powershell -NoProfile -Command \"\$dir = Join-Path \$HOME 'StyleDash-Disaster-Recovery\\manifests'; New-Item -ItemType Directory -Force -Path \$dir | Out-Null; [Console]::In.ReadToEnd() | Set-Content -NoNewline -Path (Join-Path \$dir '$NAME.sha256')\""
+
+ssh -i "$WINDOWS_KEY" \
+  "$WINDOWS_USER@$WINDOWS_HOST" \
+  "powershell -NoProfile -Command \"\$archive = Join-Path \$HOME 'StyleDash-Disaster-Recovery\\recovery\\$NAME'; \$manifest = Join-Path \$HOME 'StyleDash-Disaster-Recovery\\manifests\\$NAME.sha256'; \$actual = (Get-FileHash \$archive -Algorithm SHA256).Hash.ToLower(); \$expected = ((Get-Content \$manifest -Raw).Trim() -split '\\s+')[0].ToLower(); if (\$actual -ne \$expected) { exit 1 } else { Write-Host 'Windows manifest verified' }\""
+
+printf '%s\n' "$STAMP" > "$RUN_DIR/styledash-last-recovery-backup"
+chmod 600 "$RUN_DIR/styledash-last-recovery-backup"
+
+# Keep only the newest 4 encrypted full bundles on the phone.
+python3 - "$OUT" <<'PY'
+from pathlib import Path
+import sys
+
+root = Path(sys.argv[1])
+files = sorted(
+    root.glob("styledash-full-recovery-*.tar.gz.enc"),
+    key=lambda p: p.name,
+    reverse=True,
+)
+
+for path in files[4:]:
+    path.unlink()
+PY
+
+SUCCESS=1
+echo "Full StyleDash recovery backup verified: $STAMP"
+echo "SHA256: $HASH"
