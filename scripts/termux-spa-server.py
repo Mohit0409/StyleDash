@@ -2038,6 +2038,10 @@ class StyleDashRequestHandler(SimpleHTTPRequestHandler):
                     self.payment_service.public_inventory_availability(variant_id, product_ids),
                 )
                 return
+            if path == "/api/stores/active":
+                self._rate_limit(path, 60)
+                self._json_response(HTTPStatus.OK, {"success": True, "stores": self._shops().list_active_stores()})
+                return
             if path == "/api/shop-products/published":
                 self._rate_limit(path, 60)
                 self._json_response(

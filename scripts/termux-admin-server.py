@@ -634,14 +634,12 @@ class AdminHandler(BaseHTTPRequestHandler):
                 result = self._shops().admin_transition_application(
                     admin["id"], application_id, payload.get("status"), payload.get("reason")
                 )
-                self.payments.refresh_shop_products()
                 self._json(200, {"success": True, "application": result}); return
             if path.startswith("/api/admin/shop-products/"):
                 product_id = unquote(path.removeprefix("/api/admin/shop-products/"))
                 result = self._shops().admin_transition_product(
                     admin["id"], product_id, payload.get("status"), payload.get("reason")
                 )
-                self.payments.refresh_shop_products()
                 self._json(200, {"success": True, "product": result}); return
             if path.startswith("/api/admin/inventory/"):
                 variant_id = unquote(path.removeprefix("/api/admin/inventory/"))

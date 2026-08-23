@@ -100,6 +100,10 @@ def _row_dict(row: sqlite3.Row) -> dict[str, Any]:
     return {key: row[key] for key in row.keys()}
 
 
+def _store_slug(application_id: str) -> str:
+    return f"local-shop-{application_id[-12:]}"
+
+
 class ShopWorkflow:
     """SQLite-backed shop workflow with customer ownership enforcement."""
 
@@ -1015,6 +1019,38 @@ class ShopWorkflow:
             ).fetchone()
         return self._serialize_product(row, admin=True)
 
+    def list_active_stores(self, limit: int = 200) -> list[dict[str, Any]]:
+        """Return public-safe storefront metadata for ACTIVE shops only."""
+        safe_limit = max(1, min(limit, 200))
+        with self.connect() as db:
+            rows = db.execute(
+                """
+                SELECT a.id,a.shop_name,a.category,a.description,a.address,a.city,a.pincode,
+                       a.created_at,a.updated_at,
+                       (SELECT p.image_urls_json FROM shop_product_submissions p
+                         WHERE p.application_id=a.id AND p.status='PUBLISHED'
+                         ORDER BY p.published_at DESC LIMIT 1) AS image_urls_json
+                  FROM vendor_applications a
+                 WHERE a.status='ACTIVE'
+                 ORDER BY a.activated_at DESC,a.updated_at DESC
+                 LIMIT ?
+                """,
+                (safe_limit,),
+            ).fetchall()
+        stores: list[dict[str, Any]] = []
+        for row in rows:
+            images = json.loads(row["image_urls_json"]) if row["image_urls_json"] else []
+            image = images[0] if images else None
+            stores.append({
+                "id": row["id"], "slug": _store_slug(row["id"]),
+                "storeName": row["shop_name"], "category": row["category"],
+                "description": row["description"], "address": row["address"],
+                "city": row["city"], "pincode": row["pincode"],
+                "deliveryMinutes": 60, "bannerImage": image, "logoImage": image,
+                "active": True, "approved": True, "createdAt": row["created_at"],
+            })
+        return stores
+
     def _published_rows(self, limit: int) -> list[sqlite3.Row]:
         safe_limit = max(1, min(limit, 200))
         with self.connect() as db:
@@ -1044,7 +1080,7 @@ class ShopWorkflow:
         )
         variant_id = f"{row['id']}-var-1"
         sku = f"SD-SHOP-{row['id'][-12:].upper()}"
-        store_slug = f"local-shop-{row['application_id'][-12:]}"
+        store_slug = _store_slug(row['application_id'])
         variant = {
             "id": variant_id,
             "sku": sku,
