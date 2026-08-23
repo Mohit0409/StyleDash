@@ -79,7 +79,9 @@ export const CartDrawer: React.FC<{ isOpen: boolean; onClose: () => void }> = ({
                   <div>
                     <div className="flex justify-between items-start">
                       <div>
-                        <span className="text-[10px] font-bold uppercase text-neutral-400">{item.product.brand}</span>
+                        {item.product.brand && (
+                          <span className="text-[10px] font-bold uppercase text-neutral-400">{item.product.brand}</span>
+                        )}
                         <h5 className="font-semibold text-xs text-neutral-900 dark:text-white line-clamp-1">{item.product.name}</h5>
                       </div>
                       <button

@@ -49,14 +49,14 @@ test('customer policy pages publish launch contacts without pre-live warnings', 
 
   await page.goto('/help');
   await expect(page.locator('main')).toContainText('+91 8963942394');
-  await expect(page.locator('main')).toContainText('Grievance officer: Swapnil');
+  await expect(page.locator('main')).toContainText('Grievance officer: Mohit Jangde');
 
   await page.goto('/returns');
   await expect(page.locator('main')).toContainText('7-day size exchange');
   await expect(page.locator('main')).toContainText('INR 50');
 
   await page.goto('/privacy');
-  await expect(page.locator('main')).toContainText('Mohit Jangd');
+  await expect(page.locator('main')).toContainText('Mohit Jangde');
 });
 
 test('unknown route renders StyleDash 404', async ({ page }) => {

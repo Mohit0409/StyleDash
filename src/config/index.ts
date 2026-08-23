@@ -13,8 +13,8 @@ export const CONFIG = {
   // Current operating details for the limited-area launch.
   // Keep these centralized so the proprietor/grievance contacts can be changed once.
   LEGAL: {
-    PROPRIETOR_NAME: 'Mohit Jangd',
-    GRIEVANCE_OFFICER: 'Swapnil',
+    PROPRIETOR_NAME: 'Mohit Jangde',
+    GRIEVANCE_OFFICER: 'Mohit Jangde',
     ADDRESS: 'Alkaloid Colony, Neemuch, Madhya Pradesh 458441, India',
     SUPPORT_EMAIL: 'styledashsupport@gmail.com',
     SUPPORT_PHONE: '+91 8963942394',
