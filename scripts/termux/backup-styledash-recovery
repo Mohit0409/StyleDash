@@ -1,5 +1,6 @@
 #!/data/data/com.termux/files/usr/bin/bash
 set -euo pipefail
+umask 077
 
 RUN_DIR="$HOME/run"
 OUT="$HOME/.local/share/styledash/recovery"
@@ -28,12 +29,18 @@ WORK="$HOME/.cache/styledash-recovery-$STAMP"
 VERIFY="$HOME/.cache/styledash-verify-$STAMP"
 ARCHIVE="$OUT/styledash-full-recovery-$STAMP.tar.gz.enc"
 NAME="$(basename "$ARCHIVE")"
+SUCCESS=0
 
 cleanup() {
   unset RECOVERY_PASSWORD 2>/dev/null || true
   rm -rf "$WORK" "$VERIFY"
+  if [ "$SUCCESS" -ne 1 ] && [ -f "$ARCHIVE" ]; then
+    rm -f "$ARCHIVE"
+  fi
 }
-trap cleanup EXIT INT TERM
+trap cleanup EXIT
+trap 'exit 130' INT
+trap 'exit 143' TERM
 
 mkdir -p \
   "$WORK/home" \
@@ -190,5 +197,6 @@ for path in files[4:]:
     path.unlink()
 PY
 
+SUCCESS=1
 echo "Full StyleDash recovery backup verified: $STAMP"
 echo "SHA256: $HASH"

@@ -68,6 +68,9 @@ class ProductionReliabilityTests(unittest.TestCase):
         self.assertIn("STYLEDASH_RECOVERY_WINDOWS_PASSWORD_FILE", script)
         self.assertIn("STYLEDASH_RECOVERY_REMOTE_PRIMARY", script)
         self.assertIn("STYLEDASH_RECOVERY_REMOTE_SECONDARY", script)
+        self.assertIn("umask 077", script)
+        self.assertIn('rm -f "$ARCHIVE"', script)
+        self.assertIn("SUCCESS=1", script)
         self.assertNotIn("100.106.126.74", script)
         self.assertNotIn(r"C:\\Users\\", script)
 
