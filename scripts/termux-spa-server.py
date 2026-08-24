@@ -567,6 +567,61 @@ class PaymentService:
                     })
         return {"success": True, "availability": availability}
 
+    def shop_inventory_snapshot(self, product_ids: list[str]) -> dict[str, int]:
+        self.refresh_shop_products()
+        products = self.product_snapshot()
+        result: dict[str, int] = {}
+        with self.store.lock:
+            state = self.store.state
+            for product_id in product_ids:
+                product = products.get(product_id)
+                if not product or not product.get("vendorId") or not product.get("variants"):
+                    continue
+                result[product_id] = self._inventory(state, product["variants"][0])
+        return result
+
+    def set_shop_inventory(self, product_id: str, stock: Any) -> dict[str, Any]:
+        if (
+            isinstance(stock, bool)
+            or not isinstance(stock, int)
+            or not 0 <= stock <= 100_000
+        ):
+            raise SecurityError(
+                400,
+                "Stock must be a whole number from 0 to 100000.",
+                "invalid_inventory_adjustment",
+            )
+        self.refresh_shop_products()
+        product = self.product_snapshot().get(product_id)
+        if (
+            not product
+            or not product.get("vendorId")
+            or not product.get("active")
+            or not product.get("variants")
+        ):
+            raise SecurityError(
+                409,
+                "The published product is not currently active.",
+                "published_product_required",
+            )
+        variant = product["variants"][0]
+        inventory_alert = None
+        with self.store.lock:
+            before = self._inventory(self.store.state, variant)
+            inventory_alert = self._inventory_alert_for_change(
+                product, variant, before, stock
+            )
+            self.store.state["inventory"][variant["id"]] = stock
+            self.store.save()
+        if inventory_alert is not None:
+            _notify_inventory_alerts([inventory_alert])
+        return {
+            "productId": product_id,
+            "variantId": variant["id"],
+            "before": before,
+            "stock": stock,
+        }
+
     def _validate_address(self, payload: dict[str, Any]) -> dict[str, str]:
         address = payload.get("address")
         if not isinstance(address, dict):
@@ -2078,9 +2133,26 @@ class StyleDashRequestHandler(SimpleHTTPRequestHandler):
                 return
             if path == "/api/shop-products":
                 user, _session = self._current_user()
+                products = self._shops().list_products(user["id"])
+                live_inventory = self.payment_service.shop_inventory_snapshot(
+                    [product["id"] for product in products if product["status"] == "PUBLISHED"]
+                )
+                for product in products:
+                    if product["id"] in live_inventory:
+                        product["inventory"] = live_inventory[product["id"]]
                 self._json_response(
                     HTTPStatus.OK,
-                    {"success": True, "products": self._shops().list_products(user["id"])},
+                    {"success": True, "products": products},
+                )
+                return
+            if path == "/api/shop-product-requests":
+                user, _session = self._current_user()
+                self._json_response(
+                    HTTPStatus.OK,
+                    {
+                        "success": True,
+                        "requests": self._shops().list_product_change_requests(user["id"]),
+                    },
                 )
                 return
             if path.startswith("/api/orders/"):
@@ -2394,6 +2466,45 @@ class StyleDashRequestHandler(SimpleHTTPRequestHandler):
                     HTTPStatus.OK, {"success": True, "product": result}
                 )
                 return
+            if path.startswith("/api/shop-products/") and path.endswith("/edit-request"):
+                self._rate_limit("/api/shop-products/edit-request", 10)
+                user, _session = self._current_user()
+                self._csrf()
+                product_id = unquote(
+                    path.removeprefix("/api/shop-products/").removesuffix("/edit-request")
+                )
+                if not product_id or "/" in product_id:
+                    raise SecurityError(404, "Product submission not found.", "product_not_found")
+                result = self._shops().create_product_edit_request(
+                    user["id"], product_id, self._read_json()
+                )
+                self._json_response(
+                    HTTPStatus.CREATED, {"success": True, "request": result}
+                )
+                return
+            if path.startswith("/api/shop-products/") and path.endswith("/unpublish-request"):
+                self._rate_limit("/api/shop-products/unpublish-request", 10)
+                user, _session = self._current_user()
+                self._csrf()
+                product_id = unquote(
+                    path.removeprefix("/api/shop-products/").removesuffix("/unpublish-request")
+                )
+                if not product_id or "/" in product_id:
+                    raise SecurityError(404, "Product submission not found.", "product_not_found")
+                payload = self._read_json()
+                if payload:
+                    raise SecurityError(
+                        400,
+                        "Unpublish requests do not accept product fields.",
+                        "invalid_product_change",
+                    )
+                result = self._shops().create_product_unpublish_request(
+                    user["id"], product_id
+                )
+                self._json_response(
+                    HTTPStatus.CREATED, {"success": True, "request": result}
+                )
+                return
             if path.startswith(API_PREFIX):
                 self._json_response(HTTPStatus.NOT_FOUND, {"success": False, "error": "API endpoint not found.", "code": "not_found"})
                 return
@@ -2443,6 +2554,30 @@ class StyleDashRequestHandler(SimpleHTTPRequestHandler):
                 application = self._shops().update_draft(user["id"], self._read_json())
                 self._json_response(
                     HTTPStatus.OK, {"success": True, "application": application}
+                )
+                return
+            if path.startswith("/api/shop-products/") and path.endswith("/stock"):
+                self._rate_limit("/api/shop-products/stock", 30)
+                user, _session = self._current_user()
+                self._csrf()
+                product_id = unquote(
+                    path.removeprefix("/api/shop-products/").removesuffix("/stock")
+                )
+                if not product_id or "/" in product_id:
+                    raise SecurityError(404, "Product submission not found.", "product_not_found")
+                payload = self._read_json()
+                if not isinstance(payload, dict) or set(payload) != {"stock"}:
+                    raise SecurityError(
+                        400,
+                        "Provide only the new stock value.",
+                        "invalid_inventory_adjustment",
+                    )
+                self._shops().require_seller_published_product(user["id"], product_id)
+                inventory = self.payment_service.set_shop_inventory(
+                    product_id, payload.get("stock")
+                )
+                self._json_response(
+                    HTTPStatus.OK, {"success": True, "inventory": inventory}
                 )
                 return
             if path.startswith("/api/shop-products/"):

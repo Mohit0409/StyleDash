@@ -2054,6 +2054,47 @@ class HttpApiTests(unittest.TestCase):
         self.assertEqual(status, 200)
         self.assertTrue(availability["availability"][0]["available"])
 
+        status, stock_updated, _headers = self.patch_json(
+            f"/api/shop-products/{product_id}/stock", {"stock": 3}, session_headers
+        )
+        self.assertEqual((status, stock_updated["inventory"]["stock"]), (200, 3))
+        status, seller_products, _headers = self.get_json(
+            "/api/shop-products", {"Cookie": session_headers["Cookie"]}
+        )
+        self.assertEqual(seller_products["products"][0]["inventory"], 3)
+
+        status, change_created, _headers = self.post_json(
+            f"/api/shop-products/{product_id}/edit-request",
+            {"name": "HTTP Reviewed Kurta", "pricePaise": 149900},
+            session_headers,
+        )
+        self.assertEqual((status, change_created["request"]["status"]), (201, "SUBMITTED"))
+        change_id = change_created["request"]["id"]
+        status, requests, _headers = self.get_json(
+            "/api/shop-product-requests", {"Cookie": session_headers["Cookie"]}
+        )
+        self.assertEqual((status, [item["id"] for item in requests["requests"]]), (200, [change_id]))
+        status, live_while_pending, _headers = self.get_json("/api/shop-products/published")
+        self.assertEqual(
+            (live_while_pending["products"][0]["name"], live_while_pending["products"][0]["price"]),
+            ("HTTP Published Kurta", 1599),
+        )
+        self.service.shops.admin_transition_product_change_request(
+            "http-admin", change_id, "UNDER_REVIEW"
+        )
+        self.service.shops.admin_transition_product_change_request(
+            "http-admin", change_id, "APPROVED"
+        )
+        status, live_after_approval, _headers = self.get_json("/api/shop-products/published")
+        self.assertEqual(
+            (live_after_approval["products"][0]["name"], live_after_approval["products"][0]["price"]),
+            ("HTTP Reviewed Kurta", 1499),
+        )
+        status, seller_products_after, _headers = self.get_json(
+            "/api/shop-products", {"Cookie": session_headers["Cookie"]}
+        )
+        self.assertEqual(seller_products_after["products"][0]["inventory"], 3)
+
         cod_headers = {
             **session_headers,
             "Idempotency-Key": "shop-http-cod-001",

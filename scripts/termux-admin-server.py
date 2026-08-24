@@ -583,6 +583,9 @@ class AdminHandler(BaseHTTPRequestHandler):
             if path == "/api/admin/shop-products":
                 admin, _session = self._admin()
                 self._json(200, {"success": True, "products": self._shops().admin_list_products(admin["id"])}); return
+            if path == "/api/admin/shop-product-requests":
+                admin, _session = self._admin()
+                self._json(200, {"success": True, "requests": self._shops().admin_list_product_change_requests(admin["id"])}); return
             if path == "/api/admin/inventory":
                 self._admin(); query = self._query(); needle = query.get("q", [""])[0]; low = query.get("low", ["0"])[0] == "1"
                 self._json(200, {"success": True, "inventory": self.application.inventory(needle, low)}); return
@@ -635,6 +638,12 @@ class AdminHandler(BaseHTTPRequestHandler):
                     admin["id"], application_id, payload.get("status"), payload.get("reason")
                 )
                 self._json(200, {"success": True, "application": result}); return
+            if path.startswith("/api/admin/shop-product-requests/"):
+                request_id = unquote(path.removeprefix("/api/admin/shop-product-requests/"))
+                result = self._shops().admin_transition_product_change_request(
+                    admin["id"], request_id, payload.get("status"), payload.get("reason")
+                )
+                self._json(200, {"success": True, "request": result}); return
             if path.startswith("/api/admin/shop-products/"):
                 product_id = unquote(path.removeprefix("/api/admin/shop-products/"))
                 result = self._shops().admin_transition_product(

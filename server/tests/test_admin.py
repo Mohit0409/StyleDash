@@ -593,6 +593,30 @@ class AdminHttpTests(unittest.TestCase):
         self.assertEqual((status, body["product"]["status"]), (200, "UNDER_REVIEW"))
         refresh.assert_not_called()
 
+        for target in ("APPROVED", "PUBLISHED"):
+            status, body, _headers = self.request(
+                f"/api/admin/shop-products/{product['id']}", {"status": target, "reason": None},
+                headers={"X-CSRF-Token": csrf}, method="PATCH",
+            )
+            self.assertEqual((status, body["product"]["status"]), (200, target))
+
+        change = shops.create_product_edit_request(
+            user["id"], product["id"], {"name": "Transition Tee Updated"}
+        )
+        status, body, _headers = self.request("/api/admin/shop-product-requests")
+        self.assertEqual(status, 200)
+        self.assertEqual([item["id"] for item in body["requests"]], [change["id"]])
+        self.assertEqual(body["requests"][0]["shopName"], "Transition Shop")
+        for target in ("UNDER_REVIEW", "APPROVED"):
+            status, body, _headers = self.request(
+                f"/api/admin/shop-product-requests/{change['id']}",
+                {"status": target, "reason": None},
+                headers={"X-CSRF-Token": csrf}, method="PATCH",
+            )
+            self.assertEqual((status, body["request"]["status"]), (200, target))
+        updated = next(item for item in shops.admin_list_products(body["request"]["reviewedBy"]) if item["id"] == product["id"] )
+        self.assertEqual(updated["name"], "Transition Tee Updated")
+
     def test_non_loopback_bind_refused(self):
         with self.assertRaises(RuntimeError):
             ADMIN_SERVER.create_admin_server("0.0.0.0", 0, self.database, self.key, ROOT / "server/payment-data/catalog.json", ROOT / "server/payment-data/settings.json", self.root / "data2", ROOT / "server/admin", self.root / "backups")

@@ -70,6 +70,36 @@ describe('seller product submission API', () => {
     }
     expect(String((fetchSpy.mock.calls[1][1] as RequestInit).body)).not.toContain('status');
   });
+  it('uses CSRF-protected seller live catalogue endpoints', async () => {
+    setCsrfToken('csrf-live-catalogue');
+    const request = { id: 'shopchg_1', productId: 'shopprod_1', applicationId: 'shop-1', action: 'EDIT', status: 'SUBMITTED' };
+    const inventory = { productId: 'shopprod_1', variantId: 'shopprod_1-var-1', before: 2, stock: 7 };
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(async (endpoint) => {
+      if (String(endpoint) === '/api/shop-product-requests') return jsonResponse({ success: true, requests: [request] });
+      if (String(endpoint).endsWith('/stock')) return jsonResponse({ success: true, inventory });
+      return jsonResponse({ success: true, request }, 201);
+    });
+    const edit = { name: 'Updated Product', description: 'Updated product description', department: 'women' as const,
+      category: 'Clothing & Fashion', pricePaise: 45000, originalPricePaise: 60000, size: 'M', colourName: 'Black',
+      imageUrls: ['https://example.test/product.jpg'], attributes: {} };
+
+    await expect(shopProductApi.requests()).resolves.toEqual([request]);
+    await shopProductApi.requestEdit('shopprod_1', edit);
+    await shopProductApi.requestUnpublish('shopprod_1');
+    await expect(shopProductApi.setStock('shopprod_1', 7)).resolves.toEqual(inventory);
+
+    expect(fetchSpy.mock.calls.map(([endpoint]) => endpoint)).toEqual([
+      '/api/shop-product-requests', '/api/shop-products/shopprod_1/edit-request',
+      '/api/shop-products/shopprod_1/unpublish-request', '/api/shop-products/shopprod_1/stock',
+    ]);
+    for (const [, init] of fetchSpy.mock.calls.slice(1) as Array<[RequestInfo | URL, RequestInit]>) {
+      expect(new Headers(init.headers).get('X-CSRF-Token')).toBe('csrf-live-catalogue');
+      expect(init.credentials).toBe('include');
+    }
+    expect(JSON.parse(String((fetchSpy.mock.calls[1][1] as RequestInit).body))).not.toHaveProperty('inventory');
+    expect(JSON.parse(String((fetchSpy.mock.calls[3][1] as RequestInit).body))).toEqual({ stock: 7 });
+  });
+
 });
 
 describe('shop application API', () => {
