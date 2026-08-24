@@ -172,7 +172,7 @@ class ShopWorkflowTests(unittest.TestCase):
                 [row[0] for row in db.execute(
                     "SELECT version FROM shop_schema_migrations ORDER BY version"
                 )],
-                [1, 2],
+                [1, 2, 3],
             )
             self.assertEqual(db.execute("PRAGMA integrity_check").fetchone()[0], "ok")
             self.assertEqual(db.execute("PRAGMA foreign_key_check").fetchall(), [])
@@ -242,7 +242,7 @@ class ShopWorkflowTests(unittest.TestCase):
         db = sqlite3.connect(concurrent_path)
         self.assertEqual(
             db.execute("SELECT version,COUNT(*) FROM shop_schema_migrations GROUP BY version").fetchall(),
-            [(1, 1), (2, 1)],
+            [(1, 1), (2, 1), (3, 1)],
         )
         self.assertEqual(db.execute("PRAGMA integrity_check").fetchone()[0], "ok")
         db.close()
@@ -437,6 +437,75 @@ class ShopWorkflowTests(unittest.TestCase):
             {image_less["id"], product["id"]},
         )
 
+    def test_published_product_change_requests_preserve_live_version_until_approval(self) -> None:
+        self.create_active_shop("user-a", "Managed Publishing Shop")
+        self.create_active_shop("user-b", "Other Seller Shop")
+        product = self.store.create_product_draft(
+            "user-a", self.complete_product("Original Live Kurta")
+        )
+        self.store.submit_product("user-a", product["id"])
+        for target in ("UNDER_REVIEW", "APPROVED", "PUBLISHED"):
+            product = self.store.admin_transition_product("admin-a", product["id"], target)
+
+        original_public = self.store.list_published_products()[0]
+        self.assertEqual((original_public["name"], original_public["price"]), ("Original Live Kurta", 1599))
+        self.assert_error(
+            "product_not_found",
+            lambda: self.store.create_product_edit_request(
+                "user-b", product["id"], {"name": "Stolen Rename"}
+            ),
+        )
+        self.assert_error(
+            "invalid_product_change",
+            lambda: self.store.create_product_edit_request("user-a", product["id"], {"inventory": 99}),
+        )
+        self.assert_error(
+            "no_product_changes",
+            lambda: self.store.create_product_edit_request(
+                "user-a", product["id"], {"name": "Original Live Kurta"}
+            ),
+        )
+        first = self.store.create_product_edit_request(
+            "user-a", product["id"], {"name": "Reviewed Live Kurta", "pricePaise": 149900}
+        )
+        self.assertEqual((first["action"], first["status"]), ("EDIT", "SUBMITTED"))
+        still_live = self.store.list_published_products()[0]
+        self.assertEqual((still_live["name"], still_live["price"]), ("Original Live Kurta", 1599))
+        self.assert_error(
+            "product_change_pending",
+            lambda: self.store.create_product_unpublish_request("user-a", product["id"]),
+        )
+        self.assert_error(
+            "invalid_product_change_transition",
+            lambda: self.store.admin_transition_product_change_request("admin-a", first["id"], "APPROVED"),
+        )
+        self.store.admin_transition_product_change_request("admin-a", first["id"], "UNDER_REVIEW")
+        self.assert_error(
+            "rejection_reason_required",
+            lambda: self.store.admin_transition_product_change_request("admin-a", first["id"], "REJECTED"),
+        )
+        rejected = self.store.admin_transition_product_change_request(
+            "admin-a", first["id"], "REJECTED", "Use the approved catalogue wording."
+        )
+        self.assertEqual(rejected["rejectionReason"], "Use the approved catalogue wording.")
+        self.assertEqual(self.store.list_published_products()[0]["name"], "Original Live Kurta")
+
+        second = self.store.create_product_edit_request(
+            "user-a", product["id"], {"name": "Approved Live Kurta", "pricePaise": 149900}
+        )
+        self.store.admin_transition_product_change_request("admin-a", second["id"], "UNDER_REVIEW")
+        self.store.admin_transition_product_change_request("admin-a", second["id"], "APPROVED")
+        changed_public = self.store.list_published_products()[0]
+        self.assertEqual((changed_public["name"], changed_public["price"]), ("Approved Live Kurta", 1499))
+
+        unpublish = self.store.create_product_unpublish_request("user-a", product["id"])
+        self.store.admin_transition_product_change_request("admin-a", unpublish["id"], "UNDER_REVIEW")
+        self.store.admin_transition_product_change_request("admin-a", unpublish["id"], "APPROVED")
+        self.assertEqual(self.store.list_published_products(), [])
+        product_after = next(
+            item for item in self.store.admin_list_products("admin-a") if item["id"] == product["id"]
+        )
+        self.assertEqual(product_after["status"], "APPROVED")
 
 if __name__ == "__main__":
     unittest.main()

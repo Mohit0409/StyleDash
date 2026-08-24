@@ -27,6 +27,10 @@ test('approved shop owner can draft and submit but cannot publish a product', as
       await json({ success: true, products: product ? [product] : [] });
       return;
     }
+    if (path === '/api/shop-product-requests' && method === 'GET') {
+      await json({ success: true, requests: [] });
+      return;
+    }
     if (path === '/api/shop-products' && method === 'POST') {
       createPayload = request.postDataJSON() as Record<string, unknown>;
       product = {
@@ -66,5 +70,100 @@ test('approved shop owner can draft and submit but cannot publish a product', as
 
   await page.getByRole('button', { name: 'Submit', exact: true }).click();
   await expect(page.getByText('SUBMITTED', { exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: /publish/i })).toHaveCount(0);
+});
+
+
+test('published seller can update stock and submit edit or unpublish requests without direct publish powers', async ({ page }) => {
+  let requests: Array<Record<string, unknown>> = [];
+  let editPayload: Record<string, unknown> | null = null;
+  let stockPayload: Record<string, unknown> | null = null;
+  let unpublishPayload: Record<string, unknown> | null = null;
+  const products: Array<Record<string, unknown>> = [
+    {
+      id: 'shopprod_edit', slug: 'edit-live', applicationId: 'shop-1', status: 'PUBLISHED',
+      name: 'Editable Live Product', description: 'Published product that can request reviewed catalogue changes.',
+      brand: 'Local', department: 'women', category: 'Clothing & Fashion',
+      pricePaise: 50000, originalPricePaise: 60000, inventory: 2, size: 'M',
+      colourName: 'Black', colourHex: '#000000', imageUrls: ['https://example.test/edit.jpg'],
+      attributes: {}, createdAt: '2026-08-20T00:00:00Z', updatedAt: '2026-08-20T00:00:00Z',
+    },
+    {
+      id: 'shopprod_remove', slug: 'remove-live', applicationId: 'shop-1', status: 'PUBLISHED',
+      name: 'Unpublish Live Product', description: 'Published product that can request administrator unpublishing.',
+      brand: 'Local', department: 'women', category: 'Clothing & Fashion',
+      pricePaise: 70000, originalPricePaise: 80000, inventory: 4, size: 'L',
+      colourName: 'Blue', colourHex: '#0000FF', imageUrls: ['https://example.test/remove.jpg'],
+      attributes: {}, createdAt: '2026-08-20T00:00:00Z', updatedAt: '2026-08-20T00:00:00Z',
+    },
+  ];
+
+  await page.route('**/api/**', async route => {
+    const request = route.request();
+    const path = new URL(request.url()).pathname;
+    const method = request.method();
+    const json = (body: unknown, status = 200) => route.fulfill({ status, contentType: 'application/json', body: JSON.stringify(body) });
+    if (path === '/api/auth/me') return void await json({ success: true, csrfToken: 'csrf-live', user: { uid: 'seller-1', name: 'Seller E2E', email: 'seller@example.test', role: 'customer' } });
+    if (path === '/api/vendor-applications/me' && method === 'GET') return void await json({ success: true, application: {
+      id: 'shop-1', status: 'ACTIVE', shopName: 'E2E Active Shop', ownerName: 'Seller E2E',
+      registeredEmail: 'seller@example.test', category: 'Clothing & Fashion', description: 'Active test shop',
+      address: 'Main market', city: 'Neemuch', state: 'Madhya Pradesh', pincode: '458441',
+      createdAt: '2026-08-20T00:00:00Z', updatedAt: '2026-08-20T00:00:00Z',
+    } });
+    if (path === '/api/shop-products' && method === 'GET') return void await json({ success: true, products });
+    if (path === '/api/shop-product-requests' && method === 'GET') return void await json({ success: true, requests });
+    if (path === '/api/shop-products/shopprod_edit/stock' && method === 'PATCH') {
+      stockPayload = request.postDataJSON() as Record<string, unknown>;
+      products[0] = { ...products[0], inventory: stockPayload.stock };
+      return void await json({ success: true, inventory: { productId: 'shopprod_edit', variantId: 'shopprod_edit-var-1', before: 2, stock: stockPayload.stock } });
+    }
+    if (path === '/api/shop-products/shopprod_edit/edit-request' && method === 'POST') {
+      editPayload = request.postDataJSON() as Record<string, unknown>;
+      const change = {
+        id: 'shopchg_edit', productId: 'shopprod_edit', applicationId: 'shop-1', productName: 'Editable Live Product',
+        action: 'EDIT', status: 'SUBMITTED', proposedProduct: editPayload,
+        createdAt: '2026-08-24T00:00:00Z', updatedAt: '2026-08-24T00:00:00Z', submittedAt: '2026-08-24T00:00:00Z',
+      };
+      requests = [change, ...requests];
+      return void await json({ success: true, request: change }, 201);
+    }
+    if (path === '/api/shop-products/shopprod_remove/unpublish-request' && method === 'POST') {
+      unpublishPayload = request.postDataJSON() as Record<string, unknown>;
+      const change = {
+        id: 'shopchg_remove', productId: 'shopprod_remove', applicationId: 'shop-1', productName: 'Unpublish Live Product',
+        action: 'UNPUBLISH', status: 'SUBMITTED', proposedProduct: null,
+        createdAt: '2026-08-24T00:00:00Z', updatedAt: '2026-08-24T00:00:00Z', submittedAt: '2026-08-24T00:00:00Z',
+      };
+      requests = [change, ...requests];
+      return void await json({ success: true, request: change }, 201);
+    }
+    await json({ success: false, error: `Unexpected mocked API request: ${method} ${path}` }, 500);
+  });
+
+  page.on('dialog', async dialog => {
+    if (dialog.type() === 'prompt') await dialog.accept('5');
+    else await dialog.accept();
+  });
+  await page.goto('/partner');
+
+  const editCard = page.getByRole('article').filter({ has: page.getByRole('heading', { name: 'Editable Live Product' }) });
+  await editCard.getByRole('button', { name: 'Update Stock' }).click();
+  await expect(editCard.getByText(/Stock: 5/)).toBeVisible();
+  expect(stockPayload).toEqual({ stock: 5 });
+
+  await editCard.getByRole('button', { name: 'Edit Listing' }).click();
+  await expect(page.getByRole('heading', { name: 'Request Listing Changes' })).toBeVisible();
+  await page.getByLabel('Product name').fill('Reviewed Live Product');
+  await page.getByRole('button', { name: 'Submit Listing Changes' }).click();
+  await expect(editCard.getByText(/EDIT request submitted/i)).toBeVisible();
+  expect(editPayload).not.toHaveProperty('inventory');
+  expect(editPayload?.name).toBe('Reviewed Live Product');
+  await expect(editCard.getByRole('button', { name: 'Edit Listing' })).toHaveCount(0);
+  await expect(editCard.getByRole('button', { name: 'Request Unpublish' })).toHaveCount(0);
+
+  const removeCard = page.getByRole('article').filter({ has: page.getByRole('heading', { name: 'Unpublish Live Product' }) });
+  await removeCard.getByRole('button', { name: 'Request Unpublish' }).click();
+  await expect(removeCard.getByText(/UNPUBLISH request submitted/i)).toBeVisible();
+  expect(unpublishPayload).toEqual({});
   await expect(page.getByRole('button', { name: /publish/i })).toHaveCount(0);
 });

@@ -39,6 +39,12 @@ PRODUCT_STATUSES = (
     "PUBLISHED",
     "REJECTED",
 )
+PRODUCT_CHANGE_ACTIONS = ("EDIT", "UNPUBLISH")
+PRODUCT_CHANGE_STATUSES = ("SUBMITTED", "UNDER_REVIEW", "APPROVED", "REJECTED")
+PRODUCT_CHANGE_ADMIN_TRANSITIONS = {
+    "SUBMITTED": {"UNDER_REVIEW"},
+    "UNDER_REVIEW": {"APPROVED", "REJECTED"},
+}
 ALLOWED_CATEGORIES = {
     "Clothing & Fashion",
     "Footwear",
@@ -86,6 +92,7 @@ PRODUCT_PAYLOAD_FIELDS = {
     "colourName",
     "colourHex",
 }
+PRODUCT_CHANGE_PAYLOAD_FIELDS = PRODUCT_PAYLOAD_FIELDS - {"inventory"}
 DEPARTMENTS = {"men", "women", "kids", "unisex", "footwear", "accessories"}
 COLOUR_HEX_PATTERN = re.compile(r"^#[0-9A-Fa-f]{6}$")
 
@@ -139,6 +146,7 @@ class ShopWorkflow:
             # start concurrently against the same SQLite database.
             self._migrate_applications(db)
             self._migrate_products(db)
+            self._migrate_product_change_requests(db)
             check = db.execute("PRAGMA foreign_key_check").fetchall()
             if check:
                 raise RuntimeError("Shop migration failed foreign key validation")
@@ -298,6 +306,59 @@ class ShopWorkflow:
             )
             db.execute(
                 "INSERT INTO shop_schema_migrations(version,applied_at) VALUES(2,?)",
+                (now,),
+            )
+            db.commit()
+        except Exception:
+            db.rollback()
+            raise
+
+    @staticmethod
+    def _migrate_product_change_requests(db: sqlite3.Connection) -> None:
+        now = iso(utc_now())
+        actions = ",".join(f"'{action}'" for action in PRODUCT_CHANGE_ACTIONS)
+        statuses = ",".join(f"'{status}'" for status in PRODUCT_CHANGE_STATUSES)
+        db.execute("BEGIN IMMEDIATE")
+        try:
+            if db.execute(
+                "SELECT 1 FROM shop_schema_migrations WHERE version=3"
+            ).fetchone() is not None:
+                db.commit()
+                return
+            db.execute(
+                f"""
+                CREATE TABLE IF NOT EXISTS shop_product_change_requests(
+                  id TEXT PRIMARY KEY,
+                  product_id TEXT NOT NULL REFERENCES shop_product_submissions(id) ON DELETE CASCADE,
+                  application_id TEXT NOT NULL REFERENCES vendor_applications(id) ON DELETE CASCADE,
+                  submitted_by_user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                  action TEXT NOT NULL CHECK(action IN ({actions})),
+                  payload_json TEXT,
+                  status TEXT NOT NULL DEFAULT 'SUBMITTED' CHECK(status IN ({statuses})),
+                  rejection_reason TEXT,
+                  reviewed_by TEXT,
+                  created_at TEXT NOT NULL,
+                  updated_at TEXT NOT NULL,
+                  submitted_at TEXT NOT NULL,
+                  reviewed_at TEXT
+                )
+                """
+            )
+            db.execute(
+                "CREATE INDEX IF NOT EXISTS shop_product_change_customer_idx "
+                "ON shop_product_change_requests(submitted_by_user_id,updated_at)"
+            )
+            db.execute(
+                "CREATE INDEX IF NOT EXISTS shop_product_change_admin_idx "
+                "ON shop_product_change_requests(status,updated_at)"
+            )
+            db.execute(
+                "CREATE UNIQUE INDEX IF NOT EXISTS shop_product_change_pending_idx "
+                "ON shop_product_change_requests(product_id) "
+                "WHERE status IN ('SUBMITTED','UNDER_REVIEW')"
+            )
+            db.execute(
+                "INSERT INTO shop_schema_migrations(version,applied_at) VALUES(3,?)",
                 (now,),
             )
             db.commit()
@@ -782,6 +843,82 @@ class ShopWorkflow:
         return result
 
     @staticmethod
+    def _product_values_to_change_payload(values: dict[str, Any]) -> dict[str, Any]:
+        return {
+            "name": values["name"],
+            "description": values["description"],
+            "brand": values["brand"],
+            "department": values["department"],
+            "category": values["category"],
+            "pricePaise": values["price_paise"],
+            "originalPricePaise": values["original_price_paise"],
+            "size": values["size"],
+            "colourName": values["colour_name"],
+            "colourHex": values["colour_hex"],
+            "imageUrls": json.loads(values["image_urls_json"]),
+            "attributes": json.loads(values["attributes_json"]),
+        }
+
+    @staticmethod
+    def _serialize_change_request(
+        row: sqlite3.Row, *, admin: bool = False
+    ) -> dict[str, Any]:
+        result = {
+            "id": row["id"],
+            "productId": row["product_id"],
+            "applicationId": row["application_id"],
+            "action": row["action"],
+            "status": row["status"],
+            "proposedProduct": (
+                json.loads(row["payload_json"]) if row["payload_json"] else None
+            ),
+            "rejectionReason": (
+                row["rejection_reason"] if row["status"] == "REJECTED" else None
+            ),
+            "createdAt": row["created_at"],
+            "updatedAt": row["updated_at"],
+            "submittedAt": row["submitted_at"],
+            "reviewedAt": row["reviewed_at"],
+        }
+        if "product_name" in row.keys():
+            result["productName"] = row["product_name"]
+        if "shop_name" in row.keys():
+            result["shopName"] = row["shop_name"]
+        if admin:
+            result.update(
+                {
+                    "submittedByUserId": row["submitted_by_user_id"],
+                    "reviewedBy": row["reviewed_by"],
+                }
+            )
+        return result
+
+    def _seller_published_product(
+        self, db: sqlite3.Connection, user_id: str, product_id: str
+    ) -> sqlite3.Row:
+        application = self._seller_application(db, user_id)
+        if application["status"] != "ACTIVE":
+            raise SecurityError(
+                403,
+                "An active shop is required to manage a live product.",
+                "active_shop_required",
+            )
+        current = db.execute(
+            "SELECT * FROM shop_product_submissions "
+            "WHERE id=? AND submitted_by_user_id=?",
+            (product_id, user_id),
+        ).fetchone()
+        if current is None:
+            raise SecurityError(404, "Product submission not found.", "product_not_found")
+        if current["status"] != "PUBLISHED":
+            raise SecurityError(
+                409,
+                "A published product is required for this action.",
+                "published_product_required",
+            )
+        return current
+
+    @staticmethod
     def _product_slug(name: str, product_id: str) -> str:
         stem = re.sub(r"[^a-z0-9]+", "-", name.casefold()).strip("-")[:80]
         return f"{stem or 'local-product'}-{product_id[-12:]}"
@@ -1019,6 +1156,313 @@ class ShopWorkflow:
             ).fetchone()
         return self._serialize_product(row, admin=True)
 
+    def require_seller_published_product(
+        self, user_id: str, product_id: str
+    ) -> dict[str, Any]:
+        with self.connect() as db:
+            row = self._seller_published_product(db, user_id, product_id)
+        return self._serialize_product(row)
+
+    def list_product_change_requests(self, user_id: str) -> list[dict[str, Any]]:
+        with self.connect() as db:
+            rows = db.execute(
+                """
+                SELECT r.*,p.name AS product_name
+                  FROM shop_product_change_requests r
+                  JOIN shop_product_submissions p ON p.id=r.product_id
+                 WHERE r.submitted_by_user_id=?
+                 ORDER BY r.updated_at DESC
+                """,
+                (user_id,),
+            ).fetchall()
+        return [self._serialize_change_request(row) for row in rows]
+
+    def _create_product_change_request(
+        self,
+        user_id: str,
+        product_id: str,
+        action: str,
+        payload: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        now = iso(utc_now())
+        request_id = "shopchg_" + secrets.token_hex(12)
+        with self.connect() as db:
+            db.execute("BEGIN IMMEDIATE")
+            current = self._seller_published_product(db, user_id, product_id)
+            pending = db.execute(
+                "SELECT id FROM shop_product_change_requests "
+                "WHERE product_id=? AND status IN ('SUBMITTED','UNDER_REVIEW')",
+                (product_id,),
+            ).fetchone()
+            if pending is not None:
+                db.rollback()
+                raise SecurityError(
+                    409,
+                    "A product change request is already pending.",
+                    "product_change_pending",
+                )
+
+            if action == "EDIT":
+                if (
+                    not isinstance(payload, dict)
+                    or set(payload) - PRODUCT_CHANGE_PAYLOAD_FIELDS
+                ):
+                    db.rollback()
+                    raise SecurityError(
+                        400,
+                        "Unsupported product change field.",
+                        "invalid_product_change",
+                    )
+                candidate = dict(payload)
+                candidate["inventory"] = current["inventory"]
+                values = self._product_payload(candidate, current)
+                if not json.loads(values["image_urls_json"]):
+                    db.rollback()
+                    raise SecurityError(
+                        400,
+                        "A product image is required for a published listing.",
+                        "product_image_required",
+                    )
+                proposed = self._product_values_to_change_payload(values)
+                current_values = self._product_values_to_change_payload(
+                    self._product_payload({}, current)
+                )
+                if proposed == current_values:
+                    db.rollback()
+                    raise SecurityError(
+                        409,
+                        "No catalogue changes were provided.",
+                        "no_product_changes",
+                    )
+                payload_json = json.dumps(
+                    proposed, separators=(",", ":"), sort_keys=True
+                )
+            elif action == "UNPUBLISH":
+                if payload not in (None, {}):
+                    db.rollback()
+                    raise SecurityError(
+                        400,
+                        "Unpublish requests do not accept product fields.",
+                        "invalid_product_change",
+                    )
+                payload_json = None
+            else:
+                db.rollback()
+                raise SecurityError(
+                    400, "Invalid product change action.", "invalid_product_change"
+                )
+
+            db.execute(
+                """
+                INSERT INTO shop_product_change_requests(
+                  id,product_id,application_id,submitted_by_user_id,action,
+                  payload_json,status,created_at,updated_at,submitted_at
+                ) VALUES(?,?,?,?,?,?,'SUBMITTED',?,?,?)
+                """,
+                (
+                    request_id,
+                    product_id,
+                    current["application_id"],
+                    user_id,
+                    action,
+                    payload_json,
+                    now,
+                    now,
+                    now,
+                ),
+            )
+            db.commit()
+            row = db.execute(
+                "SELECT r.*,p.name AS product_name "
+                "FROM shop_product_change_requests r "
+                "JOIN shop_product_submissions p ON p.id=r.product_id "
+                "WHERE r.id=?",
+                (request_id,),
+            ).fetchone()
+        return self._serialize_change_request(row)
+
+    def create_product_edit_request(
+        self, user_id: str, product_id: str, payload: dict[str, Any]
+    ) -> dict[str, Any]:
+        return self._create_product_change_request(
+            user_id, product_id, "EDIT", payload
+        )
+
+    def create_product_unpublish_request(
+        self, user_id: str, product_id: str
+    ) -> dict[str, Any]:
+        return self._create_product_change_request(
+            user_id, product_id, "UNPUBLISH"
+        )
+
+    def admin_list_product_change_requests(
+        self, admin_id: str
+    ) -> list[dict[str, Any]]:
+        with self.connect() as db:
+            self._require_admin(db, admin_id)
+            rows = db.execute(
+                """
+                SELECT r.*,p.name AS product_name,a.shop_name AS shop_name
+                  FROM shop_product_change_requests r
+                  JOIN shop_product_submissions p ON p.id=r.product_id
+                  JOIN vendor_applications a ON a.id=r.application_id
+                 ORDER BY
+                   CASE r.status
+                     WHEN 'SUBMITTED' THEN 0
+                     WHEN 'UNDER_REVIEW' THEN 1
+                     ELSE 2
+                   END,
+                   r.updated_at DESC
+                 LIMIT 1000
+                """
+            ).fetchall()
+        return [self._serialize_change_request(row, admin=True) for row in rows]
+
+    def admin_transition_product_change_request(
+        self,
+        admin_id: str,
+        request_id: str,
+        target_status: Any,
+        reason: Any = None,
+    ) -> dict[str, Any]:
+        if not isinstance(target_status, str):
+            raise SecurityError(
+                400, "Invalid product change status.", "invalid_product_change_status"
+            )
+        target = target_status.strip().upper()
+        clean_reason = _optional_text(reason, "review reason", 1000)
+        if target == "REJECTED" and clean_reason is None:
+            raise SecurityError(
+                400, "A rejection reason is required.", "rejection_reason_required"
+            )
+
+        now = iso(utc_now())
+        with self.connect() as db:
+            db.execute("BEGIN IMMEDIATE")
+            self._require_admin(db, admin_id)
+            request = db.execute(
+                "SELECT * FROM shop_product_change_requests WHERE id=?",
+                (request_id,),
+            ).fetchone()
+            if request is None:
+                db.rollback()
+                raise SecurityError(
+                    404, "Product change request not found.", "product_change_not_found"
+                )
+            if target not in PRODUCT_CHANGE_ADMIN_TRANSITIONS.get(
+                request["status"], set()
+            ):
+                db.rollback()
+                raise SecurityError(
+                    409,
+                    "Product change transition is not allowed.",
+                    "invalid_product_change_transition",
+                )
+
+            if target == "APPROVED":
+                current = db.execute(
+                    "SELECT * FROM shop_product_submissions WHERE id=?",
+                    (request["product_id"],),
+                ).fetchone()
+                if current is None or current["status"] != "PUBLISHED":
+                    db.rollback()
+                    raise SecurityError(
+                        409,
+                        "The product is no longer published.",
+                        "published_product_required",
+                    )
+                if request["action"] == "EDIT":
+                    proposed = json.loads(request["payload_json"] or "{}")
+                    candidate = dict(proposed)
+                    candidate["inventory"] = current["inventory"]
+                    values = self._product_payload(candidate, current)
+                    if not json.loads(values["image_urls_json"]):
+                        db.rollback()
+                        raise SecurityError(
+                            409,
+                            "A product image is required before applying changes.",
+                            "product_image_required",
+                        )
+                    db.execute(
+                        """
+                        UPDATE shop_product_submissions
+                           SET name=?,description=?,brand=?,department=?,category=?,
+                               price_paise=?,original_price_paise=?,size=?,colour_name=?,
+                               colour_hex=?,image_urls_json=?,attributes_json=?,
+                               reviewed_by=?,reviewed_at=?,updated_at=?
+                         WHERE id=?
+                        """,
+                        (
+                            values["name"],
+                            values["description"],
+                            values["brand"],
+                            values["department"],
+                            values["category"],
+                            values["price_paise"],
+                            values["original_price_paise"],
+                            values["size"],
+                            values["colour_name"],
+                            values["colour_hex"],
+                            values["image_urls_json"],
+                            values["attributes_json"],
+                            admin_id,
+                            now,
+                            now,
+                            current["id"],
+                        ),
+                    )
+                elif request["action"] == "UNPUBLISH":
+                    db.execute(
+                        """
+                        UPDATE shop_product_submissions
+                           SET status='APPROVED',published_at=NULL,
+                               reviewed_by=?,reviewed_at=?,updated_at=?
+                         WHERE id=?
+                        """,
+                        (admin_id, now, now, current["id"]),
+                    )
+
+            db.execute(
+                """
+                UPDATE shop_product_change_requests
+                   SET status=?,rejection_reason=?,reviewed_by=?,reviewed_at=?,updated_at=?
+                 WHERE id=?
+                """,
+                (
+                    target,
+                    clean_reason if target == "REJECTED" else None,
+                    admin_id,
+                    now,
+                    now,
+                    request_id,
+                ),
+            )
+            self._audit_if_available(
+                db,
+                admin_id,
+                f"shop_product_change_{target.casefold()}",
+                "shop_product_change_request",
+                request_id,
+                {
+                    "action": request["action"],
+                    "productId": request["product_id"],
+                    "from": request["status"],
+                    "to": target,
+                },
+            )
+            db.commit()
+            row = db.execute(
+                """
+                SELECT r.*,p.name AS product_name,a.shop_name AS shop_name
+                  FROM shop_product_change_requests r
+                  JOIN shop_product_submissions p ON p.id=r.product_id
+                  JOIN vendor_applications a ON a.id=r.application_id
+                 WHERE r.id=?
+                """,
+                (request_id,),
+            ).fetchone()
+        return self._serialize_change_request(row, admin=True)
+
     def list_active_stores(self, limit: int = 200) -> list[dict[str, Any]]:
         """Return public-safe storefront metadata for ACTIVE shops only."""
         safe_limit = max(1, min(limit, 200))
@@ -1160,6 +1604,7 @@ class ShopWorkflow:
                     "id": row["id"],
                     "name": row["name"],
                     "slug": row["slug"],
+                    "vendorId": row["application_id"],
                     "active": row["status"] == "PUBLISHED" and row["shop_status"] == "ACTIVE",
                     "price": price,
                     "variants": [

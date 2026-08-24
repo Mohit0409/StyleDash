@@ -82,6 +82,18 @@ export const shopProductApi = {
   async submit(id: string): Promise<SellerProduct> {
     return (await apiJson<{ success: true; product: SellerProduct }>(`/api/shop-products/${encodeURIComponent(id)}/submit`, 'POST', {})).product;
   },
+  async requests(): Promise<SellerProductChangeRequest[]> {
+    return (await apiFetch<{ success: true; requests: SellerProductChangeRequest[] }>('/api/shop-product-requests')).requests;
+  },
+  async requestEdit(id: string, payload: SellerProductChangeDraft): Promise<SellerProductChangeRequest> {
+    return (await apiJson<{ success: true; request: SellerProductChangeRequest }>(`/api/shop-products/${encodeURIComponent(id)}/edit-request`, 'POST', payload)).request;
+  },
+  async requestUnpublish(id: string): Promise<SellerProductChangeRequest> {
+    return (await apiJson<{ success: true; request: SellerProductChangeRequest }>(`/api/shop-products/${encodeURIComponent(id)}/unpublish-request`, 'POST', {})).request;
+  },
+  async setStock(id: string, stock: number): Promise<SellerInventoryUpdate> {
+    return (await apiJson<{ success: true; inventory: SellerInventoryUpdate }>(`/api/shop-products/${encodeURIComponent(id)}/stock`, 'PATCH', { stock })).inventory;
+  },
 };
 
 export type SellerProductStatus = 'DRAFT' | 'SUBMITTED' | 'UNDER_REVIEW' | 'APPROVED' | 'PUBLISHED' | 'REJECTED';
@@ -112,6 +124,32 @@ export interface SellerProduct extends SellerProductDraft {
   updatedAt: string;
   submittedAt?: string | null;
   publishedAt?: string | null;
+}
+
+export type SellerProductChangeDraft = Omit<SellerProductDraft, 'inventory'>;
+export type SellerProductChangeAction = 'EDIT' | 'UNPUBLISH';
+export type SellerProductChangeStatus = 'SUBMITTED' | 'UNDER_REVIEW' | 'APPROVED' | 'REJECTED';
+
+export interface SellerProductChangeRequest {
+  id: string;
+  productId: string;
+  applicationId: string;
+  productName?: string;
+  action: SellerProductChangeAction;
+  status: SellerProductChangeStatus;
+  proposedProduct?: SellerProductChangeDraft | null;
+  rejectionReason?: string | null;
+  createdAt: string;
+  updatedAt: string;
+  submittedAt: string;
+  reviewedAt?: string | null;
+}
+
+export interface SellerInventoryUpdate {
+  productId: string;
+  variantId: string;
+  before: number;
+  stock: number;
 }
 
 export const profileApi = {
