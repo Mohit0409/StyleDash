@@ -2099,9 +2099,17 @@ class StyleDashRequestHandler(SimpleHTTPRequestHandler):
                 return
             if path == "/api/shop-products/published":
                 self._rate_limit(path, 60)
+                products = self._shops().list_published_products()
+                live_inventory = self.payment_service.shop_inventory_snapshot(
+                    [product["id"] for product in products]
+                )
+                for product in products:
+                    stock = live_inventory.get(product["id"])
+                    if stock is not None and product.get("variants"):
+                        product["variants"][0]["stock"] = stock
                 self._json_response(
                     HTTPStatus.OK,
-                    {"success": True, "products": self._shops().list_published_products()},
+                    {"success": True, "products": products},
                 )
                 return
             if path == f"/api/payment-test-product/{PAYMENT_TEST_PRODUCT_SLUG}":

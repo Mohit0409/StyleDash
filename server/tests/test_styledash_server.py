@@ -2062,6 +2062,9 @@ class HttpApiTests(unittest.TestCase):
             "/api/shop-products", {"Cookie": session_headers["Cookie"]}
         )
         self.assertEqual(seller_products["products"][0]["inventory"], 3)
+        status, public_after_stock, _headers = self.get_json("/api/shop-products/published")
+        self.assertEqual(status, 200)
+        self.assertEqual(public_after_stock["products"][0]["variants"][0]["stock"], 3)
 
         status, change_created, _headers = self.post_json(
             f"/api/shop-products/{product_id}/edit-request",
