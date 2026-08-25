@@ -46,6 +46,12 @@ test('approved shop owner can draft and submit but cannot publish a product', as
 
   await page.goto('/partner');
   await expect(page.getByRole('heading', { name: 'Shop Active', exact: true }).first()).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Seller Dashboard' })).toBeVisible();
+  await expect(page.getByText('Total products')).toBeVisible();
+  await page.getByRole('tab', { name: 'My Shop', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'My Shop', exact: true })).toBeVisible();
+  await expect(page.getByText('E2E Active Shop')).toBeVisible();
+  await page.getByRole('tab', { name: 'Products', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Product submissions' })).toBeVisible();
 
   await page.getByRole('button', { name: 'New Product Draft' }).click();
@@ -67,4 +73,6 @@ test('approved shop owner can draft and submit but cannot publish a product', as
   await page.getByRole('button', { name: 'Submit', exact: true }).click();
   await expect(page.getByText('SUBMITTED', { exact: true })).toBeVisible();
   await expect(page.getByRole('button', { name: /publish/i })).toHaveCount(0);
+  await page.getByRole('tab', { name: 'Overview', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'Products are under review' })).toBeVisible();
 });

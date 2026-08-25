@@ -87,8 +87,13 @@ const toPayload = (form: ProductFormState): SellerProductDraft => {
 const messageForError = (cause: unknown, fallback: string) =>
   cause instanceof ApiError || cause instanceof Error ? cause.message : fallback;
 
-export const SellerProducts: React.FC = () => {
-  const [products, setProducts] = useState<SellerProduct[]>([]);
+interface SellerProductsProps {
+  initialProducts?: SellerProduct[];
+  onProductsChange?: (products: SellerProduct[]) => void;
+}
+
+export const SellerProducts: React.FC<SellerProductsProps> = ({ initialProducts, onProductsChange }) => {
+  const [products, setProducts] = useState<SellerProduct[]>(initialProducts || []);
   const [form, setForm] = useState<ProductFormState>(EMPTY_FORM);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [formOpen, setFormOpen] = useState(false);
@@ -98,13 +103,19 @@ export const SellerProducts: React.FC = () => {
   const [message, setMessage] = useState('');
 
   useEffect(() => {
+    if (initialProducts) { setProducts(initialProducts); setLoading(false); return; }
     let active = true;
     shopProductApi.mine()
       .then(result => { if (active) setProducts(result); })
       .catch(cause => { if (active) setError(messageForError(cause, 'Product submissions could not be loaded.')); })
       .finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
-  }, []);
+  }, [initialProducts]);
+
+  const replaceProducts = (next: SellerProduct[]) => {
+    setProducts(next);
+    onProductsChange?.(next);
+  };
 
   const updateForm = (field: keyof ProductFormState, value: string) => {
     setForm(current => ({ ...current, [field]: value }));
@@ -136,7 +147,7 @@ export const SellerProducts: React.FC = () => {
       const saved = editingId
         ? await shopProductApi.updateDraft(editingId, payload)
         : await shopProductApi.createDraft(payload);
-      setProducts(current => [saved, ...current.filter(product => product.id !== saved.id)]);
+      replaceProducts([saved, ...products.filter(product => product.id !== saved.id)]);
       setFormOpen(false);
       setEditingId(null);
       setForm(EMPTY_FORM);
@@ -154,7 +165,7 @@ export const SellerProducts: React.FC = () => {
     setMessage('');
     try {
       const submitted = await shopProductApi.submit(id);
-      setProducts(current => current.map(product => product.id === submitted.id ? submitted : product));
+      replaceProducts(products.map(product => product.id === submitted.id ? submitted : product));
       setMessage('Product submitted for private administrator review. It is not publicly listed.');
     } catch (cause) {
       setError(messageForError(cause, 'The product could not be submitted.'));

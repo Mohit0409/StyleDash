@@ -11,7 +11,7 @@ import { ApiError } from '../services/apiClient';
 import { useToast } from '../context/ToastContext';
 import { useAuth } from '../context/AuthContext';
 import { CONFIG } from '../config';
-import { SellerProducts } from '../components/SellerProducts';
+import { SellerDashboard } from '../components/SellerDashboard';
 
 const CATEGORIES = [
   'Clothing & Fashion',
@@ -282,7 +282,7 @@ export const VendorOnboarding: React.FC = () => {
           </div>
           <p className="text-center text-xs text-neutral-500">Only the private StyleDash administrator can approve or activate a shop and publish products.</p>
         </form>
-      ) : (
+      ) : application && ['APPROVED', 'ACTIVE'].includes(application.status) ? null : (
         <section className="rounded-3xl border border-neutral-200 bg-white p-6 text-sm dark:border-neutral-800 dark:bg-neutral-900">
           <dl className="grid gap-4 sm:grid-cols-2">
             <div><dt className="text-xs font-bold text-neutral-500">Shop</dt><dd className="font-bold">{application?.shopName}</dd></div>
@@ -292,7 +292,7 @@ export const VendorOnboarding: React.FC = () => {
         </section>
       )}
 
-      {application && ['APPROVED', 'ACTIVE'].includes(application.status) && <SellerProducts />}
+      {application && ['APPROVED', 'ACTIVE'].includes(application.status) && <SellerDashboard application={application} />}
     </div>
   );
 };
