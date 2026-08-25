@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Heart, LogOut, Package, Save } from 'lucide-react';
+import { Heart, LogOut, Mail, Package, Save } from 'lucide-react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { SEO } from '../components/SEO';
 import { useAuth } from '../context/AuthContext';
@@ -24,6 +24,7 @@ export const Profile: React.FC = () => {
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
+  const [linkingGoogle, setLinkingGoogle] = useState(false);
 
   useEffect(() => {
     if (!user) return;
@@ -52,13 +53,26 @@ export const Profile: React.FC = () => {
     finally { setSaving(false); }
   };
 
+  const linkGoogleEmail = async () => {
+    setLinkingGoogle(true); setError(''); setMessage('');
+    try {
+      const { signInWithGoogleProvider } = await import('../services/firebaseClient');
+      const idToken = await signInWithGoogleProvider();
+      await authApi.linkFederated('google', idToken);
+      await refresh();
+      setMessage('Google email linked and verified on this StyleDash account.');
+    } catch (cause) {
+      setError(cause instanceof ApiError || cause instanceof Error ? cause.message : 'Google email could not be linked.');
+    } finally { setLinkingGoogle(false); }
+  };
+
   return <div className="max-w-3xl mx-auto px-4 py-8 space-y-6">
     <SEO title="My Profile - StyleDash" />
     <div><h1 className="text-3xl font-black">My profile</h1><p className="text-sm text-neutral-500">Your account and saved delivery details are stored securely on the StyleDash server.</p></div>
     {error && <p className="text-sm text-red-600" role="alert">{error}</p>}{message && <p className="text-sm text-green-700" role="status">{message}</p>}
     <form onSubmit={saveProfile} className="p-6 bg-white dark:bg-neutral-900 rounded-3xl border dark:border-neutral-800 space-y-4">
       <h2 className="text-xl font-black">Contact and delivery address</h2>
-      <p className="text-xs text-neutral-500">Signed in as {user?.email || user?.phone}. Email changes require support.</p>
+      <p className="text-xs text-neutral-500">Signed in as {user?.email || user?.phone}. {!user?.email && 'You can add a verified Google email below.'}</p>
       <div className="grid sm:grid-cols-2 gap-4">
         <label className="text-xs font-bold">Full name<input required minLength={2} maxLength={80} value={name} onChange={event => setName(event.target.value)} className="mt-1 w-full p-3 rounded-xl border dark:bg-neutral-800" /></label>
         <label className="text-xs font-bold">Phone<input required minLength={10} maxLength={20} value={phone} onChange={event => setPhone(event.target.value)} className="mt-1 w-full p-3 rounded-xl border dark:bg-neutral-800" /></label>
@@ -68,6 +82,11 @@ export const Profile: React.FC = () => {
       </div>
       <button disabled={saving} className="flex items-center gap-2 bg-neutral-950 text-white dark:bg-lime-400 dark:text-black px-5 py-3 rounded-xl font-bold"><Save className="w-4" />Save profile</button>
     </form>
+    {!user?.email && <section className="p-6 bg-white dark:bg-neutral-900 rounded-3xl border dark:border-neutral-800 space-y-3">
+      <h2 className="text-xl font-black">Add email & Google sign-in</h2>
+      <p className="text-sm text-neutral-500">Link a verified Google email to this same mobile account. StyleDash will not create a second account, and an email already used by another customer cannot be linked.</p>
+      <button type="button" disabled={linkingGoogle || saving} onClick={() => void linkGoogleEmail()} className="flex items-center gap-2 rounded-xl border px-5 py-3 font-bold disabled:opacity-60"><Mail className="w-4" />{linkingGoogle ? 'Linking Google…' : 'Link Google email'}</button>
+    </section>}
     {user?.hasPassword ? <form onSubmit={changePassword} className="p-6 bg-white dark:bg-neutral-900 rounded-3xl border dark:border-neutral-800 space-y-4">
       <h2 className="text-xl font-black">Change password</h2>
       <input required type="password" autoComplete="current-password" maxLength={256} value={currentPassword} onChange={event => setCurrentPassword(event.target.value)} placeholder="Current password" className="w-full p-3 rounded-xl border dark:bg-neutral-800" />

@@ -785,8 +785,10 @@ class SecurityStore:
                 if provider == "google":
                     db.execute(
                         "UPDATE users SET email=COALESCE(email,?),normalized_email=COALESCE(normalized_email,?),"
-                        "email_verified=1,email_verified_at=COALESCE(email_verified_at,?),updated_at=? WHERE id=?",
-                        (verified_email, verified_email, now, now, current["id"]),
+                        "email_verified=CASE WHEN normalized_email IS NULL OR normalized_email=? THEN 1 ELSE email_verified END,"
+                        "email_verified_at=CASE WHEN normalized_email IS NULL OR normalized_email=? "
+                        "THEN COALESCE(email_verified_at,?) ELSE email_verified_at END,updated_at=? WHERE id=?",
+                        (verified_email, verified_email, verified_email, verified_email, now, now, current["id"]),
                     )
                 else:
                     db.execute(

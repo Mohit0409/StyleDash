@@ -384,6 +384,33 @@ class FederatedAuthTests(unittest.TestCase):
             self.assertEqual(db.execute("SELECT COUNT(*) FROM users").fetchone()[0], 1)
             self.assertEqual(db.execute("SELECT COUNT(*) FROM customer_auth_identities").fetchone()[0], 1)
 
+    def test_phone_only_customer_can_link_verified_google_email(self):
+        phone_token = self.phone("phone-email-link", "+919876543210")
+        user, raw, _csrf, _created = self.store.federated_session("phone", {"idToken": phone_token})
+        self.assertIsNone(user["email"])
+        google_token = self.google("google-email-link", "linked@example.test")
+        linked = self.store.link_federated_identity(raw, "google", {"idToken": google_token})
+        self.assertEqual(linked["id"], user["id"])
+        self.assertEqual(linked["email"], "linked@example.test")
+        self.assertTrue(linked["emailVerified"])
+
+    def test_google_link_does_not_verify_a_different_existing_email(self):
+        user, raw, _csrf = self.store.register({
+            "name": "Existing Email",
+            "email": "existing@example.test",
+            "password": "long existing password 123",
+        })
+        google_token = self.google("google-other-email", "different@example.test")
+        linked = self.store.link_federated_identity(raw, "google", {"idToken": google_token})
+        self.assertEqual(linked["email"], "existing@example.test")
+        self.assertFalse(linked["emailVerified"])
+        with self.store.connect() as db:
+            identity = db.execute(
+                "SELECT verified_email FROM customer_auth_identities WHERE user_id=? AND provider='google'",
+                (user["id"],),
+            ).fetchone()
+        self.assertEqual(identity["verified_email"], "different@example.test")
+
     def test_migration_preserves_customers_sessions_and_financial_tables(self):
         user, raw, _csrf = self.store.register({
             "name": "Migration Customer",

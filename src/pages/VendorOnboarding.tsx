@@ -110,6 +110,27 @@ export const VendorOnboarding: React.FC = () => {
     return () => { active = false; };
   }, [user?.name]);
 
+  useEffect(() => {
+    if (!application || !['SUBMITTED', 'UNDER_REVIEW', 'APPROVED', 'ACTIVE', 'SUSPENDED'].includes(application.status)) return;
+    let active = true;
+    const refresh = async () => {
+      try {
+        const current = await vendorApplicationApi.mine();
+        if (!active || !current) return;
+        setApplication(previous => {
+          if (previous?.status !== current.status) {
+            setMessage('Application status updated to ' + current.status.replace('_', ' ') + '.');
+          }
+          return current;
+        });
+      } catch {
+        // Keep the last known state; transient refresh failures should not disrupt the seller.
+      }
+    };
+    const timer = window.setInterval(() => { void refresh(); }, 30_000);
+    return () => { active = false; window.clearInterval(timer); };
+  }, [application?.status]);
+
   const setField = (field: keyof ShopApplicationDraft, value: string) => {
     setDraft(current => ({ ...current, [field]: value }));
   };
