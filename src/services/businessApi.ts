@@ -114,6 +114,23 @@ export interface SellerProduct extends SellerProductDraft {
   publishedAt?: string | null;
 }
 
+export interface SellerOrderItem {
+  productId: string; productName?: string; productSlug?: string; variantId?: string; sku?: string;
+  size?: string; colourName?: string; quantity: number; unitPrice: number; lineTotal: number;
+}
+
+export interface SellerOrder {
+  id: string; status?: string; paymentStatus?: string; paymentMethod?: string; deliveryMethod?: string;
+  createdAt?: string; updatedAt?: string; sellerSubtotal: number; items: SellerOrderItem[];
+  address: { name?: string; phone?: string; street?: string; city?: string; state?: string; pincode?: string };
+}
+
+export const sellerOrderApi = {
+  async mine(): Promise<SellerOrder[]> {
+    return (await apiFetch<{ success: true; orders: SellerOrder[] }>('/api/seller-orders')).orders;
+  },
+};
+
 export const profileApi = {
   async get(): Promise<UserProfile> {
     return (await apiFetch<{ success: true; profile: UserProfile }>('/api/profile')).profile;

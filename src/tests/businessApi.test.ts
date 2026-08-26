@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { clearCsrfToken, setCsrfToken } from '../services/apiClient';
-import { publicStoreApi, shopProductApi, vendorApplicationApi } from '../services/businessApi';
+import { publicStoreApi, sellerOrderApi, shopProductApi, vendorApplicationApi } from '../services/businessApi';
 
 const application = {
   id: 'shop-1',
@@ -33,6 +33,16 @@ describe('public store API', () => {
   });
 });
 
+describe('seller order API', () => {
+  afterEach(() => { vi.restoreAllMocks(); });
+
+  it('loads the authenticated seller order projection', async () => {
+    const order = { id: 'SD-SELLER-1', sellerSubtotal: 800, items: [], address: {} };
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(jsonResponse({ success: true, orders: [order] }));
+    await expect(sellerOrderApi.mine()).resolves.toEqual([order]);
+    expect(fetchSpy).toHaveBeenCalledWith('/api/seller-orders', expect.objectContaining({ credentials: 'include' }));
+  });
+});
 describe('seller product submission API', () => {
   afterEach(() => {
     clearCsrfToken();

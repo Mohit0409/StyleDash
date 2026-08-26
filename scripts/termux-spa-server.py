@@ -740,6 +740,39 @@ class PaymentService:
         )
         return {key: order[key] for key in allowed if key in order}
 
+    def seller_orders(self, seller_product_ids: set[str]) -> list[dict[str, Any]]:
+        if not seller_product_ids:
+            return []
+        results: list[dict[str, Any]] = []
+        with self.store.lock:
+            for order in self.store.state["orders"].values():
+                seller_items = []
+                for item in order.get("items", []):
+                    if item.get("productId") not in seller_product_ids:
+                        continue
+                    seller_items.append({
+                        key: item[key]
+                        for key in ("productId", "productName", "productSlug", "variantId", "sku",
+                                    "size", "colourName", "quantity", "unitPrice", "lineTotal")
+                        if key in item
+                    })
+                if not seller_items:
+                    continue
+                address = order.get("address") if isinstance(order.get("address"), dict) else {}
+                results.append({
+                    "id": order.get("id"),
+                    "status": order.get("status"),
+                    "paymentStatus": order.get("paymentStatus"),
+                    "paymentMethod": order.get("paymentMethod"),
+                    "deliveryMethod": order.get("deliveryMethod"),
+                    "createdAt": order.get("createdAt"),
+                    "updatedAt": order.get("updatedAt"),
+                    "sellerSubtotal": sum(int(item.get("lineTotal", 0)) for item in seller_items),
+                    "items": seller_items,
+                    "address": {key: address.get(key) for key in ("name", "phone", "street", "city", "state", "pincode")},
+                })
+        return sorted(results, key=lambda row: str(row.get("createdAt") or ""), reverse=True)
+
     def _create_response(self, order: dict[str, Any]) -> dict[str, Any]:
         return {
             "success": True,
@@ -2063,6 +2096,13 @@ class StyleDashRequestHandler(SimpleHTTPRequestHandler):
             if path == "/api/orders":
                 user, _session = self._current_user()
                 orders = self._security().list_orders(self.payment_service.store, user["id"])
+                self._json_response(HTTPStatus.OK, {"success": True, "orders": orders})
+                return
+            if path == "/api/seller-orders":
+                self._rate_limit(path, 60)
+                user, _session = self._current_user()
+                product_ids = self._shops().seller_product_ids(user["id"])
+                orders = self.payment_service.seller_orders(product_ids)
                 self._json_response(HTTPStatus.OK, {"success": True, "orders": orders})
                 return
             if path == "/api/profile":

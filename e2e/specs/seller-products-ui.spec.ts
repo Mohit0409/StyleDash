@@ -23,6 +23,10 @@ test('approved shop owner can draft and submit but cannot publish a product', as
       } });
       return;
     }
+    if (path === '/api/seller-orders' && method === 'GET') {
+      await json({ success: true, orders: [] });
+      return;
+    }
     if (path === '/api/shop-products' && method === 'GET') {
       await json({ success: true, products: product ? [product] : [] });
       return;

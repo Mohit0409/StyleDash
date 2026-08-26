@@ -1,14 +1,17 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { BarChart3, Boxes, CheckCircle2, Clock3, Package, Store } from 'lucide-react';
+import { BarChart3, Boxes, CheckCircle2, Clock3, Package, ShoppingBag, Store } from 'lucide-react';
 import { SellerProducts } from './SellerProducts';
+import { SellerOrders } from './SellerOrders';
 import { ApiError } from '../services/apiClient';
 import {
+  type SellerOrder,
   type SellerProduct,
   type ShopApplication,
+  sellerOrderApi,
   shopProductApi,
 } from '../services/businessApi';
 
-type DashboardTab = 'overview' | 'shop' | 'products';
+type DashboardTab = 'overview' | 'shop' | 'products' | 'orders';
 
 const messageForError = (cause: unknown) =>
   cause instanceof ApiError || cause instanceof Error
@@ -18,13 +21,14 @@ const messageForError = (cause: unknown) =>
 export const SellerDashboard: React.FC<{ application: ShopApplication }> = ({ application }) => {
   const [tab, setTab] = useState<DashboardTab>('overview');
   const [products, setProducts] = useState<SellerProduct[]>([]);
+  const [orders, setOrders] = useState<SellerOrder[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
   useEffect(() => {
     let active = true;
-    shopProductApi.mine()
-      .then(result => { if (active) setProducts(result); })
+    Promise.all([shopProductApi.mine(), sellerOrderApi.mine()])
+      .then(([productResult, orderResult]) => { if (active) { setProducts(productResult); setOrders(orderResult); } })
       .catch(cause => { if (active) setError(messageForError(cause)); })
       .finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
@@ -35,13 +39,14 @@ export const SellerDashboard: React.FC<{ application: ShopApplication }> = ({ ap
     const published = products.filter(product => product.status === 'PUBLISHED').length;
     const drafts = products.filter(product => ['DRAFT', 'REJECTED'].includes(product.status)).length;
     const inventory = products.reduce((sum, product) => sum + product.inventory, 0);
-    return { total: products.length, pending, published, drafts, inventory };
-  }, [products]);
+    return { total: products.length, pending, published, drafts, inventory, orders: orders.length };
+  }, [products, orders]);
 
   const tabs: Array<{ id: DashboardTab; label: string; icon: React.ReactNode }> = [
     { id: 'overview', label: 'Overview', icon: <BarChart3 className="w-4" /> },
     { id: 'shop', label: 'My Shop', icon: <Store className="w-4" /> },
     { id: 'products', label: 'Products', icon: <Boxes className="w-4" /> },
+    { id: 'orders', label: 'Orders', icon: <ShoppingBag className="w-4" /> },
   ];
 
   return <section className="space-y-6" aria-labelledby="seller-dashboard-title">
@@ -64,12 +69,13 @@ export const SellerDashboard: React.FC<{ application: ShopApplication }> = ({ ap
 
     {error && <p role="alert" className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">{error}</p>}
     {tab === 'overview' && <div className="space-y-5">
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
         <Metric label="Total products" value={loading ? '…' : metrics.total} icon={<Package className="w-5" />} />
         <Metric label="Pending review" value={loading ? '…' : metrics.pending} icon={<Clock3 className="w-5" />} />
         <Metric label="Published" value={loading ? '…' : metrics.published} icon={<CheckCircle2 className="w-5" />} />
         <Metric label="Draft / changes" value={loading ? '…' : metrics.drafts} icon={<Boxes className="w-5" />} />
         <Metric label="Submitted stock" value={loading ? '…' : metrics.inventory} icon={<BarChart3 className="w-5" />} />
+        <Metric label="Seller orders" value={loading ? '…' : metrics.orders} icon={<ShoppingBag className="w-5" />} />
       </div>
       <div className="grid gap-4 lg:grid-cols-2">
         <article className="rounded-3xl border border-neutral-200 bg-white p-6 dark:border-neutral-800 dark:bg-neutral-900">
@@ -102,6 +108,7 @@ export const SellerDashboard: React.FC<{ application: ShopApplication }> = ({ ap
     </article>}
 
     {tab === 'products' && <SellerProducts initialProducts={products} onProductsChange={setProducts} />}
+    {tab === 'orders' && <SellerOrders orders={orders} loading={loading} />}
   </section>;
 };
 

@@ -795,6 +795,15 @@ class ShopWorkflow:
             ).fetchall()
         return [self._serialize_product(row) for row in rows]
 
+    def seller_product_ids(self, user_id: str) -> set[str]:
+        with self.connect() as db:
+            self._seller_application(db, user_id)
+            rows = db.execute(
+                "SELECT id FROM shop_product_submissions WHERE submitted_by_user_id=?",
+                (user_id,),
+            ).fetchall()
+        return {row["id"] for row in rows}
+
     def create_product_draft(self, user_id: str, payload: dict[str, Any]) -> dict[str, Any]:
         values = self._product_payload(payload)
         now = iso(utc_now())

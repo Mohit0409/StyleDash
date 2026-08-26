@@ -85,6 +85,30 @@ class PaymentServiceTests(unittest.TestCase):
             callback()
         self.assertEqual(caught.exception.code, code)
 
+    def test_seller_orders_filter_mixed_checkout_and_hide_sensitive_fields(self) -> None:
+        with self.service.store.lock:
+            self.service.store.state["orders"]["SD-MIXED"] = {
+                "id": "SD-MIXED", "userId": "customer-secret", "status": "placed",
+                "paymentStatus": "paid", "paymentMethod": "upi", "deliveryMethod": "express",
+                "grandTotal": 9999, "razorpayOrderId": "order_secret", "refundId": "rfnd_secret",
+                "createdAt": "2026-08-26T00:00:00+00:00", "updatedAt": "2026-08-26T00:01:00+00:00",
+                "address": {"name": "Buyer", "phone": "9999999999", "street": "Main Road",
+                            "city": "Neemuch", "state": "Madhya Pradesh", "pincode": "458441"},
+                "items": [
+                    {"productId": "seller-product", "productName": "Seller Item", "variantId": "v1",
+                     "quantity": 2, "unitPrice": 400, "lineTotal": 800},
+                    {"productId": "other-product", "productName": "Other Item", "variantId": "v2",
+                     "quantity": 1, "unitPrice": 500, "lineTotal": 500},
+                ],
+            }
+            self.service.store.save()
+        orders = self.service.seller_orders({"seller-product"})
+        self.assertEqual(len(orders), 1)
+        self.assertEqual([item["productId"] for item in orders[0]["items"]], ["seller-product"])
+        self.assertEqual(orders[0]["sellerSubtotal"], 800)
+        for forbidden in ("userId", "grandTotal", "razorpayOrderId", "refundId", "statusHistory"):
+            self.assertNotIn(forbidden, orders[0])
+
     def test_catalog_refresh_does_not_take_payment_state_file_lock(self) -> None:
         class ForbiddenStateLock:
             def __enter__(self):
