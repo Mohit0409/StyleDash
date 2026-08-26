@@ -11,7 +11,13 @@ echo "$(date -Iseconds) boot startup requested"
 
 termux-wake-lock || true
 source "$PREFIX/etc/profile.d/start-services.sh"
-sv up sshd || true
+SSHD_SERVICE="$PREFIX/var/service/sshd"
+if [ -d "$SSHD_SERVICE" ]; then
+  sv up "$SSHD_SERVICE" || true
+fi
+if ! pgrep -x sshd >/dev/null 2>&1; then
+  sshd || echo "$(date -Iseconds) standalone sshd fallback failed"
+fi
 
 for _ in $(seq 1 30); do
   curl -fsS --max-time 3 http://127.0.0.1:8080/api/health >/dev/null && break

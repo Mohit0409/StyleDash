@@ -89,6 +89,10 @@ class ProductionReliabilityTests(unittest.TestCase):
         self.assertIn("RECOVERY_RETRY_SECONDS", script)
         self.assertIn('"$HOME/bin/backup-styledash-recovery"', script)
         self.assertIn("recovery_backup_failed", script)
+        self.assertIn('SSHD_SERVICE="$PREFIX/var/service/sshd"', script)
+        self.assertIn('pgrep -x sshd', script)
+        self.assertIn('sv up "$SSHD_SERVICE"', script)
+        self.assertIn("ssh_restart_failed", script)
 
     def test_rollback_preserves_live_database_history(self) -> None:
         script = self.read("scripts/termux/rollback-payment-release")

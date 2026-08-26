@@ -53,6 +53,8 @@ ngrok_process_ok() {
 
 public_unhealthy=0
 admin_unhealthy=0
+ssh_unhealthy=0
+SSHD_SERVICE="$PREFIX/var/service/sshd"
 backup_failed=0
 recovery_backup_failed=0
 ngrok_failures=0
@@ -61,6 +63,31 @@ public_failures=0
 public_counter=0
 
 while true; do
+  if pgrep -x sshd >/dev/null 2>&1; then
+    if [ "$ssh_unhealthy" -eq 1 ]; then
+      echo "$(date -Iseconds) sshd recovered" >> "$LOG_FILE"
+      notify ssh_recovered "StyleDash SSH recovered" "Termux SSH is accepting connections again." 3 white_check_mark
+    fi
+    ssh_unhealthy=0
+  else
+    echo "$(date -Iseconds) sshd unavailable; restarting" >> "$LOG_FILE"
+    if [ "$ssh_unhealthy" -eq 0 ]; then
+      notify ssh_unhealthy "StyleDash SSH unavailable" "Termux SSH stopped; the watchdog is restarting it." 5 warning
+    fi
+    ssh_unhealthy=1
+    if [ -d "$SSHD_SERVICE" ]; then
+      sv up "$SSHD_SERVICE" >/dev/null 2>&1 || true
+      sleep 1
+    fi
+    if ! pgrep -x sshd >/dev/null 2>&1; then
+      sshd >/dev/null 2>&1 || true
+    fi
+    if ! pgrep -x sshd >/dev/null 2>&1; then
+      echo "$(date -Iseconds) sshd restart failed" >> "$LOG_FILE"
+      notify ssh_restart_failed "StyleDash SSH restart failed" "Termux SSH is still unavailable after restart attempts." 5 rotating_light
+    fi
+  fi
+
   if curl -fsS --max-time 5 http://127.0.0.1:8080/api/health >/dev/null; then
     if [ "$public_unhealthy" -eq 1 ]; then
       echo "$(date -Iseconds) local public service recovered" >> "$LOG_FILE"
