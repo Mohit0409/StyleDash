@@ -2096,6 +2096,9 @@ class StyleDashRequestHandler(SimpleHTTPRequestHandler):
             if path == "/api/orders":
                 user, _session = self._current_user()
                 orders = self._security().list_orders(self.payment_service.store, user["id"])
+                for order in orders:
+                    product_ids = [item.get("productId") for item in order.get("items", []) if isinstance(item, dict)]
+                    order["fulfillments"] = self._shops().order_fulfillments(order["id"], product_ids)
                 self._json_response(HTTPStatus.OK, {"success": True, "orders": orders})
                 return
             if path == "/api/seller-orders":
@@ -2103,6 +2106,8 @@ class StyleDashRequestHandler(SimpleHTTPRequestHandler):
                 user, _session = self._current_user()
                 product_ids = self._shops().seller_product_ids(user["id"])
                 orders = self.payment_service.seller_orders(product_ids)
+                for order in orders:
+                    order["fulfillment"] = self._shops().seller_fulfillment(user["id"], order["id"])
                 self._json_response(HTTPStatus.OK, {"success": True, "orders": orders})
                 return
             if path == "/api/profile":
@@ -2126,6 +2131,8 @@ class StyleDashRequestHandler(SimpleHTTPRequestHandler):
             if path.startswith("/api/orders/"):
                 user, _session = self._current_user()
                 order = self._security().get_order(self.payment_service.store, path.removeprefix("/api/orders/"), user["id"])
+                product_ids = [item.get("productId") for item in order.get("items", []) if isinstance(item, dict)]
+                order["fulfillments"] = self._shops().order_fulfillments(order["id"], product_ids)
                 self._json_response(HTTPStatus.OK, {"success": True, "order": order})
                 return
             if path.startswith(API_PREFIX):
@@ -2484,6 +2491,27 @@ class StyleDashRequestHandler(SimpleHTTPRequestHandler):
                 self._json_response(
                     HTTPStatus.OK, {"success": True, "application": application}
                 )
+                return
+            if path.startswith("/api/seller-orders/") and path.endswith("/fulfillment"):
+                self._rate_limit("/api/seller-orders/fulfillment", 30)
+                user, _session = self._current_user()
+                self._csrf()
+                order_id = unquote(
+                    path.removeprefix("/api/seller-orders/").removesuffix("/fulfillment")
+                ).strip("/")
+                if not order_id or "/" in order_id:
+                    raise SecurityError(404, "Seller order not found.", "seller_order_not_found")
+                product_ids = self._shops().seller_product_ids(user["id"])
+                seller_order = next(
+                    (order for order in self.payment_service.seller_orders(product_ids) if order.get("id") == order_id),
+                    None,
+                )
+                if seller_order is None:
+                    raise SecurityError(404, "Seller order not found.", "seller_order_not_found")
+                fulfillment = self._shops().update_seller_fulfillment(
+                    user["id"], order_id, self._read_json()
+                )
+                self._json_response(HTTPStatus.OK, {"success": True, "fulfillment": fulfillment})
                 return
             if path.startswith("/api/shop-products/"):
                 self._rate_limit("/api/shop-products", 20)

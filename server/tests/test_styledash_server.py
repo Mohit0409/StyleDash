@@ -2100,6 +2100,35 @@ class HttpApiTests(unittest.TestCase):
         )
         self.assertEqual(status, 201)
         self.assertEqual(placed["order"]["items"][0]["productId"], product_id)
+        order_id = placed["order"]["id"]
+        status, seller_orders, _headers = self.get_json("/api/seller-orders", {"Cookie": session_headers["Cookie"]})
+        self.assertEqual(status, 200)
+        seller_order = next(order for order in seller_orders["orders"] if order["id"] == order_id)
+        self.assertEqual(seller_order["fulfillment"]["status"], "NEW")
+        self.assertEqual(seller_order["fulfillment"]["allowedNextStatuses"], ["PROCESSING"])
+        for forbidden in ("userId", "grandTotal", "razorpayOrderId", "refundId", "statusHistory"):
+            self.assertNotIn(forbidden, seller_order)
+        status, csrf_error, _headers = self.patch_json(
+            f"/api/seller-orders/{order_id}/fulfillment", {"status": "PROCESSING"},
+            {"Cookie": session_headers["Cookie"], "Origin": "https://styledash.test"},
+        )
+        self.assertEqual((status, csrf_error["code"]), (403, "csrf_failed"))
+        status, fulfillment, _headers = self.patch_json(
+            f"/api/seller-orders/{order_id}/fulfillment", {"status": "PROCESSING"}, session_headers
+        )
+        self.assertEqual((status, fulfillment["fulfillment"]["status"]), (200, "PROCESSING"))
+        status, invalid_transition, _headers = self.patch_json(
+            f"/api/seller-orders/{order_id}/fulfillment", {"status": "SHIPPED"}, session_headers
+        )
+        self.assertEqual((status, invalid_transition["code"]), (409, "invalid_fulfillment_transition"))
+        status, customer_order, _headers = self.get_json(
+            f"/api/orders/{order_id}", {"Cookie": session_headers["Cookie"]}
+        )
+        self.assertEqual(status, 200)
+        self.assertEqual(
+            [(row["shopName"], row["status"]) for row in customer_order["order"]["fulfillments"]],
+            [(complete["shopName"], "PROCESSING")],
+        )
         self.service.shops.admin_transition_product("http-admin", product_id, "APPROVED")
         status, public_unpublished, _headers = self.get_json("/api/shop-products/published")
         self.assertEqual(public_unpublished["products"], [])

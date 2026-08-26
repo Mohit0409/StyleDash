@@ -59,6 +59,14 @@ PRODUCT_ADMIN_TRANSITIONS = {
     "APPROVED": {"PUBLISHED"},
     "PUBLISHED": {"APPROVED"},  # Explicit unpublish.
 }
+FULFILLMENT_STATUSES = ("NEW", "PROCESSING", "READY", "SHIPPED", "DELIVERED")
+FULFILLMENT_TRANSITIONS = {
+    "NEW": ("PROCESSING",),
+    "PROCESSING": ("READY",),
+    "READY": ("SHIPPED",),
+    "SHIPPED": ("DELIVERED",),
+    "DELIVERED": (),
+}
 PINCODE_PATTERN = re.compile(r"^\d{6}$")
 APPLICATION_PAYLOAD_FIELDS = {
     "shopName",
@@ -139,6 +147,7 @@ class ShopWorkflow:
             # start concurrently against the same SQLite database.
             self._migrate_applications(db)
             self._migrate_products(db)
+            self._migrate_fulfillments(db)
             check = db.execute("PRAGMA foreign_key_check").fetchall()
             if check:
                 raise RuntimeError("Shop migration failed foreign key validation")
@@ -298,6 +307,42 @@ class ShopWorkflow:
             )
             db.execute(
                 "INSERT INTO shop_schema_migrations(version,applied_at) VALUES(2,?)",
+                (now,),
+            )
+            db.commit()
+        except Exception:
+            db.rollback()
+            raise
+
+    @staticmethod
+    def _migrate_fulfillments(db: sqlite3.Connection) -> None:
+        now = iso(utc_now())
+        statuses = ",".join(f"'{status}'" for status in FULFILLMENT_STATUSES)
+        db.execute("BEGIN IMMEDIATE")
+        try:
+            if db.execute(
+                "SELECT 1 FROM shop_schema_migrations WHERE version=4"
+            ).fetchone() is not None:
+                db.commit()
+                return
+            db.execute(
+                f"""
+                CREATE TABLE IF NOT EXISTS shop_order_fulfillments(
+                  order_id TEXT NOT NULL,
+                  application_id TEXT NOT NULL REFERENCES vendor_applications(id) ON DELETE CASCADE,
+                  status TEXT NOT NULL DEFAULT 'NEW' CHECK(status IN ({statuses})),
+                  created_at TEXT NOT NULL,
+                  updated_at TEXT NOT NULL,
+                  PRIMARY KEY(order_id,application_id)
+                )
+                """
+            )
+            db.execute(
+                "CREATE INDEX IF NOT EXISTS shop_fulfillment_application_idx "
+                "ON shop_order_fulfillments(application_id,updated_at)"
+            )
+            db.execute(
+                "INSERT INTO shop_schema_migrations(version,applied_at) VALUES(4,?)",
                 (now,),
             )
             db.commit()
@@ -803,6 +848,99 @@ class ShopWorkflow:
                 (user_id,),
             ).fetchall()
         return {row["id"] for row in rows}
+
+    @staticmethod
+    def _serialize_fulfillment(status: str, updated_at: str | None) -> dict[str, Any]:
+        return {
+            "status": status,
+            "updatedAt": updated_at,
+            "allowedNextStatuses": list(FULFILLMENT_TRANSITIONS[status]),
+        }
+
+    def seller_fulfillment(self, user_id: str, order_id: str) -> dict[str, Any]:
+        safe_order_id = clean_text(order_id, "Order ID", 1, 128)
+        with self.connect() as db:
+            application = self._seller_application(db, user_id)
+            row = db.execute(
+                "SELECT status,updated_at FROM shop_order_fulfillments "
+                "WHERE order_id=? AND application_id=?",
+                (safe_order_id, application["id"]),
+            ).fetchone()
+        if row is None:
+            return self._serialize_fulfillment("NEW", None)
+        return self._serialize_fulfillment(row["status"], row["updated_at"])
+
+    def update_seller_fulfillment(
+        self, user_id: str, order_id: str, payload: dict[str, Any]
+    ) -> dict[str, Any]:
+        if not isinstance(payload, dict) or set(payload) != {"status"}:
+            raise SecurityError(400, "A fulfillment status is required.", "invalid_fulfillment")
+        safe_order_id = clean_text(order_id, "Order ID", 1, 128)
+        status = clean_text(payload.get("status"), "Fulfillment status", 1, 20)
+        if status not in FULFILLMENT_STATUSES:
+            raise SecurityError(400, "Invalid fulfillment status.", "invalid_fulfillment")
+        now = iso(utc_now())
+        with self.connect() as db:
+            db.execute("BEGIN IMMEDIATE")
+            application = self._seller_application(db, user_id)
+            row = db.execute(
+                "SELECT status,updated_at FROM shop_order_fulfillments "
+                "WHERE order_id=? AND application_id=?",
+                (safe_order_id, application["id"]),
+            ).fetchone()
+            current = row["status"] if row is not None else "NEW"
+            if status == current:
+                db.commit()
+                return self._serialize_fulfillment(current, row["updated_at"] if row else None)
+            if status not in FULFILLMENT_TRANSITIONS[current]:
+                db.rollback()
+                raise SecurityError(
+                    409,
+                    f"Fulfillment cannot move from {current} to {status}.",
+                    "invalid_fulfillment_transition",
+                )
+            if row is None:
+                db.execute(
+                    "INSERT INTO shop_order_fulfillments(order_id,application_id,status,created_at,updated_at) "
+                    "VALUES(?,?,?,?,?)",
+                    (safe_order_id, application["id"], status, now, now),
+                )
+            else:
+                db.execute(
+                    "UPDATE shop_order_fulfillments SET status=?,updated_at=? "
+                    "WHERE order_id=? AND application_id=?",
+                    (status, now, safe_order_id, application["id"]),
+                )
+            db.commit()
+        return self._serialize_fulfillment(status, now)
+
+    def order_fulfillments(self, order_id: str, product_ids: list[str]) -> list[dict[str, Any]]:
+        safe_order_id = clean_text(order_id, "Order ID", 1, 128)
+        ids = [value for value in dict.fromkeys(product_ids) if isinstance(value, str) and value]
+        if not ids:
+            return []
+        placeholders = ",".join("?" for _ in ids)
+        with self.connect() as db:
+            rows = db.execute(
+                f"""
+                SELECT DISTINCT a.id,a.shop_name,f.status,f.updated_at
+                  FROM shop_product_submissions p
+                  JOIN vendor_applications a ON a.id=p.application_id
+                  LEFT JOIN shop_order_fulfillments f
+                    ON f.application_id=a.id AND f.order_id=?
+                 WHERE p.id IN ({placeholders})
+                 ORDER BY a.shop_name
+                """,
+                (safe_order_id, *ids),
+            ).fetchall()
+        return [
+            {
+                "shopName": row["shop_name"],
+                "status": row["status"] or "NEW",
+                "updatedAt": row["updated_at"],
+            }
+            for row in rows
+        ]
 
     def create_product_draft(self, user_id: str, payload: dict[str, Any]) -> dict[str, Any]:
         values = self._product_payload(payload)

@@ -52,6 +52,7 @@ export interface ServerOrder {
   estimatedDelivery: string;
   status: string;
   statusHistory: Array<{ status: string; timestamp: string; note?: string }>;
+  fulfillments?: Array<{ shopName: string; status: 'NEW' | 'PROCESSING' | 'READY' | 'SHIPPED' | 'DELIVERED'; updatedAt?: string | null }>;
   createdAt: string;
   updatedAt: string;
   razorpayOrderId?: string;

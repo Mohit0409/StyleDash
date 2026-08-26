@@ -172,7 +172,7 @@ class ShopWorkflowTests(unittest.TestCase):
                 [row[0] for row in db.execute(
                     "SELECT version FROM shop_schema_migrations ORDER BY version"
                 )],
-                [1, 2],
+                [1, 2, 4],
             )
             self.assertEqual(db.execute("PRAGMA integrity_check").fetchone()[0], "ok")
             self.assertEqual(db.execute("PRAGMA foreign_key_check").fetchall(), [])
@@ -242,7 +242,7 @@ class ShopWorkflowTests(unittest.TestCase):
         db = sqlite3.connect(concurrent_path)
         self.assertEqual(
             db.execute("SELECT version,COUNT(*) FROM shop_schema_migrations GROUP BY version").fetchall(),
-            [(1, 1), (2, 1)],
+            [(1, 1), (2, 1), (4, 1)],
         )
         self.assertEqual(db.execute("PRAGMA integrity_check").fetchone()[0], "ok")
         db.close()
@@ -339,6 +339,26 @@ class ShopWorkflowTests(unittest.TestCase):
             }
         self.assertIn("shop_rejected", audit_actions)
         self.assertIn("shop_suspended", audit_actions)
+
+    def test_seller_fulfillment_isolated_by_shop_and_forward_only(self) -> None:
+        app_a = self.create_active_shop("user-a", "Shop A")
+        app_b = self.create_active_shop("user-b", "Shop B")
+        product_a = self.store.create_product_draft("user-a", self.complete_product("Product A"))
+        product_b = self.store.create_product_draft("user-b", self.complete_product("Product B"))
+        self.assertEqual(self.store.seller_fulfillment("user-a", "SD-MIXED")["status"], "NEW")
+        self.assertEqual(self.store.seller_fulfillment("user-b", "SD-MIXED")["status"], "NEW")
+        updated = self.store.update_seller_fulfillment("user-a", "SD-MIXED", {"status": "PROCESSING"})
+        self.assertEqual(updated["status"], "PROCESSING")
+        self.assertEqual(updated["allowedNextStatuses"], ["READY"])
+        self.assertEqual(self.store.seller_fulfillment("user-b", "SD-MIXED")["status"], "NEW")
+        self.assert_error(
+            "invalid_fulfillment_transition",
+            lambda: self.store.update_seller_fulfillment("user-a", "SD-MIXED", {"status": "SHIPPED"}),
+        )
+        summary = self.store.order_fulfillments("SD-MIXED", [product_a["id"], product_b["id"]])
+        self.assertEqual([(row["shopName"], row["status"]) for row in summary], [("Shop A", "PROCESSING"), ("Shop B", "NEW")])
+        self.assertTrue(all("applicationId" not in row for row in summary))
+        self.assertNotEqual(app_a["id"], app_b["id"])
 
     def test_customer_application_and_product_idor(self) -> None:
         self.create_active_shop("user-a", "Shop A")

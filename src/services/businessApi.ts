@@ -119,15 +119,27 @@ export interface SellerOrderItem {
   size?: string; colourName?: string; quantity: number; unitPrice: number; lineTotal: number;
 }
 
+export type SellerFulfillmentStatus = 'NEW' | 'PROCESSING' | 'READY' | 'SHIPPED' | 'DELIVERED';
+
+export interface SellerFulfillment {
+  status: SellerFulfillmentStatus;
+  updatedAt?: string | null;
+  allowedNextStatuses: SellerFulfillmentStatus[];
+}
+
 export interface SellerOrder {
   id: string; status?: string; paymentStatus?: string; paymentMethod?: string; deliveryMethod?: string;
   createdAt?: string; updatedAt?: string; sellerSubtotal: number; items: SellerOrderItem[];
+  fulfillment: SellerFulfillment;
   address: { name?: string; phone?: string; street?: string; city?: string; state?: string; pincode?: string };
 }
 
 export const sellerOrderApi = {
   async mine(): Promise<SellerOrder[]> {
     return (await apiFetch<{ success: true; orders: SellerOrder[] }>('/api/seller-orders')).orders;
+  },
+  async updateFulfillment(id: string, status: SellerFulfillmentStatus): Promise<SellerFulfillment> {
+    return (await apiJson<{ success: true; fulfillment: SellerFulfillment }>(`/api/seller-orders/${encodeURIComponent(id)}/fulfillment`, 'PATCH', { status })).fulfillment;
   },
 };
 

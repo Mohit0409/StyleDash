@@ -108,7 +108,7 @@ export const SellerDashboard: React.FC<{ application: ShopApplication }> = ({ ap
     </article>}
 
     {tab === 'products' && <SellerProducts initialProducts={products} onProductsChange={setProducts} />}
-    {tab === 'orders' && <SellerOrders orders={orders} loading={loading} />}
+    {tab === 'orders' && <SellerOrders orders={orders} loading={loading} onOrderChange={updated => setOrders(current => current.map(order => order.id === updated.id ? updated : order))} />}
   </section>;
 };
 

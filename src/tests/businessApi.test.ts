@@ -42,6 +42,18 @@ describe('seller order API', () => {
     await expect(sellerOrderApi.mine()).resolves.toEqual([order]);
     expect(fetchSpy).toHaveBeenCalledWith('/api/seller-orders', expect.objectContaining({ credentials: 'include' }));
   });
+
+  it('updates only the seller fulfillment segment with CSRF protection', async () => {
+    setCsrfToken('csrf-fulfillment-test');
+    const fulfillment = { status: 'PROCESSING', updatedAt: '2026-08-26T00:00:00Z', allowedNextStatuses: ['READY'] };
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(jsonResponse({ success: true, fulfillment }));
+    await expect(sellerOrderApi.updateFulfillment('SD-SELLER-1', 'PROCESSING')).resolves.toEqual(fulfillment);
+    const [endpoint, init] = fetchSpy.mock.calls[0] as [RequestInfo | URL, RequestInit];
+    expect(endpoint).toBe('/api/seller-orders/SD-SELLER-1/fulfillment');
+    expect(init.method).toBe('PATCH');
+    expect(new Headers(init.headers).get('X-CSRF-Token')).toBe('csrf-fulfillment-test');
+    expect(JSON.parse(String(init.body))).toEqual({ status: 'PROCESSING' });
+  });
 });
 describe('seller product submission API', () => {
   afterEach(() => {
