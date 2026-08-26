@@ -125,16 +125,21 @@ if [ "$LOCAL_ONLY" = false ]; then
     echo "Primary off-device StyleDash backup verified: $stamp"
 
     secondary="${STYLEDASH_BACKUP_REMOTE_SECONDARY:-}"
+    secondary_timeout="${STYLEDASH_BACKUP_SECONDARY_TIMEOUT_SECONDS:-60}"
+    case "$secondary_timeout" in
+      ''|*[!0-9]*|0) secondary_timeout=60 ;;
+    esac
     if [ -n "$secondary" ]; then
       secondary_target="${secondary%/}/$stamp"
 
-      rclone copy "$target" "$secondary_target"         --immutable         --create-empty-src-dirs
-
-      rclone check "$target" "$secondary_target"         --one-way         --download
-
-      printf '%s\n' "$stamp" > "$RUN_DIR/styledash-last-secondary-backup"
-      chmod 600 "$RUN_DIR/styledash-last-secondary-backup"
-      echo "Secondary off-device StyleDash backup verified: $stamp"
+      if timeout "${secondary_timeout}s" rclone copy "$target" "$secondary_target" --immutable --create-empty-src-dirs &&
+         timeout "${secondary_timeout}s" rclone check "$target" "$secondary_target" --one-way --download; then
+        printf '%s\n' "$stamp" > "$RUN_DIR/styledash-last-secondary-backup"
+        chmod 600 "$RUN_DIR/styledash-last-secondary-backup"
+        echo "Secondary off-device StyleDash backup verified: $stamp"
+      else
+        echo "Secondary off-device StyleDash backup failed or timed out; primary backup remains verified: $stamp" >&2
+      fi
     fi
   elif enabled "$require_remote"; then
     echo "Off-device backup is required but STYLEDASH_BACKUP_REMOTE is not configured" >&2

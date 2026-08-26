@@ -58,6 +58,10 @@ class ProductionReliabilityTests(unittest.TestCase):
         self.assertIn('rclone copy "$target" "$secondary_target"', script)
         self.assertIn('rclone check "$target" "$secondary_target"', script)
         self.assertIn("styledash-last-secondary-backup", script)
+        self.assertIn("STYLEDASH_BACKUP_SECONDARY_TIMEOUT_SECONDS", script)
+        self.assertIn('timeout "${secondary_timeout}s" rclone copy', script)
+        self.assertIn('timeout "${secondary_timeout}s" rclone check', script)
+        self.assertIn("primary backup remains verified", script)
 
     def test_full_recovery_bundle_is_encrypted_verified_and_offdevice(self) -> None:
         script = self.read("scripts/termux/backup-styledash-recovery")
