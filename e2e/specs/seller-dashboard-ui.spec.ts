@@ -21,6 +21,10 @@ test('approved shop enters seller dashboard before activation', async ({ page })
       } });
       return;
     }
+    if (path === '/api/seller-return-requests') {
+      await json({ success: true, requests: [] });
+      return;
+    }
     if (path === '/api/seller-orders') {
       await json({ success: true, orders: [{
         id: 'SD-SELLER-1', status: 'placed', paymentStatus: 'paid', paymentMethod: 'upi', deliveryMethod: 'express',

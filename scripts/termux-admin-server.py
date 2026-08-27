@@ -198,6 +198,91 @@ class AdminApplication:
             admin_id, order_id, application_id, product_ids, payload
         )
 
+    def return_requests(self, admin_id: str) -> dict[str, list[dict[str, Any]]]:
+        item_requests = self.shops.admin_return_requests(admin_id) if self.shops is not None else []
+        cancellations: list[dict[str, Any]] = []
+        with self.payments.store.lock:
+            for order in self.payments.store.state["orders"].values():
+                request = order.get("cancellationRequest")
+                if not isinstance(request, dict):
+                    continue
+                row = dict(request)
+                row["orderId"] = order.get("id")
+                row["orderStatus"] = order.get("status")
+                row["paymentStatus"] = order.get("paymentStatus")
+                address = order.get("address") if isinstance(order.get("address"), dict) else {}
+                row["customerName"] = address.get("name")
+                cancellations.append(row)
+        cancellations.sort(key=lambda row: str(row.get("createdAt") or ""), reverse=True)
+        return {"items": item_requests, "cancellations": cancellations}
+
+    def transition_return_request(
+        self, admin_id: str, request_id: str, payload: dict[str, Any]
+    ) -> dict[str, Any]:
+        if self.shops is None:
+            raise SecurityError(409, "Return requests are unavailable.", "returns_unavailable")
+        return self.shops.admin_transition_return_request(
+            admin_id, request_id, payload.get("status"),
+            payload.get("note"), payload.get("resolutionReference"),
+        )
+
+    def transition_cancellation_request(
+        self, admin_id: str, order_id: str, payload: dict[str, Any]
+    ) -> dict[str, Any]:
+        if not isinstance(payload, dict) or not isinstance(payload.get("status"), str):
+            raise SecurityError(400, "Invalid cancellation request status.", "invalid_cancellation_request_status")
+        target = payload["status"].strip().upper()
+        transitions = {
+            "REQUESTED": {"UNDER_REVIEW", "REJECTED"},
+            "UNDER_REVIEW": {"APPROVED", "REJECTED"},
+        }
+        note = payload.get("note")
+        clean_note = None if note in (None, "") else " ".join(str(note).split())[:1000]
+        if target == "REJECTED" and (clean_note is None or len(clean_note) < 2):
+            raise SecurityError(400, "A rejection note is required.", "cancellation_note_required")
+        now = iso(utc_now())
+        with self.payments.store.lock:
+            order = self.payments.store.state["orders"].get(order_id)
+            if order is None:
+                raise SecurityError(404, "Order not found.", "order_not_found")
+            request = order.get("cancellationRequest")
+            if not isinstance(request, dict):
+                raise SecurityError(404, "Cancellation request not found.", "cancellation_request_not_found")
+            current = str(request.get("status") or "").upper()
+            if target not in transitions.get(current, set()):
+                raise SecurityError(409, "Cancellation request transition is not allowed.", "invalid_cancellation_request_transition")
+            updated = dict(request)
+            updated["status"] = target
+            updated["updatedAt"] = now
+            updated["reviewedAt"] = now
+            if clean_note is not None:
+                updated["adminNote"] = clean_note
+            if target == "REJECTED":
+                updated["resolvedAt"] = now
+            order["cancellationRequest"] = updated
+            order["updatedAt"] = now
+            self.payments.store.save()
+            result = dict(updated)
+        self.identity.record_action(
+            admin_id, "cancellation_request_status", "order", order_id, "success",
+            {"from": current, "to": target},
+        )
+        return result
+
+    def _close_cancellation_request_after_order_cancel(
+        self, order: dict[str, Any], now: str
+    ) -> None:
+        request = order.get("cancellationRequest")
+        if not isinstance(request, dict):
+            return
+        if request.get("status") in {"REJECTED", "CANCELLED"}:
+            return
+        updated = dict(request)
+        updated["status"] = "CANCELLED"
+        updated["updatedAt"] = now
+        updated["resolvedAt"] = now
+        order["cancellationRequest"] = updated
+
     def _resolve_order_alerts(
         self,
         state: dict[str, Any],
@@ -307,6 +392,7 @@ class AdminApplication:
                     "timestamp": now,
                     "note": "Cancelled after verified Razorpay refund" if online else "Cash on Delivery order cancelled",
                 })
+                self._close_cancellation_request_after_order_cancel(order, now)
                 self._resolve_order_alerts(
                     state,
                     order,
@@ -616,6 +702,9 @@ class AdminHandler(BaseHTTPRequestHandler):
             if path == "/api/admin/orders":
                 admin, _session = self._admin(); query = self._query().get("q", [""])[0]
                 self._json(200, {"success": True, "orders": self.application.list_orders(query, admin_id=admin["id"])}); return
+            if path == "/api/admin/returns":
+                admin, _session = self._admin()
+                self._json(200, {"success": True, **self.application.return_requests(admin["id"])}); return
             if path == "/api/admin/payment-alerts":
                 self._admin(); self._json(200, {"success": True, "alerts": self.application.payment_alerts()}); return
             if path.startswith("/api/admin/orders/"):
@@ -669,6 +758,18 @@ class AdminHandler(BaseHTTPRequestHandler):
         path = urlsplit(self.path).path
         try:
             admin, _session = self._admin(); self._csrf(); payload = self._body()
+            if path.startswith("/api/admin/returns/items/"):
+                request_id = unquote(path.removeprefix("/api/admin/returns/items/")).strip("/")
+                if not request_id or "/" in request_id:
+                    raise SecurityError(404, "Return request not found.", "return_request_not_found")
+                result = self.application.transition_return_request(admin["id"], request_id, payload)
+                self._json(200, {"success": True, "request": result}); return
+            if path.startswith("/api/admin/returns/cancellations/"):
+                order_id = unquote(path.removeprefix("/api/admin/returns/cancellations/")).strip("/")
+                if not order_id or "/" in order_id:
+                    raise SecurityError(404, "Cancellation request not found.", "cancellation_request_not_found")
+                result = self.application.transition_cancellation_request(admin["id"], order_id, payload)
+                self._json(200, {"success": True, "request": result}); return
             if path.startswith("/api/admin/orders/") and "/fulfillment/" in path:
                 tail = path.removeprefix("/api/admin/orders/")
                 raw_order_id, raw_application_id = tail.split("/fulfillment/", 1)

@@ -1,28 +1,35 @@
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Package } from 'lucide-react';
+import { CustomerOrderSupport } from '../components/CustomerOrderSupport';
 import { SEO } from '../components/SEO';
-import { orderApi } from '../services/businessApi';
+import { orderApi, returnApi, type ReturnRequest } from '../services/businessApi';
 import { ServerOrder } from '../services/paymentApi';
 
 export const Orders: React.FC = () => {
   const [orders, setOrders] = useState<ServerOrder[]>([]);
+  const [requests, setRequests] = useState<ReturnRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
   useEffect(() => {
-    orderApi.mine().then(setOrders).catch((cause) => setError(cause.message)).finally(() => setLoading(false));
+    Promise.all([orderApi.mine(), returnApi.mine()])
+      .then(([orderResult, requestResult]) => { setOrders(orderResult); setRequests(requestResult); })
+      .catch(cause => setError(cause instanceof Error ? cause.message : 'Orders could not be loaded.'))
+      .finally(() => setLoading(false));
   }, []);
 
+  const requestCreated = (request: ReturnRequest) => setRequests(current => [request, ...current.filter(item => item.id !== request.id)]);
+  const cancellationCreated = (orderId: string, request: NonNullable<ServerOrder['cancellationRequest']>) => setOrders(current => current.map(order => order.id === orderId ? { ...order, cancellationRequest: request } : order));
+
   return <div className="max-w-4xl mx-auto px-4 py-8 space-y-8"><SEO title="Order History - StyleDash" />
-    <div><h1 className="text-3xl font-black">Your Orders</h1><p className="text-xs text-neutral-500">Only orders owned by your authenticated account are shown.</p></div>
+    <div><h1 className="text-3xl font-black">Your Orders</h1><p className="text-xs text-neutral-500">Track fulfillment and submit eligible exchange, issue, or cancellation requests.</p></div>
     {loading ? <div className="text-center py-12">Loading orders…</div> : error ? <p role="alert" className="text-red-600">{error}</p> : orders.length === 0 ? <div className="p-12 text-center bg-white dark:bg-neutral-900 rounded-3xl border space-y-4"><Package className="w-12 h-10 mx-auto"/><h3 className="font-bold">No orders placed yet</h3><Link to="/products" className="font-bold text-lime-600">Start shopping</Link></div> : <div className="space-y-4">{orders.map(order => <div key={order.id} className="p-6 bg-white dark:bg-neutral-900 rounded-3xl border dark:border-neutral-800 space-y-4">
       {order.isPaymentTestOrder && <div className="rounded-xl border-2 border-red-700 bg-red-50 dark:bg-red-950/30 p-3 text-sm font-black text-red-800 dark:text-red-300">TEST — NO FULFILLMENT REQUIRED</div>}
-      {order.status === 'payment_review_required' && <div role="status" className="rounded-xl border border-amber-500 bg-amber-50 dark:bg-amber-950/30 p-3 text-sm font-bold text-amber-900 dark:text-amber-200">Payment received. Stock confirmation is required. Do not pay again.</div>}
-      {order.paymentStatus === 'refunded' && order.status !== 'cancelled' && <div role="status" className="rounded-xl border border-sky-500 bg-sky-50 dark:bg-sky-950/30 p-3 text-sm font-bold text-sky-900 dark:text-sky-200">Your refund has been processed. The order is awaiting final reconciliation.</div>}
-      <div className="flex justify-between gap-4"><div><strong>Order {order.id}</strong><small className="block text-neutral-500">{new Date(order.createdAt).toLocaleDateString()}</small></div><div className="text-right"><span className="font-bold uppercase text-lime-600">{order.status}</span> · <strong>₹{order.grandTotal}</strong></div></div>
-      {order.fulfillments && order.fulfillments.length > 0 && <div className="rounded-2xl bg-neutral-50 p-3 dark:bg-neutral-800"><p className="text-xs font-black uppercase tracking-wider text-neutral-500">Shop fulfillment</p><div className="mt-2 space-y-2">{order.fulfillments.map(item => <div key={item.shopName} className="rounded-lg border px-3 py-2 text-xs dark:border-neutral-700"><div className="flex flex-wrap items-center justify-between gap-2"><span className="font-bold">{item.shopName}</span><span className="font-black text-lime-700">{item.status.replace('_', ' ')}</span></div>{item.shipping && <p className="mt-1 text-neutral-500">{item.shipping.carrier} · Tracking {item.shipping.trackingNumber}</p>}</div>)}</div></div>}
+      <div className="flex justify-between gap-4"><div><strong>Order {order.id}</strong><small className="block text-neutral-500">{new Date(order.createdAt).toLocaleDateString()}</small></div><div className="text-right"><span className="font-bold uppercase text-lime-600">{order.status.replace(/_/g, ' ')}</span> · <strong>₹{order.grandTotal}</strong></div></div>
+      {order.fulfillments && order.fulfillments.length > 0 && <div className="rounded-2xl bg-neutral-50 p-3 dark:bg-neutral-800"><p className="text-xs font-black uppercase tracking-wider text-neutral-500">Shop fulfillment</p><div className="mt-2 space-y-2">{order.fulfillments.map(item => <div key={item.shopName} className="rounded-lg border px-3 py-2 text-xs dark:border-neutral-700"><div className="flex flex-wrap items-center justify-between gap-2"><span className="font-bold">{item.shopName}</span><span className="font-black text-lime-700">{item.status.replace(/_/g, ' ')}</span></div>{item.shipping && <p className="mt-1 text-neutral-500">{item.shipping.carrier} · Tracking {item.shipping.trackingNumber}</p>}</div>)}</div></div>}
       {order.items.map(item => <div key={item.variantId} className="flex justify-between gap-4 text-sm"><span>{item.productName} ({item.size}, {item.colourName}) × {item.quantity}</span><strong>₹{item.lineTotal}</strong></div>)}
+      <CustomerOrderSupport order={order} requests={requests} onRequestCreated={requestCreated} onCancellationCreated={request => cancellationCreated(order.id, request)} />
     </div>)}</div>}
   </div>;
 };

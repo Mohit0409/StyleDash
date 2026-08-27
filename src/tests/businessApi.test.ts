@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { clearCsrfToken, setCsrfToken } from '../services/apiClient';
-import { publicStoreApi, sellerOrderApi, shopProductApi, vendorApplicationApi } from '../services/businessApi';
+import { publicStoreApi, returnApi, sellerOrderApi, sellerReturnApi, shopProductApi, vendorApplicationApi } from '../services/businessApi';
 
 const application = {
   id: 'shop-1',
@@ -163,5 +163,51 @@ describe('shop application API', () => {
       expect(new Headers(init.headers).get('X-CSRF-Token')).toBe('csrf-shop-test');
       expect(init.credentials).toBe('include');
     }
+  });
+});
+
+
+describe('returns API', () => {
+  afterEach(() => { clearCsrfToken(); vi.restoreAllMocks(); });
+
+  it('loads customer and seller return projections', async () => {
+    const request = { id: 'ret-1', orderId: 'SD-1', requestType: 'ISSUE_RETURN', status: 'REQUESTED' };
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(async () => jsonResponse({ success: true, requests: [request] }));
+    await expect(returnApi.mine()).resolves.toEqual([request]);
+    await expect(sellerReturnApi.mine()).resolves.toEqual([request]);
+    expect(fetchSpy.mock.calls.map(([endpoint]) => endpoint)).toEqual(['/api/return-requests', '/api/seller-return-requests']);
+  });
+
+  it('creates an item request with CSRF and trusted identifiers only', async () => {
+    setCsrfToken('csrf-return-test');
+    const request = { id: 'ret-1', orderId: 'SD-1', requestType: 'ISSUE_RETURN', status: 'REQUESTED' };
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(jsonResponse({ success: true, request }, 201));
+    await returnApi.create('SD-1', { productId: 'prod-1', variantId: 'var-1', requestType: 'ISSUE_RETURN', reason: 'DAMAGED', quantity: 1, details: 'Package was damaged' });
+    const [endpoint, init] = fetchSpy.mock.calls[0] as [RequestInfo | URL, RequestInit];
+    expect(endpoint).toBe('/api/orders/SD-1/return-requests');
+    expect(init.method).toBe('POST');
+    expect(new Headers(init.headers).get('X-CSRF-Token')).toBe('csrf-return-test');
+    expect(JSON.parse(String(init.body))).toEqual({ productId: 'prod-1', variantId: 'var-1', requestType: 'ISSUE_RETURN', reason: 'DAMAGED', quantity: 1, details: 'Package was damaged' });
+  });
+
+  it('submits cancellation and seller notes through CSRF-protected endpoints', async () => {
+    setCsrfToken('csrf-return-mutations');
+    const cancellationRequest = { status: 'REQUESTED', reason: 'ORDERED_BY_MISTAKE', createdAt: '2026-08-27T00:00:00Z', updatedAt: '2026-08-27T00:00:00Z' };
+    const sellerRequest = { id: 'ret-2', orderId: 'SD-2', requestType: 'SIZE_EXCHANGE', status: 'REQUESTED' };
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(async endpoint => {
+      if (String(endpoint).includes('cancellation-request')) return jsonResponse({ success: true, cancellationRequest }, 201);
+      return jsonResponse({ success: true, request: sellerRequest });
+    });
+    await returnApi.requestCancellation('SD-2', { reason: 'ORDERED_BY_MISTAKE', details: 'Selected the wrong item' });
+    await sellerReturnApi.addNote('ret-2', 'Replacement size available');
+    const [cancelEndpoint, cancelInit] = fetchSpy.mock.calls[0] as [RequestInfo | URL, RequestInit];
+    expect(cancelEndpoint).toBe('/api/orders/SD-2/cancellation-request');
+    expect(new Headers(cancelInit.headers).get('X-CSRF-Token')).toBe('csrf-return-mutations');
+    expect(JSON.parse(String(cancelInit.body))).toEqual({ reason: 'ORDERED_BY_MISTAKE', details: 'Selected the wrong item' });
+    const [noteEndpoint, noteInit] = fetchSpy.mock.calls[1] as [RequestInfo | URL, RequestInit];
+    expect(noteEndpoint).toBe('/api/seller-return-requests/ret-2');
+    expect(noteInit.method).toBe('PATCH');
+    expect(new Headers(noteInit.headers).get('X-CSRF-Token')).toBe('csrf-return-mutations');
+    expect(JSON.parse(String(noteInit.body))).toEqual({ note: 'Replacement size available' });
   });
 });

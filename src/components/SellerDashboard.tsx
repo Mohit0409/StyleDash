@@ -1,17 +1,20 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { BarChart3, Boxes, CheckCircle2, Clock3, Package, ShoppingBag, Store } from 'lucide-react';
+import { BarChart3, Boxes, CheckCircle2, Clock3, Package, RotateCcw, ShoppingBag, Store } from 'lucide-react';
 import { SellerProducts } from './SellerProducts';
 import { SellerOrders } from './SellerOrders';
+import { SellerReturns } from './SellerReturns';
 import { ApiError } from '../services/apiClient';
 import {
+  type ReturnRequest,
   type SellerOrder,
   type SellerProduct,
   type ShopApplication,
   sellerOrderApi,
+  sellerReturnApi,
   shopProductApi,
 } from '../services/businessApi';
 
-type DashboardTab = 'overview' | 'shop' | 'products' | 'orders';
+type DashboardTab = 'overview' | 'shop' | 'products' | 'orders' | 'returns';
 
 const messageForError = (cause: unknown) =>
   cause instanceof ApiError || cause instanceof Error
@@ -22,13 +25,14 @@ export const SellerDashboard: React.FC<{ application: ShopApplication }> = ({ ap
   const [tab, setTab] = useState<DashboardTab>('overview');
   const [products, setProducts] = useState<SellerProduct[]>([]);
   const [orders, setOrders] = useState<SellerOrder[]>([]);
+  const [returns, setReturns] = useState<ReturnRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
   useEffect(() => {
     let active = true;
-    Promise.all([shopProductApi.mine(), sellerOrderApi.mine()])
-      .then(([productResult, orderResult]) => { if (active) { setProducts(productResult); setOrders(orderResult); } })
+    Promise.all([shopProductApi.mine(), sellerOrderApi.mine(), sellerReturnApi.mine()])
+      .then(([productResult, orderResult, returnResult]) => { if (active) { setProducts(productResult); setOrders(orderResult); setReturns(returnResult); } })
       .catch(cause => { if (active) setError(messageForError(cause)); })
       .finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
@@ -47,6 +51,7 @@ export const SellerDashboard: React.FC<{ application: ShopApplication }> = ({ ap
     { id: 'shop', label: 'My Shop', icon: <Store className="w-4" /> },
     { id: 'products', label: 'Products', icon: <Boxes className="w-4" /> },
     { id: 'orders', label: 'Orders', icon: <ShoppingBag className="w-4" /> },
+    { id: 'returns', label: 'Returns', icon: <RotateCcw className="w-4" /> },
   ];
 
   return <section className="space-y-6" aria-labelledby="seller-dashboard-title">
@@ -109,6 +114,7 @@ export const SellerDashboard: React.FC<{ application: ShopApplication }> = ({ ap
 
     {tab === 'products' && <SellerProducts initialProducts={products} onProductsChange={setProducts} />}
     {tab === 'orders' && <SellerOrders orders={orders} loading={loading} onOrderChange={updated => setOrders(current => current.map(order => order.id === updated.id ? updated : order))} />}
+    {tab === 'returns' && <SellerReturns requests={returns} loading={loading} onRequestChange={updated => setReturns(current => current.map(item => item.id === updated.id ? updated : item))} />}
   </section>;
 };
 

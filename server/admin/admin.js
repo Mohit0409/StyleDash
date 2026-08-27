@@ -58,6 +58,20 @@ byId('content').addEventListener('click', async event => {
       }
       await api(`/api/admin/orders/${encodeURIComponent(button.dataset.order)}/fulfillment/${encodeURIComponent(button.dataset.application)}`,{method:'PATCH',body:JSON.stringify(payload)});
     }
+    if(action==='return-item') {
+      const status=button.dataset.value;
+      const note=status==='REJECTED'?prompt('Reason for rejecting this return/exchange request (required):'):null;
+      if(status==='REJECTED'&&(!note||note.trim().length<2))return;
+      let resolutionReference=null;
+      if(['EXCHANGED','REFUND_PENDING'].includes(status)) resolutionReference=prompt('Resolution/reference note (optional):')||null;
+      await api(`/api/admin/returns/items/${encodeURIComponent(button.dataset.id)}`,{method:'PATCH',body:JSON.stringify({status,note:note?.trim()||null,resolutionReference:resolutionReference?.trim()||null})});
+    }
+    if(action==='return-cancellation') {
+      const status=button.dataset.value;
+      const note=status==='REJECTED'?prompt('Reason for rejecting this cancellation request (required):'):null;
+      if(status==='REJECTED'&&(!note||note.trim().length<2))return;
+      await api(`/api/admin/returns/cancellations/${encodeURIComponent(button.dataset.order)}`,{method:'PATCH',body:JSON.stringify({status,note:note?.trim()||null})});
+    }
     if(action==='vendor') { const status=button.dataset.value; const reason=['REJECTED','SUSPENDED'].includes(status)?prompt(`Enter the ${status.toLowerCase()} reason:`):null; if(['REJECTED','SUSPENDED'].includes(status)&&!reason)return; await api(`/api/admin/vendors/${encodeURIComponent(button.dataset.id)}`,{method:'PATCH',body:JSON.stringify({status,reason})}); }
     if(action==='shop-product') { const status=button.dataset.value; const reason=status==='REJECTED'?prompt('Enter the rejection reason:'):null; if(status==='REJECTED'&&!reason)return; await api(`/api/admin/shop-products/${encodeURIComponent(button.dataset.id)}`,{method:'PATCH',body:JSON.stringify({status,reason})}); }
     if(action==='inventory') { const raw=prompt('Enter stock adjustment, for example 5 or -2:'); if(raw===null)return; await api(`/api/admin/inventory/${encodeURIComponent(button.dataset.id)}`,{method:'PATCH',body:JSON.stringify({delta:Number(raw)})}); }
@@ -72,6 +86,7 @@ async function loadTab(tab) {
     const query=encodeURIComponent(byId('search').value.trim());
     byId('search-form').hidden=!['orders','inventory','customers'].includes(tab);
     if(tab==='orders') return renderOrders((await api(`/api/admin/orders?q=${query}`)).orders);
+    if(tab==='returns') return renderReturns(await api('/api/admin/returns'));
     if(tab==='vendors') return renderVendors((await api('/api/admin/vendors')).applications);
     if(tab==='shop-products') return renderShopProducts((await api('/api/admin/shop-products')).products);
     if(tab==='inventory') return renderInventory((await api(`/api/admin/inventory?low=${query?'0':'1'}&q=${query}`)).inventory);
@@ -98,6 +113,20 @@ function renderShopFulfillments(order){
 }
 
 function renderOrders(orders){byId('content').innerHTML=`<h2>Recent orders</h2><div class="grid">${orders.map(order=>{const paymentTest=order.isPaymentTestOrder===true||order.fulfillmentRequired===false;return `<article class="card">${paymentTest?'<div class="payment-test-banner"><strong>TEST</strong><strong>NO FULFILLMENT REQUIRED</strong></div>':''}<h3>${escapeText(order.id)}</h3><div class="facts"><div class="fact"><small>Customer</small><strong>${escapeText(order.address?.name)}</strong><small>${escapeText(order.address?.phone)}</small></div><div class="fact"><small>Amount</small><strong>₹${escapeText(order.grandTotal)}</strong></div><div class="fact"><small>Payment</small><strong>${escapeText(order.paymentStatus)}</strong><small>${escapeText(order.razorpayOrderId||'')} ${escapeText(order.razorpayPaymentId||order.paymentMethod)}</small></div><div class="fact"><small>Status</small><strong>${escapeText(order.status)}</strong></div></div><p class="muted">${escapeText(order.address?.street)}, ${escapeText(order.address?.city)} ${escapeText(order.address?.pincode)}</p><pre>${escapeText((order.items||[]).map(item=>`${item.productName||item.name||item.productId} · ${item.size||''} ${item.colourName||item.colour||''} × ${item.quantity}`).join('\n'))}</pre>${paymentTest?'':renderShopFulfillments(order)}${paymentTest?'<p class="payment-test-note">Payment validation record only. Do not pack, dispatch, deliver, or adjust fashion inventory.</p>':`<div class="actions">${orderActions(order).map(status=>`<button data-action="order-status" data-id="${escapeText(order.id)}" data-value="${status}">${status.replaceAll('_',' ')}</button>`).join('')}</div>`}</article>`;}).join('')||'<p>No orders found.</p>'}</div>`;}
+function returnTransitions(item){
+  if(item.status==='REQUESTED')return ['UNDER_REVIEW','REJECTED'];
+  if(item.status==='UNDER_REVIEW')return ['APPROVED','REJECTED'];
+  if(item.requestType==='SIZE_EXCHANGE')return {APPROVED:['PICKUP_PENDING'],PICKUP_PENDING:['RECEIVED'],RECEIVED:['EXCHANGED']}[item.status]||[];
+  if(item.requestType==='ISSUE_RETURN')return {APPROVED:['PICKUP_PENDING'],PICKUP_PENDING:['RECEIVED'],RECEIVED:['REFUND_PENDING']}[item.status]||[];
+  return [];
+}
+function cancellationTransitions(item){return {REQUESTED:['UNDER_REVIEW','REJECTED'],UNDER_REVIEW:['APPROVED','REJECTED']}[item.status]||[];}
+function renderReturns(result){
+  const items=result.items||[]; const cancellations=result.cancellations||[];
+  const itemCards=items.map(item=>`<article class="card"><h3>${escapeText(item.requestType.replaceAll('_',' '))}</h3><p><strong>${escapeText(item.productName)}</strong> · ${escapeText(item.shopName)} · Order ${escapeText(item.orderId)}</p><p class="muted">Reason: ${escapeText(item.reason.replaceAll('_',' '))}${item.details?` · ${escapeText(item.details)}`:''}</p><div class="facts"><div class="fact"><small>Status</small><strong>${escapeText(item.status)}</strong></div><div class="fact"><small>Quantity</small><strong>${escapeText(item.quantity)}</strong></div><div class="fact"><small>Item subtotal snapshot</small><strong>₹${escapeText(item.itemSubtotal)}</strong></div></div>${item.sellerNote?`<p class="muted">Seller note: ${escapeText(item.sellerNote)}</p>`:''}${item.adminNote?`<p class="muted">Admin note: ${escapeText(item.adminNote)}</p>`:''}<div class="actions">${returnTransitions(item).map(status=>`<button class="${status==='REJECTED'?'danger':'success'}" data-action="return-item" data-id="${escapeText(item.id)}" data-value="${status}">${escapeText(status.replaceAll('_',' '))}</button>`).join('')}</div></article>`).join('');
+  const cancellationCards=cancellations.map(item=>`<article class="card"><h3>Order cancellation · ${escapeText(item.orderId)}</h3><p>${escapeText(item.customerName||'Customer')} · order ${escapeText(item.orderStatus)} · payment ${escapeText(item.paymentStatus)}</p><p class="muted">Reason: ${escapeText(String(item.reason||'').replaceAll('_',' '))}${item.details?` · ${escapeText(item.details)}`:''}</p><strong>${escapeText(item.status)}</strong>${item.status==='APPROVED'?'<p class="muted"><strong>Approved request only.</strong> This does not cancel or refund the order. Complete the protected order/refund action separately.</p>':''}<div class="actions">${cancellationTransitions(item).map(status=>`<button class="${status==='REJECTED'?'danger':'success'}" data-action="return-cancellation" data-order="${escapeText(item.orderId)}" data-value="${status}">${escapeText(status==='APPROVED'?'APPROVE REQUEST':status.replaceAll('_',' '))}</button>`).join('')}</div></article>`).join('');
+  byId('content').innerHTML=`<h2>Returns, exchanges & cancellations</h2><p class="muted">Approving a request never performs a Razorpay refund or global order cancellation automatically.</p><h3>Item requests</h3><div class="grid">${itemCards||'<p>No item return or exchange requests.</p>'}</div><h3>Cancellation requests</h3><div class="grid">${cancellationCards||'<p>No cancellation requests.</p>'}</div>`;
+}
 function applicationTransitions(status){return {SUBMITTED:['UNDER_REVIEW'],UNDER_REVIEW:['APPROVED','REJECTED'],APPROVED:['ACTIVE'],ACTIVE:['SUSPENDED'],SUSPENDED:['ACTIVE']}[status]||[];}
 function productTransitions(status){return {SUBMITTED:['UNDER_REVIEW'],UNDER_REVIEW:['APPROVED','REJECTED'],APPROVED:['PUBLISHED'],PUBLISHED:['APPROVED']}[status]||[];}
 function renderVendors(items){byId('content').innerHTML=`<h2>Shop applications</h2><div class="grid">${items.map(item=>`<article class="card"><h3>${escapeText(item.shopName)}</h3><p>${escapeText(item.ownerName)} · ${escapeText(item.registeredEmail)} · ${escapeText(item.registeredMobile)}</p><p class="muted">${escapeText(item.address)}, ${escapeText(item.city)} ${escapeText(item.pincode)} — ${escapeText(item.description)}</p>${item.rejectionReason?`<p class="error">${escapeText(item.rejectionReason)}</p>`:''}<strong>${escapeText(item.status)}</strong><div class="actions">${applicationTransitions(item.status).map(status=>`<button class="${['REJECTED','SUSPENDED'].includes(status)?'danger':'success'}" data-action="vendor" data-id="${escapeText(item.id)}" data-value="${status}">${escapeText(status.replaceAll('_',' '))}</button>`).join('')}</div></article>`).join('')||'<p>No applications.</p>'}</div>`;}

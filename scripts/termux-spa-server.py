@@ -15,7 +15,7 @@ import threading
 import time
 from http.cookies import SimpleCookie
 from collections import defaultdict, deque
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 from decimal import Decimal, ROUND_HALF_UP
 from functools import partial
 from http import HTTPStatus
@@ -737,6 +737,7 @@ class PaymentService:
             "updatedAt", "razorpayOrderId", "razorpayPaymentId", "paymentVerifiedAt",
             "isPaymentTestOrder", "fulfillmentRequired", "adminLabels", "inventoryCommitted",
             "inventoryReleasedAt", "refundId", "refundAmount", "refundCurrency", "refundProcessedAt",
+            "cancellationRequest",
         )
         return {key: order[key] for key in allowed if key in order}
 
@@ -767,11 +768,59 @@ class PaymentService:
                     "deliveryMethod": order.get("deliveryMethod"),
                     "createdAt": order.get("createdAt"),
                     "updatedAt": order.get("updatedAt"),
+                    "cancellationRequest": order.get("cancellationRequest"),
                     "sellerSubtotal": sum(int(item.get("lineTotal", 0)) for item in seller_items),
                     "items": seller_items,
                     "address": {key: address.get(key) for key in ("name", "phone", "street", "city", "state", "pincode")},
                 })
         return sorted(results, key=lambda row: str(row.get("createdAt") or ""), reverse=True)
+
+    def request_cancellation(
+        self, user_id: str, order_id: str, payload: dict[str, Any]
+    ) -> dict[str, Any]:
+        if not isinstance(payload, dict) or set(payload) - {"reason", "details"}:
+            raise SecurityError(400, "Invalid cancellation request.", "invalid_cancellation_request")
+        reason = payload.get("reason")
+        if not isinstance(reason, str) or reason.strip().upper() not in {"CUSTOMER_REQUEST", "ORDERED_BY_MISTAKE"}:
+            raise SecurityError(400, "Invalid cancellation reason.", "invalid_cancellation_reason")
+        reason = reason.strip().upper()
+        raw_details = payload.get("details")
+        if raw_details in (None, ""):
+            details = None
+        elif isinstance(raw_details, str):
+            details = " ".join(raw_details.split())
+            if not 5 <= len(details) <= 1000:
+                raise SecurityError(400, "Enter valid cancellation details.", "invalid_cancellation_details")
+        else:
+            raise SecurityError(400, "Enter valid cancellation details.", "invalid_cancellation_details")
+        safe_order_id = str(order_id or "").strip()
+        if not safe_order_id or len(safe_order_id) > 128 or "/" in safe_order_id:
+            raise SecurityError(404, "Order not found.", "order_not_found")
+        with self.store.lock:
+            order = self.store.state["orders"].get(safe_order_id)
+            if not isinstance(order, dict) or order.get("userId") != user_id:
+                raise SecurityError(404, "Order not found.", "order_not_found")
+            if order.get("isPaymentTestOrder") is True or order.get("fulfillmentRequired") is False:
+                raise SecurityError(409, "This order does not support cancellation.", "no_fulfillment_order")
+            if order.get("paymentStatus") == "refunded" or order.get("status") in {
+                "packed", "out_for_delivery", "delivered", "cancelled",
+            }:
+                raise SecurityError(409, "This order can no longer be cancelled.", "cancellation_not_available")
+            if isinstance(order.get("cancellationRequest"), dict):
+                raise SecurityError(409, "A cancellation request already exists for this order.", "cancellation_request_exists")
+            now = datetime.now(timezone.utc).isoformat()
+            request = {
+                "id": "can_" + secrets.token_hex(12),
+                "status": "REQUESTED",
+                "reason": reason,
+                "details": details,
+                "createdAt": now,
+                "updatedAt": now,
+            }
+            order["cancellationRequest"] = request
+            order["updatedAt"] = now
+            self.store.save()
+            return dict(request)
 
     def _create_response(self, order: dict[str, Any]) -> dict[str, Any]:
         return {
@@ -1937,6 +1986,91 @@ class StyleDashRequestHandler(SimpleHTTPRequestHandler):
             print("StyleDash fulfillment notification preparation failed", flush=True)
 
     @staticmethod
+    def _order_delivery_timestamp(order: dict[str, Any]) -> str | None:
+        history = order.get("statusHistory")
+        if not isinstance(history, list):
+            return None
+        for entry in reversed(history):
+            if isinstance(entry, dict) and entry.get("status") == "delivered":
+                timestamp = entry.get("timestamp")
+                return timestamp if isinstance(timestamp, str) else None
+        return None
+
+    @staticmethod
+    def _parse_timestamp(value: str) -> datetime:
+        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+        if parsed.tzinfo is None:
+            parsed = parsed.replace(tzinfo=timezone.utc)
+        return parsed.astimezone(timezone.utc)
+
+    def _return_request_context(
+        self,
+        order: dict[str, Any],
+        item: dict[str, Any],
+        request_type: str,
+    ) -> dict[str, Any]:
+        if order.get("isPaymentTestOrder") is True or order.get("fulfillmentRequired") is False:
+            raise SecurityError(409, "This order does not support returns.", "no_fulfillment_order")
+        if order.get("status") == "cancelled" or order.get("paymentStatus") == "refunded":
+            raise SecurityError(409, "This order is not eligible for a new return request.", "order_not_returnable")
+        product_id = item.get("productId")
+        if not isinstance(product_id, str) or not product_id:
+            raise SecurityError(404, "Order item not found.", "return_item_not_found")
+        product = self.payment_service.product_snapshot().get(product_id)
+        if not isinstance(product, dict):
+            raise SecurityError(404, "Order item not found.", "return_item_not_found")
+        shop_context = self._shops().return_context(str(order.get("id") or ""), product_id)
+        if shop_context is not None:
+            delivered = shop_context.get("fulfillmentStatus") == "DELIVERED"
+            delivered_at = shop_context.get("fulfillmentUpdatedAt")
+            application_id = shop_context.get("applicationId")
+            shop_name = shop_context.get("shopName")
+        else:
+            delivered = order.get("status") == "delivered"
+            delivered_at = self._order_delivery_timestamp(order)
+            application_id = None
+            shop_name = product.get("storeName") or product.get("brand") or "StyleDash"
+        if request_type not in {"SIZE_EXCHANGE", "ISSUE_RETURN"}:
+            raise SecurityError(400, "Invalid return request type.", "invalid_return_request")
+        if not delivered or not isinstance(delivered_at, str) or not delivered_at:
+            raise SecurityError(409, "This item has not been delivered yet.", "return_not_delivered")
+        try:
+            delivered_time = self._parse_timestamp(delivered_at)
+        except (TypeError, ValueError):
+            raise SecurityError(409, "Delivery time is unavailable.", "return_delivery_time_unavailable") from None
+        if request_type == "SIZE_EXCHANGE":
+            window = product.get("returnWindowDays")
+            if product.get("exchangeAvailable") is not True or isinstance(window, bool) or not isinstance(window, int) or window <= 0:
+                raise SecurityError(409, "Size exchange is not available for this item.", "exchange_not_available")
+        else:
+            window = self.payment_service.settings.get("issueReportWindowDays")
+            if isinstance(window, bool) or not isinstance(window, int) or not 1 <= window <= 30:
+                raise SecurityError(503, "Return policy configuration is unavailable.", "return_policy_unavailable")
+        deadline = delivered_time + timedelta(days=window)
+        if datetime.now(timezone.utc) > deadline:
+            raise SecurityError(409, "The request window for this item has closed.", "return_window_expired")
+        return {
+            "applicationId": application_id,
+            "shopName": shop_name,
+            "windowDays": window,
+            "deadline": deadline.isoformat(),
+        }
+
+    def _return_eligibility(self, order: dict[str, Any], item: dict[str, Any]) -> dict[str, Any]:
+        result: dict[str, Any] = {}
+        for key, request_type in (("sizeExchange", "SIZE_EXCHANGE"), ("issueReturn", "ISSUE_RETURN")):
+            try:
+                context = self._return_request_context(order, item, request_type)
+                result[key] = {
+                    "available": True,
+                    "windowDays": context["windowDays"],
+                    "deadline": context["deadline"],
+                }
+            except SecurityError as error:
+                result[key] = {"available": False, "code": error.code}
+        return result
+
+    @staticmethod
     def _public_origin() -> str:
         return os.environ.get("STYLEDASH_PUBLIC_ORIGIN", "").rstrip("/")
 
@@ -2141,12 +2275,29 @@ class StyleDashRequestHandler(SimpleHTTPRequestHandler):
                 profile = self._security().profile(user["id"])
                 self._json_response(HTTPStatus.OK, {"success": True, "user": profile, "csrfToken": self._security().csrf_token(raw or "")})
                 return
+            if path == "/api/return-requests":
+                self._rate_limit(path, 60)
+                user, _session = self._current_user()
+                requests = self._shops().customer_return_requests(user["id"])
+                self._json_response(HTTPStatus.OK, {"success": True, "requests": requests})
+                return
+            if path == "/api/seller-return-requests":
+                self._rate_limit(path, 60)
+                user, _session = self._current_user()
+                requests = self._shops().seller_return_requests(user["id"])
+                self._json_response(HTTPStatus.OK, {"success": True, "requests": requests})
+                return
             if path == "/api/orders":
                 user, _session = self._current_user()
                 orders = self._security().list_orders(self.payment_service.store, user["id"])
                 for order in orders:
                     product_ids = [item.get("productId") for item in order.get("items", []) if isinstance(item, dict)]
                     order["fulfillments"] = self._shops().order_fulfillments(order["id"], product_ids)
+                    order["items"] = [
+                        {**item, "returnEligibility": self._return_eligibility(order, item)}
+                        if isinstance(item, dict) else item
+                        for item in order.get("items", [])
+                    ]
                 self._json_response(HTTPStatus.OK, {"success": True, "orders": orders})
                 return
             if path == "/api/seller-orders":
@@ -2181,6 +2332,11 @@ class StyleDashRequestHandler(SimpleHTTPRequestHandler):
                 order = self._security().get_order(self.payment_service.store, path.removeprefix("/api/orders/"), user["id"])
                 product_ids = [item.get("productId") for item in order.get("items", []) if isinstance(item, dict)]
                 order["fulfillments"] = self._shops().order_fulfillments(order["id"], product_ids)
+                order["items"] = [
+                    {**item, "returnEligibility": self._return_eligibility(order, item)}
+                    if isinstance(item, dict) else item
+                    for item in order.get("items", [])
+                ]
                 self._json_response(HTTPStatus.OK, {"success": True, "order": order})
                 return
             if path.startswith(API_PREFIX):
@@ -2406,6 +2562,70 @@ class StyleDashRequestHandler(SimpleHTTPRequestHandler):
                 raw, csrf = self._security().change_password(self._session_token() or "", self._read_json())
                 self._json_response(HTTPStatus.OK, {"success": True, "csrfToken": csrf}, headers={"Set-Cookie": self._security().cookie(raw)})
                 return
+            if path.startswith("/api/orders/") and path.endswith("/cancellation-request"):
+                self._rate_limit("/api/cancellation-request", 8)
+                user, _session = self._current_user()
+                self._csrf()
+                order_id = unquote(
+                    path.removeprefix("/api/orders/").removesuffix("/cancellation-request")
+                ).strip("/")
+                if not order_id or "/" in order_id:
+                    raise SecurityError(404, "Order not found.", "order_not_found")
+                order = self._security().get_order(
+                    self.payment_service.store, order_id, user["id"]
+                )
+                product_ids = [
+                    item.get("productId") for item in order.get("items", [])
+                    if isinstance(item, dict) and isinstance(item.get("productId"), str)
+                ]
+                fulfillments = self._shops().order_fulfillments(order_id, product_ids)
+                if any(row.get("status") in {"SHIPPED", "DELIVERED"} for row in fulfillments):
+                    raise SecurityError(409, "This order has already been dispatched.", "cancellation_not_available")
+                result = self.payment_service.request_cancellation(
+                    user["id"], order_id, self._read_json()
+                )
+                self._json_response(
+                    HTTPStatus.CREATED, {"success": True, "cancellationRequest": result}
+                )
+                return
+            if path.startswith("/api/orders/") and path.endswith("/return-requests"):
+                self._rate_limit("/api/return-requests", 12)
+                user, _session = self._current_user()
+                self._csrf()
+                order_id = unquote(
+                    path.removeprefix("/api/orders/").removesuffix("/return-requests")
+                ).strip("/")
+                if not order_id or "/" in order_id:
+                    raise SecurityError(404, "Order not found.", "order_not_found")
+                order = self._security().get_order(
+                    self.payment_service.store, order_id, user["id"]
+                )
+                payload = self._read_json()
+                product_id = payload.get("productId")
+                variant_id = payload.get("variantId")
+                item = next(
+                    (
+                        row for row in order.get("items", [])
+                        if isinstance(row, dict)
+                        and row.get("productId") == product_id
+                        and row.get("variantId") == variant_id
+                    ),
+                    None,
+                )
+                if item is None:
+                    raise SecurityError(404, "Order item not found.", "return_item_not_found")
+                request_type = payload.get("requestType")
+                normalized_type = request_type.strip().upper() if isinstance(request_type, str) else ""
+                context = self._return_request_context(order, item, normalized_type)
+                request_payload = {
+                    key: value for key, value in payload.items()
+                    if key not in {"productId", "variantId"}
+                }
+                result = self._shops().create_return_request(
+                    user["id"], order_id, item, context, request_payload
+                )
+                self._json_response(HTTPStatus.CREATED, {"success": True, "request": result})
+                return
             if path == "/api/vendor-applications":
                 self._rate_limit(path, 5)
                 user, _session = self._current_user()
@@ -2539,6 +2759,21 @@ class StyleDashRequestHandler(SimpleHTTPRequestHandler):
                 self._json_response(
                     HTTPStatus.OK, {"success": True, "application": application}
                 )
+                return
+            if path.startswith("/api/seller-return-requests/"):
+                self._rate_limit("/api/seller-return-requests", 30)
+                user, _session = self._current_user()
+                self._csrf()
+                request_id = unquote(path.removeprefix("/api/seller-return-requests/")).strip("/")
+                if not request_id or "/" in request_id:
+                    raise SecurityError(404, "Return request not found.", "return_request_not_found")
+                payload = self._read_json()
+                if not isinstance(payload, dict) or set(payload) != {"note"}:
+                    raise SecurityError(400, "A seller note is required.", "invalid_return_note")
+                result = self._shops().seller_note_return_request(
+                    user["id"], request_id, payload.get("note")
+                )
+                self._json_response(HTTPStatus.OK, {"success": True, "request": result})
                 return
             if path.startswith("/api/seller-orders/") and path.endswith("/fulfillment"):
                 self._rate_limit("/api/seller-orders/fulfillment", 30)

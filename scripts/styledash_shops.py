@@ -67,6 +67,16 @@ FULFILLMENT_TRANSITIONS = {
     "SHIPPED": ("DELIVERED",),
     "DELIVERED": (),
 }
+RETURN_REQUEST_TYPES = ("SIZE_EXCHANGE", "ISSUE_RETURN")
+RETURN_REQUEST_STATUSES = (
+    "REQUESTED", "UNDER_REVIEW", "APPROVED", "REJECTED",
+    "PICKUP_PENDING", "RECEIVED", "REFUND_PENDING", "REFUNDED",
+    "EXCHANGED", "CANCELLED",
+)
+RETURN_REQUEST_REASONS = (
+    "CUSTOMER_REQUEST", "ORDERED_BY_MISTAKE", "SIZE_ISSUE",
+    "WRONG_ITEM", "DAMAGED", "DEFECTIVE", "MISSING_ITEM", "OTHER",
+)
 CARRIER_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9&().,'\/+ -]{1,79}$")
 TRACKING_NUMBER_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._/# -]{1,119}$")
 PINCODE_PATTERN = re.compile(r"^\d{6}$")
@@ -151,6 +161,7 @@ class ShopWorkflow:
             self._migrate_products(db)
             self._migrate_fulfillments(db)
             self._migrate_shipping_tracking(db)
+            self._migrate_return_requests(db)
             check = db.execute("PRAGMA foreign_key_check").fetchall()
             if check:
                 raise RuntimeError("Shop migration failed foreign key validation")
@@ -372,6 +383,67 @@ class ShopWorkflow:
                 db.execute("ALTER TABLE shop_order_fulfillments ADD COLUMN tracking_number TEXT")
             db.execute(
                 "INSERT INTO shop_schema_migrations(version,applied_at) VALUES(5,?)",
+                (now,),
+            )
+            db.commit()
+        except Exception:
+            db.rollback()
+            raise
+
+    @staticmethod
+    def _migrate_return_requests(db: sqlite3.Connection) -> None:
+        now = iso(utc_now())
+        db.execute("BEGIN IMMEDIATE")
+        try:
+            if db.execute(
+                "SELECT 1 FROM shop_schema_migrations WHERE version=6"
+            ).fetchone() is not None:
+                db.commit()
+                return
+            request_types = ",".join(f"'{value}'" for value in RETURN_REQUEST_TYPES)
+            statuses = ",".join(f"'{value}'" for value in RETURN_REQUEST_STATUSES)
+            db.execute(f"""
+                CREATE TABLE IF NOT EXISTS shop_return_requests(
+                  id TEXT PRIMARY KEY,
+                  order_id TEXT NOT NULL,
+                  customer_user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                  application_id TEXT REFERENCES vendor_applications(id) ON DELETE SET NULL,
+                  shop_name TEXT NOT NULL,
+                  product_id TEXT NOT NULL,
+                  product_name TEXT NOT NULL,
+                  variant_id TEXT NOT NULL,
+                  request_type TEXT NOT NULL CHECK(request_type IN ({request_types})),
+                  reason TEXT NOT NULL,
+                  details TEXT,
+                  quantity INTEGER NOT NULL CHECK(quantity > 0),
+                  unit_price INTEGER NOT NULL CHECK(unit_price >= 0),
+                  item_subtotal INTEGER NOT NULL CHECK(item_subtotal >= 0),
+                  status TEXT NOT NULL DEFAULT 'REQUESTED' CHECK(status IN ({statuses})),
+                  seller_note TEXT,
+                  seller_noted_at TEXT,
+                  admin_note TEXT,
+                  resolution_reference TEXT,
+                  created_at TEXT NOT NULL,
+                  updated_at TEXT NOT NULL,
+                  reviewed_at TEXT,
+                  resolved_at TEXT
+                )
+            """)
+            db.execute(
+                "CREATE INDEX IF NOT EXISTS shop_returns_customer_idx "
+                "ON shop_return_requests(customer_user_id,created_at)"
+            )
+            db.execute(
+                "CREATE INDEX IF NOT EXISTS shop_returns_seller_idx "
+                "ON shop_return_requests(application_id,status,updated_at)"
+            )
+            db.execute(
+                "CREATE UNIQUE INDEX IF NOT EXISTS shop_returns_active_line_idx "
+                "ON shop_return_requests(order_id,customer_user_id,product_id,variant_id) "
+                "WHERE status NOT IN ('REJECTED','REFUNDED','EXCHANGED','CANCELLED')"
+            )
+            db.execute(
+                "INSERT INTO shop_schema_migrations(version,applied_at) VALUES(6,?)",
                 (now,),
             )
             db.commit()
@@ -1178,6 +1250,298 @@ class ShopWorkflow:
         result["applicationId"] = safe_application_id
         result["shopName"] = application["shop_name"]
         return result
+
+    @staticmethod
+    def _serialize_return_request(row: sqlite3.Row, *, admin: bool = False) -> dict[str, Any]:
+        payload = {
+            "id": row["id"],
+            "orderId": row["order_id"],
+            "shopName": row["shop_name"],
+            "productId": row["product_id"],
+            "productName": row["product_name"],
+            "variantId": row["variant_id"],
+            "requestType": row["request_type"],
+            "reason": row["reason"],
+            "details": row["details"],
+            "quantity": row["quantity"],
+            "unitPrice": row["unit_price"],
+            "itemSubtotal": row["item_subtotal"],
+            "status": row["status"],
+            "sellerNote": row["seller_note"],
+            "adminNote": row["admin_note"],
+            "createdAt": row["created_at"],
+            "updatedAt": row["updated_at"],
+        }
+        if row["seller_noted_at"]:
+            payload["sellerNotedAt"] = row["seller_noted_at"]
+        if row["reviewed_at"]:
+            payload["reviewedAt"] = row["reviewed_at"]
+        if row["resolved_at"]:
+            payload["resolvedAt"] = row["resolved_at"]
+        if admin:
+            payload["applicationId"] = row["application_id"]
+            payload["customerUserId"] = row["customer_user_id"]
+            payload["resolutionReference"] = row["resolution_reference"]
+        return payload
+
+    @staticmethod
+    def _return_rows_sql(where: str) -> str:
+        return f"""
+            SELECT r.* FROM shop_return_requests r
+             WHERE {where}
+             ORDER BY r.created_at DESC
+        """
+
+    def return_context(self, order_id: str, product_id: str) -> dict[str, Any] | None:
+        safe_order_id = clean_text(order_id, "Order ID", 1, 128)
+        safe_product_id = clean_text(product_id, "Product ID", 1, 128)
+        with self.connect() as db:
+            row = db.execute(
+                """
+                SELECT p.application_id,a.shop_name,
+                       f.status AS fulfillment_status,f.updated_at AS fulfillment_updated_at
+                  FROM shop_product_submissions p
+                  JOIN vendor_applications a ON a.id=p.application_id
+                  LEFT JOIN shop_order_fulfillments f
+                    ON f.application_id=p.application_id AND f.order_id=?
+                 WHERE p.id=?
+                """,
+                (safe_order_id, safe_product_id),
+            ).fetchone()
+        if row is None:
+            return None
+        return {
+            "applicationId": row["application_id"],
+            "shopName": row["shop_name"],
+            "fulfillmentStatus": row["fulfillment_status"] or "NEW",
+            "fulfillmentUpdatedAt": row["fulfillment_updated_at"],
+        }
+
+    def create_return_request(
+        self,
+        customer_user_id: str,
+        order_id: str,
+        item: dict[str, Any],
+        context: dict[str, Any],
+        payload: dict[str, Any],
+    ) -> dict[str, Any]:
+        if not isinstance(payload, dict):
+            raise SecurityError(400, "A return request is required.", "invalid_return_request")
+        allowed = {"requestType", "reason", "details", "quantity"}
+        if set(payload) - allowed:
+            raise SecurityError(400, "Unsupported return request field.", "invalid_return_request")
+        request_type = clean_text(payload.get("requestType"), "request type", 3, 32).upper()
+        reason = clean_text(payload.get("reason"), "return reason", 3, 40).upper()
+        if request_type not in RETURN_REQUEST_TYPES or reason not in RETURN_REQUEST_REASONS:
+            raise SecurityError(400, "Invalid return request.", "invalid_return_request")
+        allowed_reasons = {
+            "SIZE_EXCHANGE": {"SIZE_ISSUE"},
+            "ISSUE_RETURN": {"WRONG_ITEM", "DAMAGED", "DEFECTIVE", "MISSING_ITEM"},
+        }
+        if reason not in allowed_reasons[request_type]:
+            raise SecurityError(400, "This reason is not valid for the selected request type.", "invalid_return_reason")
+        details_value = payload.get("details")
+        details = None if details_value in (None, "") else clean_text(details_value, "return details", 5, 1000)
+        product_id = clean_text(item.get("productId"), "Product ID", 1, 128)
+        variant_id = clean_text(item.get("variantId"), "Variant ID", 1, 160)
+        purchased_quantity = item.get("quantity")
+        quantity = payload.get("quantity", purchased_quantity)
+        unit_price = item.get("unitPrice")
+        if (
+            isinstance(purchased_quantity, bool) or not isinstance(purchased_quantity, int)
+            or isinstance(quantity, bool) or not isinstance(quantity, int)
+            or not 1 <= quantity <= purchased_quantity
+            or isinstance(unit_price, bool) or not isinstance(unit_price, int) or unit_price < 0
+        ):
+            raise SecurityError(400, "Invalid return quantity.", "invalid_return_quantity")
+        safe_order_id = clean_text(order_id, "Order ID", 1, 128)
+        if not isinstance(context, dict):
+            raise SecurityError(400, "Return context is required.", "invalid_return_request")
+        application_id = context.get("applicationId")
+        if application_id is not None:
+            application_id = clean_text(application_id, "application ID", 1, 128)
+        shop_name = clean_text(context.get("shopName") or "StyleDash", "shop name", 1, 120)
+        product_name = clean_text(item.get("productName"), "product name", 1, 200)
+        now = iso(utc_now())
+        request_id = "ret_" + secrets.token_hex(12)
+        with self.connect() as db:
+            db.execute("BEGIN IMMEDIATE")
+
+            if application_id is not None and db.execute(
+                "SELECT 1 FROM vendor_applications WHERE id=?", (application_id,)
+            ).fetchone() is None:
+                db.rollback()
+                raise SecurityError(400, "Invalid seller context.", "invalid_return_request")
+            prior = db.execute(
+                """
+                SELECT status FROM shop_return_requests
+                 WHERE order_id=? AND customer_user_id=? AND product_id=? AND variant_id=?
+                 ORDER BY created_at DESC
+                """,
+                (safe_order_id, customer_user_id, product_id, variant_id),
+            ).fetchall()
+            if any(row["status"] not in {"REJECTED", "REFUNDED", "EXCHANGED", "CANCELLED"} for row in prior):
+                db.rollback()
+                raise SecurityError(409, "An active request already exists for this item.", "return_request_exists")
+            if any(row["status"] in {"REFUNDED", "EXCHANGED", "CANCELLED"} for row in prior):
+                db.rollback()
+                raise SecurityError(409, "This item already has a completed request.", "return_already_resolved")
+            db.execute(
+                """
+                INSERT INTO shop_return_requests(
+                  id,order_id,customer_user_id,application_id,shop_name,
+                  product_id,product_name,variant_id,request_type,reason,details,
+                  quantity,unit_price,item_subtotal,status,created_at,updated_at
+                ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?, 'REQUESTED',?,?)
+                """,
+                (
+                    request_id, safe_order_id, customer_user_id, application_id, shop_name,
+                    product_id, product_name, variant_id, request_type, reason, details,
+                    quantity, unit_price, unit_price * quantity, now, now,
+                ),
+            )
+            db.commit()
+            row = db.execute(
+                self._return_rows_sql("r.id=?"), (request_id,)
+            ).fetchone()
+        return self._serialize_return_request(row)
+
+    def customer_return_requests(self, user_id: str) -> list[dict[str, Any]]:
+        with self.connect() as db:
+            rows = db.execute(
+                self._return_rows_sql("r.customer_user_id=?"), (user_id,)
+            ).fetchall()
+        return [self._serialize_return_request(row) for row in rows]
+
+
+    def seller_return_requests(self, user_id: str) -> list[dict[str, Any]]:
+        with self.connect() as db:
+            application = self._seller_application(db, user_id)
+            rows = db.execute(
+                self._return_rows_sql("r.application_id=?"), (application["id"],)
+            ).fetchall()
+        return [self._serialize_return_request(row) for row in rows]
+
+    def seller_note_return_request(
+        self, user_id: str, request_id: str, note: Any
+    ) -> dict[str, Any]:
+        clean_note = clean_text(note, "seller note", 2, 1000)
+        safe_id = clean_text(request_id, "request ID", 1, 128)
+        now = iso(utc_now())
+        with self.connect() as db:
+            db.execute("BEGIN IMMEDIATE")
+            application = self._seller_application(db, user_id)
+            row = db.execute(
+                "SELECT status FROM shop_return_requests WHERE id=? AND application_id=?",
+                (safe_id, application["id"]),
+            ).fetchone()
+            if row is None:
+                db.rollback()
+                raise SecurityError(404, "Return request not found.", "return_request_not_found")
+            if row["status"] in {"REJECTED", "REFUNDED", "EXCHANGED", "CANCELLED"}:
+                db.rollback()
+                raise SecurityError(409, "This request is already closed.", "return_request_closed")
+            db.execute(
+                "UPDATE shop_return_requests SET seller_note=?,seller_noted_at=?,updated_at=? WHERE id=?",
+                (clean_note, now, now, safe_id),
+            )
+            db.commit()
+            result = db.execute(self._return_rows_sql("r.id=?"), (safe_id,)).fetchone()
+        return self._serialize_return_request(result)
+
+    def admin_return_requests(self, admin_id: str) -> list[dict[str, Any]]:
+        with self.connect() as db:
+            self._require_admin(db, admin_id)
+            rows = db.execute(self._return_rows_sql("1=1")).fetchall()
+        return [self._serialize_return_request(row, admin=True) for row in rows]
+
+    @staticmethod
+    def _return_admin_targets(request_type: str, status: str) -> set[str]:
+        common = {
+            "REQUESTED": {"UNDER_REVIEW", "REJECTED"},
+            "UNDER_REVIEW": {"APPROVED", "REJECTED"},
+        }
+        if status in common:
+            return common[status]
+        if request_type == "SIZE_EXCHANGE":
+            return {
+                "APPROVED": {"PICKUP_PENDING"},
+                "PICKUP_PENDING": {"RECEIVED"},
+                "RECEIVED": {"EXCHANGED"},
+            }.get(status, set())
+        if request_type == "ISSUE_RETURN":
+            return {
+                "APPROVED": {"PICKUP_PENDING"},
+                "PICKUP_PENDING": {"RECEIVED"},
+                "RECEIVED": {"REFUND_PENDING"},
+            }.get(status, set())
+        return set()
+
+    def admin_transition_return_request(
+        self,
+        admin_id: str,
+        request_id: str,
+        target_status: Any,
+        note: Any = None,
+        resolution_reference: Any = None,
+    ) -> dict[str, Any]:
+        safe_id = clean_text(request_id, "request ID", 1, 128)
+        if not isinstance(target_status, str):
+            raise SecurityError(400, "Invalid return status.", "invalid_return_status")
+        target = target_status.strip().upper()
+        if target not in RETURN_REQUEST_STATUSES or target == "REFUNDED":
+            raise SecurityError(400, "Invalid return status.", "invalid_return_status")
+        clean_note = None if note in (None, "") else clean_text(note, "admin note", 2, 1000)
+        clean_reference = None if resolution_reference in (None, "") else clean_text(
+            resolution_reference, "resolution reference", 2, 200
+        )
+        if target == "REJECTED" and clean_note is None:
+            raise SecurityError(400, "A rejection note is required.", "return_note_required")
+        now = iso(utc_now())
+        with self.connect() as db:
+            db.execute("BEGIN IMMEDIATE")
+            self._require_admin(db, admin_id)
+            current = db.execute(
+                "SELECT * FROM shop_return_requests WHERE id=?", (safe_id,)
+            ).fetchone()
+            if current is None:
+                db.rollback()
+                raise SecurityError(404, "Return request not found.", "return_request_not_found")
+            if target not in self._return_admin_targets(current["request_type"], current["status"]):
+                db.rollback()
+                raise SecurityError(409, "Return request transition is not allowed.", "invalid_return_transition")
+            resolved_at = now if target in {"REJECTED", "EXCHANGED", "CANCELLED"} else current["resolved_at"]
+            reviewed_at = now if target in {"UNDER_REVIEW", "APPROVED", "REJECTED"} else current["reviewed_at"]
+            db.execute(
+                """
+                UPDATE shop_return_requests
+                   SET status=?,admin_note=COALESCE(?,admin_note),
+                       resolution_reference=COALESCE(?,resolution_reference),
+                       reviewed_at=?,resolved_at=?,updated_at=?
+                 WHERE id=?
+                """,
+                (
+                    target, clean_note, clean_reference, reviewed_at,
+                    resolved_at, now, safe_id,
+                ),
+            )
+            self._audit_if_available(
+                db,
+                admin_id,
+                "return_request_status",
+                "return_request",
+                safe_id,
+                {
+                    "from": current["status"],
+                    "to": target,
+                    "requestType": current["request_type"],
+                    "orderId": current["order_id"],
+                    "productId": current["product_id"],
+                },
+            )
+            db.commit()
+            result = db.execute(self._return_rows_sql("r.id=?"), (safe_id,)).fetchone()
+        return self._serialize_return_request(result, admin=True)
 
     def create_product_draft(self, user_id: str, payload: dict[str, Any]) -> dict[str, Any]:
         values = self._product_payload(payload)

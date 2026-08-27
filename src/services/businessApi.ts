@@ -11,6 +11,28 @@ export const orderApi = {
   },
 };
 
+
+export type ReturnRequestType = 'SIZE_EXCHANGE' | 'ISSUE_RETURN';
+export type ReturnRequestStatus = 'REQUESTED' | 'UNDER_REVIEW' | 'APPROVED' | 'REJECTED' | 'PICKUP_PENDING' | 'RECEIVED' | 'REFUND_PENDING' | 'REFUNDED' | 'EXCHANGED' | 'CANCELLED';
+export interface ReturnRequest {
+  id: string; orderId: string; shopName: string; productId: string; productName: string; variantId: string;
+  requestType: ReturnRequestType; reason: string; details?: string | null; quantity: number; unitPrice: number;
+  itemSubtotal: number; status: ReturnRequestStatus; sellerNote?: string | null; adminNote?: string | null;
+  createdAt: string; updatedAt: string; reviewedAt?: string; resolvedAt?: string;
+}
+
+export const returnApi = {
+  async mine(): Promise<ReturnRequest[]> {
+    return (await apiFetch<{ success: true; requests: ReturnRequest[] }>('/api/return-requests')).requests;
+  },
+  async create(orderId: string, payload: { productId: string; variantId: string; requestType: ReturnRequestType; reason: string; details?: string; quantity?: number }): Promise<ReturnRequest> {
+    return (await apiJson<{ success: true; request: ReturnRequest }>(`/api/orders/${encodeURIComponent(orderId)}/return-requests`, 'POST', payload)).request;
+  },
+  async requestCancellation(orderId: string, payload: { reason: 'CUSTOMER_REQUEST' | 'ORDERED_BY_MISTAKE'; details?: string }): Promise<NonNullable<ServerOrder['cancellationRequest']>> {
+    return (await apiJson<{ success: true; cancellationRequest: NonNullable<ServerOrder['cancellationRequest']> }>(`/api/orders/${encodeURIComponent(orderId)}/cancellation-request`, 'POST', payload)).cancellationRequest;
+  },
+};
+
 export type ShopApplicationStatus =
   | 'DRAFT'
   | 'SUBMITTED'
@@ -132,6 +154,7 @@ export interface SellerOrder {
   id: string; status?: string; paymentStatus?: string; paymentMethod?: string; deliveryMethod?: string;
   createdAt?: string; updatedAt?: string; sellerSubtotal: number; items: SellerOrderItem[];
   fulfillment: SellerFulfillment;
+  cancellationRequest?: ServerOrder['cancellationRequest'];
   address: { name?: string; phone?: string; street?: string; city?: string; state?: string; pincode?: string };
 }
 
@@ -142,6 +165,15 @@ export const sellerOrderApi = {
   async updateFulfillment(id: string, status: SellerFulfillmentStatus, shipping?: { carrier: string; trackingNumber: string }): Promise<SellerFulfillment> {
     const payload = shipping ? { status, ...shipping } : { status };
     return (await apiJson<{ success: true; fulfillment: SellerFulfillment }>(`/api/seller-orders/${encodeURIComponent(id)}/fulfillment`, 'PATCH', payload)).fulfillment;
+  },
+};
+
+export const sellerReturnApi = {
+  async mine(): Promise<ReturnRequest[]> {
+    return (await apiFetch<{ success: true; requests: ReturnRequest[] }>('/api/seller-return-requests')).requests;
+  },
+  async addNote(id: string, note: string): Promise<ReturnRequest> {
+    return (await apiJson<{ success: true; request: ReturnRequest }>(`/api/seller-return-requests/${encodeURIComponent(id)}`, 'PATCH', { note })).request;
   },
 };
 

@@ -33,6 +33,10 @@ export interface TrustedOrderItem {
   quantity: number;
   unitPrice: number;
   lineTotal: number;
+  returnEligibility?: {
+    sizeExchange: { available: boolean; windowDays?: number; deadline?: string; code?: string };
+    issueReturn: { available: boolean; windowDays?: number; deadline?: string; code?: string };
+  };
 }
 
 export interface ServerOrder {
@@ -53,6 +57,7 @@ export interface ServerOrder {
   status: string;
   statusHistory: Array<{ status: string; timestamp: string; note?: string }>;
   fulfillments?: Array<{ shopName: string; status: 'NEW' | 'PROCESSING' | 'READY' | 'SHIPPED' | 'DELIVERED'; updatedAt?: string | null; shipping?: { carrier: string; trackingNumber: string } | null }>;
+  cancellationRequest?: { reason: 'CUSTOMER_REQUEST' | 'ORDERED_BY_MISTAKE'; details?: string | null; status: 'REQUESTED' | 'UNDER_REVIEW' | 'APPROVED' | 'REJECTED' | 'CANCELLED'; createdAt: string; updatedAt: string; reviewedAt?: string; resolvedAt?: string; adminNote?: string };
   createdAt: string;
   updatedAt: string;
   razorpayOrderId?: string;

@@ -686,6 +686,117 @@ class AdminHttpTests(unittest.TestCase):
         self.assertIn("Override shop fulfillment", admin_ui)
         self.assertIn("administrator override", admin_ui)
 
+    def test_return_review_requires_admin_csrf_and_is_audited(self):
+        customers = SECURITY.SecurityStore(self.database, self.key)
+        seller, _raw, _csrf = customers.register({
+            "name": "Return Seller", "email": "return-seller@example.test",
+            "password": "long return seller password 123", "phone": "9999999961",
+        })
+        buyer, _raw, _csrf = customers.register({
+            "name": "Return Buyer", "email": "return-buyer@example.test",
+            "password": "long return buyer password 123", "phone": "9999999962",
+        })
+        shops = ADMIN_SERVER.ShopWorkflow(self.database)
+        application = shops.create_draft(seller["id"], {
+            "shopName": "Return Review Shop", "ownerName": "Return Seller",
+            "category": "Clothing & Fashion", "description": "A return review test shop.",
+            "address": "77 Main Market", "city": "Neemuch",
+            "state": "Madhya Pradesh", "pincode": "458441",
+        })
+        shops.submit_application(seller["id"])
+        with shops.connect() as db:
+            admin_id = db.execute("SELECT id FROM admin_users LIMIT 1").fetchone()[0]
+        for status in ("UNDER_REVIEW", "APPROVED", "ACTIVE"):
+            shops.admin_transition_application(admin_id, application["id"], status)
+        product = shops.create_product_draft(seller["id"], {
+            "name": "Return Review Tee", "description": "A return-review product fixture.",
+            "brand": "Local", "department": "men", "category": "Clothing & Fashion",
+            "pricePaise": 50000, "originalPricePaise": 55000, "inventory": 3,
+            "size": "M", "colourName": "Black", "colourHex": "#000000",
+            "imageUrls": ["https://example.test/return-review.jpg"], "attributes": {},
+        })
+        return_request = shops.create_return_request(
+            buyer["id"], "ORDER-RETURN-REVIEW",
+            {"productId": product["id"], "productName": product["name"],
+             "variantId": f"{product['id']}-var-1", "quantity": 1, "unitPrice": 500},
+            {"applicationId": application["id"], "shopName": "Return Review Shop"},
+            {"requestType": "ISSUE_RETURN", "reason": "DAMAGED", "details": "Damaged seam", "quantity": 1},
+        )
+        app = self.server.RequestHandlerClass.application
+        with app.payments.store.lock:
+            app.payments.store.state["orders"]["ORDER-CANCEL-REVIEW"] = {
+                "id": "ORDER-CANCEL-REVIEW", "userId": buyer["id"],
+                "status": "placed", "paymentStatus": "pending", "paymentMethod": "cod",
+                "inventoryCommitted": False, "items": [],
+                "address": {"name": "Return Buyer", "phone": "9999999962"},
+                "cancellationRequest": {
+                    "status": "REQUESTED", "reason": "CUSTOMER_REQUEST",
+                    "details": "Please cancel", "createdAt": "2026-08-27T12:00:00+00:00",
+                    "updatedAt": "2026-08-27T12:00:00+00:00",
+                },
+                "createdAt": "2026-08-27T12:00:00+00:00", "updatedAt": "2026-08-27T12:00:00+00:00",
+            }
+            app.payments.store.save()
+        status, body, _headers = self.request("/api/admin/returns")
+        self.assertEqual((status, body["code"]), (401, "admin_authentication_required"))
+        self.request("/api/admin/login", {
+            "username": "local-owner", "password": "long administrator password 123"
+        }, method="POST")
+        status, body, _headers = self.request(
+            "/api/admin/totp", {"code": pyotp.TOTP(self.secret).now()}, method="POST"
+        )
+        self.assertEqual(status, 200)
+        csrf = body["csrfToken"]
+        status, body, _headers = self.request("/api/admin/returns")
+        self.assertEqual(status, 200)
+        self.assertEqual(body["items"][0]["id"], return_request["id"])
+        self.assertEqual(body["cancellations"][0]["orderId"], "ORDER-CANCEL-REVIEW")
+
+        item_path = f"/api/admin/returns/items/{return_request['id']}"
+        status, body, _headers = self.request(item_path, {"status": "UNDER_REVIEW"}, method="PATCH")
+        self.assertEqual((status, body["code"]), (403, "admin_csrf_failed"))
+        status, body, _headers = self.request(
+            item_path, {"status": "UNDER_REVIEW"}, headers={"X-CSRF-Token": csrf}, method="PATCH"
+        )
+        self.assertEqual((status, body["request"]["status"]), (200, "UNDER_REVIEW"))
+        status, body, _headers = self.request(
+            item_path, {"status": "REFUNDED"}, headers={"X-CSRF-Token": csrf}, method="PATCH"
+        )
+        self.assertEqual((status, body["code"]), (400, "invalid_return_status"))
+        cancel_path = "/api/admin/returns/cancellations/ORDER-CANCEL-REVIEW"
+        status, body, _headers = self.request(
+            cancel_path, {"status": "UNDER_REVIEW"}, headers={"X-CSRF-Token": csrf}, method="PATCH"
+        )
+        self.assertEqual((status, body["request"]["status"]), (200, "UNDER_REVIEW"))
+        status, body, _headers = self.request(
+            cancel_path, {"status": "APPROVED"}, headers={"X-CSRF-Token": csrf}, method="PATCH"
+        )
+        self.assertEqual((status, body["request"]["status"]), (200, "APPROVED"))
+        with app.payments.store.lock:
+            self.assertEqual(app.payments.store.state["orders"]["ORDER-CANCEL-REVIEW"]["status"], "placed")
+        status, body, _headers = self.request(
+            cancel_path, {"status": "REJECTED", "note": "Too late"},
+            headers={"X-CSRF-Token": csrf}, method="PATCH",
+        )
+        self.assertEqual((status, body["code"]), (409, "invalid_cancellation_request_transition"))
+
+        status, body, _headers = self.request(
+            "/api/admin/orders/ORDER-CANCEL-REVIEW/status", {"status": "cancelled"},
+            headers={"X-CSRF-Token": csrf}, method="PATCH",
+        )
+        self.assertEqual((status, body["order"]["status"]), (200, "cancelled"))
+        self.assertEqual(body["order"]["cancellationRequest"]["status"], "CANCELLED")
+        status, body, _headers = self.request("/api/admin/audit")
+        self.assertEqual(status, 200)
+        actions = {row["action"] for row in body["audit"]}
+        self.assertIn("return_request_status", actions)
+        self.assertIn("cancellation_request_status", actions)
+        self.assertIn("order_status", actions)
+        admin_ui = (ROOT / "server/admin/admin.js").read_text(encoding="utf-8")
+        admin_html = (ROOT / "server/admin/index.html").read_text(encoding="utf-8")
+        self.assertIn("renderReturns", admin_ui)
+        self.assertIn("Approving a request never performs a Razorpay refund", admin_ui)
+        self.assertIn('data-tab="returns"', admin_html)
     def test_non_loopback_bind_refused(self):
         with self.assertRaises(RuntimeError):
             ADMIN_SERVER.create_admin_server("0.0.0.0", 0, self.database, self.key, ROOT / "server/payment-data/catalog.json", ROOT / "server/payment-data/settings.json", self.root / "data2", ROOT / "server/admin", self.root / "backups")

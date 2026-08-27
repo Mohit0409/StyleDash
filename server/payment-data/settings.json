@@ -39,5 +39,6 @@
       "active": true,
       "expiryDate": "2026-12-31"
     }
-  ]
+  ],
+  "issueReportWindowDays": 2
 }

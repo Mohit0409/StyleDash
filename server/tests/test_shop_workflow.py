@@ -173,7 +173,7 @@ class ShopWorkflowTests(unittest.TestCase):
                 [row[0] for row in db.execute(
                     "SELECT version FROM shop_schema_migrations ORDER BY version"
                 )],
-                [1, 2, 4, 5],
+                [1, 2, 4, 5, 6],
             )
             self.assertEqual(db.execute("PRAGMA integrity_check").fetchone()[0], "ok")
             self.assertEqual(db.execute("PRAGMA foreign_key_check").fetchall(), [])
@@ -243,7 +243,7 @@ class ShopWorkflowTests(unittest.TestCase):
         db = sqlite3.connect(concurrent_path)
         self.assertEqual(
             db.execute("SELECT version,COUNT(*) FROM shop_schema_migrations GROUP BY version").fetchall(),
-            [(1, 1), (2, 1), (4, 1), (5, 1)],
+            [(1, 1), (2, 1), (4, 1), (5, 1), (6, 1)],
         )
         self.assertEqual(db.execute("PRAGMA integrity_check").fetchone()[0], "ok")
         db.close()
@@ -395,6 +395,106 @@ class ShopWorkflowTests(unittest.TestCase):
         self.assertIsNone(summary[1]["shipping"])
         self.assertTrue(all("applicationId" not in row for row in summary))
         self.assertNotEqual(app_a["id"], app_b["id"])
+
+    def test_return_request_core_is_scoped_validated_and_audited(self) -> None:
+        app_a = self.create_active_shop("user-a", "Return Shop A")
+        self.create_active_shop("user-b", "Return Shop B")
+        product_a = self.store.create_product_draft("user-a", self.complete_product("Return Product A"))
+        product_b = self.store.create_product_draft("user-b", self.complete_product("Return Product B"))
+        item_a = {
+            "productId": product_a["id"], "productName": "Return Product A",
+            "variantId": f"{product_a['id']}-var-1",
+            "quantity": 2, "unitPrice": 1599,
+        }
+        context_a = {
+            "applicationId": app_a["id"],
+            "shopName": "Return Shop A",
+        }
+        created = self.store.create_return_request(
+            "user-a", "SD-RETURN-1", item_a, context_a,
+            {"requestType": "SIZE_EXCHANGE", "reason": "SIZE_ISSUE", "quantity": 1},
+        )
+        self.assertEqual(created["status"], "REQUESTED")
+        self.assertEqual(created["shopName"], "Return Shop A")
+        self.assertEqual(created["itemSubtotal"], 1599)
+        self.assertNotIn("customerUserId", created)
+        self.assertNotIn("applicationId", created)
+        self.assert_error(
+            "return_request_exists",
+            lambda: self.store.create_return_request(
+                "user-a", "SD-RETURN-1", item_a, context_a,
+                {"requestType": "SIZE_EXCHANGE", "reason": "SIZE_ISSUE", "quantity": 1},
+            ),
+        )
+        self.assert_error(
+            "invalid_return_quantity",
+            lambda: self.store.create_return_request(
+                "user-a", "SD-RETURN-2", item_a, context_a,
+                {"requestType": "SIZE_EXCHANGE", "reason": "SIZE_ISSUE", "quantity": 3},
+            ),
+        )
+        self.assert_error(
+            "invalid_return_reason",
+            lambda: self.store.create_return_request(
+                "user-a", "SD-RETURN-3", item_a, context_a,
+                {"requestType": "ISSUE_RETURN", "reason": "CUSTOMER_REQUEST", "quantity": 1},
+            ),
+        )
+        seller_a = self.store.seller_return_requests("user-a")
+        seller_b = self.store.seller_return_requests("user-b")
+        self.assertEqual([row["id"] for row in seller_a], [created["id"]])
+        self.assertEqual(seller_b, [])
+        noted = self.store.seller_note_return_request(
+            "user-a", created["id"], "Customer requested a smaller size."
+        )
+        self.assertEqual(noted["sellerNote"], "Customer requested a smaller size.")
+        self.assert_error(
+            "return_request_not_found",
+            lambda: self.store.seller_note_return_request(
+                "user-b", created["id"], "Must not cross seller boundary."
+            ),
+        )
+        reviewing = self.store.admin_transition_return_request(
+            "admin-a", created["id"], "UNDER_REVIEW", "Reviewing exchange eligibility"
+        )
+        self.assertEqual(reviewing["status"], "UNDER_REVIEW")
+        approved = self.store.admin_transition_return_request(
+            "admin-a", created["id"], "APPROVED", "Eligible size exchange"
+        )
+        self.assertEqual(approved["status"], "APPROVED")
+        self.assert_error(
+            "invalid_return_transition",
+            lambda: self.store.admin_transition_return_request(
+                "admin-a", created["id"], "REFUND_PENDING"
+            ),
+        )
+        pickup = self.store.admin_transition_return_request(
+            "admin-a", created["id"], "PICKUP_PENDING"
+        )
+        received = self.store.admin_transition_return_request(
+            "admin-a", created["id"], "RECEIVED"
+        )
+        exchanged = self.store.admin_transition_return_request(
+            "admin-a", created["id"], "EXCHANGED", "Replacement handed to customer",
+            "exchange-local-001",
+        )
+        self.assertEqual((pickup["status"], received["status"], exchanged["status"]),
+                         ("PICKUP_PENDING", "RECEIVED", "EXCHANGED"))
+        self.assert_error(
+            "return_request_closed",
+            lambda: self.store.seller_note_return_request(
+                "user-a", created["id"], "Too late to change notes."
+            ),
+        )
+        admin_rows = self.store.admin_return_requests("admin-a")
+        self.assertEqual(admin_rows[0]["applicationId"], app_a["id"])
+        self.assertEqual(admin_rows[0]["customerUserId"], "user-a")
+        with self.store.connect() as db:
+            actions = {row[0] for row in db.execute(
+                "SELECT action FROM local_admin_audit_log WHERE target_id=?", (created["id"],)
+            )}
+        self.assertIn("return_request_status", actions)
+        self.assertNotEqual(product_a["id"], product_b["id"])
 
     def test_admin_fulfillment_override_is_scoped_and_audited(self) -> None:
         app_a = self.create_active_shop("user-a", "Shop A")

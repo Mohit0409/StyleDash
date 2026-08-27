@@ -12,6 +12,10 @@ test('customer sees per-shop carrier and tracking details', async ({ page }) => 
       } });
       return;
     }
+    if (path === '/api/return-requests') {
+      await json({ success: true, requests: [] });
+      return;
+    }
     if (path === '/api/orders') {
       await json({ success: true, orders: [{
         id: 'SD-TRACK-1', createdAt: '2026-08-27T08:00:00Z', status: 'placed',

@@ -2200,6 +2200,161 @@ class HttpApiTests(unittest.TestCase):
             tracked_customer_order["order"]["fulfillments"][0]["shipping"],
             {"carrier": "Delhivery", "trackingNumber": "DLV-654321"},
         )
+        before_delivery_eligibility = tracked_customer_order["order"]["items"][0]["returnEligibility"]
+        self.assertFalse(before_delivery_eligibility["issueReturn"]["available"])
+        self.assertEqual(before_delivery_eligibility["issueReturn"]["code"], "return_not_delivered")
+        status, not_delivered, _headers = self.post_json(
+            f"/api/orders/{order_id}/return-requests",
+            {
+                "productId": product_id, "variantId": variant_id,
+                "requestType": "ISSUE_RETURN", "reason": "DAMAGED", "quantity": 1,
+            },
+            session_headers,
+        )
+        self.assertEqual((status, not_delivered["code"]), (409, "return_not_delivered"))
+        status, delivered, _headers = self.patch_json(
+            f"/api/seller-orders/{order_id}/fulfillment", {"status": "DELIVERED"}, session_headers
+        )
+        self.assertEqual((status, delivered["fulfillment"]["status"]), (200, "DELIVERED"))
+        status, delivered_order, _headers = self.get_json(
+            f"/api/orders/{order_id}", {"Cookie": session_headers["Cookie"]}
+        )
+        self.assertEqual(status, 200)
+        eligibility = delivered_order["order"]["items"][0]["returnEligibility"]
+        self.assertTrue(eligibility["issueReturn"]["available"])
+        self.assertEqual(eligibility["issueReturn"]["windowDays"], 2)
+        self.assertFalse(eligibility["sizeExchange"]["available"])
+        self.assertEqual(eligibility["sizeExchange"]["code"], "exchange_not_available")
+        status, missing_return_csrf, _headers = self.post_json(
+            f"/api/orders/{order_id}/return-requests",
+            {
+                "productId": product_id, "variantId": variant_id,
+                "requestType": "ISSUE_RETURN", "reason": "DAMAGED", "quantity": 1,
+            },
+            {"Cookie": session_headers["Cookie"], "Origin": "https://styledash.test"},
+        )
+        self.assertEqual((status, missing_return_csrf["code"]), (403, "csrf_failed"))
+        status, invalid_reason, _headers = self.post_json(
+            f"/api/orders/{order_id}/return-requests",
+            {
+                "productId": product_id, "variantId": variant_id,
+                "requestType": "ISSUE_RETURN", "reason": "CUSTOMER_REQUEST", "quantity": 1,
+            },
+            session_headers,
+        )
+        self.assertEqual((status, invalid_reason["code"]), (400, "invalid_return_reason"))
+        status, no_exchange, _headers = self.post_json(
+            f"/api/orders/{order_id}/return-requests",
+            {
+                "productId": product_id, "variantId": variant_id,
+                "requestType": "SIZE_EXCHANGE", "reason": "SIZE_ISSUE", "quantity": 1,
+            },
+            session_headers,
+        )
+        self.assertEqual((status, no_exchange["code"]), (409, "exchange_not_available"))
+        status, return_created, _headers = self.post_json(
+            f"/api/orders/{order_id}/return-requests",
+            {
+                "productId": product_id, "variantId": variant_id,
+                "requestType": "ISSUE_RETURN", "reason": "DAMAGED",
+                "details": "Outer packaging was intact but the garment was torn.", "quantity": 1,
+            },
+            session_headers,
+        )
+        self.assertEqual(status, 201)
+        return_id = return_created["request"]["id"]
+        self.assertEqual(return_created["request"]["status"], "REQUESTED")
+        self.assertEqual(return_created["request"]["itemSubtotal"], placed["order"]["items"][0]["unitPrice"])
+        status, duplicate_return, _headers = self.post_json(
+            f"/api/orders/{order_id}/return-requests",
+            {
+                "productId": product_id, "variantId": variant_id,
+                "requestType": "ISSUE_RETURN", "reason": "DAMAGED", "quantity": 1,
+            },
+            session_headers,
+        )
+        self.assertEqual((status, duplicate_return["code"]), (409, "return_request_exists"))
+        status, customer_returns, _headers = self.get_json(
+            "/api/return-requests", {"Cookie": session_headers["Cookie"]}
+        )
+        self.assertEqual(status, 200)
+        self.assertEqual([row["id"] for row in customer_returns["requests"]], [return_id])
+        status, seller_returns, _headers = self.get_json(
+            "/api/seller-return-requests", {"Cookie": session_headers["Cookie"]}
+        )
+        self.assertEqual(status, 200)
+        self.assertEqual([row["id"] for row in seller_returns["requests"]], [return_id])
+        status, note_csrf, _headers = self.patch_json(
+            f"/api/seller-return-requests/{return_id}", {"note": "Checking item condition."},
+            {"Cookie": session_headers["Cookie"], "Origin": "https://styledash.test"},
+        )
+        self.assertEqual((status, note_csrf["code"]), (403, "csrf_failed"))
+        status, noted_return, _headers = self.patch_json(
+            f"/api/seller-return-requests/{return_id}", {"note": "Checking item condition."},
+            session_headers,
+        )
+        self.assertEqual((status, noted_return["request"]["sellerNote"]), (200, "Checking item condition."))
+        status, anonymous_returns, _headers = self.get_json("/api/return-requests")
+        self.assertEqual((status, anonymous_returns["code"]), (401, "authentication_required"))
+
+        status, cancel_order, _headers = self.post_json(
+            "/api/place-cod-order",
+            {
+                "items": [{"productId": product_id, "variantId": variant_id, "quantity": 1}],
+                "address": {
+                    "name": "Shop HTTP Owner", "phone": "9876543210",
+                    "street": "12 Main Market Road", "city": "Neemuch", "pincode": "458441",
+                },
+                "deliveryMethod": "express", "paymentMethod": "cod",
+            },
+            {**session_headers, "Idempotency-Key": "shop-http-cancel-001"},
+        )
+        self.assertEqual(status, 201)
+        cancel_order_id = cancel_order["order"]["id"]
+        status, cancel_csrf, _headers = self.post_json(
+            f"/api/orders/{cancel_order_id}/cancellation-request",
+            {"reason": "CUSTOMER_REQUEST"},
+            {"Cookie": session_headers["Cookie"], "Origin": "https://styledash.test"},
+        )
+        self.assertEqual((status, cancel_csrf["code"]), (403, "csrf_failed"))
+        status, bad_cancel_reason, _headers = self.post_json(
+            f"/api/orders/{cancel_order_id}/cancellation-request",
+            {"reason": "SIZE_ISSUE"}, session_headers,
+        )
+        self.assertEqual((status, bad_cancel_reason["code"]), (400, "invalid_cancellation_reason"))
+        status, cancellation, _headers = self.post_json(
+            f"/api/orders/{cancel_order_id}/cancellation-request",
+            {"reason": "ORDERED_BY_MISTAKE", "details": "Placed the order twice by mistake."},
+            session_headers,
+        )
+        self.assertEqual(status, 201)
+        self.assertEqual(cancellation["cancellationRequest"]["status"], "REQUESTED")
+        status, cancel_customer_order, _headers = self.get_json(
+            f"/api/orders/{cancel_order_id}", {"Cookie": session_headers["Cookie"]}
+        )
+        self.assertEqual(status, 200)
+        self.assertEqual(cancel_customer_order["order"]["cancellationRequest"]["reason"], "ORDERED_BY_MISTAKE")
+        status, cancel_seller_orders, _headers = self.get_json(
+            "/api/seller-orders", {"Cookie": session_headers["Cookie"]}
+        )
+        cancel_seller = next(row for row in cancel_seller_orders["orders"] if row["id"] == cancel_order_id)
+        self.assertEqual(cancel_seller["cancellationRequest"]["status"], "REQUESTED")
+        status, duplicate_cancel, _headers = self.post_json(
+            f"/api/orders/{cancel_order_id}/cancellation-request",
+            {"reason": "CUSTOMER_REQUEST"}, session_headers,
+        )
+        self.assertEqual((status, duplicate_cancel["code"]), (409, "cancellation_request_exists"))
+        for target in ("PROCESSING", "READY", "SHIPPED"):
+            status, _body, _headers = self.patch_json(
+                f"/api/seller-orders/{cancel_order_id}/fulfillment", {"status": target}, session_headers
+            )
+            self.assertEqual(status, 200)
+        status, dispatched_cancel, _headers = self.post_json(
+            f"/api/orders/{cancel_order_id}/cancellation-request",
+            {"reason": "CUSTOMER_REQUEST"}, session_headers,
+        )
+        self.assertEqual((status, dispatched_cancel["code"]), (409, "cancellation_not_available"))
+
         self.service.shops.admin_transition_product("http-admin", product_id, "APPROVED")
         status, public_unpublished, _headers = self.get_json("/api/shop-products/published")
         self.assertEqual(public_unpublished["products"], [])
