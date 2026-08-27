@@ -35,12 +35,12 @@ export const Header: React.FC<{ onOpenCart: () => void; onOpenLocation: () => vo
       </div>
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex items-center justify-between h-16 gap-2 sm:gap-4">
+        <div className="flex items-center justify-between h-16 gap-1 sm:gap-4">
           
           {/* Brand Logo & Tagline */}
-          <div className="flex min-w-0 items-center gap-2 sm:gap-6">
-            <Link to="/" className="group flex items-center" aria-label="vibe4you home">
-              <BrandWordmark showTagline className="text-[1.45rem] transition-transform group-hover:scale-[1.02]" />
+          <div className="flex min-w-0 shrink-0 items-center gap-2 sm:gap-6">
+            <Link to="/" className="group flex shrink-0 items-center" aria-label="vibe4you home">
+              <BrandWordmark showTagline className="w-[clamp(8rem,37vw,10.75rem)] transition-transform group-hover:scale-[1.02]" />
             </Link>
 
             {/* Location Selector */}
@@ -66,7 +66,7 @@ export const Header: React.FC<{ onOpenCart: () => void; onOpenLocation: () => vo
           </form>
 
           {/* Header Action Controls */}
-          <div className="flex shrink-0 items-center gap-1 sm:gap-3">
+          <div className="flex shrink-0 items-center gap-0 sm:gap-3">
             <Link
               to="/stores"
               className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 text-xs font-extrabold text-neutral-800 dark:text-neutral-200 hover:text-lime-600 transition-colors"
@@ -78,7 +78,7 @@ export const Header: React.FC<{ onOpenCart: () => void; onOpenLocation: () => vo
 
             <button
               onClick={toggleTheme}
-              className="p-2 rounded-full hover:bg-neutral-100 dark:hover:bg-neutral-800 text-neutral-700 dark:text-neutral-300 transition-colors"
+              className="p-1.5 sm:p-2 rounded-full hover:bg-neutral-100 dark:hover:bg-neutral-800 text-neutral-700 dark:text-neutral-300 transition-colors"
               title="Toggle Dark Mode"
             >
               {isDark ? <Sun className="w-5 h-5 text-amber-400" /> : <Moon className="w-5 h-5" />}
@@ -86,7 +86,7 @@ export const Header: React.FC<{ onOpenCart: () => void; onOpenLocation: () => vo
 
             <Link
               to="/wishlist"
-              className="p-2 rounded-full hover:bg-neutral-100 dark:hover:bg-neutral-800 text-neutral-700 dark:text-neutral-300 relative transition-colors"
+              className="p-1.5 sm:p-2 rounded-full hover:bg-neutral-100 dark:hover:bg-neutral-800 text-neutral-700 dark:text-neutral-300 relative transition-colors"
               title="Wishlist"
             >
               <Heart className="w-5 h-5" />
@@ -99,7 +99,7 @@ export const Header: React.FC<{ onOpenCart: () => void; onOpenLocation: () => vo
 
             <Link
               to="/profile"
-              className="p-2 rounded-full hover:bg-neutral-100 dark:hover:bg-neutral-800 text-neutral-700 dark:text-neutral-300 transition-colors"
+              className="p-1.5 sm:p-2 rounded-full hover:bg-neutral-100 dark:hover:bg-neutral-800 text-neutral-700 dark:text-neutral-300 transition-colors"
               title="Profile / Account"
             >
               <User className="w-5 h-5" />
@@ -108,11 +108,11 @@ export const Header: React.FC<{ onOpenCart: () => void; onOpenLocation: () => vo
             <button
               onClick={onOpenCart}
               aria-label={`Cart ${totalItemsCount}`}
-              className="flex items-center gap-2 bg-neutral-950 dark:bg-lime-400 text-white dark:text-neutral-950 px-4 py-2 rounded-full font-bold text-sm shadow-md hover:bg-neutral-800 dark:hover:bg-lime-300 transition-all transform active:scale-95"
+              className="flex items-center gap-1 sm:gap-2 bg-neutral-950 dark:bg-lime-400 text-white dark:text-neutral-950 px-2.5 sm:px-4 py-2 rounded-full font-bold text-sm shadow-md hover:bg-neutral-800 dark:hover:bg-lime-300 transition-all transform active:scale-95"
             >
               <ShoppingBag className="w-4 h-4" />
               <span className="hidden sm:inline">Cart</span>
-              <span className="bg-lime-400 dark:bg-neutral-900 text-neutral-950 dark:text-lime-400 px-2 py-0.5 rounded-full text-xs font-black">
+              <span className="bg-lime-400 dark:bg-neutral-900 text-neutral-950 dark:text-lime-400 px-1.5 sm:px-2 py-0.5 rounded-full text-xs font-black">
                 {totalItemsCount}
               </span>
             </button>

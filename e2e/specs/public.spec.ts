@@ -28,9 +28,22 @@ for (const route of routes) {
 test('vibe4you wordmark and tagline are visible', async ({ page }) => {
   await page.goto('/');
 
-  await expect(page.getByRole('link', { name: 'vibe4you home' })).toBeVisible();
+  const homeLink = page.getByRole('link', { name: 'vibe4you home' });
+  await expect(homeLink).toBeVisible();
+  await expect(homeLink.locator('svg[aria-label="Vibe4You"]')).toBeVisible();
   await expect(page.getByText('Your City. Your Shops. Your Style.', { exact: true }).first()).toBeVisible();
   await expect(page.locator('header')).not.toContainText('StyleDash');
+  await expect(page).not.toHaveTitle(/StyleDash/i);
+});
+
+test('favicon uses the interlocked 44 mark', async ({ request }) => {
+  const response = await request.get('/favicon.svg');
+  const favicon = await response.text();
+
+  expect(response.ok()).toBeTruthy();
+  expect(favicon).toContain('Vibe4You interlocked 44');
+  expect(favicon).not.toContain('V4Y');
+  expect(favicon).not.toContain('SD');
 });
 
 test('customer policy pages publish launch contacts without pre-live warnings', async ({

@@ -55,7 +55,7 @@ export const Footer: React.FC = () => {
         <div className="grid grid-cols-2 md:grid-cols-5 gap-8 py-10">
           <div className="col-span-2">
             <div className="mb-3">
-              <BrandWordmark inverse showTagline className="text-2xl" />
+              <BrandWordmark inverse showTagline className="w-52 max-w-full sm:w-56" />
             </div>
             <p className="text-xs text-neutral-400 mb-4 max-w-sm">
               Vibe4You provides hyperlocal fashion ordering and delivery in its

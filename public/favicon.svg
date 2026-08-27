@@ -1,8 +1,17 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-labelledby="title">
-  <title id="title">vibe4you</title>
-  <rect width="64" height="64" rx="16" fill="#111111"/>
-  <g fill="none" stroke="#b79a8a" stroke-width="6.5" stroke-linecap="square" stroke-linejoin="miter">
-    <path d="M13 37 29 14v36M13 37h25"/>
-    <path d="M27 40 43 18v32M27 40h24"/>
+  <title id="title">Vibe4You interlocked 44</title>
+  <defs>
+    <linearGradient id="copper" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#efc5ad"/>
+      <stop offset="0.5" stop-color="#c89c84"/>
+      <stop offset="1" stop-color="#a86750"/>
+    </linearGradient>
+  </defs>
+  <rect width="64" height="64" rx="14" fill="#11100f"/>
+  <g fill="url(#copper)" fill-rule="evenodd" stroke="#754939" stroke-width="1.35" stroke-linejoin="miter" paint-order="stroke fill">
+    <path d="M31 5 9 35v9h22v14h10V44h7V34h-7V5ZM31 20v14H20Z"/>
+    <path d="M45 9 23 38v9h21v13h10V47h7V37h-7V9ZM44 24v13H34Z"/>
   </g>
+  <path d="M29.5 9 12.5 37H31" fill="none" stroke="#f4d4c2" stroke-width="1.25" opacity=".75"/>
+  <path d="M43.5 13 27 40H44" fill="none" stroke="#f4d4c2" stroke-width="1.15" opacity=".68"/>
 </svg>
