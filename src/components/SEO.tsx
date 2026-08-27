@@ -1,4 +1,5 @@
 import React, { useEffect } from 'react';
+import { CONFIG } from '../config';
 
 interface SEOProps {
   title?: string;
@@ -23,14 +24,14 @@ const removeMeta = (attribute: 'name' | 'property', key: string) => {
 };
 
 export const SEO: React.FC<SEOProps> = ({
-  title = 'StyleDash - Your look, delivered fast.',
-  description = 'Fashion essentials, trending streetwear, ethnic wear, and footwear delivered from nearby stores in Neemuch within 60 minutes.',
+  title = `${CONFIG.BRAND_NAME} - ${CONFIG.TAGLINE}`,
+  description = 'Fashion essentials, trending streetwear, ethnic wear, and footwear from nearby stores in Neemuch with fast local delivery.',
   image,
   type = 'website',
   jsonLd,
 }) => {
   useEffect(() => {
-    const resolvedTitle = title.includes('StyleDash') ? title : `${title} | StyleDash`;
+    const resolvedTitle = title.includes(CONFIG.BRAND_NAME) ? title : `${title} | ${CONFIG.BRAND_NAME}`;
     const canonicalUrl = `${window.location.origin}${window.location.pathname}`;
     const imageUrl = image ? new URL(image, window.location.origin).href : null;
 

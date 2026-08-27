@@ -60,15 +60,15 @@ export const Profile: React.FC = () => {
       const idToken = await signInWithGoogleProvider();
       await authApi.linkFederated('google', idToken);
       await refresh();
-      setMessage('Google email linked and verified on this StyleDash account.');
+      setMessage('Google email linked and verified on this Vibe4You account.');
     } catch (cause) {
       setError(cause instanceof ApiError || cause instanceof Error ? cause.message : 'Google email could not be linked.');
     } finally { setLinkingGoogle(false); }
   };
 
   return <div className="max-w-3xl mx-auto px-4 py-8 space-y-6">
-    <SEO title="My Profile - StyleDash" />
-    <div><h1 className="text-3xl font-black">My profile</h1><p className="text-sm text-neutral-500">Your account and saved delivery details are stored securely on the StyleDash server.</p></div>
+    <SEO title="My Profile - Vibe4You" />
+    <div><h1 className="text-3xl font-black">My profile</h1><p className="text-sm text-neutral-500">Your account and saved delivery details are stored securely on the Vibe4You server.</p></div>
     {error && <p className="text-sm text-red-600" role="alert">{error}</p>}{message && <p className="text-sm text-green-700" role="status">{message}</p>}
     <form onSubmit={saveProfile} className="p-6 bg-white dark:bg-neutral-900 rounded-3xl border dark:border-neutral-800 space-y-4">
       <h2 className="text-xl font-black">Contact and delivery address</h2>
@@ -84,7 +84,7 @@ export const Profile: React.FC = () => {
     </form>
     {!user?.email && <section className="p-6 bg-white dark:bg-neutral-900 rounded-3xl border dark:border-neutral-800 space-y-3">
       <h2 className="text-xl font-black">Add email & Google sign-in</h2>
-      <p className="text-sm text-neutral-500">Link a verified Google email to this same mobile account. StyleDash will not create a second account, and an email already used by another customer cannot be linked.</p>
+      <p className="text-sm text-neutral-500">Link a verified Google email to this same mobile account. Vibe4You will not create a second account, and an email already used by another customer cannot be linked.</p>
       <button type="button" disabled={linkingGoogle || saving} onClick={() => void linkGoogleEmail()} className="flex items-center gap-2 rounded-xl border px-5 py-3 font-bold disabled:opacity-60"><Mail className="w-4" />{linkingGoogle ? 'Linking Google…' : 'Link Google email'}</button>
     </section>}
     {user?.hasPassword ? <form onSubmit={changePassword} className="p-6 bg-white dark:bg-neutral-900 rounded-3xl border dark:border-neutral-800 space-y-4">
@@ -94,7 +94,7 @@ export const Profile: React.FC = () => {
       <button disabled={saving} className="px-5 py-3 rounded-xl border font-bold">Change password</button>
     </form> : <div className="p-6 bg-white dark:bg-neutral-900 rounded-3xl border dark:border-neutral-800 space-y-2">
       <h2 className="text-xl font-black">Sign-in security</h2>
-      <p className="text-sm text-neutral-500">This account uses a linked Google or mobile sign-in method and does not have a StyleDash password.</p>
+      <p className="text-sm text-neutral-500">This account uses a linked Google or mobile sign-in method and does not have a Vibe4You password.</p>
     </div>}
     <div className="grid sm:grid-cols-2 gap-3">
       <Link to="/orders" className="flex gap-3 p-4 bg-white dark:bg-neutral-900 rounded-2xl border dark:border-neutral-800 font-bold"><Package className="w-4" />Order history</Link>

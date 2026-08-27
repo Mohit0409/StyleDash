@@ -2,6 +2,7 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 import { ShieldCheck, Truck, RefreshCw, Zap } from 'lucide-react';
 import { CONFIG } from '../config';
+import { BrandWordmark } from './BrandWordmark';
 
 export const Footer: React.FC = () => {
   return (
@@ -14,7 +15,7 @@ export const Footer: React.FC = () => {
             <div className="p-3 bg-neutral-900 rounded-full text-lime-400">
               <Zap className="w-6 h-6 fill-lime-400" />
             </div>
-            <h4 className="font-bold text-white text-sm">60-Minute Delivery</h4>
+            <h4 className="font-bold text-white text-sm">Fast Local Delivery</h4>
             <p className="text-xs text-neutral-400">
               Hyperlocal fashion dispatch in {CONFIG.SERVICE_CITY}
             </p>
@@ -53,16 +54,11 @@ export const Footer: React.FC = () => {
         {/* Footer Nav Links */}
         <div className="grid grid-cols-2 md:grid-cols-5 gap-8 py-10">
           <div className="col-span-2">
-            <div className="flex items-center gap-2 mb-3">
-              <div className="w-8 h-8 bg-lime-400 text-neutral-950 font-black rounded-lg flex items-center justify-center text-lg">
-                SD
-              </div>
-              <span className="font-extrabold text-xl text-white">
-                Style<span className="text-lime-400">Dash</span>
-              </span>
+            <div className="mb-3">
+              <BrandWordmark inverse showTagline className="text-2xl" />
             </div>
             <p className="text-xs text-neutral-400 mb-4 max-w-sm">
-              StyleDash provides hyperlocal fashion ordering and delivery in its
+              Vibe4You provides hyperlocal fashion ordering and delivery in its
               currently supported Neemuch service area.
             </p>
             <p className="text-xs text-neutral-500 mb-1">
@@ -107,7 +103,7 @@ export const Footer: React.FC = () => {
         {/* Bottom copyright */}
         <div className="pt-6 border-t border-neutral-900 flex flex-col md:flex-row items-center justify-between text-xs text-neutral-500 gap-4">
           <p>
-            Copyright 2026 StyleDash. Operated by {CONFIG.LEGAL.PROPRIETOR_NAME}. All rights reserved.
+            Copyright 2026 Vibe4You. Operated by {CONFIG.LEGAL.PROPRIETOR_NAME}. All rights reserved.
           </p>
           <p>
             {CONFIG.LEGAL.ADDRESS}

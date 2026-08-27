@@ -40,11 +40,11 @@ const STATUS_CONTENT: Record<ShopApplicationStatus, { title: string; description
   },
   SUBMITTED: {
     title: 'Application Submitted',
-    description: 'Your application is waiting for the private StyleDash review team. It is not publicly active.',
+    description: 'Your application is waiting for the private Vibe4You review team. It is not publicly active.',
   },
   UNDER_REVIEW: {
     title: 'Under Review',
-    description: 'The private StyleDash team is reviewing your shop application. No action is needed right now.',
+    description: 'The private Vibe4You team is reviewing your shop application. No action is needed right now.',
   },
   APPROVED: {
     title: 'Shop Approved',
@@ -60,7 +60,7 @@ const STATUS_CONTENT: Record<ShopApplicationStatus, { title: string; description
   },
   SUSPENDED: {
     title: 'Shop Suspended',
-    description: 'This shop is currently suspended. Contact StyleDash support for next steps.',
+    description: 'This shop is currently suspended. Contact Vibe4You support for next steps.',
   },
 };
 
@@ -146,7 +146,7 @@ export const VendorOnboarding: React.FC = () => {
       setApplication(saved);
       setDraft(draftFromApplication(saved));
       if (announce) {
-        setMessage('Draft saved securely to your StyleDash account.');
+        setMessage('Draft saved securely to your Vibe4You account.');
         showToast('Shop application draft saved.', 'success');
       }
       return saved;
@@ -167,7 +167,7 @@ export const VendorOnboarding: React.FC = () => {
     try {
       const submitted = await vendorApplicationApi.submit();
       setApplication(submitted);
-      setMessage('Application submitted for private StyleDash review.');
+      setMessage('Application submitted for private Vibe4You review.');
       showToast('Application submitted for review.', 'success');
     } catch (cause) {
       setError(errorMessage(cause, 'Your application could not be submitted. The draft remains saved.'));
@@ -188,7 +188,7 @@ export const VendorOnboarding: React.FC = () => {
 
   return (
     <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
-      <SEO title="List Your Shop - StyleDash" />
+      <SEO title="List Your Shop - Vibe4You" />
 
       <div className="text-center space-y-2">
         <div className="w-16 h-16 bg-lime-400 text-neutral-950 rounded-3xl flex items-center justify-center mx-auto shadow-xl">
@@ -236,7 +236,7 @@ export const VendorOnboarding: React.FC = () => {
           </div>
 
           <div className="rounded-2xl border border-lime-200 bg-lime-50 p-4 text-xs text-lime-950 dark:border-lime-900 dark:bg-lime-950/20 dark:text-lime-200">
-            <div className="flex gap-2 font-bold"><ShieldCheck className="w-4 shrink-0" />Application ownership is linked to your authenticated StyleDash account.</div>
+            <div className="flex gap-2 font-bold"><ShieldCheck className="w-4 shrink-0" />Application ownership is linked to your authenticated Vibe4You account.</div>
             <p className="mt-1 ml-6">Registered contact: {registeredContact || 'Complete your account contact details before submission.'}</p>
           </div>
 
@@ -280,7 +280,7 @@ export const VendorOnboarding: React.FC = () => {
               Submit for Review <ArrowRight className="w-4" />
             </button>
           </div>
-          <p className="text-center text-xs text-neutral-500">Only the private StyleDash administrator can approve or activate a shop and publish products.</p>
+          <p className="text-center text-xs text-neutral-500">Only the private Vibe4You administrator can approve or activate a shop and publish products.</p>
         </form>
       ) : application && ['APPROVED', 'ACTIVE'].includes(application.status) ? null : (
         <section className="rounded-3xl border border-neutral-200 bg-white p-6 text-sm dark:border-neutral-800 dark:bg-neutral-900">

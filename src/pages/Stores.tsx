@@ -19,7 +19,7 @@ export const Stores: React.FC = () => {
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
-      <SEO title="Local Partner Stores in Neemuch - StyleDash" />
+      <SEO title="Local Partner Stores in Neemuch - Vibe4You" />
 
       {/* Header Banner */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 p-8 bg-neutral-950 text-white rounded-3xl relative overflow-hidden shadow-xl">
@@ -27,7 +27,7 @@ export const Stores: React.FC = () => {
           <span className="text-xs font-black text-lime-400 uppercase tracking-widest">Multi-Store Quick-Commerce Marketplace</span>
           <h1 className="text-2xl sm:text-3xl font-black">Local Boutiques & Partner Stores in {CONFIG.SERVICE_CITY}</h1>
           <p className="text-xs text-neutral-400">
-            Shop directly from verified neighbourhood clothing, ethnic wear, and footwear stores with 60-minute doorstep dispatch.
+            Shop directly from verified neighbourhood clothing, ethnic wear, and footwear stores with fast local doorstep delivery.
           </p>
         </div>
 
@@ -36,7 +36,7 @@ export const Stores: React.FC = () => {
           className="z-10 px-6 py-3 bg-lime-400 text-neutral-950 font-black text-xs uppercase tracking-wider rounded-xl hover:bg-lime-300 transition-colors flex items-center gap-2 whitespace-nowrap self-start md:self-auto"
         >
           <PlusCircle className="w-4 h-4" />
-          <span>List Your Store on StyleDash</span>
+          <span>List Your Store on Vibe4You</span>
         </Link>
       </div>
 

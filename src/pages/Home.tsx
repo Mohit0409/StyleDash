@@ -27,19 +27,19 @@ export const Home: React.FC = () => {
 
   return (
     <div className="space-y-12 pb-16">
-      <SEO title="StyleDash - Your look, delivered fast" />
+      <SEO title="Vibe4You - Your City. Your Shops. Your Style." />
 
       {/* Hero Section */}
       <section className="relative overflow-hidden bg-neutral-950 text-white py-16 lg:py-24 px-4 sm:px-6 lg:px-8">
         <div className="max-w-7xl mx-auto grid lg:grid-cols-2 gap-12 items-center">
           <div className="space-y-6 z-10">
             <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-lime-400 text-neutral-950 text-xs font-black uppercase tracking-wider">
-              <Zap className="w-3.5 h-3.5 fill-neutral-950" /> 60-Minute Fashion Delivery in {CONFIG.SERVICE_CITY}
+              <Zap className="w-3.5 h-3.5 fill-neutral-950" /> Fast Local Fashion Delivery in {CONFIG.SERVICE_CITY}
             </div>
 
             <h1 className="text-4xl sm:text-6xl font-black tracking-tight leading-none">
-              Your look, <br />
-              <span className="text-lime-400">delivered fast.</span>
+              Your City. Your Shops. <br />
+              <span className="text-lime-400">Your Style.</span>
             </h1>
 
             <p className="text-neutral-400 text-sm sm:text-base max-w-lg leading-relaxed">

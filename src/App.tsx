@@ -40,7 +40,7 @@ export const App: React.FC = () => {
               <ToastProvider>
                 <Suspense fallback={
                   <div className="h-screen w-full flex items-center justify-center text-sm font-bold text-neutral-500">
-                    Loading StyleDash...
+                    Loading Vibe4You...
                   </div>
                 }>
                   <Routes>

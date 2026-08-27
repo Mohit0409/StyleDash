@@ -22,7 +22,7 @@ export const Orders: React.FC = () => {
   const requestCreated = (request: ReturnRequest) => setRequests(current => [request, ...current.filter(item => item.id !== request.id)]);
   const cancellationCreated = (orderId: string, request: NonNullable<ServerOrder['cancellationRequest']>) => setOrders(current => current.map(order => order.id === orderId ? { ...order, cancellationRequest: request } : order));
 
-  return <div className="max-w-4xl mx-auto px-4 py-8 space-y-8"><SEO title="Order History - StyleDash" />
+  return <div className="max-w-4xl mx-auto px-4 py-8 space-y-8"><SEO title="Order History - Vibe4You" />
     <div><h1 className="text-3xl font-black">Your Orders</h1><p className="text-xs text-neutral-500">Track fulfillment and submit eligible exchange, issue, or cancellation requests.</p></div>
     {loading ? <div className="text-center py-12">Loading orders…</div> : error ? <p role="alert" className="text-red-600">{error}</p> : orders.length === 0 ? <div className="p-12 text-center bg-white dark:bg-neutral-900 rounded-3xl border space-y-4"><Package className="w-12 h-10 mx-auto"/><h3 className="font-bold">No orders placed yet</h3><Link to="/products" className="font-bold text-lime-600">Start shopping</Link></div> : <div className="space-y-4">{orders.map(order => <div key={order.id} className="p-6 bg-white dark:bg-neutral-900 rounded-3xl border dark:border-neutral-800 space-y-4">
       {order.isPaymentTestOrder && <div className="rounded-xl border-2 border-red-700 bg-red-50 dark:bg-red-950/30 p-3 text-sm font-black text-red-800 dark:text-red-300">TEST — NO FULFILLMENT REQUIRED</div>}

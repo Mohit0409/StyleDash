@@ -54,7 +54,7 @@ export const LocationSelector: React.FC<{ isOpen: boolean; onClose: () => void }
         </div>
 
         <h3 className="text-lg font-black text-neutral-900 dark:text-white mb-2">Check Delivery Availability</h3>
-        <p className="text-xs text-neutral-500 mb-6">Enter your 6-digit area pincode in {CONFIG.SERVICE_CITY} to verify 60-minute express service.</p>
+        <p className="text-xs text-neutral-500 mb-6">Enter your 6-digit area pincode in {CONFIG.SERVICE_CITY} to check fast local delivery availability.</p>
 
         <form onSubmit={handleCheck} className="flex gap-2 mb-4">
           <input

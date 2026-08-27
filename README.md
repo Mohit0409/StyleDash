@@ -1,6 +1,6 @@
-# StyleDash - Your look, delivered fast.
+# Vibe4You - Your City. Your Shops. Your Style.
 
-StyleDash is a production-quality, hyperlocal clothing quick-commerce web application built for 60-minute fashion delivery in Neemuch, MP.
+Vibe4You is a production-quality, hyperlocal clothing quick-commerce web application built for 60-minute fashion delivery in Neemuch, MP.
 
 ## Features
 

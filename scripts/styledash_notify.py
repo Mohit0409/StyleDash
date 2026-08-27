@@ -127,7 +127,7 @@ class NtfyNotifier:
                     "Content-Type":
                         "application/json; charset=utf-8",
                     "User-Agent":
-                        "StyleDash-Owner-Notifications/1.0",
+                        "Vibe4You-Owner-Notifications/1.0",
                 },
                 method="POST",
             )
@@ -144,7 +144,7 @@ class NtfyNotifier:
 
                 if not 200 <= int(status) < 300:
                     LOGGER.warning(
-                        "StyleDash notification delivery "
+                        "Vibe4You notification delivery "
                         "failed event=%s",
                         safe_event,
                     )
@@ -156,7 +156,7 @@ class NtfyNotifier:
             # Never expose topic, URL, credentials,
             # customer data or payment data.
             LOGGER.warning(
-                "StyleDash notification delivery "
+                "Vibe4You notification delivery "
                 "failed event=%s",
                 safe_event,
             )
@@ -262,7 +262,7 @@ class _NotificationDispatcher:
             # Never block an order/payment/request because
             # the notification queue is saturated.
             LOGGER.warning(
-                "StyleDash notification queue full "
+                "Vibe4You notification queue full "
                 "event=%s",
                 safe_event,
             )
@@ -285,7 +285,7 @@ class _NotificationDispatcher:
                 # _deliver already isolates normal failures,
                 # but the worker itself must never die.
                 LOGGER.warning(
-                    "StyleDash notification worker "
+                    "Vibe4You notification worker "
                     "failed event=%s",
                     safe_event,
                 )

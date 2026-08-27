@@ -5,6 +5,7 @@ import { useCart } from '../context/CartContext';
 import { useWishlist } from '../context/WishlistContext';
 import { useTheme } from '../context/ThemeContext';
 import { CONFIG } from '../config';
+import { BrandWordmark } from './BrandWordmark';
 import { useAuth } from '../context/AuthContext';
 
 export const Header: React.FC<{ onOpenCart: () => void; onOpenLocation: () => void }> = ({
@@ -38,18 +39,8 @@ export const Header: React.FC<{ onOpenCart: () => void; onOpenLocation: () => vo
           
           {/* Brand Logo & Tagline */}
           <div className="flex min-w-0 items-center gap-2 sm:gap-6">
-            <Link to="/" className="flex items-center gap-2 group">
-              <div className="w-9 h-9 bg-neutral-950 dark:bg-lime-400 rounded-xl flex items-center justify-center font-black text-xl text-lime-400 dark:text-neutral-950 shadow-md group-hover:scale-105 transition-transform">
-                SD
-              </div>
-              <div className="flex flex-col">
-                <span className="font-extrabold text-xl tracking-tight text-neutral-900 dark:text-white leading-none">
-                  Style<span className="text-lime-500">Dash</span>
-                </span>
-                <span className="hidden sm:block text-[10px] text-neutral-500 font-medium tracking-wide">
-                  {CONFIG.TAGLINE}
-                </span>
-              </div>
+            <Link to="/" className="group flex items-center" aria-label="vibe4you home">
+              <BrandWordmark showTagline className="text-[1.45rem] transition-transform group-hover:scale-[1.02]" />
             </Link>
 
             {/* Location Selector */}

@@ -8,13 +8,13 @@ const money = (paise: number | null | undefined) =>
 const label = (value: string) => value.replace(/_/g, ' ');
 
 const statusMessage: Record<SellerSettlement['status'], string> = {
-  COMMISSION_REQUIRED: 'StyleDash commission is not configured yet.',
+  COMMISSION_REQUIRED: 'Vibe4You commission is not configured yet.',
   AWAITING_PAYMENT: 'Waiting for confirmed online payment.',
   AWAITING_COLLECTION: 'Delivered COD order; cash collection still needs private-admin confirmation.',
   PENDING_CLEARANCE: 'Delivery completed. Waiting for the customer support window to close.',
   ON_HOLD: 'Settlement is paused while a return, cancellation, refund, or review is active.',
-  ELIGIBLE: 'Cleared for manual payout processing by StyleDash admin.',
-  SETTLED: 'StyleDash admin recorded this payout as completed externally.',
+  ELIGIBLE: 'Cleared for manual payout processing by Vibe4You admin.',
+  SETTLED: 'Vibe4You admin recorded this payout as completed externally.',
   VOID: 'This settlement was voided and must not be paid.',
 };
 
@@ -35,7 +35,7 @@ export const SellerEarnings: React.FC<{ settlements: SellerSettlement[]; loading
   return <div className="space-y-5">
     <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
       <Metric label="Gross delivered" value={money(totals.gross)} icon={<CircleDollarSign className="w-5" />} />
-      <Metric label="StyleDash commission" value={money(totals.commission)} icon={<ShieldCheck className="w-5" />} />
+      <Metric label="Vibe4You commission" value={money(totals.commission)} icon={<ShieldCheck className="w-5" />} />
       <Metric label="Seller net" value={money(totals.net)} icon={<WalletCards className="w-5" />} />
       <Metric label="Eligible now" value={money(totals.eligible)} icon={<Clock3 className="w-5" />} />
       <Metric label="Recorded paid" value={money(totals.settled)} icon={<ShieldCheck className="w-5" />} />
@@ -47,7 +47,7 @@ export const SellerEarnings: React.FC<{ settlements: SellerSettlement[]; loading
           <p className="text-xs font-black uppercase tracking-wider text-neutral-500">Settlement ledger</p>
           <h3 className="mt-1 text-xl font-black">Earnings & payouts</h3>
         </div>
-        <p className="max-w-xl text-xs text-neutral-500">Amounts are server-calculated snapshots. Only StyleDash private admin can confirm COD collection, release a settlement, or record an external payout.</p>
+        <p className="max-w-xl text-xs text-neutral-500">Amounts are server-calculated snapshots. Only Vibe4You private admin can confirm COD collection, release a settlement, or record an external payout.</p>
       </div>
       <div className="mt-5 space-y-3">
         {settlements.length === 0 && <p className="rounded-2xl bg-neutral-50 p-4 text-sm text-neutral-500 dark:bg-neutral-800">No delivered seller segments have created a settlement yet.</p>}

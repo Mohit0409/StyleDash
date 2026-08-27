@@ -125,7 +125,7 @@ export const Checkout: React.FC = () => {
 
   return (
     <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
-      <SEO title="Checkout - StyleDash" />
+      <SEO title="Checkout - Vibe4You" />
       <h1 className="text-2xl sm:text-3xl font-black text-neutral-900 dark:text-white">Secure Checkout</h1>
 
       <form onSubmit={handlePlaceOrder} className="grid md:grid-cols-3 gap-8">
@@ -170,7 +170,7 @@ export const Checkout: React.FC = () => {
               ))}
             </div>
             {paymentMethod !== 'cod' && (
-              <p className="flex gap-2 text-[11px] text-neutral-500"><ShieldCheck className="w-4 h-4 shrink-0 text-lime-600" /> Your payment is completed in Razorpay Checkout. StyleDash confirms fulfillment only after server-side signature and captured-payment verification.</p>
+              <p className="flex gap-2 text-[11px] text-neutral-500"><ShieldCheck className="w-4 h-4 shrink-0 text-lime-600" /> Your payment is completed in Razorpay Checkout. Vibe4You confirms fulfillment only after server-side signature and captured-payment verification.</p>
             )}
           </div>
         </div>

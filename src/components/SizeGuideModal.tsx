@@ -20,8 +20,8 @@ export const SizeGuideModal: React.FC<{ isOpen: boolean; onClose: () => void; de
           <X className="w-5 h-5" />
         </button>
 
-        <h3 className="text-xl font-black text-neutral-900 dark:text-white mb-2">StyleDash Size Guide</h3>
-        <p className="text-xs text-neutral-500 mb-6">Find your perfect fit before ordering for 60-minute doorstep delivery.</p>
+        <h3 className="text-xl font-black text-neutral-900 dark:text-white mb-2">Vibe4You Size Guide</h3>
+        <p className="text-xs text-neutral-500 mb-6">Find your perfect fit before ordering for fast doorstep delivery.</p>
 
         {/* Category Tabs */}
         <div className="flex gap-3 mb-6 border-b border-neutral-200 dark:border-neutral-800">
@@ -83,7 +83,7 @@ export const SizeGuideModal: React.FC<{ isOpen: boolean; onClose: () => void; de
 
         <div className="mt-6 p-4 bg-neutral-50 dark:bg-neutral-800 rounded-2xl text-xs text-neutral-600 dark:text-neutral-400 space-y-1">
           <p className="font-bold text-neutral-900 dark:text-white">Need a size swap after delivery?</p>
-          <p>StyleDash offers instant doorstep 7-day size exchanges in Neemuch free of cost!</p>
+          <p>Vibe4You offers doorstep 7-day size exchanges in Neemuch, subject to the returns policy.</p>
         </div>
       </div>
     </div>

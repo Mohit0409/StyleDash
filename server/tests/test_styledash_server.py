@@ -1561,7 +1561,7 @@ class PaymentTestProductTests(unittest.TestCase):
         self.assertEqual(metadata, {"success": True, "product": {
             "id": "styledash-payment-test-item",
             "slug": "styledash-payment-test-item",
-            "name": "StyleDash Payment Test Item",
+            "name": "Vibe4You Payment Test Item",
             "price": 10,
             "amount": 1000,
             "currency": "INR",
@@ -1629,7 +1629,7 @@ class PaymentTestProductTests(unittest.TestCase):
             },
         }])
         order = self.service.store.state["orders"][created["styleDashOrderId"]]
-        self.assertEqual(order["items"][0]["productName"], "StyleDash Payment Test Item")
+        self.assertEqual(order["items"][0]["productName"], "Vibe4You Payment Test Item")
         self.assertEqual(order["deliveryMethod"], "none")
         self.assertEqual(order["adminLabels"], ["TEST", "NO FULFILLMENT REQUIRED"])
         self.assertFalse(order["fulfillmentRequired"])
@@ -1775,7 +1775,7 @@ class HttpApiTests(unittest.TestCase):
         root = Path(self.temporary.name)
         web_root = root / "web"
         web_root.mkdir()
-        (web_root / "index.html").write_text("<!doctype html><title>StyleDash</title>", encoding="utf-8")
+        (web_root / "index.html").write_text("<!doctype html><title>Vibe4You</title>", encoding="utf-8")
         self.reset_deliveries = []
         self.fulfillment_notifications = []
         self.fulfillment_notification_failure = False
@@ -1832,7 +1832,7 @@ class HttpApiTests(unittest.TestCase):
     def test_health_and_security_headers(self) -> None:
         with urllib.request.urlopen(f"{self.base_url}/api/health") as response:
             payload = json.load(response)
-            self.assertEqual(payload, {"status": "ok", "service": "StyleDash", "database": "ok"})
+            self.assertEqual(payload, {"status": "ok", "service": "Vibe4You", "database": "ok"})
             self.assertNotIn("paymentMode", payload)
             self.assertEqual(response.headers["X-Content-Type-Options"], "nosniff")
             self.assertEqual(response.headers["Referrer-Policy"], "strict-origin-when-cross-origin")
@@ -2135,7 +2135,7 @@ class HttpApiTests(unittest.TestCase):
         self.assertEqual(len(self.fulfillment_notifications), 1)
         recipient, subject, body = self.fulfillment_notifications[0]
         self.assertEqual(recipient, "shop-http-owner@example.test")
-        self.assertEqual(subject, "Your StyleDash order update")
+        self.assertEqual(subject, "Your Vibe4You order update")
         self.assertIn(order_id, body)
         self.assertIn(complete["shopName"], body)
         self.assertIn("Processing", body)
@@ -3383,7 +3383,7 @@ class HttpApiTests(unittest.TestCase):
         )
         with urllib.request.urlopen(route_request) as route_response:
             self.assertEqual(route_response.status, 200)
-            self.assertIn("StyleDash", route_response.read().decode())
+            self.assertIn("Vibe4You", route_response.read().decode())
         route_status, route_hidden, _headers = self.get_json(
             f"{controlled_route}/", {"Cookie": owner_cookie}
         )

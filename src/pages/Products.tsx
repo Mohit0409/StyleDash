@@ -82,7 +82,7 @@ export const Products: React.FC = () => {
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
-      <SEO title="Browse Fashion Catalogue - StyleDash" />
+      <SEO title="Browse Fashion Catalogue - Vibe4You" />
 
       {/* Page Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-6 border-b border-neutral-200 dark:border-neutral-800">
@@ -91,7 +91,7 @@ export const Products: React.FC = () => {
             {searchQuery ? `Search results for "${searchQuery}"` : `${department} Fashion Catalogue`}
           </h1>
           <p className="text-xs text-neutral-500 mt-1">
-            Showing <strong>{sortedProducts.length}</strong> available items for 60-minute delivery in Neemuch
+            Showing <strong>{sortedProducts.length}</strong> available items for fast local delivery in Neemuch
           </p>
         </div>
 

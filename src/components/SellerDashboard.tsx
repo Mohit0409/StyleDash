@@ -97,7 +97,7 @@ export const SellerDashboard: React.FC<{ application: ShopApplication }> = ({ ap
         <article className="rounded-3xl border border-neutral-200 bg-white p-6 dark:border-neutral-800 dark:bg-neutral-900">
           <p className="text-xs font-black uppercase tracking-wider text-neutral-500">Next action</p>
           <h3 className="mt-1 text-xl font-black">{metrics.drafts ? 'Finish your product drafts' : metrics.pending ? 'Products are under review' : 'Add your next product'}</h3>
-          <p className="mt-2 text-sm text-neutral-500">Only StyleDash administrators can approve or publish products. You control preparation and submission only.</p>
+          <p className="mt-2 text-sm text-neutral-500">Only Vibe4You administrators can approve or publish products. You control preparation and submission only.</p>
           <button type="button" onClick={() => setTab('products')} className="mt-4 rounded-xl bg-neutral-950 px-4 py-2 text-sm font-bold text-white dark:bg-lime-400 dark:text-neutral-950">Manage products</button>
         </article>
       </div>
@@ -113,7 +113,7 @@ export const SellerDashboard: React.FC<{ application: ShopApplication }> = ({ ap
         <Detail label="Address" value={`${application.address}, ${application.city}, ${application.state} ${application.pincode}`} wide />
         <Detail label="Description" value={application.description} wide />
         {application.businessInformation && <Detail label="Business information" value={application.businessInformation} wide />}
-        <Detail label="StyleDash commission" value={application.commissionPercent == null ? 'Not configured' : `${application.commissionPercent}%`} />
+        <Detail label="Vibe4You commission" value={application.commissionPercent == null ? 'Not configured' : `${application.commissionPercent}%`} />
       </dl>
       <p className="mt-5 rounded-2xl bg-neutral-50 p-4 text-xs text-neutral-500 dark:bg-neutral-800">Shop identity and approval status remain administrator-controlled. Editable seller settings can be added here in a later dashboard phase.</p>
     </article>}

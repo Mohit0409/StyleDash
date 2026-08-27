@@ -117,13 +117,13 @@ class SmtpPasswordResetSenderTests(unittest.TestCase):
         assert sender is not None
         sender.send_transactional(
             "customer@example.test",
-            "Your StyleDash order update",
+            "Your Vibe4You order update",
             "Order SD-TEST from Test Shop is now Shipped.",
         )
         self.assertEqual(len(connections), 1)
         message = connections[0].messages[0]
         self.assertEqual(message["To"], "customer@example.test")
-        self.assertEqual(message["Subject"], "Your StyleDash order update")
+        self.assertEqual(message["Subject"], "Your Vibe4You order update")
         self.assertIn("Test Shop is now Shipped", message.get_content())
         self.assertEqual(connections[0].login_values, ("mailer@example.test", "not-a-real-test-secret"))
         self.assertIsNotNone(connections[0].tls_context)

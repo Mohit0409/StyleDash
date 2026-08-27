@@ -506,7 +506,7 @@ class AdminHttpTests(unittest.TestCase):
 
     def test_loopback_host_password_totp_and_separate_cookie(self):
         status, html, _headers = self.request("/", headers={"Origin": ""})
-        self.assertEqual(status, 200); self.assertIn("StyleDash Local Administration", html)
+        self.assertEqual(status, 200); self.assertIn("Vibe4You Local Administration", html)
         bad = urllib.request.Request(self.base + "/", headers={"Host": "evil.example"})
         with self.assertRaises(urllib.error.HTTPError) as caught: urllib.request.urlopen(bad)
         self.assertEqual(caught.exception.code, 421); caught.exception.close()

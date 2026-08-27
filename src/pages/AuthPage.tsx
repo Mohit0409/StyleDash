@@ -143,7 +143,7 @@ export const AuthPage: React.FC<{ mode: 'login' | 'register' }> = ({ mode }) => 
   };
 
   return <div className="max-w-md mx-auto px-4 py-12">
-    <SEO title={`${mode === 'login' ? 'Login' : 'Register'} - StyleDash`} />
+    <SEO title={`${mode === 'login' ? 'Login' : 'Register'} - Vibe4You`} />
     <div className="bg-white dark:bg-neutral-900 border dark:border-neutral-800 rounded-3xl p-7 space-y-4 shadow-sm">
       <h1 className="text-2xl font-black">{mode === 'login' ? 'Welcome back' : 'Create your account'}</h1>
       <div className="space-y-2">

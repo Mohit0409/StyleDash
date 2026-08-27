@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { calculateCartTotals } from '../context/cartTotals';
 import { Coupon } from '../types';
 
-describe('StyleDash Cart & Variant Logic', () => {
+describe('Vibe4You Cart & Variant Logic', () => {
   it('generates a stable variant-aware lineId', () => {
     const productId = 'sd-prod-001';
     const variantId = 'sd-prod-001-var-1';

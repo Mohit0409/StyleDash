@@ -25,6 +25,14 @@ for (const route of routes) {
   });
 }
 
+test('vibe4you wordmark and tagline are visible', async ({ page }) => {
+  await page.goto('/');
+
+  await expect(page.getByRole('link', { name: 'vibe4you home' })).toBeVisible();
+  await expect(page.getByText('Your City. Your Shops. Your Style.', { exact: true }).first()).toBeVisible();
+  await expect(page.locator('header')).not.toContainText('StyleDash');
+});
+
 test('customer policy pages publish launch contacts without pre-live warnings', async ({
   page,
 }) => {
@@ -59,7 +67,7 @@ test('customer policy pages publish launch contacts without pre-live warnings', 
   await expect(page.locator('main')).toContainText('Mohit Jangd');
 });
 
-test('unknown route renders StyleDash 404', async ({ page }) => {
+test('unknown route renders Vibe4You 404', async ({ page }) => {
   await page.goto('/this-route-must-not-exist-e2e');
 
   await expect(
@@ -91,7 +99,7 @@ test('restricted payment product fails closed for anonymous visitor', async ({
 
   // The denial must not reveal the hidden product or authorization rules.
   await expect(page.locator('body')).not.toContainText(
-    'StyleDash Payment Test Item',
+    'Vibe4You Payment Test Item',
   );
   await expect(page.locator('body')).not.toContainText(
     'e2e-owner@example.test',
@@ -125,7 +133,7 @@ test('public SEO exposes canonical and social metadata without query duplication
 
   await expect(page.locator('link[rel="canonical"]')).toHaveAttribute('href', /\/products$/);
   await expect(page.locator('meta[property="og:url"]')).toHaveAttribute('content', /\/products$/);
-  await expect(page.locator('meta[property="og:title"]')).toHaveAttribute('content', /StyleDash/);
+  await expect(page.locator('meta[property="og:title"]')).toHaveAttribute('content', /Vibe4You/);
   await expect(page.locator('meta[name="twitter:card"]')).toHaveAttribute('content', 'summary');
 });
 

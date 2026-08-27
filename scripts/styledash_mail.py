@@ -165,8 +165,8 @@ class SmtpPasswordResetSender:
     def __call__(self, recipient: str, token: str) -> None:
         self._send_message(
             recipient,
-            "Reset your Style Dash password",
-            "A password reset was requested for your Style Dash account.\n\n"
+            "Reset your Vibe4You password",
+            "A password reset was requested for your Vibe4You account.\n\n"
             f"Reset your password: {self._reset_link(token)}\n\n"
             "This link expires in 30 minutes and can be used once. If you did not request it, you can ignore this email.",
         )

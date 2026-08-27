@@ -48,7 +48,7 @@ export const ProductDetail: React.FC = () => {
   }, [slug]);
 
   if (loading) {
-    return <div className="max-w-7xl mx-auto p-12 text-center text-neutral-500">Loading StyleDash Product...</div>;
+    return <div className="max-w-7xl mx-auto p-12 text-center text-neutral-500">Loading Vibe4You Product...</div>;
   }
 
   if (!product) {
@@ -91,7 +91,7 @@ export const ProductDetail: React.FC = () => {
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-12">
       <SEO
-        title={`${product.name} - ${product.brand} | StyleDash`}
+        title={`${product.name} - ${product.brand} | Vibe4You`}
         description={product.shortDescription}
         image={product.images[0] || product.thumbnail}
         type="product"
