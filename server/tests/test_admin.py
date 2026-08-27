@@ -593,6 +593,99 @@ class AdminHttpTests(unittest.TestCase):
         self.assertEqual((status, body["product"]["status"]), (200, "UNDER_REVIEW"))
         refresh.assert_not_called()
 
+    def test_shop_fulfillment_override_requires_admin_csrf_and_is_audited(self):
+        customers = SECURITY.SecurityStore(self.database, self.key)
+        user, _raw, _csrf = customers.register({
+            "name": "Seller Override", "email": "seller-override@example.test",
+            "password": "long seller override password 123", "phone": "9999999997",
+        })
+        shops = ADMIN_SERVER.ShopWorkflow(self.database)
+        application = shops.create_draft(user["id"], {
+            "shopName": "Override Shop", "ownerName": "Seller Override",
+            "category": "Clothing & Fashion", "description": "A complete override test shop description.",
+            "address": "44 Main Market", "city": "Neemuch",
+            "state": "Madhya Pradesh", "pincode": "458441",
+        })
+        shops.submit_application(user["id"])
+        with shops.connect() as db:
+            admin_id = db.execute("SELECT id FROM admin_users LIMIT 1").fetchone()[0]
+        for status in ("UNDER_REVIEW", "APPROVED", "ACTIVE"):
+            shops.admin_transition_application(admin_id, application["id"], status)
+        product = shops.create_product_draft(user["id"], {
+            "name": "Override Tee", "description": "A tracked seller product for private admin override testing.",
+            "brand": "Local", "department": "men", "category": "Clothing & Fashion",
+            "pricePaise": 45000, "originalPricePaise": 50000, "inventory": 4,
+            "size": "M", "colourName": "Black", "colourHex": "#000000",
+            "imageUrls": ["https://example.test/override.jpg"], "attributes": {},
+        })
+        app = self.server.RequestHandlerClass.application
+        with app.payments.store.lock:
+            app.payments.store.state["orders"]["ORDER-SHOP-OVERRIDE"] = {
+                "id": "ORDER-SHOP-OVERRIDE", "userId": user["id"],
+                "status": "placed", "paymentStatus": "paid", "paymentMethod": "upi",
+                "fulfillmentRequired": True, "createdAt": "2026-08-27T10:00:00+00:00",
+                "items": [{"productId": product["id"], "quantity": 1}],
+                "address": {"name": "Buyer", "phone": "9999999996"},
+            }
+            app.payments.store.save()
+
+        status, body, _headers = self.request("/api/admin/orders?q=ORDER-SHOP-OVERRIDE")
+        self.assertEqual((status, body["code"]), (401, "admin_authentication_required"))
+        self.request("/api/admin/login", {"username": "local-owner", "password": "long administrator password 123"}, method="POST")
+        status, body, _headers = self.request(
+            "/api/admin/totp", {"code": pyotp.TOTP(self.secret).now()}, method="POST"
+        )
+        self.assertEqual(status, 200)
+        csrf = body["csrfToken"]
+        status, body, _headers = self.request("/api/admin/orders?q=ORDER-SHOP-OVERRIDE")
+        self.assertEqual(status, 200)
+        order = body["orders"][0]
+        self.assertEqual(order["shopFulfillments"][0]["shopName"], "Override Shop")
+        self.assertEqual(order["shopFulfillments"][0]["status"], "NEW")
+        segment = order["shopFulfillments"][0]["applicationId"]
+
+        path = f"/api/admin/orders/ORDER-SHOP-OVERRIDE/fulfillment/{segment}"
+        payload = {
+            "status": "SHIPPED", "carrier": "Delhivery",
+            "trackingNumber": "DLV-ADMIN-HTTP", "reason": "Correct seller shipping state",
+        }
+        status, body, _headers = self.request(path, payload, method="PATCH")
+        self.assertEqual((status, body["code"]), (403, "admin_csrf_failed"))
+        status, body, _headers = self.request(
+            path, payload, headers={"X-CSRF-Token": csrf}, method="PATCH"
+        )
+        self.assertEqual((status, body["fulfillment"]["status"]), (200, "SHIPPED"))
+        self.assertEqual(body["fulfillment"]["shipping"]["trackingNumber"], "DLV-ADMIN-HTTP")
+        status, body, _headers = self.request(
+            "/api/admin/orders?q=ORDER-SHOP-OVERRIDE"
+        )
+        self.assertEqual(status, 200)
+        self.assertEqual(body["orders"][0]["shopFulfillments"][0]["status"], "SHIPPED")
+        self.assertEqual(
+            body["orders"][0]["shopFulfillments"][0]["shipping"]["trackingNumber"],
+            "DLV-ADMIN-HTTP",
+        )
+        status, body, _headers = self.request(
+            "/api/admin/orders/ORDER-SHOP-OVERRIDE/fulfillment/not-this-shop",
+            {"status": "READY", "reason": "Must not cross shop boundary"},
+            headers={"X-CSRF-Token": csrf}, method="PATCH",
+        )
+        self.assertEqual((status, body["code"]), (404, "order_shop_segment_not_found"))
+        with app.payments.store.lock:
+            app.payments.store.state["orders"]["ORDER-SHOP-OVERRIDE"]["status"] = "cancelled"
+            app.payments.store.save()
+        status, body, _headers = self.request(
+            path, {"status": "READY", "reason": "Cancelled order must remain stopped"},
+            headers={"X-CSRF-Token": csrf}, method="PATCH",
+        )
+        self.assertEqual((status, body["code"]), (409, "order_not_fulfillable"))
+        status, body, _headers = self.request("/api/admin/audit")
+        self.assertEqual(status, 200)
+        self.assertIn("shop_fulfillment_override", {row["action"] for row in body["audit"]})
+        admin_ui = (ROOT / "server/admin/admin.js").read_text(encoding="utf-8")
+        self.assertIn("Override shop fulfillment", admin_ui)
+        self.assertIn("administrator override", admin_ui)
+
     def test_non_loopback_bind_refused(self):
         with self.assertRaises(RuntimeError):
             ADMIN_SERVER.create_admin_server("0.0.0.0", 0, self.database, self.key, ROOT / "server/payment-data/catalog.json", ROOT / "server/payment-data/settings.json", self.root / "data2", ROOT / "server/admin", self.root / "backups")

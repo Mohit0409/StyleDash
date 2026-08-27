@@ -131,13 +131,32 @@ class AdminApplication:
             shop_workflow=self.shops,
         )
 
-    def list_orders(self, query: str = "") -> list[dict[str, Any]]:
+    @staticmethod
+    def _order_product_ids(order: dict[str, Any]) -> list[str]:
+        return [
+            item["productId"]
+            for item in order.get("items", [])
+            if isinstance(item, dict) and isinstance(item.get("productId"), str)
+        ]
+
+    def _with_shop_fulfillments(self, admin_id: str, order: dict[str, Any]) -> dict[str, Any]:
+        result = dict(order)
+        if self.shops is not None and order.get("fulfillmentRequired") is not False:
+            result["shopFulfillments"] = self.shops.admin_order_fulfillments(
+                admin_id, str(order.get("id") or ""), self._order_product_ids(order)
+            )
+        else:
+            result["shopFulfillments"] = []
+        return result
+
+    def list_orders(self, query: str = "", admin_id: str | None = None) -> list[dict[str, Any]]:
         needle = query.strip().casefold()[:100]
         with self.payments.store.lock:
             orders = list(self.payments.store.state["orders"].values())
             if needle:
                 orders = [order for order in orders if needle in str(order.get("id", "")).casefold()]
-            return [dict(order) for order in sorted(orders, key=lambda item: item.get("createdAt", ""), reverse=True)[:250]]
+            ordered = [dict(order) for order in sorted(orders, key=lambda item: item.get("createdAt", ""), reverse=True)[:250]]
+        return ordered if admin_id is None else [self._with_shop_fulfillments(admin_id, order) for order in ordered]
 
     def payment_alerts(self) -> list[dict[str, Any]]:
         with self.payments.store.lock:
@@ -147,12 +166,37 @@ class AdminApplication:
                 for alert in sorted(alerts, key=lambda item: item.get("recordedAt", ""), reverse=True)[:250]
             ]
 
-    def get_order(self, order_id: str) -> dict[str, Any]:
+    def get_order(self, order_id: str, admin_id: str | None = None) -> dict[str, Any]:
         with self.payments.store.lock:
             order = self.payments.store.state["orders"].get(order_id)
             if order is None:
                 raise SecurityError(404, "Order not found.", "order_not_found")
-            return dict(order)
+            result = dict(order)
+        return result if admin_id is None else self._with_shop_fulfillments(admin_id, result)
+
+    def override_order_fulfillment(
+        self,
+        admin_id: str,
+        order_id: str,
+        application_id: str,
+        payload: dict[str, Any],
+    ) -> dict[str, Any]:
+        if self.shops is None:
+            raise SecurityError(409, "Shop fulfillment is unavailable.", "shop_fulfillment_unavailable")
+        with self.payments.store.lock:
+            order = self.payments.store.state["orders"].get(order_id)
+            if order is None:
+                raise SecurityError(404, "Order not found.", "order_not_found")
+            if order.get("fulfillmentRequired") is False:
+                raise SecurityError(409, "This payment validation order requires no fulfillment.", "no_fulfillment_order")
+            if order.get("status") == "cancelled" or order.get("paymentStatus") == "refunded":
+                raise SecurityError(
+                    409, "A cancelled or fully refunded order cannot be fulfilled.", "order_not_fulfillable"
+                )
+            product_ids = self._order_product_ids(order)
+        return self.shops.admin_override_fulfillment(
+            admin_id, order_id, application_id, product_ids, payload
+        )
 
     def _resolve_order_alerts(
         self,
@@ -570,13 +614,13 @@ class AdminHandler(BaseHTTPRequestHandler):
                 admin, _session = self._admin()
                 self._json(200, {"success": True, "admin": admin, "csrfToken": self.application.identity.csrf_token(self._cookie(ADMIN_COOKIE) or "")}); return
             if path == "/api/admin/orders":
-                self._admin(); query = self._query().get("q", [""])[0]
-                self._json(200, {"success": True, "orders": self.application.list_orders(query)}); return
+                admin, _session = self._admin(); query = self._query().get("q", [""])[0]
+                self._json(200, {"success": True, "orders": self.application.list_orders(query, admin_id=admin["id"])}); return
             if path == "/api/admin/payment-alerts":
                 self._admin(); self._json(200, {"success": True, "alerts": self.application.payment_alerts()}); return
             if path.startswith("/api/admin/orders/"):
-                self._admin(); order_id = unquote(path.removeprefix("/api/admin/orders/"))
-                self._json(200, {"success": True, "order": self.application.get_order(order_id)}); return
+                admin, _session = self._admin(); order_id = unquote(path.removeprefix("/api/admin/orders/"))
+                self._json(200, {"success": True, "order": self.application.get_order(order_id, admin_id=admin["id"])}); return
             if path == "/api/admin/vendors":
                 admin, _session = self._admin()
                 self._json(200, {"success": True, "applications": self._shops().admin_list_applications(admin["id"])}); return
@@ -625,6 +669,17 @@ class AdminHandler(BaseHTTPRequestHandler):
         path = urlsplit(self.path).path
         try:
             admin, _session = self._admin(); self._csrf(); payload = self._body()
+            if path.startswith("/api/admin/orders/") and "/fulfillment/" in path:
+                tail = path.removeprefix("/api/admin/orders/")
+                raw_order_id, raw_application_id = tail.split("/fulfillment/", 1)
+                order_id = unquote(raw_order_id).strip("/")
+                application_id = unquote(raw_application_id).strip("/")
+                if not order_id or not application_id or "/" in order_id or "/" in application_id:
+                    raise SecurityError(404, "Shop segment not found for this order.", "order_shop_segment_not_found")
+                result = self.application.override_order_fulfillment(
+                    admin["id"], order_id, application_id, payload
+                )
+                self._json(200, {"success": True, "fulfillment": result}); return
             if path.startswith("/api/admin/orders/") and path.endswith("/status"):
                 order_id = unquote(path.removeprefix("/api/admin/orders/").removesuffix("/status"))
                 result = self.application.update_order_status(admin["id"], order_id, payload.get("status"))

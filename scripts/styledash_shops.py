@@ -1042,6 +1042,143 @@ class ShopWorkflow:
             for row in rows
         ]
 
+    def admin_order_fulfillments(
+        self, admin_id: str, order_id: str, product_ids: list[str]
+    ) -> list[dict[str, Any]]:
+        safe_order_id = clean_text(order_id, "Order ID", 1, 128)
+        ids = [value for value in dict.fromkeys(product_ids) if isinstance(value, str) and value]
+        if not ids:
+            return []
+        placeholders = ",".join("?" for _ in ids)
+        with self.connect() as db:
+            self._require_admin(db, admin_id)
+            rows = db.execute(
+                f"""
+                SELECT DISTINCT a.id,a.shop_name,f.status,f.updated_at,f.carrier,f.tracking_number
+                  FROM shop_product_submissions p
+                  JOIN vendor_applications a ON a.id=p.application_id
+                  LEFT JOIN shop_order_fulfillments f
+                    ON f.application_id=a.id AND f.order_id=?
+                 WHERE p.id IN ({placeholders})
+                 ORDER BY a.shop_name
+                """,
+                (safe_order_id, *ids),
+            ).fetchall()
+        return [
+            {
+                "applicationId": row["id"],
+                "shopName": row["shop_name"],
+                "status": row["status"] or "NEW",
+                "updatedAt": row["updated_at"],
+                "shipping": (
+                    {"carrier": row["carrier"], "trackingNumber": row["tracking_number"]}
+                    if row["carrier"] and row["tracking_number"]
+                    else None
+                ),
+            }
+            for row in rows
+        ]
+
+    def admin_override_fulfillment(
+        self,
+        admin_id: str,
+        order_id: str,
+        application_id: str,
+        product_ids: list[str],
+        payload: dict[str, Any],
+    ) -> dict[str, Any]:
+        if not isinstance(payload, dict):
+            raise SecurityError(400, "A JSON object is required.", "invalid_fulfillment_override")
+        allowed = {"status", "carrier", "trackingNumber", "reason"}
+        if "status" not in payload or "reason" not in payload or set(payload) - allowed:
+            raise SecurityError(400, "Status and override reason are required.", "invalid_fulfillment_override")
+        safe_order_id = clean_text(order_id, "Order ID", 1, 128)
+        safe_application_id = clean_text(application_id, "application ID", 1, 128)
+        status = clean_text(payload.get("status"), "Fulfillment status", 1, 20).upper()
+        if status not in FULFILLMENT_STATUSES:
+            raise SecurityError(400, "Invalid fulfillment status.", "invalid_fulfillment_override")
+        reason = clean_text(payload.get("reason"), "override reason", 5, 500)
+        shipping = self._shipping_payload(payload, status)
+        ids = [value for value in dict.fromkeys(product_ids) if isinstance(value, str) and value]
+        if not ids:
+            raise SecurityError(404, "Shop segment not found for this order.", "order_shop_segment_not_found")
+        placeholders = ",".join("?" for _ in ids)
+        now = iso(utc_now())
+        with self.connect() as db:
+            db.execute("BEGIN IMMEDIATE")
+            self._require_admin(db, admin_id)
+            application = db.execute(
+                "SELECT id,shop_name FROM vendor_applications WHERE id=?",
+                (safe_application_id,),
+            ).fetchone()
+            if application is None:
+                db.rollback()
+                raise SecurityError(404, "Shop segment not found for this order.", "order_shop_segment_not_found")
+            involved = db.execute(
+                f"SELECT 1 FROM shop_product_submissions WHERE application_id=? AND id IN ({placeholders}) LIMIT 1",
+                (safe_application_id, *ids),
+            ).fetchone()
+            if involved is None:
+                db.rollback()
+                raise SecurityError(404, "Shop segment not found for this order.", "order_shop_segment_not_found")
+            row = db.execute(
+                "SELECT status,updated_at,carrier,tracking_number FROM shop_order_fulfillments "
+                "WHERE order_id=? AND application_id=?",
+                (safe_order_id, safe_application_id),
+            ).fetchone()
+            before_status = row["status"] if row is not None else "NEW"
+            before_shipping = (
+                {"carrier": row["carrier"], "trackingNumber": row["tracking_number"]}
+                if row is not None and row["carrier"] and row["tracking_number"]
+                else None
+            )
+            carrier = tracking_number = None
+            if status == "SHIPPED":
+                if shipping is not None:
+                    carrier, tracking_number = shipping
+                elif row is not None and before_status == "SHIPPED":
+                    carrier, tracking_number = row["carrier"], row["tracking_number"]
+            if row is None:
+                db.execute(
+                    "INSERT INTO shop_order_fulfillments("
+                    "order_id,application_id,status,created_at,updated_at,carrier,tracking_number"
+                    ") VALUES(?,?,?,?,?,?,?)",
+                    (safe_order_id, safe_application_id, status, now, now, carrier, tracking_number),
+                )
+            else:
+                db.execute(
+                    "UPDATE shop_order_fulfillments SET status=?,carrier=?,tracking_number=?,updated_at=? "
+                    "WHERE order_id=? AND application_id=?",
+                    (status, carrier, tracking_number, now, safe_order_id, safe_application_id),
+                )
+            after_shipping = (
+                {"carrier": carrier, "trackingNumber": tracking_number}
+                if carrier and tracking_number
+                else None
+            )
+            self._audit_if_available(
+                db,
+                admin_id,
+                "shop_fulfillment_override",
+                "order_shop_fulfillment",
+                f"{safe_order_id}:{safe_application_id}",
+                {
+                    "orderId": safe_order_id,
+                    "applicationId": safe_application_id,
+                    "shopName": application["shop_name"],
+                    "from": before_status,
+                    "to": status,
+                    "beforeShipping": before_shipping,
+                    "afterShipping": after_shipping,
+                    "reason": reason,
+                },
+            )
+            db.commit()
+        result = self._serialize_fulfillment(status, now, carrier, tracking_number)
+        result["applicationId"] = safe_application_id
+        result["shopName"] = application["shop_name"]
+        return result
+
     def create_product_draft(self, user_id: str, payload: dict[str, Any]) -> dict[str, Any]:
         values = self._product_payload(payload)
         now = iso(utc_now())

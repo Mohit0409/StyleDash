@@ -1,3 +1,4 @@
+import json
 import sqlite3
 import tempfile
 import threading
@@ -394,6 +395,47 @@ class ShopWorkflowTests(unittest.TestCase):
         self.assertIsNone(summary[1]["shipping"])
         self.assertTrue(all("applicationId" not in row for row in summary))
         self.assertNotEqual(app_a["id"], app_b["id"])
+
+    def test_admin_fulfillment_override_is_scoped_and_audited(self) -> None:
+        app_a = self.create_active_shop("user-a", "Shop A")
+        app_b = self.create_active_shop("user-b", "Shop B")
+        product_a = self.store.create_product_draft("user-a", self.complete_product("Product A"))
+        self.store.create_product_draft("user-b", self.complete_product("Product B"))
+        self.store.update_seller_fulfillment("user-a", "SD-ADMIN", {"status": "PROCESSING"})
+        segments = self.store.admin_order_fulfillments("admin-a", "SD-ADMIN", [product_a["id"]])
+        self.assertEqual([(row["shopName"], row["status"]) for row in segments], [("Shop A", "PROCESSING")])
+        self.assertEqual(segments[0]["applicationId"], app_a["id"])
+        overridden = self.store.admin_override_fulfillment(
+            "admin-a", "SD-ADMIN", app_a["id"], [product_a["id"]],
+            {"status": "SHIPPED", "carrier": "Delhivery", "trackingNumber": "DLV-ADMIN-1", "reason": "Correct seller dispatch state"},
+        )
+        self.assertEqual(overridden["status"], "SHIPPED")
+        self.assertEqual(overridden["shipping"]["trackingNumber"], "DLV-ADMIN-1")
+        corrected = self.store.admin_override_fulfillment(
+            "admin-a", "SD-ADMIN", app_a["id"], [product_a["id"]],
+            {"status": "PROCESSING", "reason": "Seller marked shipment by mistake"},
+        )
+        self.assertEqual(corrected["status"], "PROCESSING")
+        self.assertIsNone(corrected["shipping"])
+        self.assert_error(
+            "order_shop_segment_not_found",
+            lambda: self.store.admin_override_fulfillment(
+                "admin-a", "SD-ADMIN", app_b["id"], [product_a["id"]],
+                {"status": "READY", "reason": "Wrong shop must not be writable"},
+            ),
+        )
+        self.assert_error(
+            "admin_authorization_required",
+            lambda: self.store.admin_order_fulfillments("user-a", "SD-ADMIN", [product_a["id"]]),
+        )
+        with self.store.connect() as db:
+            rows = db.execute(
+                "SELECT action,metadata_json FROM local_admin_audit_log WHERE action='shop_fulfillment_override' ORDER BY id"
+            ).fetchall()
+        self.assertEqual(len(rows), 2)
+        metadata = json.loads(rows[-1]["metadata_json"])
+        self.assertEqual((metadata["from"], metadata["to"]), ("SHIPPED", "PROCESSING"))
+        self.assertEqual(metadata["reason"], "Seller marked shipment by mistake")
 
     def test_customer_application_and_product_idor(self) -> None:
         self.create_active_shop("user-a", "Shop A")
