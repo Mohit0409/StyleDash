@@ -15,16 +15,18 @@ export const BrandWordmark: React.FC<BrandWordmarkProps> = ({
   const ink = inverse ? 'text-white' : 'text-neutral-950 dark:text-white';
 
   return <span className={`inline-flex flex-col ${className}`}>
-    <span aria-label="vibe4you" className={`inline-flex items-center font-black tracking-[-0.07em] leading-none ${ink}`}>
+    <span aria-label="vibe4you" className={`inline-flex items-end font-black tracking-[-0.075em] leading-none ${ink}`}>
       <span>vibe</span>
-      <span className="relative mx-[-0.02em] inline-block w-[1.38em] text-[#b79a8a]" aria-hidden="true">
-        <span className="absolute left-0 top-0">4</span>
-        <span className="absolute left-[0.42em] top-[0.05em]">4</span>
-        <span className="invisible">44</span>
+      <span
+        className="relative mx-[-0.06em] inline-block h-[1.08em] w-[1.44em] shrink-0 text-[#c39a86]"
+        aria-hidden="true"
+      >
+        <span className="absolute bottom-[-0.02em] left-0 text-[1.28em] leading-none">4</span>
+        <span className="absolute bottom-[-0.02em] left-[0.39em] text-[1.28em] leading-none">4</span>
       </span>
-      <span>you</span>
+      <span className="ml-[-0.03em]">you</span>
     </span>
-    {showTagline && <span className="mt-1 text-[9px] font-semibold tracking-[0.08em] text-neutral-500 dark:text-neutral-400 sm:text-[10px]">
+    {showTagline && <span className="mt-1 whitespace-nowrap text-[9px] font-semibold tracking-[0.045em] text-neutral-500 dark:text-neutral-400 sm:text-[10px]">
       {CONFIG.TAGLINE}
     </span>}
   </span>;
