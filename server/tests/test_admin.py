@@ -570,12 +570,21 @@ class AdminHttpTests(unittest.TestCase):
         self.assertEqual((status, body["application"]["status"]), (200, "UNDER_REVIEW"))
         refresh.assert_not_called()
 
-        for target in ("APPROVED", "ACTIVE"):
-            status, body, _headers = self.request(
-                f"/api/admin/vendors/{application['id']}", {"status": target, "reason": None},
-                headers={"X-CSRF-Token": csrf}, method="PATCH",
-            )
-            self.assertEqual((status, body["application"]["status"]), (200, target))
+        status, body, _headers = self.request(
+            f"/api/admin/vendors/{application['id']}", {"status": "APPROVED", "reason": None},
+            headers={"X-CSRF-Token": csrf}, method="PATCH",
+        )
+        self.assertEqual((status, body["application"]["status"]), (200, "APPROVED"))
+        status, body, _headers = self.request(
+            f"/api/admin/vendors/{application['id']}/commission", {"commissionPercent": 12},
+            headers={"X-CSRF-Token": csrf}, method="PATCH",
+        )
+        self.assertEqual((status, body["application"]["commissionPercent"]), (200, 12))
+        status, body, _headers = self.request(
+            f"/api/admin/vendors/{application['id']}", {"status": "ACTIVE", "reason": None},
+            headers={"X-CSRF-Token": csrf}, method="PATCH",
+        )
+        self.assertEqual((status, body["application"]["status"]), (200, "ACTIVE"))
 
         product = shops.create_product_draft(user["id"], {
             "name": "Transition Tee", "description": "A reviewed transition product for handler coverage.",
@@ -609,8 +618,10 @@ class AdminHttpTests(unittest.TestCase):
         shops.submit_application(user["id"])
         with shops.connect() as db:
             admin_id = db.execute("SELECT id FROM admin_users LIMIT 1").fetchone()[0]
-        for status in ("UNDER_REVIEW", "APPROVED", "ACTIVE"):
+        for status in ("UNDER_REVIEW", "APPROVED"):
             shops.admin_transition_application(admin_id, application["id"], status)
+        shops.admin_set_commission(admin_id, application["id"], 12)
+        shops.admin_transition_application(admin_id, application["id"], "ACTIVE")
         product = shops.create_product_draft(user["id"], {
             "name": "Override Tee", "description": "A tracked seller product for private admin override testing.",
             "brand": "Local", "department": "men", "category": "Clothing & Fashion",
@@ -706,8 +717,10 @@ class AdminHttpTests(unittest.TestCase):
         shops.submit_application(seller["id"])
         with shops.connect() as db:
             admin_id = db.execute("SELECT id FROM admin_users LIMIT 1").fetchone()[0]
-        for status in ("UNDER_REVIEW", "APPROVED", "ACTIVE"):
+        for status in ("UNDER_REVIEW", "APPROVED"):
             shops.admin_transition_application(admin_id, application["id"], status)
+        shops.admin_set_commission(admin_id, application["id"], 12)
+        shops.admin_transition_application(admin_id, application["id"], "ACTIVE")
         product = shops.create_product_draft(seller["id"], {
             "name": "Return Review Tee", "description": "A return-review product fixture.",
             "brand": "Local", "department": "men", "category": "Clothing & Fashion",
@@ -797,6 +810,94 @@ class AdminHttpTests(unittest.TestCase):
         self.assertIn("renderReturns", admin_ui)
         self.assertIn("Approving a request never performs a Razorpay refund", admin_ui)
         self.assertIn('data-tab="returns"', admin_html)
+    def test_settlement_admin_flow_requires_csrf_and_records_manual_payout(self):
+        customers = SECURITY.SecurityStore(self.database, self.key)
+        seller, _raw, _csrf = customers.register({
+            "name": "Settlement Seller", "email": "settlement-seller@example.test",
+            "password": "long settlement seller password 123", "phone": "9999999951",
+        })
+        shops = ADMIN_SERVER.ShopWorkflow(self.database)
+        application = shops.create_draft(seller["id"], {
+            "shopName": "Settlement Review Shop", "ownerName": "Settlement Seller",
+            "category": "Clothing & Fashion", "description": "A settlement administration test shop.",
+            "address": "88 Main Market", "city": "Neemuch",
+            "state": "Madhya Pradesh", "pincode": "458441",
+        })
+        shops.submit_application(seller["id"])
+        with shops.connect() as db:
+            admin_id = db.execute("SELECT id FROM admin_users LIMIT 1").fetchone()[0]
+        shops.admin_transition_application(admin_id, application["id"], "UNDER_REVIEW")
+        shops.admin_transition_application(admin_id, application["id"], "APPROVED")
+        shops.admin_set_commission(admin_id, application["id"], 12)
+        shops.admin_transition_application(admin_id, application["id"], "ACTIVE")
+
+        app = self.server.RequestHandlerClass.application
+        order_id = "ORDER-SETTLEMENT-ADMIN"
+        with app.payments.store.lock:
+            app.payments.store.state["orders"][order_id] = {
+                "id": order_id, "userId": seller["id"], "status": "delivered",
+                "paymentStatus": "pending", "paymentMethod": "cod",
+                "fulfillmentRequired": True, "items": [],
+                "address": {"name": "Buyer", "phone": "9999999952"},
+                "createdAt": "2026-08-20T10:00:00+00:00",
+                "updatedAt": "2026-08-20T10:00:00+00:00",
+            }
+            app.payments.store.save()
+        settlement = shops.record_seller_delivery_settlement(
+            seller["id"], order_id, 1000, "cod", "pending",
+            "2026-08-20T10:00:00+00:00", "2026-08-21T10:00:00+00:00",
+        )
+        self.assertEqual(settlement["status"], "AWAITING_COLLECTION")
+
+        status, body, _headers = self.request("/api/admin/settlements")
+        self.assertEqual((status, body["code"]), (401, "admin_authentication_required"))
+        self.request("/api/admin/login", {
+            "username": "local-owner", "password": "long administrator password 123"
+        }, method="POST")
+        status, body, _headers = self.request(
+            "/api/admin/totp", {"code": pyotp.TOTP(self.secret).now()}, method="POST"
+        )
+        self.assertEqual(status, 200)
+        csrf = body["csrfToken"]
+        status, body, _headers = self.request("/api/admin/settlements")
+        self.assertEqual(status, 200)
+        row = next(item for item in body["settlements"] if item["id"] == settlement["id"])
+        self.assertEqual(row["status"], "AWAITING_COLLECTION")
+        self.assertEqual(row["applicationId"], application["id"])
+
+        path = f"/api/admin/settlements/{settlement['id']}"
+        status, body, _headers = self.request(path, {"action": "CONFIRM_COLLECTION"}, method="PATCH")
+        self.assertEqual((status, body["code"]), (403, "admin_csrf_failed"))
+        status, body, _headers = self.request(
+            path, {"action": "CONFIRM_COLLECTION", "note": "Cash received"},
+            headers={"X-CSRF-Token": csrf}, method="PATCH",
+        )
+        self.assertEqual((status, body["settlement"]["status"]), (200, "PENDING_CLEARANCE"))
+        status, body, _headers = self.request(
+            path, {"action": "RELEASE", "note": "Return window cleared"},
+            headers={"X-CSRF-Token": csrf}, method="PATCH",
+        )
+        self.assertEqual((status, body["settlement"]["status"]), (200, "ELIGIBLE"))
+        status, body, _headers = self.request(
+            path, {"action": "MARK_SETTLED", "payoutReference": "UTR-ADMIN-001",
+                   "note": "External bank payout recorded"},
+            headers={"X-CSRF-Token": csrf}, method="PATCH",
+        )
+        self.assertEqual((status, body["settlement"]["status"]), (200, "SETTLED"))
+        self.assertEqual(body["settlement"]["payoutReference"], "UTR-ADMIN-001")
+        status, body, _headers = self.request("/api/admin/audit")
+        self.assertEqual(status, 200)
+        actions = {row["action"] for row in body["audit"]}
+        self.assertTrue({
+            "settlement_collection_confirmed", "settlement_released", "settlement_recorded"
+        }.issubset(actions))
+        admin_ui = (ROOT / "server/admin/admin.js").read_text(encoding="utf-8")
+        admin_html = (ROOT / "server/admin/index.html").read_text(encoding="utf-8")
+        self.assertIn("renderSettlements", admin_ui)
+        self.assertIn("No money is transferred by this page", admin_ui)
+        self.assertIn("vendor-commission", admin_ui)
+        self.assertIn('data-tab="settlements"', admin_html)
+
     def test_non_loopback_bind_refused(self):
         with self.assertRaises(RuntimeError):
             ADMIN_SERVER.create_admin_server("0.0.0.0", 0, self.database, self.key, ROOT / "server/payment-data/catalog.json", ROOT / "server/payment-data/settings.json", self.root / "data2", ROOT / "server/admin", self.root / "backups")

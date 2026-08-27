@@ -221,10 +221,13 @@ class AdminApplication:
     ) -> dict[str, Any]:
         if self.shops is None:
             raise SecurityError(409, "Return requests are unavailable.", "returns_unavailable")
-        return self.shops.admin_transition_return_request(
+        result = self.shops.admin_transition_return_request(
             admin_id, request_id, payload.get("status"),
             payload.get("note"), payload.get("resolutionReference"),
         )
+        if result.get("status") in {"REJECTED", "EXCHANGED", "CANCELLED"}:
+            self.shops.restore_settlements_for_order(result["orderId"])
+        return result
 
     def transition_cancellation_request(
         self, admin_id: str, order_id: str, payload: dict[str, Any]
@@ -267,7 +270,71 @@ class AdminApplication:
             admin_id, "cancellation_request_status", "order", order_id, "success",
             {"from": current, "to": target},
         )
+        if self.shops is not None and target == "REJECTED":
+            self.shops.restore_settlements_for_order(order_id)
         return result
+
+    def settlements(self, admin_id: str) -> list[dict[str, Any]]:
+        if self.shops is None:
+            return []
+        rows = self.shops.admin_settlements(admin_id)
+        with self.payments.store.lock:
+            orders = self.payments.store.state["orders"]
+            for row in rows:
+                order = orders.get(row["orderId"])
+                if not isinstance(order, dict):
+                    row["orderStatus"] = None
+                    row["currentPaymentStatus"] = None
+                    continue
+                row["orderStatus"] = order.get("status")
+                row["currentPaymentStatus"] = order.get("paymentStatus")
+                row["refundAmount"] = order.get("refundAmount")
+                request = order.get("cancellationRequest")
+                row["cancellationStatus"] = request.get("status") if isinstance(request, dict) else None
+        return rows
+
+    def set_shop_commission(self, admin_id: str, application_id: str, payload: dict[str, Any]) -> dict[str, Any]:
+        if self.shops is None:
+            raise SecurityError(409, "Shop settlements are unavailable.", "settlements_unavailable")
+        if not isinstance(payload, dict) or set(payload) != {"commissionPercent"}:
+            raise SecurityError(400, "A commission percentage is required.", "invalid_commission")
+        return self.shops.admin_set_commission(admin_id, application_id, payload.get("commissionPercent"))
+
+    def _settlement_order_guard(self, settlement: dict[str, Any]) -> None:
+        with self.payments.store.lock:
+            order = self.payments.store.state["orders"].get(settlement["orderId"])
+            if not isinstance(order, dict):
+                raise SecurityError(404, "Settlement order not found.", "order_not_found")
+            if order.get("status") == "cancelled" or order.get("paymentStatus") == "refunded":
+                raise SecurityError(409, "Cancelled or refunded orders cannot be settled.", "settlement_order_blocked")
+            refund_amount = order.get("refundAmount")
+            if isinstance(refund_amount, (int, float)) and not isinstance(refund_amount, bool) and refund_amount > 0:
+                raise SecurityError(409, "An order with recorded refunds cannot be settled automatically.", "settlement_refund_hold")
+            request = order.get("cancellationRequest")
+            if isinstance(request, dict) and request.get("status") not in {"REJECTED", "CANCELLED"}:
+                raise SecurityError(409, "An active cancellation request blocks settlement.", "settlement_cancellation_hold")
+            if settlement.get("paymentMethod") in {"upi", "card"} and order.get("paymentStatus") != "paid":
+                raise SecurityError(409, "Online payment is not in a paid state.", "settlement_payment_unresolved")
+
+    def settlement_action(self, admin_id: str, settlement_id: str, payload: dict[str, Any]) -> dict[str, Any]:
+        if self.shops is None:
+            raise SecurityError(409, "Shop settlements are unavailable.", "settlements_unavailable")
+        if not isinstance(payload, dict) or not isinstance(payload.get("action"), str):
+            raise SecurityError(400, "A settlement action is required.", "invalid_settlement_action")
+        action = payload["action"].strip().upper()
+        current = next((row for row in self.shops.admin_settlements(admin_id) if row["id"] == settlement_id), None)
+        if current is None:
+            raise SecurityError(404, "Settlement not found.", "settlement_not_found")
+        self._settlement_order_guard(current)
+        if action == "CONFIRM_COLLECTION":
+            return self.shops.admin_confirm_settlement_collection(admin_id, settlement_id, payload.get("note"))
+        if action == "RELEASE":
+            return self.shops.admin_release_settlement(admin_id, settlement_id, payload.get("note"))
+        if action == "MARK_SETTLED":
+            return self.shops.admin_mark_settlement_settled(
+                admin_id, settlement_id, payload.get("payoutReference"), payload.get("note")
+            )
+        raise SecurityError(400, "Unknown settlement action.", "invalid_settlement_action")
 
     def _close_cancellation_request_after_order_cancel(
         self, order: dict[str, Any], now: str
@@ -422,6 +489,9 @@ class AdminApplication:
                 "inventoryReleased": inventory_released,
             },
         )
+
+        if requested == "cancelled" and self.shops is not None:
+            self.shops.void_settlements_for_order(order_id, "Order cancelled")
 
         if inventory_alerts:
             _notify_inventory_alerts(inventory_alerts)
@@ -705,6 +775,9 @@ class AdminHandler(BaseHTTPRequestHandler):
             if path == "/api/admin/returns":
                 admin, _session = self._admin()
                 self._json(200, {"success": True, **self.application.return_requests(admin["id"])}); return
+            if path == "/api/admin/settlements":
+                admin, _session = self._admin()
+                self._json(200, {"success": True, "settlements": self.application.settlements(admin["id"])}); return
             if path == "/api/admin/payment-alerts":
                 self._admin(); self._json(200, {"success": True, "alerts": self.application.payment_alerts()}); return
             if path.startswith("/api/admin/orders/"):
@@ -758,6 +831,18 @@ class AdminHandler(BaseHTTPRequestHandler):
         path = urlsplit(self.path).path
         try:
             admin, _session = self._admin(); self._csrf(); payload = self._body()
+            if path.startswith("/api/admin/settlements/"):
+                settlement_id = unquote(path.removeprefix("/api/admin/settlements/")).strip("/")
+                if not settlement_id or "/" in settlement_id:
+                    raise SecurityError(404, "Settlement not found.", "settlement_not_found")
+                result = self.application.settlement_action(admin["id"], settlement_id, payload)
+                self._json(200, {"success": True, "settlement": result}); return
+            if path.startswith("/api/admin/vendors/") and path.endswith("/commission"):
+                application_id = unquote(path.removeprefix("/api/admin/vendors/").removesuffix("/commission")).strip("/")
+                if not application_id or "/" in application_id:
+                    raise SecurityError(404, "Shop application not found.", "vendor_application_not_found")
+                result = self.application.set_shop_commission(admin["id"], application_id, payload)
+                self._json(200, {"success": True, "application": result}); return
             if path.startswith("/api/admin/returns/items/"):
                 request_id = unquote(path.removeprefix("/api/admin/returns/items/")).strip("/")
                 if not request_id or "/" in request_id:

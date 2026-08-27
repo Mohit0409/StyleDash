@@ -2031,6 +2031,7 @@ class HttpApiTests(unittest.TestCase):
         self.service.shops.admin_transition_application(
             "http-admin", application_id, "APPROVED"
         )
+        self.service.shops.admin_set_commission("http-admin", application_id, 12)
         self.service.shops.admin_transition_application(
             "http-admin", application_id, "ACTIVE"
         )
@@ -2216,6 +2217,14 @@ class HttpApiTests(unittest.TestCase):
             f"/api/seller-orders/{order_id}/fulfillment", {"status": "DELIVERED"}, session_headers
         )
         self.assertEqual((status, delivered["fulfillment"]["status"]), (200, "DELIVERED"))
+        status, seller_settlements, _headers = self.get_json(
+            "/api/seller-settlements", {"Cookie": session_headers["Cookie"]}
+        )
+        self.assertEqual(status, 200)
+        settlement = next(row for row in seller_settlements["settlements"] if row["orderId"] == order_id)
+        self.assertEqual(settlement["status"], "AWAITING_COLLECTION")
+        self.assertEqual(settlement["commissionPercent"], 12)
+        self.assertNotIn("applicationId", settlement)
         status, delivered_order, _headers = self.get_json(
             f"/api/orders/{order_id}", {"Cookie": session_headers["Cookie"]}
         )
@@ -2265,6 +2274,11 @@ class HttpApiTests(unittest.TestCase):
         return_id = return_created["request"]["id"]
         self.assertEqual(return_created["request"]["status"], "REQUESTED")
         self.assertEqual(return_created["request"]["itemSubtotal"], placed["order"]["items"][0]["unitPrice"])
+        status, held_settlements, _headers = self.get_json(
+            "/api/seller-settlements", {"Cookie": session_headers["Cookie"]}
+        )
+        held = next(row for row in held_settlements["settlements"] if row["orderId"] == order_id)
+        self.assertEqual((status, held["status"]), (200, "ON_HOLD"))
         status, duplicate_return, _headers = self.post_json(
             f"/api/orders/{order_id}/return-requests",
             {

@@ -21,6 +21,7 @@ test('approved shop enters seller dashboard before activation', async ({ page })
       } });
       return;
     }
+    if (path === '/api/seller-settlements') { await json({ success: true, settlements: [] }); return; }
     if (path === '/api/seller-return-requests') {
       await json({ success: true, requests: [] });
       return;

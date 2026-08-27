@@ -12,6 +12,8 @@ import json
 import re
 import secrets
 import sqlite3
+from datetime import datetime, timezone
+from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 from pathlib import Path
 from typing import Any
 from urllib.parse import urlsplit
@@ -76,6 +78,10 @@ RETURN_REQUEST_STATUSES = (
 RETURN_REQUEST_REASONS = (
     "CUSTOMER_REQUEST", "ORDERED_BY_MISTAKE", "SIZE_ISSUE",
     "WRONG_ITEM", "DAMAGED", "DEFECTIVE", "MISSING_ITEM", "OTHER",
+)
+SETTLEMENT_STATUSES = (
+    "COMMISSION_REQUIRED", "AWAITING_PAYMENT", "AWAITING_COLLECTION",
+    "PENDING_CLEARANCE", "ON_HOLD", "ELIGIBLE", "SETTLED", "VOID",
 )
 CARRIER_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9&().,'\/+ -]{1,79}$")
 TRACKING_NUMBER_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._/# -]{1,119}$")
@@ -162,6 +168,7 @@ class ShopWorkflow:
             self._migrate_fulfillments(db)
             self._migrate_shipping_tracking(db)
             self._migrate_return_requests(db)
+            self._migrate_seller_settlements(db)
             check = db.execute("PRAGMA foreign_key_check").fetchall()
             if check:
                 raise RuntimeError("Shop migration failed foreign key validation")
@@ -531,6 +538,61 @@ class ShopWorkflow:
         ).fetchone()
 
     @staticmethod
+    def _migrate_seller_settlements(db: sqlite3.Connection) -> None:
+        now = iso(utc_now())
+        db.execute("BEGIN IMMEDIATE")
+        try:
+            if db.execute(
+                "SELECT 1 FROM shop_schema_migrations WHERE version=7"
+            ).fetchone() is not None:
+                db.commit()
+                return
+            application_columns = {
+                row["name"] for row in db.execute("PRAGMA table_info(vendor_applications)")
+            }
+            if "commission_percent" not in application_columns:
+                db.execute("ALTER TABLE vendor_applications ADD COLUMN commission_percent INTEGER")
+            statuses = ",".join(f"'{value}'" for value in SETTLEMENT_STATUSES)
+            db.execute(f"""
+                CREATE TABLE IF NOT EXISTS seller_settlements(
+                  id TEXT PRIMARY KEY,
+                  order_id TEXT NOT NULL,
+                  application_id TEXT NOT NULL,
+                  shop_name TEXT NOT NULL,
+                  gross_amount_paise INTEGER NOT NULL CHECK(gross_amount_paise>=0),
+                  commission_percent INTEGER CHECK(commission_percent BETWEEN 0 AND 100),
+                  commission_amount_paise INTEGER CHECK(commission_amount_paise>=0),
+                  net_amount_paise INTEGER CHECK(net_amount_paise>=0),
+                  payment_method TEXT NOT NULL,
+                  payment_status_snapshot TEXT NOT NULL,
+                  status TEXT NOT NULL CHECK(status IN ({statuses})),
+                  delivered_at TEXT NOT NULL,
+                  clearance_until TEXT NOT NULL,
+                  hold_reason TEXT,
+                  collection_confirmed_at TEXT,
+                  eligible_at TEXT,
+                  settled_at TEXT,
+                  payout_reference TEXT,
+                  admin_note TEXT,
+                  created_at TEXT NOT NULL,
+                  updated_at TEXT NOT NULL,
+                  UNIQUE(order_id,application_id)
+                )
+            """)
+            db.execute(
+                "CREATE INDEX IF NOT EXISTS seller_settlements_application_idx "
+                "ON seller_settlements(application_id,status,updated_at)"
+            )
+            db.execute(
+                "INSERT INTO shop_schema_migrations(version,applied_at) VALUES(7,?)",
+                (now,),
+            )
+            db.commit()
+        except Exception:
+            db.rollback()
+            raise
+
+    @staticmethod
     def _serialize_application(row: sqlite3.Row, *, admin: bool = False) -> dict[str, Any]:
         result = {
             "id": row["id"],
@@ -546,6 +608,7 @@ class ShopWorkflow:
             "state": row["state"],
             "pincode": row["pincode"],
             "businessInformation": row["business_information"],
+            "commissionPercent": row["commission_percent"] if "commission_percent" in row.keys() else None,
             "rejectionReason": row["rejection_reason"] if row["status"] == "REJECTED" else None,
             "createdAt": row["created_at"],
             "updatedAt": row["updated_at"],
@@ -746,6 +809,9 @@ class ShopWorkflow:
                     "Shop application transition is not allowed.",
                     "invalid_vendor_transition",
                 )
+            if target == "ACTIVE" and current["commission_percent"] is None:
+                db.rollback()
+                raise SecurityError(409, "Configure seller commission before activation.", "commission_required")
             rejection_reason = clean_reason if target == "REJECTED" else None
             suspension_reason = clean_reason if target == "SUSPENDED" else None
             db.execute(
@@ -1542,6 +1608,258 @@ class ShopWorkflow:
             db.commit()
             result = db.execute(self._return_rows_sql("r.id=?"), (safe_id,)).fetchone()
         return self._serialize_return_request(result, admin=True)
+
+    @staticmethod
+    def _money_to_paise(value: Any, field: str) -> int:
+        if isinstance(value, bool) or not isinstance(value, (int, float, str)):
+            raise SecurityError(400, f"Invalid {field}.", "invalid_settlement_amount")
+        try:
+            amount = Decimal(str(value))
+        except InvalidOperation as exc:
+            raise SecurityError(400, f"Invalid {field}.", "invalid_settlement_amount") from exc
+        if not amount.is_finite() or amount < 0:
+            raise SecurityError(400, f"Invalid {field}.", "invalid_settlement_amount")
+        return int((amount * 100).quantize(Decimal("1"), rounding=ROUND_HALF_UP))
+
+    @staticmethod
+    def _settlement_amounts(gross_paise: int, commission_percent: int | None) -> tuple[int | None, int | None]:
+        if commission_percent is None:
+            return None, None
+        commission = (gross_paise * commission_percent + 50) // 100
+        return commission, gross_paise - commission
+
+    @staticmethod
+    def _serialize_settlement(row: sqlite3.Row, *, admin: bool = False) -> dict[str, Any]:
+        payload = {
+            "id": row["id"], "orderId": row["order_id"], "shopName": row["shop_name"],
+            "grossAmountPaise": row["gross_amount_paise"], "commissionPercent": row["commission_percent"],
+            "commissionAmountPaise": row["commission_amount_paise"], "netAmountPaise": row["net_amount_paise"],
+            "paymentMethod": row["payment_method"], "status": row["status"],
+            "deliveredAt": row["delivered_at"], "clearanceUntil": row["clearance_until"],
+            "holdReason": row["hold_reason"], "createdAt": row["created_at"], "updatedAt": row["updated_at"],
+        }
+        for key, column in (
+            ("collectionConfirmedAt", "collection_confirmed_at"), ("eligibleAt", "eligible_at"),
+            ("settledAt", "settled_at"), ("payoutReference", "payout_reference"),
+        ):
+            if row[column]: payload[key] = row[column]
+        if admin:
+            payload["applicationId"] = row["application_id"]
+            payload["paymentStatusSnapshot"] = row["payment_status_snapshot"]
+            payload["adminNote"] = row["admin_note"]
+        return payload
+
+    def admin_set_commission(self, admin_id: str, application_id: str, percent: Any) -> dict[str, Any]:
+        if isinstance(percent, bool) or not isinstance(percent, int) or not 0 <= percent <= 100:
+            raise SecurityError(400, "Commission must be a whole percentage from 0 to 100.", "invalid_commission")
+        safe_id = clean_text(application_id, "application ID", 1, 128)
+        now = iso(utc_now())
+        with self.connect() as db:
+            db.execute("BEGIN IMMEDIATE")
+            self._require_admin(db, admin_id)
+            application = db.execute("SELECT * FROM vendor_applications WHERE id=?", (safe_id,)).fetchone()
+            if application is None:
+                db.rollback(); raise SecurityError(404, "Shop application not found.", "vendor_application_not_found")
+            previous = application["commission_percent"]
+            db.execute("UPDATE vendor_applications SET commission_percent=?,updated_at=? WHERE id=?", (percent, now, safe_id))
+            rows = db.execute(
+                "SELECT * FROM seller_settlements WHERE application_id=? AND status='COMMISSION_REQUIRED'", (safe_id,)
+            ).fetchall()
+            for row in rows:
+                commission, net = self._settlement_amounts(row["gross_amount_paise"], percent)
+                if row["payment_method"] == "cod": next_status = "AWAITING_COLLECTION"
+                elif row["payment_status_snapshot"] == "paid": next_status = "PENDING_CLEARANCE"
+                else: next_status = "AWAITING_PAYMENT"
+                db.execute(
+                    "UPDATE seller_settlements SET commission_percent=?,commission_amount_paise=?,net_amount_paise=?,status=?,updated_at=? WHERE id=?",
+                    (percent, commission, net, next_status, now, row["id"]),
+                )
+            self._audit_if_available(db, admin_id, "shop_commission_updated", "shop_application", safe_id,
+                                     {"from": previous, "to": percent})
+            db.commit()
+            result = db.execute("SELECT * FROM vendor_applications WHERE id=?", (safe_id,)).fetchone()
+        return self._serialize_application(result, admin=True)
+
+    def record_seller_delivery_settlement(
+        self, user_id: str, order_id: str, seller_subtotal: Any,
+        payment_method: Any, payment_status: Any, delivered_at: Any, clearance_until: Any,
+    ) -> dict[str, Any]:
+        safe_order = clean_text(order_id, "order ID", 1, 128)
+        method = clean_text(payment_method, "payment method", 2, 32).lower()
+        pay_status = clean_text(payment_status, "payment status", 2, 32).lower()
+        delivered = clean_text(delivered_at, "delivery timestamp", 10, 80)
+        clearance = clean_text(clearance_until, "clearance timestamp", 10, 80)
+        gross = self._money_to_paise(seller_subtotal, "seller subtotal")
+        now = iso(utc_now())
+        with self.connect() as db:
+            db.execute("BEGIN IMMEDIATE")
+            application = self._seller_application(db, user_id)
+            existing = db.execute(
+                "SELECT * FROM seller_settlements WHERE order_id=? AND application_id=?",
+                (safe_order, application["id"]),
+            ).fetchone()
+            if existing is not None:
+                db.commit(); return self._serialize_settlement(existing)
+            percent = application["commission_percent"]
+            commission, net = self._settlement_amounts(gross, percent)
+            if percent is None: status = "COMMISSION_REQUIRED"
+            elif method == "cod": status = "AWAITING_COLLECTION"
+            elif pay_status == "paid": status = "PENDING_CLEARANCE"
+            else: status = "AWAITING_PAYMENT"
+            settlement_id = "set_" + secrets.token_hex(12)
+            db.execute(
+                """INSERT INTO seller_settlements(
+                     id,order_id,application_id,shop_name,gross_amount_paise,commission_percent,
+                     commission_amount_paise,net_amount_paise,payment_method,payment_status_snapshot,
+                     status,delivered_at,clearance_until,created_at,updated_at
+                   ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                (settlement_id, safe_order, application["id"], application["shop_name"], gross, percent,
+                 commission, net, method, pay_status, status, delivered, clearance, now, now),
+            )
+            db.commit()
+            row = db.execute("SELECT * FROM seller_settlements WHERE id=?", (settlement_id,)).fetchone()
+        return self._serialize_settlement(row)
+
+    def seller_settlements(self, user_id: str) -> list[dict[str, Any]]:
+        with self.connect() as db:
+            application = self._seller_application(db, user_id)
+            rows = db.execute(
+                "SELECT * FROM seller_settlements WHERE application_id=? ORDER BY created_at DESC", (application["id"],)
+            ).fetchall()
+        return [self._serialize_settlement(row) for row in rows]
+
+    def admin_settlements(self, admin_id: str) -> list[dict[str, Any]]:
+        with self.connect() as db:
+            self._require_admin(db, admin_id)
+            rows = db.execute("SELECT * FROM seller_settlements ORDER BY created_at DESC").fetchall()
+        return [self._serialize_settlement(row, admin=True) for row in rows]
+
+    def hold_settlements_for_order(self, order_id: str, reason: str, application_id: str | None = None) -> None:
+        safe_order = clean_text(order_id, "order ID", 1, 128)
+        safe_reason = clean_text(reason, "hold reason", 2, 200)
+        now = iso(utc_now())
+        with self.connect() as db:
+            db.execute("BEGIN IMMEDIATE")
+            if application_id is None:
+                db.execute(
+                    "UPDATE seller_settlements SET status='ON_HOLD',hold_reason=?,updated_at=? "
+                    "WHERE order_id=? AND status NOT IN ('SETTLED','VOID')",
+                    (safe_reason, now, safe_order),
+                )
+            else:
+                safe_app = clean_text(application_id, "application ID", 1, 128)
+                db.execute(
+                    "UPDATE seller_settlements SET status='ON_HOLD',hold_reason=?,updated_at=? "
+                    "WHERE order_id=? AND application_id=? AND status NOT IN ('SETTLED','VOID')",
+                    (safe_reason, now, safe_order, safe_app),
+                )
+            db.commit()
+
+    def restore_settlements_for_order(self, order_id: str) -> None:
+        safe_order = clean_text(order_id, "order ID", 1, 128)
+        now = iso(utc_now())
+        with self.connect() as db:
+            db.execute("BEGIN IMMEDIATE")
+            rows = db.execute("SELECT * FROM seller_settlements WHERE order_id=? AND status='ON_HOLD'", (safe_order,)).fetchall()
+            for row in rows:
+                blocker = db.execute(
+                    "SELECT 1 FROM shop_return_requests WHERE order_id=? AND application_id=? "
+                    "AND status NOT IN ('REJECTED','REFUNDED','EXCHANGED','CANCELLED') LIMIT 1",
+                    (safe_order, row["application_id"]),
+                ).fetchone()
+                if blocker is not None: continue
+                if row["commission_percent"] is None: status = "COMMISSION_REQUIRED"
+                elif row["payment_method"] == "cod" and not row["collection_confirmed_at"]: status = "AWAITING_COLLECTION"
+                elif row["payment_method"] != "cod" and row["payment_status_snapshot"] != "paid": status = "AWAITING_PAYMENT"
+                else: status = "PENDING_CLEARANCE"
+                db.execute("UPDATE seller_settlements SET status=?,hold_reason=NULL,updated_at=? WHERE id=?", (status, now, row["id"]))
+            db.commit()
+
+    def void_settlements_for_order(self, order_id: str, reason: str) -> None:
+        safe_order = clean_text(order_id, "order ID", 1, 128)
+        safe_reason = clean_text(reason, "void reason", 2, 200)
+        now = iso(utc_now())
+        with self.connect() as db:
+            db.execute("BEGIN IMMEDIATE")
+            db.execute(
+                "UPDATE seller_settlements SET status='VOID',hold_reason=?,updated_at=? "
+                "WHERE order_id=? AND status NOT IN ('SETTLED','VOID')", (safe_reason, now, safe_order)
+            )
+            db.commit()
+
+    def admin_confirm_settlement_collection(self, admin_id: str, settlement_id: str, note: Any = None) -> dict[str, Any]:
+        safe_id = clean_text(settlement_id, "settlement ID", 1, 128)
+        clean_note = None if note in (None, "") else clean_text(note, "admin note", 2, 1000)
+        now = iso(utc_now())
+        with self.connect() as db:
+            db.execute("BEGIN IMMEDIATE"); self._require_admin(db, admin_id)
+            row = db.execute("SELECT * FROM seller_settlements WHERE id=?", (safe_id,)).fetchone()
+            if row is None:
+                db.rollback(); raise SecurityError(404, "Settlement not found.", "settlement_not_found")
+            if row["status"] != "AWAITING_COLLECTION" or row["payment_method"] != "cod":
+                db.rollback(); raise SecurityError(409, "Collection confirmation is not allowed.", "invalid_settlement_transition")
+            db.execute(
+                "UPDATE seller_settlements SET status='PENDING_CLEARANCE',collection_confirmed_at=?,admin_note=COALESCE(?,admin_note),updated_at=? WHERE id=?",
+                (now, clean_note, now, safe_id),
+            )
+            self._audit_if_available(db, admin_id, "settlement_collection_confirmed", "seller_settlement", safe_id, {})
+            db.commit(); result=db.execute("SELECT * FROM seller_settlements WHERE id=?",(safe_id,)).fetchone()
+        return self._serialize_settlement(result, admin=True)
+
+    def admin_release_settlement(self, admin_id: str, settlement_id: str, note: Any = None) -> dict[str, Any]:
+        safe_id = clean_text(settlement_id, "settlement ID", 1, 128)
+        clean_note = None if note in (None, "") else clean_text(note, "admin note", 2, 1000)
+        now_dt = utc_now(); now = iso(now_dt)
+        with self.connect() as db:
+            db.execute("BEGIN IMMEDIATE"); self._require_admin(db, admin_id)
+            row = db.execute("SELECT * FROM seller_settlements WHERE id=?", (safe_id,)).fetchone()
+            if row is None:
+                db.rollback(); raise SecurityError(404, "Settlement not found.", "settlement_not_found")
+            if row["status"] not in {"PENDING_CLEARANCE", "ON_HOLD"}:
+                db.rollback(); raise SecurityError(409, "Settlement cannot be released.", "invalid_settlement_transition")
+            if row["commission_percent"] is None or row["net_amount_paise"] is None:
+                db.rollback(); raise SecurityError(409, "Seller commission is not configured.", "commission_required")
+            try:
+                deadline = datetime.fromisoformat(row["clearance_until"].replace("Z", "+00:00"))
+                if deadline.tzinfo is None: deadline = deadline.replace(tzinfo=timezone.utc)
+            except (TypeError, ValueError):
+                db.rollback(); raise SecurityError(409, "Settlement clearance timestamp is invalid.", "settlement_clearance_invalid") from None
+            if now_dt < deadline.astimezone(timezone.utc):
+                db.rollback(); raise SecurityError(409, "Customer return window is still open.", "settlement_clearance_open")
+            blocker = db.execute(
+                "SELECT 1 FROM shop_return_requests WHERE order_id=? AND application_id=? "
+                "AND (status NOT IN ('REJECTED','EXCHANGED','CANCELLED') OR (request_type='ISSUE_RETURN' AND status='REFUNDED')) LIMIT 1",
+                (row["order_id"], row["application_id"]),
+            ).fetchone()
+            if blocker is not None:
+                db.rollback(); raise SecurityError(409, "A return or refund request blocks settlement.", "settlement_return_hold")
+            db.execute(
+                "UPDATE seller_settlements SET status='ELIGIBLE',hold_reason=NULL,eligible_at=?,admin_note=COALESCE(?,admin_note),updated_at=? WHERE id=?",
+                (now, clean_note, now, safe_id),
+            )
+            self._audit_if_available(db, admin_id, "settlement_released", "seller_settlement", safe_id, {})
+            db.commit(); result=db.execute("SELECT * FROM seller_settlements WHERE id=?",(safe_id,)).fetchone()
+        return self._serialize_settlement(result, admin=True)
+
+    def admin_mark_settlement_settled(self, admin_id: str, settlement_id: str, payout_reference: Any, note: Any = None) -> dict[str, Any]:
+        safe_id = clean_text(settlement_id, "settlement ID", 1, 128)
+        reference = clean_text(payout_reference, "payout reference", 3, 200)
+        clean_note = None if note in (None, "") else clean_text(note, "admin note", 2, 1000)
+        now = iso(utc_now())
+        with self.connect() as db:
+            db.execute("BEGIN IMMEDIATE"); self._require_admin(db, admin_id)
+            row = db.execute("SELECT * FROM seller_settlements WHERE id=?", (safe_id,)).fetchone()
+            if row is None:
+                db.rollback(); raise SecurityError(404, "Settlement not found.", "settlement_not_found")
+            if row["status"] != "ELIGIBLE":
+                db.rollback(); raise SecurityError(409, "Settlement is not eligible for payout recording.", "invalid_settlement_transition")
+            db.execute(
+                "UPDATE seller_settlements SET status='SETTLED',payout_reference=?,settled_at=?,admin_note=COALESCE(?,admin_note),updated_at=? WHERE id=?",
+                (reference, now, clean_note, now, safe_id),
+            )
+            self._audit_if_available(db, admin_id, "settlement_recorded", "seller_settlement", safe_id, {"payoutReference": reference})
+            db.commit(); result=db.execute("SELECT * FROM seller_settlements WHERE id=?",(safe_id,)).fetchone()
+        return self._serialize_settlement(result, admin=True)
 
     def create_product_draft(self, user_id: str, payload: dict[str, Any]) -> dict[str, Any]:
         values = self._product_payload(payload)

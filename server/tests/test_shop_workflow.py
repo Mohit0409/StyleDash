@@ -3,6 +3,7 @@ import sqlite3
 import tempfile
 import threading
 import unittest
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from scripts.styledash_security import SecurityError
@@ -128,6 +129,7 @@ class ShopWorkflowTests(unittest.TestCase):
         application = self.store.admin_transition_application(
             "admin-a", application["id"], "APPROVED"
         )
+        self.store.admin_set_commission("admin-a", application["id"], 12)
         return self.store.admin_transition_application(
             "admin-a", application["id"], "ACTIVE"
         )
@@ -173,7 +175,7 @@ class ShopWorkflowTests(unittest.TestCase):
                 [row[0] for row in db.execute(
                     "SELECT version FROM shop_schema_migrations ORDER BY version"
                 )],
-                [1, 2, 4, 5, 6],
+                [1, 2, 4, 5, 6, 7],
             )
             self.assertEqual(db.execute("PRAGMA integrity_check").fetchone()[0], "ok")
             self.assertEqual(db.execute("PRAGMA foreign_key_check").fetchall(), [])
@@ -243,7 +245,7 @@ class ShopWorkflowTests(unittest.TestCase):
         db = sqlite3.connect(concurrent_path)
         self.assertEqual(
             db.execute("SELECT version,COUNT(*) FROM shop_schema_migrations GROUP BY version").fetchall(),
-            [(1, 1), (2, 1), (4, 1), (5, 1), (6, 1)],
+            [(1, 1), (2, 1), (4, 1), (5, 1), (6, 1), (7, 1)],
         )
         self.assertEqual(db.execute("PRAGMA integrity_check").fetchone()[0], "ok")
         db.close()
@@ -314,6 +316,12 @@ class ShopWorkflowTests(unittest.TestCase):
         self.store.admin_transition_application(
             "admin-a", resubmitted["id"], "APPROVED"
         )
+        self.assert_error(
+            "commission_required",
+            lambda: self.store.admin_transition_application("admin-a", resubmitted["id"], "ACTIVE"),
+        )
+        commissioned = self.store.admin_set_commission("admin-a", resubmitted["id"], 12)
+        self.assertEqual(commissioned["commissionPercent"], 12)
         active = self.store.admin_transition_application(
             "admin-a", resubmitted["id"], "ACTIVE"
         )
@@ -395,6 +403,89 @@ class ShopWorkflowTests(unittest.TestCase):
         self.assertIsNone(summary[1]["shipping"])
         self.assertTrue(all("applicationId" not in row for row in summary))
         self.assertNotEqual(app_a["id"], app_b["id"])
+
+    def test_seller_settlement_core_is_snapshotted_gated_and_audited(self) -> None:
+        application = self.store.create_draft("user-a", self.complete_application("Settlement Shop"))
+        self.store.submit_application("user-a")
+        self.store.admin_transition_application("admin-a", application["id"], "UNDER_REVIEW")
+        approved = self.store.admin_transition_application("admin-a", application["id"], "APPROVED")
+        self.assertIsNone(approved["commissionPercent"])
+        self.assert_error(
+            "commission_required",
+            lambda: self.store.admin_transition_application("admin-a", application["id"], "ACTIVE"),
+        )
+
+        now = datetime.now(timezone.utc)
+        past = (now - timedelta(days=1)).isoformat()
+        future = (now + timedelta(days=2)).isoformat()
+        missing = self.store.record_seller_delivery_settlement(
+            "user-a", "SD-COMMISSION-MISSING", 1000, "upi", "paid", now.isoformat(), past,
+        )
+        self.assertEqual(missing["status"], "COMMISSION_REQUIRED")
+        self.assertIsNone(missing["commissionPercent"])
+        commissioned = self.store.admin_set_commission("admin-a", application["id"], 12)
+        self.assertEqual(commissioned["commissionPercent"], 12)
+        refreshed = next(row for row in self.store.seller_settlements("user-a") if row["id"] == missing["id"])
+        self.assertEqual(refreshed["status"], "PENDING_CLEARANCE")
+        self.assertEqual(refreshed["commissionAmountPaise"], 12000)
+        self.assertEqual(refreshed["netAmountPaise"], 88000)
+        self.store.admin_transition_application("admin-a", application["id"], "ACTIVE")
+
+        online = self.store.record_seller_delivery_settlement(
+            "user-a", "SD-ONLINE-SETTLEMENT", 1599, "upi", "paid", now.isoformat(), future,
+        )
+        self.assertEqual(online["status"], "PENDING_CLEARANCE")
+        self.assertEqual(online["grossAmountPaise"], 159900)
+        self.assertEqual(online["commissionAmountPaise"], 19188)
+        self.assertEqual(online["netAmountPaise"], 140712)
+        duplicate = self.store.record_seller_delivery_settlement(
+            "user-a", "SD-ONLINE-SETTLEMENT", 9999, "upi", "paid", now.isoformat(), past,
+        )
+        self.assertEqual(duplicate["id"], online["id"])
+        self.assertEqual(duplicate["grossAmountPaise"], 159900)
+        self.assert_error(
+            "settlement_clearance_open",
+            lambda: self.store.admin_release_settlement("admin-a", online["id"]),
+        )
+
+        cod = self.store.record_seller_delivery_settlement(
+            "user-a", "SD-COD-SETTLEMENT", 800, "cod", "pending", now.isoformat(), past,
+        )
+        self.assertEqual(cod["status"], "AWAITING_COLLECTION")
+        self.assert_error(
+            "invalid_settlement_transition",
+            lambda: self.store.admin_release_settlement("admin-a", cod["id"]),
+        )
+        collected = self.store.admin_confirm_settlement_collection("admin-a", cod["id"], "Cash received")
+        self.assertEqual(collected["status"], "PENDING_CLEARANCE")
+        self.store.hold_settlements_for_order("SD-COD-SETTLEMENT", "Customer support review")
+        held = next(row for row in self.store.seller_settlements("user-a") if row["id"] == cod["id"])
+        self.assertEqual(held["status"], "ON_HOLD")
+        self.store.restore_settlements_for_order("SD-COD-SETTLEMENT")
+        restored = next(row for row in self.store.seller_settlements("user-a") if row["id"] == cod["id"])
+        self.assertEqual(restored["status"], "PENDING_CLEARANCE")
+        eligible = self.store.admin_release_settlement("admin-a", cod["id"], "Clearance complete")
+        self.assertEqual(eligible["status"], "ELIGIBLE")
+        settled = self.store.admin_mark_settlement_settled(
+            "admin-a", cod["id"], "UTR-SETTLEMENT-001", "Manual bank payout recorded"
+        )
+        self.assertEqual(settled["status"], "SETTLED")
+        self.assertEqual(settled["payoutReference"], "UTR-SETTLEMENT-001")
+        self.assert_error(
+            "invalid_settlement_transition",
+            lambda: self.store.admin_mark_settlement_settled("admin-a", cod["id"], "UTR-DUPLICATE"),
+        )
+
+        seller_rows = self.store.seller_settlements("user-a")
+        self.assertTrue(all("applicationId" not in row and "adminNote" not in row for row in seller_rows))
+        admin_rows = self.store.admin_settlements("admin-a")
+        self.assertTrue(any(row["id"] == cod["id"] and row["applicationId"] == application["id"] for row in admin_rows))
+        with self.store.connect() as db:
+            actions = {row[0] for row in db.execute("SELECT action FROM local_admin_audit_log")}
+        self.assertIn("shop_commission_updated", actions)
+        self.assertIn("settlement_collection_confirmed", actions)
+        self.assertIn("settlement_released", actions)
+        self.assertIn("settlement_recorded", actions)
 
     def test_return_request_core_is_scoped_validated_and_audited(self) -> None:
         app_a = self.create_active_shop("user-a", "Return Shop A")

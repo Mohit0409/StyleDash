@@ -56,6 +56,7 @@ export interface ShopApplication {
   state: string;
   pincode: string;
   businessInformation?: string | null;
+  commissionPercent?: number | null;
   rejectionReason?: string | null;
   createdAt: string;
   updatedAt: string;
@@ -165,6 +166,22 @@ export const sellerOrderApi = {
   async updateFulfillment(id: string, status: SellerFulfillmentStatus, shipping?: { carrier: string; trackingNumber: string }): Promise<SellerFulfillment> {
     const payload = shipping ? { status, ...shipping } : { status };
     return (await apiJson<{ success: true; fulfillment: SellerFulfillment }>(`/api/seller-orders/${encodeURIComponent(id)}/fulfillment`, 'PATCH', payload)).fulfillment;
+  },
+};
+
+export type SellerSettlementStatus = 'COMMISSION_REQUIRED' | 'AWAITING_PAYMENT' | 'AWAITING_COLLECTION' | 'PENDING_CLEARANCE' | 'ON_HOLD' | 'ELIGIBLE' | 'SETTLED' | 'VOID';
+
+export interface SellerSettlement {
+  id: string; orderId: string; shopName: string; grossAmountPaise: number;
+  commissionPercent: number | null; commissionAmountPaise: number | null; netAmountPaise: number | null;
+  paymentMethod: string; status: SellerSettlementStatus; deliveredAt: string; clearanceUntil: string;
+  holdReason?: string | null; collectionConfirmedAt?: string; eligibleAt?: string; settledAt?: string;
+  payoutReference?: string; createdAt: string; updatedAt: string;
+}
+
+export const sellerSettlementApi = {
+  async mine(): Promise<SellerSettlement[]> {
+    return (await apiFetch<{ success: true; settlements: SellerSettlement[] }>('/api/seller-settlements')).settlements;
   },
 };
 

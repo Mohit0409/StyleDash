@@ -1616,7 +1616,10 @@ class PaymentService:
                         "note": "Razorpay confirmed a full refund; fulfillment state awaits administrator reconciliation",
                     })
             self.store.save()
-            return {"duplicate": False, "fullRefund": full_refund, "order": self._public_order(order) if order else None}
+            result = {"duplicate": False, "fullRefund": full_refund, "order": self._public_order(order) if order else None}
+        if full_refund and style_order_id and self.shops is not None:
+            self.shops.void_settlements_for_order(style_order_id, "Verified full refund")
+        return result
 
     def process_webhook(
         self,
@@ -2300,6 +2303,12 @@ class StyleDashRequestHandler(SimpleHTTPRequestHandler):
                     ]
                 self._json_response(HTTPStatus.OK, {"success": True, "orders": orders})
                 return
+            if path == "/api/seller-settlements":
+                self._rate_limit(path, 60)
+                user, _session = self._current_user()
+                settlements = self._shops().seller_settlements(user["id"])
+                self._json_response(HTTPStatus.OK, {"success": True, "settlements": settlements})
+                return
             if path == "/api/seller-orders":
                 self._rate_limit(path, 60)
                 user, _session = self._current_user()
@@ -2584,6 +2593,7 @@ class StyleDashRequestHandler(SimpleHTTPRequestHandler):
                 result = self.payment_service.request_cancellation(
                     user["id"], order_id, self._read_json()
                 )
+                self._shops().hold_settlements_for_order(order_id, "Customer cancellation request")
                 self._json_response(
                     HTTPStatus.CREATED, {"success": True, "cancellationRequest": result}
                 )
@@ -2624,6 +2634,10 @@ class StyleDashRequestHandler(SimpleHTTPRequestHandler):
                 result = self._shops().create_return_request(
                     user["id"], order_id, item, context, request_payload
                 )
+                if context.get("applicationId"):
+                    self._shops().hold_settlements_for_order(
+                        order_id, "Customer return or exchange request", context["applicationId"]
+                    )
                 self._json_response(HTTPStatus.CREATED, {"success": True, "request": result})
                 return
             if path == "/api/vendor-applications":
@@ -2796,6 +2810,32 @@ class StyleDashRequestHandler(SimpleHTTPRequestHandler):
                 )
                 changed = bool(fulfillment.pop("changed", False))
                 shipping_changed = bool(fulfillment.pop("shippingChanged", False))
+                if changed and fulfillment.get("status") == "DELIVERED":
+                    try:
+                        issue_window = self.payment_service.settings.get("issueReportWindowDays")
+                        if isinstance(issue_window, bool) or not isinstance(issue_window, int) or not 1 <= issue_window <= 30:
+                            raise ValueError("invalid issue report window")
+                        clearance_days = issue_window
+                        products = self.payment_service.product_snapshot()
+                        for seller_item in seller_order.get("items", []):
+                            product = products.get(seller_item.get("productId"))
+                            if not isinstance(product, dict) or product.get("exchangeAvailable") is not True:
+                                continue
+                            exchange_window = product.get("returnWindowDays")
+                            if isinstance(exchange_window, int) and not isinstance(exchange_window, bool) and exchange_window > 0:
+                                clearance_days = max(clearance_days, exchange_window)
+                        delivered_at = str(fulfillment.get("updatedAt") or datetime.now(timezone.utc).isoformat())
+                        delivered_time = datetime.fromisoformat(delivered_at.replace("Z", "+00:00"))
+                        if delivered_time.tzinfo is None:
+                            delivered_time = delivered_time.replace(tzinfo=timezone.utc)
+                        clearance_until = (delivered_time.astimezone(timezone.utc) + timedelta(days=clearance_days)).isoformat()
+                        self._shops().record_seller_delivery_settlement(
+                            user["id"], order_id, seller_order.get("sellerSubtotal", 0),
+                            seller_order.get("paymentMethod"), seller_order.get("paymentStatus"),
+                            delivered_at, clearance_until,
+                        )
+                    except Exception:
+                        print(f"StyleDash settlement preparation failed order={order_id}", flush=True)
                 if changed or shipping_changed:
                     self._notify_customer_fulfillment(
                         user["id"], order_id, fulfillment,

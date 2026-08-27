@@ -1,20 +1,23 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { BarChart3, Boxes, CheckCircle2, Clock3, Package, RotateCcw, ShoppingBag, Store } from 'lucide-react';
+import { BarChart3, Boxes, CheckCircle2, Clock3, Package, RotateCcw, ShoppingBag, Store, WalletCards } from 'lucide-react';
 import { SellerProducts } from './SellerProducts';
 import { SellerOrders } from './SellerOrders';
 import { SellerReturns } from './SellerReturns';
+import { SellerEarnings } from './SellerEarnings';
 import { ApiError } from '../services/apiClient';
 import {
   type ReturnRequest,
   type SellerOrder,
+  type SellerSettlement,
   type SellerProduct,
   type ShopApplication,
   sellerOrderApi,
+  sellerSettlementApi,
   sellerReturnApi,
   shopProductApi,
 } from '../services/businessApi';
 
-type DashboardTab = 'overview' | 'shop' | 'products' | 'orders' | 'returns';
+type DashboardTab = 'overview' | 'shop' | 'products' | 'orders' | 'returns' | 'earnings';
 
 const messageForError = (cause: unknown) =>
   cause instanceof ApiError || cause instanceof Error
@@ -26,13 +29,14 @@ export const SellerDashboard: React.FC<{ application: ShopApplication }> = ({ ap
   const [products, setProducts] = useState<SellerProduct[]>([]);
   const [orders, setOrders] = useState<SellerOrder[]>([]);
   const [returns, setReturns] = useState<ReturnRequest[]>([]);
+  const [settlements, setSettlements] = useState<SellerSettlement[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
   useEffect(() => {
     let active = true;
-    Promise.all([shopProductApi.mine(), sellerOrderApi.mine(), sellerReturnApi.mine()])
-      .then(([productResult, orderResult, returnResult]) => { if (active) { setProducts(productResult); setOrders(orderResult); setReturns(returnResult); } })
+    Promise.all([shopProductApi.mine(), sellerOrderApi.mine(), sellerReturnApi.mine(), sellerSettlementApi.mine()])
+      .then(([productResult, orderResult, returnResult, settlementResult]) => { if (active) { setProducts(productResult); setOrders(orderResult); setReturns(returnResult); setSettlements(settlementResult); } })
       .catch(cause => { if (active) setError(messageForError(cause)); })
       .finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
@@ -52,6 +56,7 @@ export const SellerDashboard: React.FC<{ application: ShopApplication }> = ({ ap
     { id: 'products', label: 'Products', icon: <Boxes className="w-4" /> },
     { id: 'orders', label: 'Orders', icon: <ShoppingBag className="w-4" /> },
     { id: 'returns', label: 'Returns', icon: <RotateCcw className="w-4" /> },
+    { id: 'earnings', label: 'Earnings', icon: <WalletCards className="w-4" /> },
   ];
 
   return <section className="space-y-6" aria-labelledby="seller-dashboard-title">
@@ -108,6 +113,7 @@ export const SellerDashboard: React.FC<{ application: ShopApplication }> = ({ ap
         <Detail label="Address" value={`${application.address}, ${application.city}, ${application.state} ${application.pincode}`} wide />
         <Detail label="Description" value={application.description} wide />
         {application.businessInformation && <Detail label="Business information" value={application.businessInformation} wide />}
+        <Detail label="StyleDash commission" value={application.commissionPercent == null ? 'Not configured' : `${application.commissionPercent}%`} />
       </dl>
       <p className="mt-5 rounded-2xl bg-neutral-50 p-4 text-xs text-neutral-500 dark:bg-neutral-800">Shop identity and approval status remain administrator-controlled. Editable seller settings can be added here in a later dashboard phase.</p>
     </article>}
@@ -115,6 +121,7 @@ export const SellerDashboard: React.FC<{ application: ShopApplication }> = ({ ap
     {tab === 'products' && <SellerProducts initialProducts={products} onProductsChange={setProducts} />}
     {tab === 'orders' && <SellerOrders orders={orders} loading={loading} onOrderChange={updated => setOrders(current => current.map(order => order.id === updated.id ? updated : order))} />}
     {tab === 'returns' && <SellerReturns requests={returns} loading={loading} onRequestChange={updated => setReturns(current => current.map(item => item.id === updated.id ? updated : item))} />}
+    {tab === 'earnings' && <SellerEarnings settlements={settlements} loading={loading} />}
   </section>;
 };
 

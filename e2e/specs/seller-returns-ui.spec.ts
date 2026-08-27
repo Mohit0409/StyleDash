@@ -16,6 +16,7 @@ test('seller sees only shop return requests and adds a review note', async ({ pa
     }
     if (path === '/api/shop-products') { await json({ success: true, products: [] }); return; }
     if (path === '/api/seller-orders') { await json({ success: true, orders: [] }); return; }
+    if (path === '/api/seller-settlements') { await json({ success: true, settlements: [] }); return; }
     if (path === '/api/seller-return-requests' && request.method() === 'GET') {
       await json({ success: true, requests: [{ id: 'ret-seller-1', orderId: 'SD-SELLER-RETURN', shopName: 'Return Shop', productId: 'prod-1', productName: 'Seller Return Item', variantId: 'var-1', requestType: 'SIZE_EXCHANGE', reason: 'SIZE_ISSUE', details: 'Need a larger size', quantity: 1, unitPrice: 900, itemSubtotal: 900, status: 'REQUESTED', sellerNote, adminNote: null, createdAt: '2026-08-27T10:00:00Z', updatedAt: '2026-08-27T10:00:00Z' }] });
       return;

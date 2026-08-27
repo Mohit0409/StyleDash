@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { clearCsrfToken, setCsrfToken } from '../services/apiClient';
-import { publicStoreApi, returnApi, sellerOrderApi, sellerReturnApi, shopProductApi, vendorApplicationApi } from '../services/businessApi';
+import { publicStoreApi, returnApi, sellerOrderApi, sellerReturnApi, sellerSettlementApi, shopProductApi, vendorApplicationApi } from '../services/businessApi';
 
 const application = {
   id: 'shop-1',
@@ -209,5 +209,24 @@ describe('returns API', () => {
     expect(noteInit.method).toBe('PATCH');
     expect(new Headers(noteInit.headers).get('X-CSRF-Token')).toBe('csrf-return-mutations');
     expect(JSON.parse(String(noteInit.body))).toEqual({ note: 'Replacement size available' });
+  });
+});
+
+
+describe('seller settlements API', () => {
+  afterEach(() => { clearCsrfToken(); vi.restoreAllMocks(); });
+
+  it('loads the authenticated seller settlement projection read-only', async () => {
+    const settlement = {
+      id: 'set-1', orderId: 'SD-1', shopName: 'Seller Shop', grossAmountPaise: 159900,
+      commissionPercent: 12, commissionAmountPaise: 19188, netAmountPaise: 140712,
+      paymentMethod: 'cod', status: 'AWAITING_COLLECTION', deliveredAt: '2026-08-27T12:00:00Z',
+      clearanceUntil: '2026-09-03T12:00:00Z', createdAt: '2026-08-27T12:00:00Z', updatedAt: '2026-08-27T12:00:00Z',
+    };
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(jsonResponse({ success: true, settlements: [settlement] }));
+    await expect(sellerSettlementApi.mine()).resolves.toEqual([settlement]);
+    expect(fetchSpy).toHaveBeenCalledWith('/api/seller-settlements', expect.objectContaining({ credentials: 'include' }));
+    const [, init] = fetchSpy.mock.calls[0] as [RequestInfo | URL, RequestInit];
+    expect((init.method || 'GET').toUpperCase()).toBe('GET');
   });
 });
