@@ -891,7 +891,9 @@ class ShopWorkflow:
             current = row["status"] if row is not None else "NEW"
             if status == current:
                 db.commit()
-                return self._serialize_fulfillment(current, row["updated_at"] if row else None)
+                result = self._serialize_fulfillment(current, row["updated_at"] if row else None)
+                result["changed"] = False
+                return result
             if status not in FULFILLMENT_TRANSITIONS[current]:
                 db.rollback()
                 raise SecurityError(
@@ -912,7 +914,9 @@ class ShopWorkflow:
                     (status, now, safe_order_id, application["id"]),
                 )
             db.commit()
-        return self._serialize_fulfillment(status, now)
+        result = self._serialize_fulfillment(status, now)
+        result["changed"] = True
+        return result
 
     def order_fulfillments(self, order_id: str, product_ids: list[str]) -> list[dict[str, Any]]:
         safe_order_id = clean_text(order_id, "Order ID", 1, 128)

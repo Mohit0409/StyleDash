@@ -46,6 +46,7 @@ class SmtpConnection(Protocol):
 
 SmtpFactory = Callable[..., SmtpConnection]
 PasswordResetFailure = Callable[[], None]
+TransactionalMessageSender = Callable[[str, str, str], None]
 
 
 def _required_value(values: Mapping[str, str], name: str) -> str:
@@ -142,16 +143,12 @@ class SmtpPasswordResetSender:
         # token cannot enter server/tunnel access logs or Referer headers.
         return urlunsplit((parsed.scheme, parsed.netloc, parsed.path, parsed.query, urlencode({"token": token})))
 
-    def __call__(self, recipient: str, token: str) -> None:
+    def _send_message(self, recipient: str, subject: str, body: str) -> None:
         message = EmailMessage()
         message["From"] = self.from_address
         message["To"] = _validate_email(recipient)
-        message["Subject"] = "Reset your Style Dash password"
-        message.set_content(
-            "A password reset was requested for your Style Dash account.\n\n"
-            f"Reset your password: {self._reset_link(token)}\n\n"
-            "This link expires in 30 minutes and can be used once. If you did not request it, you can ignore this email."
-        )
+        message["Subject"] = subject
+        message.set_content(body)
         client = self.smtp_factory(self.host, self.port, timeout=SMTP_TIMEOUT_SECONDS)
         try:
             client.ehlo()
@@ -164,6 +161,18 @@ class SmtpPasswordResetSender:
                 client.quit()
             except Exception:
                 pass
+
+    def __call__(self, recipient: str, token: str) -> None:
+        self._send_message(
+            recipient,
+            "Reset your Style Dash password",
+            "A password reset was requested for your Style Dash account.\n\n"
+            f"Reset your password: {self._reset_link(token)}\n\n"
+            "This link expires in 30 minutes and can be used once. If you did not request it, you can ignore this email.",
+        )
+
+    def send_transactional(self, recipient: str, subject: str, body: str) -> None:
+        self._send_message(recipient, subject, body)
 
 
 class PasswordResetDeliveryQueue:
@@ -208,6 +217,54 @@ class PasswordResetDeliveryQueue:
                         on_failure()
                     except Exception:
                         pass
+            finally:
+                self._queue.task_done()
+
+    def close(self) -> None:
+        with self._lock:
+            if self._closed:
+                return
+            self._closed = True
+        self._queue.put(self._stop)
+        self._worker.join()
+
+
+class TransactionalDeliveryQueue:
+    """Bounded, failure-isolated queue for transactional customer messages."""
+
+    def __init__(self, sender: TransactionalMessageSender, *, max_pending: int = 100) -> None:
+        if max_pending < 1:
+            raise ValueError("max_pending must be positive")
+        self._sender = sender
+        self._queue: queue.Queue[tuple[str, str, str] | object] = queue.Queue(maxsize=max_pending)
+        self._stop = object()
+        self._lock = threading.Lock()
+        self._closed = False
+        self._worker = threading.Thread(
+            target=self._run, name="styledash-transactional-mail", daemon=True
+        )
+        self._worker.start()
+
+    def dispatch(self, recipient: str, subject: str, body: str) -> None:
+        with self._lock:
+            if self._closed:
+                raise RuntimeError("Transactional delivery is unavailable")
+            try:
+                self._queue.put_nowait((recipient, subject, body))
+            except queue.Full as exc:
+                raise RuntimeError("Transactional delivery is unavailable") from exc
+
+    def _run(self) -> None:
+        while True:
+            item = self._queue.get()
+            try:
+                if item is self._stop:
+                    return
+                recipient, subject, body = item
+                try:
+                    self._sender(recipient, subject, body)
+                except Exception:
+                    pass
             finally:
                 self._queue.task_done()
 

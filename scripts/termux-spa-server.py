@@ -41,9 +41,9 @@ except ModuleNotFoundError:  # Repository test import path.
     from scripts.styledash_shops import ShopWorkflow
 
 try:
-    from styledash_mail import PasswordResetDeliveryQueue, SmtpPasswordResetSender
+    from styledash_mail import PasswordResetDeliveryQueue, SmtpPasswordResetSender, TransactionalDeliveryQueue
 except ModuleNotFoundError:  # Repository test import path.
-    from scripts.styledash_mail import PasswordResetDeliveryQueue, SmtpPasswordResetSender
+    from scripts.styledash_mail import PasswordResetDeliveryQueue, SmtpPasswordResetSender, TransactionalDeliveryQueue
 
 try:
     from styledash_notify import mask_email, mask_phone, owner_notifier
@@ -1849,6 +1849,7 @@ class PaymentService:
 class StyleDashRequestHandler(SimpleHTTPRequestHandler):
     payment_service: PaymentService
     rate_limiter = RateLimiter()
+    fulfillment_notification_dispatcher: Callable[[str, str, str], None] | None = None
 
     def end_headers(self) -> None:
         path = urlsplit(self.path).path
@@ -1887,6 +1888,35 @@ class StyleDashRequestHandler(SimpleHTTPRequestHandler):
         self.end_headers()
         if not head_only:
             self.wfile.write(encoded)
+
+    def _notify_customer_fulfillment(self, seller_user_id: str, order_id: str, status: str) -> None:
+        dispatcher = self.fulfillment_notification_dispatcher
+        if dispatcher is None:
+            return
+        try:
+            with self.payment_service.store.lock:
+                order = self.payment_service.store.state["orders"].get(order_id)
+                customer_id = order.get("userId") if isinstance(order, dict) else None
+            if not isinstance(customer_id, str) or not customer_id:
+                return
+            profile = self._security().profile(customer_id)
+            email = profile.get("email")
+            if not profile.get("emailVerified") or not isinstance(email, str) or not email:
+                return
+            application = self._shops().get_application(seller_user_id)
+            shop_name = application.get("shopName") if isinstance(application, dict) else None
+            if not isinstance(shop_name, str) or not shop_name:
+                return
+            origin = self._public_origin()
+            orders_url = f"{origin}/orders" if origin else "/orders"
+            dispatcher(
+                email,
+                "Your StyleDash order update",
+                f"Order {order_id} from {shop_name} is now {status.replace('_', ' ').title()}.\n\n"
+                f"View your orders: {orders_url}\n",
+            )
+        except Exception:
+            print("StyleDash fulfillment notification preparation failed", flush=True)
 
     @staticmethod
     def _public_origin() -> str:
@@ -2511,6 +2541,9 @@ class StyleDashRequestHandler(SimpleHTTPRequestHandler):
                 fulfillment = self._shops().update_seller_fulfillment(
                     user["id"], order_id, self._read_json()
                 )
+                changed = bool(fulfillment.pop("changed", False))
+                if changed:
+                    self._notify_customer_fulfillment(user["id"], order_id, fulfillment["status"])
                 self._json_response(HTTPStatus.OK, {"success": True, "fulfillment": fulfillment})
                 return
             if path.startswith("/api/shop-products/"):
@@ -2582,8 +2615,10 @@ def create_server(
     data_directory: Path,
     *,
     service: PaymentService | None = None,
+    fulfillment_notification_dispatcher: Callable[[str, str, str], None] | None = None,
 ) -> ThreadingHTTPServer:
     delivery_queue: PasswordResetDeliveryQueue | None = None
+    transactional_queue: TransactionalDeliveryQueue | None = None
     if service is None:
         encryption_key = os.environ.get("STYLEDASH_TOTP_ENCRYPTION_KEY", "").strip()
         if not encryption_key:
@@ -2593,6 +2628,11 @@ def create_server(
         ).resolve()
         mailer = SmtpPasswordResetSender.from_environment()
         delivery_queue = PasswordResetDeliveryQueue(mailer) if mailer is not None else None
+        transactional_queue = (
+            TransactionalDeliveryQueue(mailer.send_transactional)
+            if mailer is not None
+            else None
+        )
         security_store = SecurityStore(
             database_path,
             encryption_key,
@@ -2603,18 +2643,28 @@ def create_server(
         )
     else:
         payment_service = service
+    if fulfillment_notification_dispatcher is None and transactional_queue is not None:
+        fulfillment_notification_dispatcher = transactional_queue.dispatch
     class BoundStyleDashRequestHandler(StyleDashRequestHandler):
         pass
 
     BoundStyleDashRequestHandler.payment_service = payment_service
     BoundStyleDashRequestHandler.rate_limiter = RateLimiter()
+    BoundStyleDashRequestHandler.fulfillment_notification_dispatcher = (
+        staticmethod(fulfillment_notification_dispatcher)
+        if fulfillment_notification_dispatcher is not None
+        else None
+    )
     handler = partial(BoundStyleDashRequestHandler, directory=str(directory))
     server = ThreadingHTTPServer((bind, port), handler)
-    if service is None and delivery_queue is not None:
+    if service is None and (delivery_queue is not None or transactional_queue is not None):
         original_server_close = server.server_close
 
         def close_server() -> None:
-            delivery_queue.close()
+            if delivery_queue is not None:
+                delivery_queue.close()
+            if transactional_queue is not None:
+                transactional_queue.close()
             original_server_close()
 
         server.server_close = close_server  # type: ignore[method-assign]

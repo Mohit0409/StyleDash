@@ -1777,7 +1777,14 @@ class HttpApiTests(unittest.TestCase):
         web_root.mkdir()
         (web_root / "index.html").write_text("<!doctype html><title>StyleDash</title>", encoding="utf-8")
         self.reset_deliveries = []
+        self.fulfillment_notifications = []
+        self.fulfillment_notification_failure = False
         self.firebase_claims = {}
+
+        def fulfillment_dispatcher(recipient: str, subject: str, body: str) -> None:
+            if self.fulfillment_notification_failure:
+                raise RuntimeError("simulated fulfillment notification failure")
+            self.fulfillment_notifications.append((recipient, subject, body))
         security_store = SERVER.SecurityStore(
             root / "styledash.db", Fernet.generate_key().decode(),
             password_reset_sender=lambda email, token: self.reset_deliveries.append((email, token)),
@@ -1806,6 +1813,7 @@ class HttpApiTests(unittest.TestCase):
             ROOT / "server" / "payment-data" / "settings.json",
             root / "data",
             service=service,
+            fulfillment_notification_dispatcher=fulfillment_dispatcher,
         )
         self.thread = threading.Thread(target=self.server.serve_forever, daemon=True)
         self.thread.start()
@@ -2106,6 +2114,11 @@ class HttpApiTests(unittest.TestCase):
         seller_order = next(order for order in seller_orders["orders"] if order["id"] == order_id)
         self.assertEqual(seller_order["fulfillment"]["status"], "NEW")
         self.assertEqual(seller_order["fulfillment"]["allowedNextStatuses"], ["PROCESSING"])
+        with self.service.security.connect() as db:
+            db.execute(
+                "UPDATE users SET email_verified_at=? WHERE id=?",
+                ("2026-08-27T00:00:00+00:00", registered["user"]["id"]),
+            )
         for forbidden in ("userId", "grandTotal", "razorpayOrderId", "refundId", "statusHistory"):
             self.assertNotIn(forbidden, seller_order)
         status, csrf_error, _headers = self.patch_json(
@@ -2117,6 +2130,19 @@ class HttpApiTests(unittest.TestCase):
             f"/api/seller-orders/{order_id}/fulfillment", {"status": "PROCESSING"}, session_headers
         )
         self.assertEqual((status, fulfillment["fulfillment"]["status"]), (200, "PROCESSING"))
+        self.assertNotIn("changed", fulfillment["fulfillment"])
+        self.assertEqual(len(self.fulfillment_notifications), 1)
+        recipient, subject, body = self.fulfillment_notifications[0]
+        self.assertEqual(recipient, "shop-http-owner@example.test")
+        self.assertEqual(subject, "Your StyleDash order update")
+        self.assertIn(order_id, body)
+        self.assertIn(complete["shopName"], body)
+        self.assertIn("Processing", body)
+        status, duplicate_fulfillment, _headers = self.patch_json(
+            f"/api/seller-orders/{order_id}/fulfillment", {"status": "PROCESSING"}, session_headers
+        )
+        self.assertEqual((status, duplicate_fulfillment["fulfillment"]["status"]), (200, "PROCESSING"))
+        self.assertEqual(len(self.fulfillment_notifications), 1)
         status, invalid_transition, _headers = self.patch_json(
             f"/api/seller-orders/{order_id}/fulfillment", {"status": "SHIPPED"}, session_headers
         )
@@ -2129,6 +2155,25 @@ class HttpApiTests(unittest.TestCase):
             [(row["shopName"], row["status"]) for row in customer_order["order"]["fulfillments"]],
             [(complete["shopName"], "PROCESSING")],
         )
+        with self.service.security.connect() as db:
+            db.execute("UPDATE users SET email_verified_at=NULL WHERE id=?", (registered["user"]["id"],))
+        status, ready, _headers = self.patch_json(
+            f"/api/seller-orders/{order_id}/fulfillment", {"status": "READY"}, session_headers
+        )
+        self.assertEqual((status, ready["fulfillment"]["status"]), (200, "READY"))
+        self.assertEqual(len(self.fulfillment_notifications), 1)
+        with self.service.security.connect() as db:
+            db.execute(
+                "UPDATE users SET email_verified_at=? WHERE id=?",
+                ("2026-08-27T00:00:00+00:00", registered["user"]["id"]),
+            )
+        self.fulfillment_notification_failure = True
+        status, shipped, _headers = self.patch_json(
+            f"/api/seller-orders/{order_id}/fulfillment", {"status": "SHIPPED"}, session_headers
+        )
+        self.assertEqual((status, shipped["fulfillment"]["status"]), (200, "SHIPPED"))
+        self.assertEqual(len(self.fulfillment_notifications), 1)
+        self.fulfillment_notification_failure = False
         self.service.shops.admin_transition_product("http-admin", product_id, "APPROVED")
         status, public_unpublished, _headers = self.get_json("/api/shop-products/published")
         self.assertEqual(public_unpublished["products"], [])

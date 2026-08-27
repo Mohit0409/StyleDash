@@ -103,6 +103,45 @@ class SmtpPasswordResetSenderTests(unittest.TestCase):
         with self.assertRaises(MAIL.SmtpConfigurationError):
             MAIL.SmtpPasswordResetSender.from_environment(injected)
 
+    def test_transactional_sender_reuses_authenticated_tls_transport(self) -> None:
+        connections: list[FakeSmtp] = []
+
+        def smtp_factory(*args, **kwargs) -> FakeSmtp:
+            connection = FakeSmtp(*args, **kwargs)
+            connections.append(connection)
+            return connection
+
+        sender = MAIL.SmtpPasswordResetSender.from_environment(
+            self.configuration(), smtp_factory=smtp_factory
+        )
+        assert sender is not None
+        sender.send_transactional(
+            "customer@example.test",
+            "Your StyleDash order update",
+            "Order SD-TEST from Test Shop is now Shipped.",
+        )
+        self.assertEqual(len(connections), 1)
+        message = connections[0].messages[0]
+        self.assertEqual(message["To"], "customer@example.test")
+        self.assertEqual(message["Subject"], "Your StyleDash order update")
+        self.assertIn("Test Shop is now Shipped", message.get_content())
+        self.assertEqual(connections[0].login_values, ("mailer@example.test", "not-a-real-test-secret"))
+        self.assertIsNotNone(connections[0].tls_context)
+
+    def test_transactional_queue_drains_and_isolates_sender_failure(self) -> None:
+        attempts = []
+
+        def failing_sender(recipient: str, subject: str, body: str) -> None:
+            attempts.append((recipient, subject, body))
+            raise RuntimeError("simulated delivery failure")
+
+        delivery_queue = MAIL.TransactionalDeliveryQueue(failing_sender, max_pending=1)
+        delivery_queue.dispatch("customer@example.test", "Order update", "Shipped")
+        delivery_queue.close()
+        self.assertEqual(attempts, [("customer@example.test", "Order update", "Shipped")])
+        with self.assertRaises(RuntimeError):
+            delivery_queue.dispatch("customer@example.test", "After close", "ignored")
+
     def test_delivery_queue_is_bounded_and_drains_for_deterministic_shutdown(self) -> None:
         deliveries = []
         failures = []
