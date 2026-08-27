@@ -34,7 +34,7 @@ describe('public store API', () => {
 });
 
 describe('seller order API', () => {
-  afterEach(() => { vi.restoreAllMocks(); });
+  afterEach(() => { clearCsrfToken(); vi.restoreAllMocks(); });
 
   it('loads the authenticated seller order projection', async () => {
     const order = { id: 'SD-SELLER-1', sellerSubtotal: 800, items: [], address: {} };
@@ -53,6 +53,23 @@ describe('seller order API', () => {
     expect(init.method).toBe('PATCH');
     expect(new Headers(init.headers).get('X-CSRF-Token')).toBe('csrf-fulfillment-test');
     expect(JSON.parse(String(init.body))).toEqual({ status: 'PROCESSING' });
+  });
+
+  it('sends optional shipping details for a shipped seller segment', async () => {
+    setCsrfToken('csrf-shipping-test');
+    const fulfillment = {
+      status: 'SHIPPED', updatedAt: '2026-08-27T08:00:00Z', allowedNextStatuses: ['DELIVERED'],
+      shipping: { carrier: 'Delhivery', trackingNumber: 'DLV-123456' },
+    };
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(jsonResponse({ success: true, fulfillment }));
+    await expect(sellerOrderApi.updateFulfillment(
+      'SD-SELLER-1', 'SHIPPED', { carrier: 'Delhivery', trackingNumber: 'DLV-123456' },
+    )).resolves.toEqual(fulfillment);
+    const [, init] = fetchSpy.mock.calls[0] as [RequestInfo | URL, RequestInit];
+    expect(new Headers(init.headers).get('X-CSRF-Token')).toBe('csrf-shipping-test');
+    expect(JSON.parse(String(init.body))).toEqual({
+      status: 'SHIPPED', carrier: 'Delhivery', trackingNumber: 'DLV-123456',
+    });
   });
 });
 describe('seller product submission API', () => {

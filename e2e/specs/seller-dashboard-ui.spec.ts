@@ -1,6 +1,9 @@
 import { expect, test } from '@playwright/test';
 
 test('approved shop enters seller dashboard before activation', async ({ page }) => {
+  let fulfillment: Record<string, unknown> = {
+    status: 'NEW', updatedAt: null, allowedNextStatuses: ['PROCESSING'], shipping: null,
+  };
   await page.route('**/api/**', async route => {
     const request = route.request();
     const path = new URL(request.url()).pathname;
@@ -24,12 +27,18 @@ test('approved shop enters seller dashboard before activation', async ({ page })
         createdAt: '2026-08-25T12:00:00Z', updatedAt: '2026-08-25T12:01:00Z', sellerSubtotal: 800,
         address: { name: 'Buyer One', phone: '9999999999', street: 'Main Road', city: 'Neemuch', state: 'Madhya Pradesh', pincode: '458441' },
         items: [{ productId: 'shopprod_1', productName: 'Seller Item', variantId: 'v1', quantity: 2, unitPrice: 400, lineTotal: 800 }],
-        fulfillment: { status: 'NEW', updatedAt: null, allowedNextStatuses: ['PROCESSING'] },
+        fulfillment,
       }] });
       return;
     }
     if (path === '/api/seller-orders/SD-SELLER-1/fulfillment' && request.method() === 'PATCH') {
-      await json({ success: true, fulfillment: { status: 'PROCESSING', updatedAt: '2026-08-26T12:02:00Z', allowedNextStatuses: ['READY'] } });
+      const payload = request.postDataJSON() as { status: string; carrier?: string; trackingNumber?: string };
+      const nextByStatus: Record<string, string[]> = { PROCESSING: ['READY'], READY: ['SHIPPED'], SHIPPED: ['DELIVERED'], DELIVERED: [] };
+      fulfillment = {
+        status: payload.status, updatedAt: '2026-08-27T12:02:00Z', allowedNextStatuses: nextByStatus[payload.status] || [],
+        shipping: payload.carrier && payload.trackingNumber ? { carrier: payload.carrier, trackingNumber: payload.trackingNumber } : (fulfillment.shipping || null),
+      };
+      await json({ success: true, fulfillment });
       return;
     }
     if (path === '/api/shop-products') {
@@ -53,7 +62,14 @@ test('approved shop enters seller dashboard before activation', async ({ page })
   await expect(page.getByText('NEW', { exact: true })).toBeVisible();
   await page.getByRole('button', { name: 'Start processing' }).click();
   await expect(page.getByText('PROCESSING', { exact: true })).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Mark ready' })).toBeVisible();
+  await page.getByRole('button', { name: 'Mark ready' }).click();
+  await expect(page.getByText('READY', { exact: true })).toBeVisible();
+  await page.getByLabel('Carrier (optional)').fill('Delhivery');
+  await page.getByLabel('Tracking number (optional)').fill('DLV-123456');
+  await page.getByRole('button', { name: 'Mark shipped' }).click();
+  await expect(page.getByText('SHIPPED', { exact: true })).toBeVisible();
+  await expect(page.getByText('Tracking: DLV-123456')).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Mark delivered' })).toBeVisible();
   await page.getByRole('tab', { name: 'Products', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Product submissions' })).toBeVisible();
   await expect(page.getByRole('button', { name: /publish/i })).toHaveCount(0);

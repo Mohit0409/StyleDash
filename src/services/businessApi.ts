@@ -125,6 +125,7 @@ export interface SellerFulfillment {
   status: SellerFulfillmentStatus;
   updatedAt?: string | null;
   allowedNextStatuses: SellerFulfillmentStatus[];
+  shipping?: { carrier: string; trackingNumber: string } | null;
 }
 
 export interface SellerOrder {
@@ -138,8 +139,9 @@ export const sellerOrderApi = {
   async mine(): Promise<SellerOrder[]> {
     return (await apiFetch<{ success: true; orders: SellerOrder[] }>('/api/seller-orders')).orders;
   },
-  async updateFulfillment(id: string, status: SellerFulfillmentStatus): Promise<SellerFulfillment> {
-    return (await apiJson<{ success: true; fulfillment: SellerFulfillment }>(`/api/seller-orders/${encodeURIComponent(id)}/fulfillment`, 'PATCH', { status })).fulfillment;
+  async updateFulfillment(id: string, status: SellerFulfillmentStatus, shipping?: { carrier: string; trackingNumber: string }): Promise<SellerFulfillment> {
+    const payload = shipping ? { status, ...shipping } : { status };
+    return (await apiJson<{ success: true; fulfillment: SellerFulfillment }>(`/api/seller-orders/${encodeURIComponent(id)}/fulfillment`, 'PATCH', payload)).fulfillment;
   },
 };
 

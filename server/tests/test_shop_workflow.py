@@ -172,7 +172,7 @@ class ShopWorkflowTests(unittest.TestCase):
                 [row[0] for row in db.execute(
                     "SELECT version FROM shop_schema_migrations ORDER BY version"
                 )],
-                [1, 2, 4],
+                [1, 2, 4, 5],
             )
             self.assertEqual(db.execute("PRAGMA integrity_check").fetchone()[0], "ok")
             self.assertEqual(db.execute("PRAGMA foreign_key_check").fetchall(), [])
@@ -242,7 +242,7 @@ class ShopWorkflowTests(unittest.TestCase):
         db = sqlite3.connect(concurrent_path)
         self.assertEqual(
             db.execute("SELECT version,COUNT(*) FROM shop_schema_migrations GROUP BY version").fetchall(),
-            [(1, 1), (2, 1), (4, 1)],
+            [(1, 1), (2, 1), (4, 1), (5, 1)],
         )
         self.assertEqual(db.execute("PRAGMA integrity_check").fetchone()[0], "ok")
         db.close()
@@ -350,13 +350,48 @@ class ShopWorkflowTests(unittest.TestCase):
         updated = self.store.update_seller_fulfillment("user-a", "SD-MIXED", {"status": "PROCESSING"})
         self.assertEqual(updated["status"], "PROCESSING")
         self.assertEqual(updated["allowedNextStatuses"], ["READY"])
+        self.assertIsNone(updated["shipping"])
         self.assertEqual(self.store.seller_fulfillment("user-b", "SD-MIXED")["status"], "NEW")
         self.assert_error(
             "invalid_fulfillment_transition",
             lambda: self.store.update_seller_fulfillment("user-a", "SD-MIXED", {"status": "SHIPPED"}),
         )
+        self.store.update_seller_fulfillment("user-a", "SD-MIXED", {"status": "READY"})
+        self.assert_error(
+            "invalid_shipping_details",
+            lambda: self.store.update_seller_fulfillment(
+                "user-a", "SD-MIXED", {"status": "SHIPPED", "carrier": "Delhivery"}
+            ),
+        )
+        self.assert_error(
+            "invalid_shipping_details",
+            lambda: self.store.update_seller_fulfillment(
+                "user-a", "SD-MIXED",
+                {"status": "SHIPPED", "carrier": "Bad\nCarrier", "trackingNumber": "DLV-123456"},
+            ),
+        )
+        shipped = self.store.update_seller_fulfillment(
+            "user-a", "SD-MIXED",
+            {"status": "SHIPPED", "carrier": "Delhivery", "trackingNumber": "DLV-123456"},
+        )
+        self.assertEqual(shipped["shipping"], {"carrier": "Delhivery", "trackingNumber": "DLV-123456"})
+        changed = self.store.update_seller_fulfillment(
+            "user-a", "SD-MIXED",
+            {"status": "SHIPPED", "carrier": "Delhivery", "trackingNumber": "DLV-654321"},
+        )
+        self.assertFalse(changed["changed"])
+        self.assertTrue(changed["shippingChanged"])
+        self.assertEqual(changed["shipping"]["trackingNumber"], "DLV-654321")
         summary = self.store.order_fulfillments("SD-MIXED", [product_a["id"], product_b["id"]])
-        self.assertEqual([(row["shopName"], row["status"]) for row in summary], [("Shop A", "PROCESSING"), ("Shop B", "NEW")])
+        self.assertEqual(
+            [(row["shopName"], row["status"]) for row in summary],
+            [("Shop A", "SHIPPED"), ("Shop B", "NEW")],
+        )
+        self.assertEqual(
+            summary[0]["shipping"],
+            {"carrier": "Delhivery", "trackingNumber": "DLV-654321"},
+        )
+        self.assertIsNone(summary[1]["shipping"])
         self.assertTrue(all("applicationId" not in row for row in summary))
         self.assertNotEqual(app_a["id"], app_b["id"])
 

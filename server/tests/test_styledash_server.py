@@ -2169,11 +2169,37 @@ class HttpApiTests(unittest.TestCase):
             )
         self.fulfillment_notification_failure = True
         status, shipped, _headers = self.patch_json(
-            f"/api/seller-orders/{order_id}/fulfillment", {"status": "SHIPPED"}, session_headers
+            f"/api/seller-orders/{order_id}/fulfillment",
+            {"status": "SHIPPED", "carrier": "Delhivery", "trackingNumber": "DLV-123456"},
+            session_headers,
         )
         self.assertEqual((status, shipped["fulfillment"]["status"]), (200, "SHIPPED"))
+        self.assertEqual(
+            shipped["fulfillment"]["shipping"],
+            {"carrier": "Delhivery", "trackingNumber": "DLV-123456"},
+        )
+        self.assertNotIn("changed", shipped["fulfillment"])
+        self.assertNotIn("shippingChanged", shipped["fulfillment"])
         self.assertEqual(len(self.fulfillment_notifications), 1)
         self.fulfillment_notification_failure = False
+        status, tracking_update, _headers = self.patch_json(
+            f"/api/seller-orders/{order_id}/fulfillment",
+            {"status": "SHIPPED", "carrier": "Delhivery", "trackingNumber": "DLV-654321"},
+            session_headers,
+        )
+        self.assertEqual(status, 200)
+        self.assertEqual(tracking_update["fulfillment"]["shipping"]["trackingNumber"], "DLV-654321")
+        self.assertEqual(len(self.fulfillment_notifications), 2)
+        self.assertIn("Shipping details", self.fulfillment_notifications[-1][2])
+        self.assertIn("DLV-654321", self.fulfillment_notifications[-1][2])
+        status, tracked_customer_order, _headers = self.get_json(
+            f"/api/orders/{order_id}", {"Cookie": session_headers["Cookie"]}
+        )
+        self.assertEqual(status, 200)
+        self.assertEqual(
+            tracked_customer_order["order"]["fulfillments"][0]["shipping"],
+            {"carrier": "Delhivery", "trackingNumber": "DLV-654321"},
+        )
         self.service.shops.admin_transition_product("http-admin", product_id, "APPROVED")
         status, public_unpublished, _headers = self.get_json("/api/shop-products/published")
         self.assertEqual(public_unpublished["products"], [])

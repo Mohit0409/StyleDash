@@ -67,6 +67,8 @@ FULFILLMENT_TRANSITIONS = {
     "SHIPPED": ("DELIVERED",),
     "DELIVERED": (),
 }
+CARRIER_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9&().,'\/+ -]{1,79}$")
+TRACKING_NUMBER_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._/# -]{1,119}$")
 PINCODE_PATTERN = re.compile(r"^\d{6}$")
 APPLICATION_PAYLOAD_FIELDS = {
     "shopName",
@@ -148,6 +150,7 @@ class ShopWorkflow:
             self._migrate_applications(db)
             self._migrate_products(db)
             self._migrate_fulfillments(db)
+            self._migrate_shipping_tracking(db)
             check = db.execute("PRAGMA foreign_key_check").fetchall()
             if check:
                 raise RuntimeError("Shop migration failed foreign key validation")
@@ -343,6 +346,32 @@ class ShopWorkflow:
             )
             db.execute(
                 "INSERT INTO shop_schema_migrations(version,applied_at) VALUES(4,?)",
+                (now,),
+            )
+            db.commit()
+        except Exception:
+            db.rollback()
+            raise
+
+    @staticmethod
+    def _migrate_shipping_tracking(db: sqlite3.Connection) -> None:
+        now = iso(utc_now())
+        db.execute("BEGIN IMMEDIATE")
+        try:
+            if db.execute(
+                "SELECT 1 FROM shop_schema_migrations WHERE version=5"
+            ).fetchone() is not None:
+                db.commit()
+                return
+            columns = {
+                row[1] for row in db.execute("PRAGMA table_info(shop_order_fulfillments)").fetchall()
+            }
+            if "carrier" not in columns:
+                db.execute("ALTER TABLE shop_order_fulfillments ADD COLUMN carrier TEXT")
+            if "tracking_number" not in columns:
+                db.execute("ALTER TABLE shop_order_fulfillments ADD COLUMN tracking_number TEXT")
+            db.execute(
+                "INSERT INTO shop_schema_migrations(version,applied_at) VALUES(5,?)",
                 (now,),
             )
             db.commit()
@@ -850,49 +879,99 @@ class ShopWorkflow:
         return {row["id"] for row in rows}
 
     @staticmethod
-    def _serialize_fulfillment(status: str, updated_at: str | None) -> dict[str, Any]:
+    def _serialize_fulfillment(
+        status: str,
+        updated_at: str | None,
+        carrier: str | None = None,
+        tracking_number: str | None = None,
+    ) -> dict[str, Any]:
+        shipping = None
+        if carrier and tracking_number:
+            shipping = {"carrier": carrier, "trackingNumber": tracking_number}
         return {
             "status": status,
             "updatedAt": updated_at,
             "allowedNextStatuses": list(FULFILLMENT_TRANSITIONS[status]),
+            "shipping": shipping,
         }
+
+    @staticmethod
+    def _shipping_payload(
+        payload: dict[str, Any], status: str
+    ) -> tuple[str, str] | None:
+        has_carrier = "carrier" in payload
+        has_tracking = "trackingNumber" in payload
+        if has_carrier != has_tracking:
+            raise SecurityError(400, "Carrier and tracking number must be supplied together.", "invalid_shipping_details")
+        if not has_carrier:
+            return None
+        if status != "SHIPPED":
+            raise SecurityError(400, "Shipping details can only be attached to a shipped order.", "invalid_shipping_details")
+        carrier = clean_text(payload.get("carrier"), "carrier", 2, 80)
+        if not CARRIER_PATTERN.fullmatch(carrier):
+            raise SecurityError(400, "Enter a valid carrier.", "invalid_shipping_details")
+        tracking_number = clean_text(payload.get("trackingNumber"), "tracking number", 2, 120)
+        if not TRACKING_NUMBER_PATTERN.fullmatch(tracking_number):
+            raise SecurityError(400, "Enter a valid tracking number.", "invalid_shipping_details")
+        return carrier, tracking_number
 
     def seller_fulfillment(self, user_id: str, order_id: str) -> dict[str, Any]:
         safe_order_id = clean_text(order_id, "Order ID", 1, 128)
         with self.connect() as db:
             application = self._seller_application(db, user_id)
             row = db.execute(
-                "SELECT status,updated_at FROM shop_order_fulfillments "
+                "SELECT status,updated_at,carrier,tracking_number FROM shop_order_fulfillments "
                 "WHERE order_id=? AND application_id=?",
                 (safe_order_id, application["id"]),
             ).fetchone()
         if row is None:
             return self._serialize_fulfillment("NEW", None)
-        return self._serialize_fulfillment(row["status"], row["updated_at"])
+        return self._serialize_fulfillment(
+            row["status"], row["updated_at"], row["carrier"], row["tracking_number"]
+        )
 
     def update_seller_fulfillment(
         self, user_id: str, order_id: str, payload: dict[str, Any]
     ) -> dict[str, Any]:
-        if not isinstance(payload, dict) or set(payload) != {"status"}:
+        allowed_fields = {"status", "carrier", "trackingNumber"}
+        if not isinstance(payload, dict) or "status" not in payload or set(payload) - allowed_fields:
             raise SecurityError(400, "A fulfillment status is required.", "invalid_fulfillment")
         safe_order_id = clean_text(order_id, "Order ID", 1, 128)
         status = clean_text(payload.get("status"), "Fulfillment status", 1, 20)
         if status not in FULFILLMENT_STATUSES:
             raise SecurityError(400, "Invalid fulfillment status.", "invalid_fulfillment")
+        shipping = self._shipping_payload(payload, status)
         now = iso(utc_now())
         with self.connect() as db:
             db.execute("BEGIN IMMEDIATE")
             application = self._seller_application(db, user_id)
             row = db.execute(
-                "SELECT status,updated_at FROM shop_order_fulfillments "
+                "SELECT status,updated_at,carrier,tracking_number FROM shop_order_fulfillments "
                 "WHERE order_id=? AND application_id=?",
                 (safe_order_id, application["id"]),
             ).fetchone()
             current = row["status"] if row is not None else "NEW"
+            carrier = row["carrier"] if row is not None else None
+            tracking_number = row["tracking_number"] if row is not None else None
             if status == current:
+                shipping_changed = False
+                if shipping is not None and shipping != (carrier, tracking_number):
+                    carrier, tracking_number = shipping
+                    db.execute(
+                        "UPDATE shop_order_fulfillments SET carrier=?,tracking_number=?,updated_at=? "
+                        "WHERE order_id=? AND application_id=?",
+                        (carrier, tracking_number, now, safe_order_id, application["id"]),
+                    )
+                    shipping_changed = True
                 db.commit()
-                result = self._serialize_fulfillment(current, row["updated_at"] if row else None)
+                result = self._serialize_fulfillment(
+                    current,
+                    now if shipping_changed else (row["updated_at"] if row else None),
+                    carrier,
+                    tracking_number,
+                )
                 result["changed"] = False
+                result["shippingChanged"] = shipping_changed
                 return result
             if status not in FULFILLMENT_TRANSITIONS[current]:
                 db.rollback()
@@ -901,21 +980,33 @@ class ShopWorkflow:
                     f"Fulfillment cannot move from {current} to {status}.",
                     "invalid_fulfillment_transition",
                 )
+            if shipping is not None:
+                carrier, tracking_number = shipping
             if row is None:
                 db.execute(
-                    "INSERT INTO shop_order_fulfillments(order_id,application_id,status,created_at,updated_at) "
-                    "VALUES(?,?,?,?,?)",
-                    (safe_order_id, application["id"], status, now, now),
+                    "INSERT INTO shop_order_fulfillments("
+                    "order_id,application_id,status,created_at,updated_at,carrier,tracking_number"
+                    ") VALUES(?,?,?,?,?,?,?)",
+                    (safe_order_id, application["id"], status, now, now, carrier, tracking_number),
                 )
             else:
                 db.execute(
-                    "UPDATE shop_order_fulfillments SET status=?,updated_at=? "
+                    "UPDATE shop_order_fulfillments "
+                    "SET status=?,carrier=?,tracking_number=?,updated_at=? "
                     "WHERE order_id=? AND application_id=?",
-                    (status, now, safe_order_id, application["id"]),
+                    (
+                        status,
+                        carrier,
+                        tracking_number,
+                        now,
+                        safe_order_id,
+                        application["id"],
+                    ),
                 )
             db.commit()
-        result = self._serialize_fulfillment(status, now)
+        result = self._serialize_fulfillment(status, now, carrier, tracking_number)
         result["changed"] = True
+        result["shippingChanged"] = shipping is not None
         return result
 
     def order_fulfillments(self, order_id: str, product_ids: list[str]) -> list[dict[str, Any]]:
@@ -927,7 +1018,7 @@ class ShopWorkflow:
         with self.connect() as db:
             rows = db.execute(
                 f"""
-                SELECT DISTINCT a.id,a.shop_name,f.status,f.updated_at
+                SELECT DISTINCT a.id,a.shop_name,f.status,f.updated_at,f.carrier,f.tracking_number
                   FROM shop_product_submissions p
                   JOIN vendor_applications a ON a.id=p.application_id
                   LEFT JOIN shop_order_fulfillments f
@@ -942,6 +1033,11 @@ class ShopWorkflow:
                 "shopName": row["shop_name"],
                 "status": row["status"] or "NEW",
                 "updatedAt": row["updated_at"],
+                "shipping": (
+                    {"carrier": row["carrier"], "trackingNumber": row["tracking_number"]}
+                    if row["carrier"] and row["tracking_number"]
+                    else None
+                ),
             }
             for row in rows
         ]

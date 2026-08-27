@@ -1889,7 +1889,14 @@ class StyleDashRequestHandler(SimpleHTTPRequestHandler):
         if not head_only:
             self.wfile.write(encoded)
 
-    def _notify_customer_fulfillment(self, seller_user_id: str, order_id: str, status: str) -> None:
+    def _notify_customer_fulfillment(
+        self,
+        seller_user_id: str,
+        order_id: str,
+        fulfillment: dict[str, Any],
+        *,
+        details_only: bool = False,
+    ) -> None:
         dispatcher = self.fulfillment_notification_dispatcher
         if dispatcher is None:
             return
@@ -1907,13 +1914,24 @@ class StyleDashRequestHandler(SimpleHTTPRequestHandler):
             shop_name = application.get("shopName") if isinstance(application, dict) else None
             if not isinstance(shop_name, str) or not shop_name:
                 return
+            status = str(fulfillment.get("status") or "")
+            shipping = fulfillment.get("shipping")
+            if details_only:
+                intro = f"Shipping details for order {order_id} from {shop_name} were updated."
+            else:
+                intro = f"Order {order_id} from {shop_name} is now {status.replace('_', ' ').title()}."
+            details = ""
+            if isinstance(shipping, dict):
+                carrier = shipping.get("carrier")
+                tracking_number = shipping.get("trackingNumber")
+                if isinstance(carrier, str) and isinstance(tracking_number, str):
+                    details = f"\nCarrier: {carrier}\nTracking number: {tracking_number}\n"
             origin = self._public_origin()
             orders_url = f"{origin}/orders" if origin else "/orders"
             dispatcher(
                 email,
                 "Your StyleDash order update",
-                f"Order {order_id} from {shop_name} is now {status.replace('_', ' ').title()}.\n\n"
-                f"View your orders: {orders_url}\n",
+                f"{intro}\n{details}\nView your orders: {orders_url}\n",
             )
         except Exception:
             print("StyleDash fulfillment notification preparation failed", flush=True)
@@ -2542,8 +2560,12 @@ class StyleDashRequestHandler(SimpleHTTPRequestHandler):
                     user["id"], order_id, self._read_json()
                 )
                 changed = bool(fulfillment.pop("changed", False))
-                if changed:
-                    self._notify_customer_fulfillment(user["id"], order_id, fulfillment["status"])
+                shipping_changed = bool(fulfillment.pop("shippingChanged", False))
+                if changed or shipping_changed:
+                    self._notify_customer_fulfillment(
+                        user["id"], order_id, fulfillment,
+                        details_only=shipping_changed and not changed,
+                    )
                 self._json_response(HTTPStatus.OK, {"success": True, "fulfillment": fulfillment})
                 return
             if path.startswith("/api/shop-products/"):
