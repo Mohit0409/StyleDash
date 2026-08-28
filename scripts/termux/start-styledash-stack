@@ -20,6 +20,7 @@ if ! curl -fsS --max-time 3 -H 'Host: 127.0.0.1:8081' http://127.0.0.1:8081/ >/d
 fi
 
 "$HOME/bin/start-styledash-ngrok" || echo "$(date -Iseconds) ngrok is not established yet; watchdog will retry" >> "$HOME/logs/styledash-health.log"
+"$HOME/bin/start-styledash-cloudflare" || echo "$(date -Iseconds) Cloudflare tunnel is not established yet; startup will retry on next stack launch" >> "$HOME/logs/styledash-health.log"
 if [ ! -s "$HOME/run/styledash-health.pid" ] || ! kill -0 "$(cat "$HOME/run/styledash-health.pid")" 2>/dev/null; then
   nohup "$HOME/bin/styledash-health" >> "$HOME/logs/styledash-health.log" 2>&1 &
 fi

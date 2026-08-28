@@ -1,0 +1,31 @@
+#!/data/data/com.termux/files/usr/bin/bash
+# Start the named Cloudflare Tunnel without exposing its token in argv.
+set -eu
+
+TOKEN_FILE="$HOME/.config/styledash/cloudflare-tunnel-token"
+PID_FILE="$HOME/run/styledash-cloudflare.pid"
+LOG_FILE="$HOME/logs/styledash-cloudflare.log"
+mkdir -p "$HOME/run" "$HOME/logs"
+
+[ -s "$TOKEN_FILE" ] || {
+  echo "Cloudflare tunnel token file is missing" >&2
+  exit 1
+}
+
+if [ -s "$PID_FILE" ]; then
+  pid="$(cat "$PID_FILE" 2>/dev/null || true)"
+  if [ -n "$pid" ] && kill -0 "$pid" 2>/dev/null && \
+     tr '\0' ' ' < "/proc/$pid/cmdline" 2>/dev/null | grep -Fq 'cloudflared tunnel run'; then
+    exit 0
+  fi
+  rm -f "$PID_FILE"
+fi
+nohup cloudflared tunnel run --protocol http2 --token-file "$TOKEN_FILE" >> "$LOG_FILE" 2>&1 &
+pid=$!
+printf '%s\n' "$pid" > "$PID_FILE"
+chmod 600 "$PID_FILE"
+sleep 3
+kill -0 "$pid" 2>/dev/null || {
+  echo "Cloudflare tunnel failed to stay running; see $LOG_FILE" >&2
+  exit 1
+}

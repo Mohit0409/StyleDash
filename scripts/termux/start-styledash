@@ -45,7 +45,7 @@ export STYLEDASH_CATALOG_PATH="$DATA_ROOT/catalog.json"
 export STYLEDASH_SETTINGS_PATH="$DATA_ROOT/settings.json"
 export STYLEDASH_DATA_DIR="$DATA_ROOT/runtime"
 export STYLEDASH_DATABASE_PATH="$DATA_ROOT/styledash.db"
-export STYLEDASH_PUBLIC_ORIGIN="${STYLEDASH_PUBLIC_ORIGIN:-https://display-landslide-gigahertz.ngrok-free.dev}"
+export STYLEDASH_PUBLIC_ORIGIN="${STYLEDASH_PUBLIC_ORIGIN:-https://vibe4you.in}"
 export STYLEDASH_TRUST_LOOPBACK_PROXY=1
 
 trim_log() {

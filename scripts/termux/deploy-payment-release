@@ -12,7 +12,7 @@ DATA_ROOT="$HOME/.local/share/styledash"
 LIVE_DB="$DATA_ROOT/styledash.db"
 LIVE_STATE="$DATA_ROOT/runtime/orders.json"
 BACKUP_SCRIPT="$STAGE/scripts/termux/backup-styledash-data"
-for required_ops_script in styledash-health styledash-notify rollback-payment-release backup-styledash-recovery; do
+for required_ops_script in styledash-health styledash-notify rollback-payment-release backup-styledash-recovery start-styledash-cloudflare; do
   if [ ! -f "$STAGE/scripts/termux/$required_ops_script" ]; then
     echo "release is missing $required_ops_script; deployment aborted" >&2
     exit 1
@@ -211,6 +211,7 @@ install -m 644 "$STAGE/server/payment-data/settings.json" "$HOME/.local/share/st
 install -m 755 "$STAGE/scripts/termux/start-styledash" "$HOME/bin/start-styledash"
 install -m 755 "$STAGE/scripts/termux/start-styledash-admin" "$HOME/bin/start-styledash-admin"
 install -m 755 "$STAGE/scripts/termux/start-styledash-stack" "$HOME/bin/start-styledash-stack"
+install -m 700 "$STAGE/scripts/termux/start-styledash-cloudflare" "$HOME/bin/start-styledash-cloudflare"
 install -m 755 "$STAGE/scripts/termux/styledash-health" "$HOME/bin/styledash-health"
 install -m 755 "$STAGE/scripts/termux/normalize-razorpay-secrets" "$HOME/bin/normalize-razorpay-secrets"
 install -m 755 "$STAGE/scripts/termux/backup-styledash-data" "$HOME/bin/backup-styledash-data"

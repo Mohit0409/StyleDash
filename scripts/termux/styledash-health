@@ -7,6 +7,7 @@ RUN_DIR="$HOME/run"
 PID_FILE="$RUN_DIR/styledash-health.pid"
 LOG_FILE="$LOG_DIR/styledash-health.log"
 NGROK_PID_FILE="$RUN_DIR/styledash-ngrok.pid"
+CLOUDFLARE_PID_FILE="$RUN_DIR/styledash-cloudflare.pid"
 URL_FILE="$RUN_DIR/styledash-public-url"
 EXPECTED_CMD='ngrok http http://127.0.0.1:8080'
 LAST_BACKUP_FILE="$RUN_DIR/styledash-last-backup-date"
@@ -51,6 +52,13 @@ ngrok_process_ok() {
   tr '\0' ' ' < "/proc/$pid/cmdline" 2>/dev/null | grep -Fq "$EXPECTED_CMD"
 }
 
+cloudflare_process_ok() {
+  [ -s "$CLOUDFLARE_PID_FILE" ] || return 1
+  pid="$(cat "$CLOUDFLARE_PID_FILE")"
+  kill -0 "$pid" 2>/dev/null || return 1
+  tr '\0' ' ' < "/proc/$pid/cmdline" 2>/dev/null | grep -Fq 'cloudflared tunnel run'
+}
+
 public_unhealthy=0
 admin_unhealthy=0
 ssh_unhealthy=0
@@ -59,6 +67,7 @@ backup_failed=0
 recovery_backup_failed=0
 ngrok_failures=0
 ngrok_unhealthy=0
+cloudflare_unhealthy=0
 public_failures=0
 public_counter=0
 
@@ -203,6 +212,20 @@ while true; do
 
       recovery_backup_failed=1
     fi
+  fi
+
+  if ! cloudflare_process_ok; then
+    echo "$(date -Iseconds) Cloudflare tunnel process unavailable; restarting" >> "$LOG_FILE"
+    if [ "$cloudflare_unhealthy" -eq 0 ]; then
+      notify cloudflare_tunnel_unhealthy "Vibe4You Cloudflare tunnel unavailable" "The production tunnel stopped; the watchdog is restarting it." 5 warning
+    fi
+    cloudflare_unhealthy=1
+    if "$HOME/bin/start-styledash-cloudflare"; then
+            cloudflare_unhealthy=0
+      notify cloudflare_tunnel_recovered "Vibe4You Cloudflare tunnel recovered" "The production tunnel process is running again." 3 white_check_mark
+    fi
+  else
+        cloudflare_unhealthy=0
   fi
 
   url=''
