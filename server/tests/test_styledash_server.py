@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import hmac
+import http.client
 import importlib.util
 import io
 import json
@@ -1826,6 +1827,34 @@ class HttpApiTests(unittest.TestCase):
             self.assertIn("<loc>https://styledash.test/</loc>", body)
             self.assertIn("<loc>https://styledash.test/products</loc>", body)
             self.assertIn("https://styledash.test/product/", body)
+
+    def test_noncanonical_web_host_redirects_to_public_origin(self) -> None:
+        connection = http.client.HTTPConnection("127.0.0.1", self.server.server_address[1])
+        connection.request(
+            "GET",
+            "/products?dept=men&sort=price-asc",
+            headers={"Host": "display-landslide-gigahertz.ngrok-free.dev"},
+        )
+        response = connection.getresponse()
+        self.assertEqual(response.status, 308)
+        self.assertEqual(
+            response.getheader("Location"),
+            "https://styledash.test/products?dept=men&sort=price-asc",
+        )
+        response.read()
+        connection.close()
+
+    def test_noncanonical_api_health_remains_available_for_tunnel_diagnostics(self) -> None:
+        connection = http.client.HTTPConnection("127.0.0.1", self.server.server_address[1])
+        connection.request(
+            "GET",
+            "/api/health",
+            headers={"Host": "display-landslide-gigahertz.ngrok-free.dev"},
+        )
+        response = connection.getresponse()
+        self.assertEqual(response.status, 200)
+        self.assertEqual(json.loads(response.read()), {"status": "ok", "service": "Vibe4You", "database": "ok"})
+        connection.close()
 
     def test_malformed_json_returns_safe_400(self) -> None:
         request = urllib.request.Request(

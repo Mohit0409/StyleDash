@@ -1928,6 +1928,25 @@ class StyleDashRequestHandler(SimpleHTTPRequestHandler):
     def _public_origin() -> str:
         return os.environ.get("STYLEDASH_PUBLIC_ORIGIN", "").rstrip("/")
 
+    def _redirect_to_canonical_host(self) -> bool:
+        origin = self._public_origin()
+        canonical_host = urlsplit(origin).hostname if origin else None
+        request_host = urlsplit(f"//{self.headers.get('Host', '').strip()}").hostname
+        if not canonical_host or not request_host:
+            return False
+        if request_host.lower() in {canonical_host.lower(), "localhost", "127.0.0.1", "::1"}:
+            return False
+        if urlsplit(self.path).path.startswith(API_PREFIX):
+            return False
+
+        request_target = self.path if self.path.startswith("/") else f"/{self.path}"
+        self.send_response(HTTPStatus.PERMANENT_REDIRECT)
+        self.send_header("Location", f"{origin}{request_target}")
+        self.send_header("Content-Length", "0")
+        self.send_header("Cache-Control", "public, max-age=300")
+        self.end_headers()
+        return True
+
     def _robots_body(self) -> str:
         origin = self._public_origin()
         lines = ["User-agent: *", "Allow: /"]
@@ -2067,6 +2086,8 @@ class StyleDashRequestHandler(SimpleHTTPRequestHandler):
         parsed = urlsplit(self.path)
         path = parsed.path
         try:
+            if self._redirect_to_canonical_host():
+                return
             if self._sensitive_path(path):
                 self._json_response(HTTPStatus.NOT_FOUND, {"success": False, "error": "Not found.", "code": "not_found"})
                 return
@@ -2193,6 +2214,8 @@ class StyleDashRequestHandler(SimpleHTTPRequestHandler):
 
     def do_HEAD(self) -> None:  # noqa: N802 - stdlib override name
         path = urlsplit(self.path).path
+        if self._redirect_to_canonical_host():
+            return
         if self._sensitive_path(path):
             self._json_response(HTTPStatus.NOT_FOUND, {"success": False, "error": "Not found.", "code": "not_found"}, head_only=True)
             return
