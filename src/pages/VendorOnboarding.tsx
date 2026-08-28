@@ -76,6 +76,18 @@ const draftFromApplication = (application: ShopApplication): ShopApplicationDraf
   businessInformation: application.businessInformation || '',
 });
 
+const ONBOARDING_STAGES = ['Application', 'Submitted', 'Under Review', 'Approved', 'Active', 'Products'] as const;
+
+const stageIndexFor = (status: ShopApplicationStatus) => ({
+  DRAFT: 0,
+  SUBMITTED: 1,
+  UNDER_REVIEW: 2,
+  APPROVED: 3,
+  REJECTED: 2,
+  ACTIVE: 4,
+  SUSPENDED: 4,
+}[status]);
+
 const errorMessage = (cause: unknown, fallback: string) =>
   cause instanceof ApiError ? cause.message : fallback;
 
@@ -180,6 +192,25 @@ export const VendorOnboarding: React.FC = () => {
           {statusContent?.description || `Apply to list your fashion shop in ${CONFIG.SERVICE_CITY}. Submission never activates a shop automatically.`}
         </p>
       </div>
+
+      {application && (
+        <nav aria-label="Shop onboarding progress" className="rounded-3xl border border-neutral-200 bg-white p-4 shadow-sm dark:border-neutral-800 dark:bg-neutral-900">
+          <ol className="grid grid-cols-3 gap-2 sm:grid-cols-6">
+            {ONBOARDING_STAGES.map((stage, index) => {
+              const current = stageIndexFor(application.status);
+              const complete = index <= current || (stage === 'Products' && application.status === 'ACTIVE');
+              const isCurrent = index === current || (stage === 'Products' && application.status === 'ACTIVE');
+              return (
+                <li key={stage} aria-current={isCurrent ? 'step' : undefined} className="text-center">
+                  <span className={`mx-auto flex h-8 w-8 items-center justify-center rounded-full text-xs font-black ${complete ? 'bg-lime-400 text-neutral-950' : 'bg-neutral-100 text-neutral-400 dark:bg-neutral-800'}`}>{index + 1}</span>
+                  <span className={`mt-1 block text-[10px] font-bold sm:text-xs ${isCurrent ? 'text-neutral-950 dark:text-white' : 'text-neutral-500'}`}>{stage}</span>
+                </li>
+              );
+            })}
+          </ol>
+          {application.status === 'ACTIVE' && <p className="mt-3 text-center text-xs text-neutral-500">Your shop is active. Add products below and submit them for administrator review.</p>}
+        </nav>
+      )}
 
       {error && <p role="alert" className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">{error}</p>}
       {message && <p role="status" className="rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800">{message}</p>}
