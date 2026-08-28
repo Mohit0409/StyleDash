@@ -7,7 +7,7 @@ const supportPhoneHref = CONFIG.LEGAL.SUPPORT_PHONE.replace(/\s+/g, '');
 
 export const Help = () => (
   <div className="max-w-3xl mx-auto p-8 space-y-6">
-    <SEO title="Help & Support - StyleDash" />
+    <SEO title="Help & Support - Vibe4You" />
     <h1 className="text-3xl font-black">Help and customer support</h1>
     <nav aria-label="Help topics" className="flex flex-wrap gap-3 text-xs font-bold">
       <Link className="underline" to="#contact-styledash">Contact</Link>
@@ -16,7 +16,7 @@ export const Help = () => (
     </nav>
 
     <section id="contact-styledash" className="scroll-mt-32 space-y-2">
-      <h2 className="font-black">Contact StyleDash</h2>
+      <h2 className="font-black">Contact Vibe4You</h2>
       <p className="text-sm text-neutral-600">
         Email:{' '}
         <a
@@ -73,7 +73,7 @@ export const Help = () => (
     <section className="space-y-2">
       <h2 className="font-black">Delivery area and timing</h2>
       <p className="text-sm text-neutral-600">
-        StyleDash validates delivery addresses against the server-configured
+        Vibe4You validates delivery addresses against the server-configured
         service area during checkout. Delivery estimates are targets and may
         vary with store acceptance, stock, traffic, weather, address accuracy,
         and rider availability.
@@ -83,7 +83,7 @@ export const Help = () => (
     <section className="space-y-2">
       <h2 className="font-black">Payments</h2>
       <p className="text-sm text-neutral-600">
-        Online payments open Razorpay checkout. StyleDash does not ask you to
+        Online payments open Razorpay checkout. Vibe4You does not ask you to
         share a card CVV or UPI PIN with support staff. If checkout is cancelled
         or fails, check Your Orders before trying again.
       </p>

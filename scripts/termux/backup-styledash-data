@@ -122,7 +122,7 @@ if [ "$LOCAL_ONLY" = false ]; then
 
     printf '%s\n' "$stamp" > "$RUN_DIR/styledash-last-offdevice-backup"
     chmod 600 "$RUN_DIR/styledash-last-offdevice-backup"
-    echo "Primary off-device StyleDash backup verified: $stamp"
+    echo "Primary off-device Vibe4You backup verified: $stamp"
 
     secondary="${STYLEDASH_BACKUP_REMOTE_SECONDARY:-}"
     if [ -n "$secondary" ]; then
@@ -134,7 +134,7 @@ if [ "$LOCAL_ONLY" = false ]; then
 
       printf '%s\n' "$stamp" > "$RUN_DIR/styledash-last-secondary-backup"
       chmod 600 "$RUN_DIR/styledash-last-secondary-backup"
-      echo "Secondary off-device StyleDash backup verified: $stamp"
+      echo "Secondary off-device Vibe4You backup verified: $stamp"
     fi
   elif enabled "$require_remote"; then
     echo "Off-device backup is required but STYLEDASH_BACKUP_REMOTE is not configured" >&2
@@ -142,4 +142,4 @@ if [ "$LOCAL_ONLY" = false ]; then
   fi
 fi
 
-echo "Private StyleDash backup completed: $stamp"
+echo "Private Vibe4You backup completed: $stamp"

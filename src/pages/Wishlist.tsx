@@ -17,7 +17,7 @@ export const Wishlist: React.FC = () => {
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
-      <SEO title="Saved Wishlist - StyleDash" />
+      <SEO title="Saved Wishlist - Vibe4You" />
       <h1 className="text-2xl sm:text-3xl font-black text-neutral-900 dark:text-white">Saved Wishlist ({products.length})</h1>
 
       {products.length === 0 ? (

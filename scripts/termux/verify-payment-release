@@ -56,7 +56,7 @@ if [ "${1:-}" = "--cod" ]; then
   echo 'Authenticated COD verification must use an isolated test account; this legacy unauthenticated mode is disabled.' >&2
   exit 2
   : <<'LEGACY_DISABLED'
-  printf '%s' '{"items":[{"productId":"sd-prod-001","variantId":"sd-prod-001-var-2","quantity":1}],"address":{"name":"StyleDash Deployment Test","phone":"9999999999","street":"123 Test Street","city":"Neemuch","pincode":"458441"},"userId":"deployment-test","deliveryMethod":"express","couponCode":null,"walletAmount":0,"paymentMethod":"cod"}' > "$PAYLOAD_FILE"
+  printf '%s' '{"items":[{"productId":"sd-prod-001","variantId":"sd-prod-001-var-2","quantity":1}],"address":{"name":"Vibe4You Deployment Test","phone":"9999999999","street":"123 Test Street","city":"Neemuch","pincode":"458441"},"userId":"deployment-test","deliveryMethod":"express","couponCode":null,"walletAmount":0,"paymentMethod":"cod"}' > "$PAYLOAD_FILE"
   status="$(curl -sS --max-time 10 -o "$RESPONSE_FILE" -w '%{http_code}' \
     -H 'Content-Type: application/json' \
     -H 'Idempotency-Key: deployment-cod-20260813' \

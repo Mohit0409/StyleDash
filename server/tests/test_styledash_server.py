@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import hmac
+import http.client
 import importlib.util
 import io
 import json
@@ -1537,7 +1538,7 @@ class PaymentTestProductTests(unittest.TestCase):
         self.assertEqual(metadata, {"success": True, "product": {
             "id": "styledash-payment-test-item",
             "slug": "styledash-payment-test-item",
-            "name": "StyleDash Payment Test Item",
+            "name": "Vibe4You Payment Test Item",
             "price": 10,
             "amount": 1000,
             "currency": "INR",
@@ -1605,7 +1606,7 @@ class PaymentTestProductTests(unittest.TestCase):
             },
         }])
         order = self.service.store.state["orders"][created["styleDashOrderId"]]
-        self.assertEqual(order["items"][0]["productName"], "StyleDash Payment Test Item")
+        self.assertEqual(order["items"][0]["productName"], "Vibe4You Payment Test Item")
         self.assertEqual(order["deliveryMethod"], "none")
         self.assertEqual(order["adminLabels"], ["TEST", "NO FULFILLMENT REQUIRED"])
         self.assertFalse(order["fulfillmentRequired"])
@@ -1751,7 +1752,8 @@ class HttpApiTests(unittest.TestCase):
         root = Path(self.temporary.name)
         web_root = root / "web"
         web_root.mkdir()
-        (web_root / "index.html").write_text("<!doctype html><title>StyleDash</title>", encoding="utf-8")
+        (web_root / "index.html").write_text("<!doctype html><title>Vibe4You</title>", encoding="utf-8")
+        (web_root / "utf8.js").write_text("window.price = 'â‚¹576';", encoding="utf-8")
         self.reset_deliveries = []
         self.firebase_claims = {}
         security_store = SERVER.SecurityStore(
@@ -1800,11 +1802,17 @@ class HttpApiTests(unittest.TestCase):
     def test_health_and_security_headers(self) -> None:
         with urllib.request.urlopen(f"{self.base_url}/api/health") as response:
             payload = json.load(response)
-            self.assertEqual(payload, {"status": "ok", "service": "StyleDash", "database": "ok"})
+            self.assertEqual(payload, {"status": "ok", "service": "Vibe4You", "database": "ok"})
             self.assertNotIn("paymentMode", payload)
             self.assertEqual(response.headers["X-Content-Type-Options"], "nosniff")
             self.assertEqual(response.headers["Referrer-Policy"], "strict-origin-when-cross-origin")
             self.assertIn("checkout.razorpay.com", response.headers["Content-Security-Policy"])
+
+    def test_static_utf8_assets_declare_charset(self) -> None:
+        with urllib.request.urlopen(f"{self.base_url}/utf8.js") as response:
+            body = response.read().decode("utf-8")
+            self.assertEqual(response.headers.get_content_charset(), "utf-8")
+            self.assertIn("â‚¹576", body)
 
     def test_public_robots_and_sitemap_use_configured_origin(self) -> None:
         with urllib.request.urlopen(f"{self.base_url}/robots.txt") as response:
@@ -1819,6 +1827,34 @@ class HttpApiTests(unittest.TestCase):
             self.assertIn("<loc>https://styledash.test/</loc>", body)
             self.assertIn("<loc>https://styledash.test/products</loc>", body)
             self.assertIn("https://styledash.test/product/", body)
+
+    def test_noncanonical_web_host_redirects_to_public_origin(self) -> None:
+        connection = http.client.HTTPConnection("127.0.0.1", self.server.server_address[1])
+        connection.request(
+            "GET",
+            "/products?dept=men&sort=price-asc",
+            headers={"Host": "display-landslide-gigahertz.ngrok-free.dev"},
+        )
+        response = connection.getresponse()
+        self.assertEqual(response.status, 308)
+        self.assertEqual(
+            response.getheader("Location"),
+            "https://styledash.test/products?dept=men&sort=price-asc",
+        )
+        response.read()
+        connection.close()
+
+    def test_noncanonical_api_health_remains_available_for_tunnel_diagnostics(self) -> None:
+        connection = http.client.HTTPConnection("127.0.0.1", self.server.server_address[1])
+        connection.request(
+            "GET",
+            "/api/health",
+            headers={"Host": "display-landslide-gigahertz.ngrok-free.dev"},
+        )
+        response = connection.getresponse()
+        self.assertEqual(response.status, 200)
+        self.assertEqual(json.loads(response.read()), {"status": "ok", "service": "Vibe4You", "database": "ok"})
+        connection.close()
 
     def test_malformed_json_returns_safe_400(self) -> None:
         request = urllib.request.Request(
@@ -3134,7 +3170,7 @@ class HttpApiTests(unittest.TestCase):
         )
         with urllib.request.urlopen(route_request) as route_response:
             self.assertEqual(route_response.status, 200)
-            self.assertIn("StyleDash", route_response.read().decode())
+            self.assertIn("Vibe4You", route_response.read().decode())
         route_status, route_hidden, _headers = self.get_json(
             f"{controlled_route}/", {"Cookie": owner_cookie}
         )

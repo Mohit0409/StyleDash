@@ -22,7 +22,7 @@ export async function apiFetch<T>(
   try {
     response = await fetcher(endpoint, { ...init, headers, credentials: 'include' });
   } catch {
-    throw new ApiError('The StyleDash server is unavailable.', 'server_unavailable');
+    throw new ApiError('The Vibe4You server is unavailable.', 'server_unavailable');
   }
   let payload: T & { error?: string; code?: string };
   try {

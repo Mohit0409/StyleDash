@@ -14,7 +14,7 @@ describe('controlled payment test API', () => {
     const product = {
       id: 'styledash-payment-test-item',
       slug: 'styledash-payment-test-item',
-      name: 'StyleDash Payment Test Item',
+      name: 'Vibe4You Payment Test Item',
       price: 10,
       amount: 1000,
       currency: 'INR' as const,
@@ -78,7 +78,7 @@ describe('controlled payment test route isolation', () => {
     ];
     for (const path of [...catalogueSources, ...discoverySources]) {
       expect(source(path), path).not.toContain(hiddenIdentifier);
-      expect(source(path), path).not.toContain('StyleDash Payment Test Item');
+      expect(source(path), path).not.toContain('Vibe4You Payment Test Item');
     }
 
     const app = source('src/App.tsx');
@@ -93,6 +93,6 @@ describe('controlled payment test route isolation', () => {
     expect(api).not.toMatch(/email|userId/);
     expect(page).toContain('onClick={startValidation}');
     expect(page).not.toMatch(/useEffect\([\s\S]*startValidation\(\)/);
-    expect(page).toContain('TEST — NO FULFILLMENT REQUIRED');
+    expect(page).toContain('TEST â€” NO FULFILLMENT REQUIRED');
   });
 });

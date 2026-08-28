@@ -48,7 +48,7 @@ export const ProductDetail: React.FC = () => {
   }, [slug]);
 
   if (loading) {
-    return <div className="max-w-7xl mx-auto p-12 text-center text-neutral-500">Loading StyleDash Product...</div>;
+    return <div className="max-w-7xl mx-auto p-12 text-center text-neutral-500">Loading Vibe4You Product...</div>;
   }
 
   if (!product) {
@@ -91,7 +91,7 @@ export const ProductDetail: React.FC = () => {
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-12">
       <SEO
-        title={`${product.name}${product.brand ? ` - ${product.brand}` : ""} | StyleDash`}
+        title={`${product.name}${product.brand ? ` - ${product.brand}` : ""} | Vibe4You`}
         description={product.shortDescription}
         image={product.images[0] || product.thumbnail}
         type="product"
@@ -179,10 +179,10 @@ export const ProductDetail: React.FC = () => {
 
           {/* Pricing */}
           <div className="p-4 bg-neutral-50 dark:bg-neutral-800/50 rounded-2xl border border-neutral-200 dark:border-neutral-800 flex items-baseline gap-3">
-            <span className="text-3xl font-black text-neutral-900 dark:text-white">₹{selectedVariant?.price ?? product.price}</span>
+            <span className="text-3xl font-black text-neutral-900 dark:text-white">â‚¹{selectedVariant?.price ?? product.price}</span>
             {product.originalPrice > product.price && (
               <>
-                <span className="text-sm text-neutral-400 line-through">₹{product.originalPrice}</span>
+                <span className="text-sm text-neutral-400 line-through">â‚¹{product.originalPrice}</span>
                 <span className="text-xs font-black text-rose-500 bg-rose-50 dark:bg-rose-950/40 px-2 py-0.5 rounded-full">
                   {product.discount}% OFF
                 </span>

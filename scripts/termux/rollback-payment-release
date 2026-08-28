@@ -20,7 +20,7 @@ fail() {
   code=$?
   set +e
   echo "$(date -Iseconds) rollback failed; manual recovery required" >> "$LOG_FILE"
-  notify rollback_failed "StyleDash rollback failed" "Code rollback failed and requires manual recovery." 5 rotating_light
+  notify rollback_failed "Vibe4You rollback failed" "Code rollback failed and requires manual recovery." 5 rotating_light
   exit "$code"
 }
 trap fail ERR
@@ -119,6 +119,6 @@ curl -fsS --max-time 5 -H 'Host: 127.0.0.1:8081' http://127.0.0.1:8081/ >/dev/nu
 
 trap - ERR
 echo "$(date -Iseconds) rollback completed from $backup" >> "$LOG_FILE"
-notify rollback_completed "StyleDash rollback completed" "The previous code/config release was restored. Live production data was preserved." 4 white_check_mark
+notify rollback_completed "Vibe4You rollback completed" "The previous code/config release was restored. Live production data was preserved." 4 white_check_mark
 printf 'rollback_restored=%s\n' "$backup"
 printf 'production_data=preserved\n'

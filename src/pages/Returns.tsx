@@ -5,11 +5,11 @@ import { CONFIG } from '../config';
 
 export const Returns = () => (
   <div className="max-w-3xl mx-auto p-8 space-y-6">
-    <SEO title="Returns & Exchanges - StyleDash" />
+    <SEO title="Returns & Exchanges - Vibe4You" />
     <h1 className="text-3xl font-black">Returns and exchanges</h1>
 
     <p className="text-sm text-neutral-600">
-      This policy applies to orders placed through StyleDash in the current
+      This policy applies to orders placed through Vibe4You in the current
       service area. Keep the item unused, unwashed, unaltered, with original
       tags and packaging until your request is reviewed.
     </p>
@@ -52,7 +52,7 @@ export const Returns = () => (
         A customer-choice return pickup may carry an INR{' '}
         {CONFIG.LEGAL.RETURN_PICKUP_FEE} pickup charge. A size exchange may
         carry an INR {CONFIG.LEGAL.EXCHANGE_PICKUP_FEE} pickup/exchange charge.
-        These charges are waived when StyleDash confirms that the item was
+        These charges are waived when Vibe4You confirms that the item was
         wrong, damaged, defective, or not as ordered.
       </p>
       <p className="text-sm text-neutral-600">
@@ -66,12 +66,12 @@ export const Returns = () => (
     <section className="space-y-2">
       <h2 className="font-black">Refund timing</h2>
       <p className="text-sm text-neutral-600">
-        Once a return or cancellation is approved, StyleDash initiates the
+        Once a return or cancellation is approved, Vibe4You initiates the
         refund within {CONFIG.LEGAL.REFUND_TIMELINE_DAYS} calendar days. Online
         payments are refunded to the original supported payment method. Approved
         Cash on Delivery refunds are issued by UPI after the customer supplies a
         valid UPI ID. Your bank or payment provider may take additional time to
-        display the credit after StyleDash initiates it.
+        display the credit after Vibe4You initiates it.
       </p>
     </section>
 

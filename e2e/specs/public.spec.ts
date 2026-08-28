@@ -25,6 +25,27 @@ for (const route of routes) {
   });
 }
 
+test('vibe4you wordmark and tagline are visible', async ({ page }) => {
+  await page.goto('/');
+  const homeLink = page.getByRole('link', { name: 'vibe4you home' });
+  await expect(homeLink).toBeVisible();
+  await expect(homeLink.locator('svg[aria-label="Vibe4You"]')).toBeVisible();
+  await expect(page.getByText('Your City. Your Shops. Your Style.', { exact: true }).first()).toBeVisible();
+  await expect(page.locator('header')).not.toContainText('StyleDash');
+  await expect(page).not.toHaveTitle(/StyleDash/i);
+});
+
+test('favicon uses the interlocked 44 mark', async ({ request }) => {
+  const response = await request.get('/favicon.svg');
+  const favicon = await response.text();
+  expect(response.ok()).toBeTruthy();
+  expect(favicon).toContain('Vibe4You black and gray interlocked 44');
+  expect(favicon).toContain('#171717');
+  expect(favicon).toContain('#aaa8a5');
+  expect(favicon).not.toContain('V4Y');
+  expect(favicon).not.toContain('SD');
+});
+
 test('customer policy pages publish launch contacts without pre-live warnings', async ({
   page,
 }) => {
@@ -59,7 +80,7 @@ test('customer policy pages publish launch contacts without pre-live warnings', 
   await expect(page.locator('main')).toContainText('Mohit Jangde');
 });
 
-test('unknown route renders StyleDash 404', async ({ page }) => {
+test('unknown route renders Vibe4You 404', async ({ page }) => {
   await page.goto('/this-route-must-not-exist-e2e');
 
   await expect(
@@ -91,7 +112,7 @@ test('restricted payment product fails closed for anonymous visitor', async ({
 
   // The denial must not reveal the hidden product or authorization rules.
   await expect(page.locator('body')).not.toContainText(
-    'StyleDash Payment Test Item',
+    'Vibe4You Payment Test Item',
   );
   await expect(page.locator('body')).not.toContainText(
     'e2e-owner@example.test',
@@ -123,9 +144,9 @@ test('wishlist icon buttons expose accessible names', async ({ page }) => {
 test('public SEO exposes canonical and social metadata without query duplication', async ({ page }) => {
   await page.goto('/products?dept=men&sort=price-asc');
 
-  await expect(page.locator('link[rel="canonical"]')).toHaveAttribute('href', /\/products$/);
-  await expect(page.locator('meta[property="og:url"]')).toHaveAttribute('content', /\/products$/);
-  await expect(page.locator('meta[property="og:title"]')).toHaveAttribute('content', /StyleDash/);
+  await expect(page.locator('link[rel="canonical"]')).toHaveAttribute('href', 'https://vibe4you.in/products');
+  await expect(page.locator('meta[property="og:url"]')).toHaveAttribute('content', 'https://vibe4you.in/products');
+  await expect(page.locator('meta[property="og:title"]')).toHaveAttribute('content', /Vibe4You/);
   await expect(page.locator('meta[name="twitter:card"]')).toHaveAttribute('content', 'summary');
 });
 

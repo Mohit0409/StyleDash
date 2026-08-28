@@ -1,4 +1,4 @@
-name: StyleDash CI
+name: Vibe4You CI
 
 on:
   pull_request:

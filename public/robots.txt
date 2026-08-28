@@ -1,2 +1,3 @@
 User-agent: *
 Allow: /
+Sitemap: https://vibe4you.in/sitemap.xml

@@ -85,6 +85,10 @@ class ProductionReliabilityTests(unittest.TestCase):
         self.assertIn("RECOVERY_RETRY_SECONDS", script)
         self.assertIn('"$HOME/bin/backup-styledash-recovery"', script)
         self.assertIn("recovery_backup_failed", script)
+        self.assertIn("PRIMARY_PUBLIC_URL='https://vibe4you.in'", script)
+        self.assertIn("start-styledash-cloudflare", script)
+        self.assertIn('"service":"Vibe4You"', script)
+        self.assertIn("public_origin_failed", script)
 
     def test_rollback_preserves_live_database_history(self) -> None:
         script = self.read("scripts/termux/rollback-payment-release")
@@ -109,6 +113,11 @@ class ProductionReliabilityTests(unittest.TestCase):
         self.assertIn(
             'install -m 700 "$STAGE/scripts/termux/backup-styledash-recovery" '
             '"$HOME/bin/backup-styledash-recovery"',
+            script,
+        )
+        self.assertIn(
+            'install -m 700 "$STAGE/scripts/termux/start-styledash-cloudflare" '
+            '"$HOME/bin/start-styledash-cloudflare"',
             script,
         )
         self.assertIn("razorpay-global-preload-unexpected", script)

@@ -26,7 +26,7 @@ for path in /admin /admin/ /api/admin/orders /secrets.env /.env /database.db /ba
   printf 'public_denied=%s %s\n' "$status" "$path"
 done
 
-curl -fsS --max-time 3 -H 'Host: 127.0.0.1:8081' http://127.0.0.1:8081/ | grep -Fq 'StyleDash Local Administration'
+curl -fsS --max-time 3 -H 'Host: 127.0.0.1:8081' http://127.0.0.1:8081/ | grep -Fq 'Vibe4You Local Administration'
 echo 'local_admin_ui=ok'
 admin_pid="$(cat "$HOME/run/styledash-admin.pid")"
 tr '\0' ' ' < "/proc/$admin_pid/cmdline" | grep -Fq -- '--bind 127.0.0.1 --port 8081'

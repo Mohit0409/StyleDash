@@ -31,7 +31,7 @@ def main() -> None:
         raise SystemExit("Passwords do not match; no changes made.")
     secret = pyotp.random_base32()
     normalized = AdminStore.normalize_username(username)
-    uri = pyotp.TOTP(secret).provisioning_uri(name=normalized, issuer_name="StyleDash Local Admin")
+    uri = pyotp.TOTP(secret).provisioning_uri(name=normalized, issuer_name="Vibe4You Local Admin")
     print("\nAdd this account to your authenticator. This setup URI is shown locally once:")
     print(uri)
     verified = False

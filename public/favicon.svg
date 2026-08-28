@@ -1,4 +1,10 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="StyleDash">
-  <rect width="64" height="64" rx="16" fill="#a3e635"/>
-  <path fill="#171717" d="M17 17h30v9H26v5h18v8H26v8h21v9H17z"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-labelledby="title">
+  <title id="title">Vibe4You black and gray interlocked 44</title>
+  <rect width="64" height="64" rx="14" fill="#f3efe9"/>
+  <g fill="none" stroke="#aaa8a5" stroke-width="9" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M46 10 28 40 56 35M44 18 37 59"/>
+  </g>
+  <g fill="none" stroke="#171717" stroke-width="10" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M37 5 11 38 43 32M34 14 27 59"/>
+  </g>
 </svg>
