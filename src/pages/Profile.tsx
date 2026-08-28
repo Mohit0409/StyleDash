@@ -24,6 +24,7 @@ export const Profile: React.FC = () => {
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
+  const [linkingGoogle, setLinkingGoogle] = useState(false);
 
   useEffect(() => {
     if (!user) return;
@@ -45,6 +46,20 @@ export const Profile: React.FC = () => {
     finally { setSaving(false); }
   };
 
+  const linkGoogle = async () => {
+    setLinkingGoogle(true); setError(''); setMessage('');
+    try {
+      const { signInWithGoogleProvider } = await import('../services/firebaseClient');
+      const idToken = await signInWithGoogleProvider();
+      await authApi.linkFederated('google', idToken);
+      await refresh();
+      setMessage('Google account linked successfully. You can now sign in with Gmail.');
+    } catch (cause) {
+      setError(cause instanceof ApiError ? cause.message : cause instanceof Error ? cause.message : 'Google account could not be linked.');
+    } finally {
+      setLinkingGoogle(false);
+    }
+  };
   const changePassword = async (event: React.FormEvent) => {
     event.preventDefault(); setSaving(true); setError(''); setMessage('');
     try { await authApi.changePassword(currentPassword, newPassword); setCurrentPassword(''); setNewPassword(''); setMessage('Password changed and other sessions signed out.'); }
@@ -58,7 +73,8 @@ export const Profile: React.FC = () => {
     {error && <p className="text-sm text-red-600" role="alert">{error}</p>}{message && <p className="text-sm text-green-700" role="status">{message}</p>}
     <form onSubmit={saveProfile} className="p-6 bg-white dark:bg-neutral-900 rounded-3xl border dark:border-neutral-800 space-y-4">
       <h2 className="text-xl font-black">Contact and delivery address</h2>
-      <p className="text-xs text-neutral-500">Signed in as {user?.email || user?.phone}. Email changes require support.</p>
+      <p className="text-xs text-neutral-500">Signed in as {user?.email || user?.phone}.</p>
+      {!user?.email && <div className="rounded-2xl border border-neutral-200 dark:border-neutral-800 p-4 space-y-2"><p className="text-sm font-semibold">Add Gmail to this account</p><p className="text-xs text-neutral-500">Link a verified Google account so you can sign in with Gmail without creating a duplicate Vibe4You account.</p><button type="button" disabled={linkingGoogle || saving} onClick={linkGoogle} className="px-4 py-2 rounded-xl border font-bold disabled:opacity-60">{linkingGoogle ? 'Linking Google…' : 'Link Google account'}</button></div>}
       <div className="grid sm:grid-cols-2 gap-4">
         <label className="text-xs font-bold">Full name<input required minLength={2} maxLength={80} value={name} onChange={event => setName(event.target.value)} className="mt-1 w-full p-3 rounded-xl border dark:bg-neutral-800" /></label>
         <label className="text-xs font-bold">Phone<input required minLength={10} maxLength={20} value={phone} onChange={event => setPhone(event.target.value)} className="mt-1 w-full p-3 rounded-xl border dark:bg-neutral-800" /></label>
