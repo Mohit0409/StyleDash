@@ -1,6 +1,6 @@
 export const CONFIG = {
-  BRAND_NAME: import.meta.env.VITE_BRAND_NAME || 'StyleDash',
-  TAGLINE: 'Your look, delivered fast.',
+  BRAND_NAME: import.meta.env.VITE_BRAND_NAME || 'Vibe4You',
+  TAGLINE: 'Your City. Your Shops. Your Style.',
   SUPPORTING_MESSAGE: 'Fashion essentials and trending styles delivered from nearby stores.',
   SERVICE_CITY: import.meta.env.VITE_SERVICE_CITY || 'Neemuch',
   DEFAULT_PINCODE: import.meta.env.VITE_DEFAULT_PINCODE || '458441',

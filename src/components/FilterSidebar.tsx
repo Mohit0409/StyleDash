@@ -135,7 +135,7 @@ export const FilterSidebar: React.FC<FilterSidebarProps> = ({
       <div>
         <label className="block text-xs font-bold uppercase tracking-wider text-neutral-500 mb-2">Brand</label>
         <div className="space-y-1 max-h-40 overflow-y-auto pr-2 no-scrollbar">
-          {['all', 'Roadster', 'HRX', 'StyleDash Studio', 'Anouk', 'Mast & Harbour', 'Highlander', 'Snitch'].map(b => (
+          {['all', 'Roadster', 'HRX', 'Vibe4You Studio', 'Anouk', 'Mast & Harbour', 'Highlander', 'Snitch'].map(b => (
             <label key={b} className="flex items-center gap-2 text-xs font-medium cursor-pointer py-1">
               <input
                 type="radio"

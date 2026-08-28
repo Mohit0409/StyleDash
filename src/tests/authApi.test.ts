@@ -26,7 +26,7 @@ describe('federated auth API', () => {
     expect(JSON.parse(String(init?.body))).toEqual({ idToken: 'token-123' });
   });
 
-  it('proxies /api traffic to the StyleDash backend during local development', () => {
+  it('proxies /api traffic to the Vibe4You backend during local development', () => {
     const config = viteConfig as { server?: { proxy?: Record<string, unknown> } };
     const proxy = config.server?.proxy;
 

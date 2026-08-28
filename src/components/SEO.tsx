@@ -8,6 +8,8 @@ interface SEOProps {
   jsonLd?: Record<string, unknown>;
 }
 
+const PRODUCTION_ORIGIN = 'https://vibe4you.in';
+
 const ensureMeta = (attribute: 'name' | 'property', key: string, content: string) => {
   let element = document.querySelector<HTMLMetaElement>(`meta[${attribute}="${key}"]`);
   if (!element) {
@@ -23,16 +25,16 @@ const removeMeta = (attribute: 'name' | 'property', key: string) => {
 };
 
 export const SEO: React.FC<SEOProps> = ({
-  title = 'StyleDash - Your look, delivered fast.',
+  title = 'Vibe4You - Your City. Your Shops. Your Style.',
   description = 'Fashion essentials, trending streetwear, ethnic wear, and footwear delivered from nearby stores in Neemuch within 60 minutes.',
   image,
   type = 'website',
   jsonLd,
 }) => {
   useEffect(() => {
-    const resolvedTitle = title.includes('StyleDash') ? title : `${title} | StyleDash`;
-    const canonicalUrl = `${window.location.origin}${window.location.pathname}`;
-    const imageUrl = image ? new URL(image, window.location.origin).href : null;
+    const resolvedTitle = title.includes('Vibe4You') ? title : `${title} | Vibe4You`;
+    const canonicalUrl = `${PRODUCTION_ORIGIN}${window.location.pathname}`;
+    const imageUrl = image ? new URL(image, PRODUCTION_ORIGIN).href : null;
 
     document.title = resolvedTitle;
     ensureMeta('name', 'description', description);

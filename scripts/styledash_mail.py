@@ -1,4 +1,4 @@
-"""Private SMTP delivery for StyleDash customer password-reset messages.
+"""Private SMTP delivery for Vibe4You customer password-reset messages.
 
 This module intentionally accepts configuration only from the server runtime.
 It never logs configuration values or reset tokens, and its SMTP transport is

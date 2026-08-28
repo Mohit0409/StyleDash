@@ -12,7 +12,7 @@ DATA_ROOT="$HOME/.local/share/styledash"
 LIVE_DB="$DATA_ROOT/styledash.db"
 LIVE_STATE="$DATA_ROOT/runtime/orders.json"
 BACKUP_SCRIPT="$STAGE/scripts/termux/backup-styledash-data"
-for required_ops_script in styledash-health styledash-notify rollback-payment-release backup-styledash-recovery; do
+for required_ops_script in styledash-health styledash-notify rollback-payment-release backup-styledash-recovery start-styledash-cloudflare; do
   if [ ! -f "$STAGE/scripts/termux/$required_ops_script" ]; then
     echo "release is missing $required_ops_script; deployment aborted" >&2
     exit 1
@@ -211,6 +211,7 @@ install -m 644 "$STAGE/server/payment-data/settings.json" "$HOME/.local/share/st
 install -m 755 "$STAGE/scripts/termux/start-styledash" "$HOME/bin/start-styledash"
 install -m 755 "$STAGE/scripts/termux/start-styledash-admin" "$HOME/bin/start-styledash-admin"
 install -m 755 "$STAGE/scripts/termux/start-styledash-stack" "$HOME/bin/start-styledash-stack"
+install -m 700 "$STAGE/scripts/termux/start-styledash-cloudflare" "$HOME/bin/start-styledash-cloudflare"
 install -m 755 "$STAGE/scripts/termux/styledash-health" "$HOME/bin/styledash-health"
 install -m 755 "$STAGE/scripts/termux/normalize-razorpay-secrets" "$HOME/bin/normalize-razorpay-secrets"
 install -m 755 "$STAGE/scripts/termux/backup-styledash-data" "$HOME/bin/backup-styledash-data"
@@ -260,9 +261,9 @@ try:
 finally:
     connection.close()
 if 6 not in identity_versions or not {1, 2, 3}.issubset(shop_versions):
-    raise SystemExit("StyleDash schema migrations are incomplete")
+    raise SystemExit("Vibe4You schema migrations are incomplete")
 if integrity != "ok" or foreign_keys:
-    raise SystemExit("StyleDash post-migration database validation failed")
+    raise SystemExit("Vibe4You post-migration database validation failed")
 print("styledash_migrations=ok")
 PY
 printf 'backup=%s\n' "$BACKUP"
@@ -278,5 +279,5 @@ else
   echo razorpay-lazy-loader-missing
   exit 1
 fi
-"$HOME/bin/styledash-notify" release_deployed "StyleDash release deployed" "The production release passed local post-deploy health validation." 3 white_check_mark || true
+"$HOME/bin/styledash-notify" release_deployed "Vibe4You release deployed" "The production release passed local post-deploy health validation." 3 white_check_mark || true
 printf 'rollback_command=%s\n' "$HOME/bin/rollback-payment-release"

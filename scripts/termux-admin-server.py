@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Loopback-only StyleDash administrator UI/API. Never tunnel through ngrok."""
+"""Loopback-only Vibe4You administrator UI/API. Never expose publicly."""
 
 from __future__ import annotations
 
@@ -52,10 +52,10 @@ def load_public_module():
     )
     source = next((path for path in candidates if path.exists()), None)
     if source is None:
-        raise RuntimeError("StyleDash public server module was not found")
+        raise RuntimeError("Vibe4You public server module was not found")
     spec = importlib.util.spec_from_file_location("styledash_public_runtime", source)
     if spec is None or spec.loader is None:
-        raise RuntimeError("StyleDash public server module could not be loaded")
+        raise RuntimeError("Vibe4You public server module could not be loaded")
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     return module
@@ -72,11 +72,11 @@ def _notify_inventory_alerts(
 
             if kind == "out_of_stock":
                 event = "inventory_out_of_stock"
-                title = "StyleDash Out of Stock"
+                title = "Vibe4You Out of Stock"
                 tags = ["rotating_light"]
             elif kind == "low_stock":
                 event = "inventory_low_stock"
-                title = "StyleDash Low Stock"
+                title = "Vibe4You Low Stock"
                 tags = ["warning"]
             else:
                 continue
@@ -107,7 +107,7 @@ def _notify_inventory_alerts(
 
         except Exception:
             print(
-                "StyleDash notification preparation failed "
+                "Vibe4You notification preparation failed "
                 "event=inventory",
                 flush=True,
             )
@@ -312,7 +312,7 @@ class AdminApplication:
 
                 owner_notifier().send(
                     event="order_cancelled",
-                    title="StyleDash Order Cancelled",
+                    title="Vibe4You Order Cancelled",
                     message=(
                         f"Order: {order_id}\n"
                         f"Amount: {amount_text}\n"
@@ -326,7 +326,7 @@ class AdminApplication:
             except Exception:
                 # Cancellation and audit are already durable.
                 print(
-                    "StyleDash notification preparation failed "
+                    "Vibe4You notification preparation failed "
                     "event=order_cancelled",
                     flush=True,
                 )
@@ -466,7 +466,7 @@ class AdminApplication:
 
 
 class AdminHandler(BaseHTTPRequestHandler):
-    server_version = "StyleDashAdmin"
+    server_version = "Vibe4YouAdmin"
     application: AdminApplication
     asset_root: Path
     backup_root: Path
@@ -705,7 +705,7 @@ def main() -> None:
         Path(args.settings).resolve(), Path(args.data_dir).resolve(), Path(args.assets).resolve(),
         home / ".local/share/styledash/backups",
     )
-    print(f"StyleDash local administrator service listening on {args.bind}:{args.port}")
+    print(f"Vibe4You local administrator service listening on {args.bind}:{args.port}")
     server.serve_forever()
 
 

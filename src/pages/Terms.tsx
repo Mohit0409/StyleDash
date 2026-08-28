@@ -5,11 +5,11 @@ import { CONFIG } from '../config';
 
 export const Terms = () => (
   <div className="max-w-3xl mx-auto p-8 space-y-6">
-    <SEO title="Terms - StyleDash" />
+    <SEO title="Terms - Vibe4You" />
     <h1 className="text-3xl font-black">Terms of service</h1>
 
     <p className="text-sm text-neutral-600">
-      StyleDash is currently operated by {CONFIG.LEGAL.PROPRIETOR_NAME} from{' '}
+      Vibe4You is currently operated by {CONFIG.LEGAL.PROPRIETOR_NAME} from{' '}
       {CONFIG.LEGAL.ADDRESS}. By placing an order, you agree to these terms and
       the policies linked from them.
     </p>
@@ -18,7 +18,7 @@ export const Terms = () => (
       <h2 className="font-black">Orders and availability</h2>
       <p className="text-sm text-neutral-600">
         Catalogue availability, serviceability, pricing, discounts, delivery
-        charges, and stock are checked by the StyleDash service when an order is
+        charges, and stock are checked by the Vibe4You service when an order is
         submitted. An item shown in the catalogue may become unavailable before
         confirmation. We may reject or cancel an order that cannot be fulfilled
         or that appears fraudulent or abusive.
@@ -30,7 +30,7 @@ export const Terms = () => (
       <p className="text-sm text-neutral-600">
         The server-calculated checkout total is the amount used to create an
         order. If an obvious pricing or catalogue error is discovered before
-        fulfillment, StyleDash may cancel the affected order and refund any
+        fulfillment, Vibe4You may cancel the affected order and refund any
         verified payment rather than fulfill at an erroneous amount.
       </p>
     </section>
@@ -49,7 +49,7 @@ export const Terms = () => (
       <p className="text-sm text-neutral-600">
         Supported orders may use Cash on Delivery or Razorpay checkout. An
         online order is treated as paid only after server-side verification.
-        Do not share a CVV or UPI PIN with StyleDash support staff.
+        Do not share a CVV or UPI PIN with Vibe4You support staff.
       </p>
     </section>
 

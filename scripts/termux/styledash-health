@@ -1,5 +1,5 @@
 #!/data/data/com.termux/files/usr/bin/bash
-# Low-frequency watchdog for local StyleDash services and the authenticated ngrok agent.
+# Low-frequency watchdog for Vibe4You local services, primary Cloudflare origin, and diagnostic ngrok tunnel.
 set -u
 
 LOG_DIR="$HOME/logs"
@@ -7,8 +7,10 @@ RUN_DIR="$HOME/run"
 PID_FILE="$RUN_DIR/styledash-health.pid"
 LOG_FILE="$LOG_DIR/styledash-health.log"
 NGROK_PID_FILE="$RUN_DIR/styledash-ngrok.pid"
+CLOUDFLARE_PID_FILE="$RUN_DIR/styledash-cloudflare.pid"
 URL_FILE="$RUN_DIR/styledash-public-url"
 EXPECTED_CMD='ngrok http http://127.0.0.1:8080'
+PRIMARY_PUBLIC_URL='https://vibe4you.in'
 LAST_BACKUP_FILE="$RUN_DIR/styledash-last-backup-date"
 LAST_BACKUP_ATTEMPT_FILE="$RUN_DIR/styledash-last-backup-attempt"
 BACKUP_RETRY_SECONDS=3600
@@ -51,49 +53,84 @@ ngrok_process_ok() {
   tr '\0' ' ' < "/proc/$pid/cmdline" 2>/dev/null | grep -Fq "$EXPECTED_CMD"
 }
 
+cloudflare_process_ok() {
+  [ -s "$CLOUDFLARE_PID_FILE" ] || return 1
+  pid="$(cat "$CLOUDFLARE_PID_FILE")"
+  kill -0 "$pid" 2>/dev/null || return 1
+  tr '\0' ' ' < "/proc/$pid/cmdline" 2>/dev/null | grep -Fq 'cloudflared tunnel run'
+}
+
 public_unhealthy=0
 admin_unhealthy=0
+ssh_unhealthy=0
+SSHD_SERVICE="$PREFIX/var/service/sshd"
 backup_failed=0
 recovery_backup_failed=0
 ngrok_failures=0
 ngrok_unhealthy=0
+cloudflare_unhealthy=0
 public_failures=0
 public_counter=0
 
 while true; do
+  if pgrep -x sshd >/dev/null 2>&1; then
+    if [ "$ssh_unhealthy" -eq 1 ]; then
+      echo "$(date -Iseconds) sshd recovered" >> "$LOG_FILE"
+      notify ssh_recovered "Vibe4You SSH recovered" "Termux SSH is accepting connections again." 3 white_check_mark
+    fi
+    ssh_unhealthy=0
+  else
+    echo "$(date -Iseconds) sshd unavailable; restarting" >> "$LOG_FILE"
+    if [ "$ssh_unhealthy" -eq 0 ]; then
+      notify ssh_unhealthy "Vibe4You SSH unavailable" "Termux SSH stopped; the watchdog is restarting it." 5 warning
+    fi
+    ssh_unhealthy=1
+    if [ -d "$SSHD_SERVICE" ]; then
+      sv up "$SSHD_SERVICE" >/dev/null 2>&1 || true
+      sleep 1
+    fi
+    if ! pgrep -x sshd >/dev/null 2>&1; then
+      sshd >/dev/null 2>&1 || true
+    fi
+    if ! pgrep -x sshd >/dev/null 2>&1; then
+      echo "$(date -Iseconds) sshd restart failed" >> "$LOG_FILE"
+      notify ssh_restart_failed "Vibe4You SSH restart failed" "Termux SSH is still unavailable after restart attempts." 5 rotating_light
+    fi
+  fi
+
   if curl -fsS --max-time 5 http://127.0.0.1:8080/api/health >/dev/null; then
     if [ "$public_unhealthy" -eq 1 ]; then
       echo "$(date -Iseconds) local public service recovered" >> "$LOG_FILE"
-      notify public_recovered "StyleDash public service recovered" "Port 8080 is healthy again." 3 white_check_mark
+      notify public_recovered "Vibe4You public service recovered" "Port 8080 is healthy again." 3 white_check_mark
     fi
     public_unhealthy=0
   else
     echo "$(date -Iseconds) local public site unhealthy; restarting" >> "$LOG_FILE"
     if [ "$public_unhealthy" -eq 0 ]; then
-      notify public_unhealthy "StyleDash public service unhealthy" "Port 8080 failed its health check; a restart was requested." 5 rotating_light
+      notify public_unhealthy "Vibe4You public service unhealthy" "Port 8080 failed its health check; a restart was requested." 5 rotating_light
     fi
     public_unhealthy=1
     if ! "$HOME/bin/start-styledash"; then
       echo "$(date -Iseconds) local public service restart failed" >> "$LOG_FILE"
-      notify public_restart_failed "StyleDash public restart failed" "Port 8080 is still unavailable after a restart attempt." 5 rotating_light
+      notify public_restart_failed "Vibe4You public restart failed" "Port 8080 is still unavailable after a restart attempt." 5 rotating_light
     fi
   fi
 
   if curl -fsS --max-time 3 -H 'Host: 127.0.0.1:8081' http://127.0.0.1:8081/ >/dev/null; then
     if [ "$admin_unhealthy" -eq 1 ]; then
       echo "$(date -Iseconds) local admin service recovered" >> "$LOG_FILE"
-      notify admin_recovered "StyleDash admin service recovered" "Private port 8081 is healthy again." 3 white_check_mark
+      notify admin_recovered "Vibe4You admin service recovered" "Private port 8081 is healthy again." 3 white_check_mark
     fi
     admin_unhealthy=0
   else
     echo "$(date -Iseconds) local admin service unhealthy; restarting it independently" >> "$LOG_FILE"
     if [ "$admin_unhealthy" -eq 0 ]; then
-      notify admin_unhealthy "StyleDash admin service unhealthy" "Private port 8081 failed its health check; a restart was requested." 5 rotating_light
+      notify admin_unhealthy "Vibe4You admin service unhealthy" "Private port 8081 failed its health check; a restart was requested." 5 rotating_light
     fi
     admin_unhealthy=1
     if ! "$HOME/bin/start-styledash-admin"; then
       echo "$(date -Iseconds) local admin service restart failed" >> "$LOG_FILE"
-      notify admin_restart_failed "StyleDash admin restart failed" "Private port 8081 is still unavailable after a restart attempt." 5 rotating_light
+      notify admin_restart_failed "Vibe4You admin restart failed" "Private port 8081 is still unavailable after a restart attempt." 5 rotating_light
     fi
   fi
 
@@ -117,13 +154,13 @@ while true; do
     if "$HOME/bin/backup-styledash-data" >> "$LOG_FILE" 2>&1; then
       printf '%s\n' "$backup_date" > "$LAST_BACKUP_FILE"
       if [ "$backup_failed" -eq 1 ]; then
-        notify backup_recovered "StyleDash backup recovered" "The scheduled production backup completed successfully." 3 white_check_mark
+        notify backup_recovered "Vibe4You backup recovered" "The scheduled production backup completed successfully." 3 white_check_mark
       fi
       backup_failed=0
     else
       echo "$(date -Iseconds) private data backup failed; watchdog will retry after cooldown" >> "$LOG_FILE"
       if [ "$backup_failed" -eq 0 ]; then
-        notify backup_failed "StyleDash backup failed" "The scheduled production backup failed; the watchdog will retry after its cooldown." 5 warning
+        notify backup_failed "Vibe4You backup failed" "The scheduled production backup failed; the watchdog will retry after its cooldown." 5 warning
       fi
       backup_failed=1
     fi
@@ -157,7 +194,7 @@ while true; do
 
       if [ "$recovery_backup_failed" -eq 1 ]; then
         notify recovery_backup_recovered \
-          "StyleDash recovery backup recovered" \
+          "Vibe4You recovery backup recovered" \
           "The weekly full disaster-recovery backup completed successfully." \
           3 white_check_mark
       fi
@@ -169,13 +206,27 @@ while true; do
 
       if [ "$recovery_backup_failed" -eq 0 ]; then
         notify recovery_backup_failed \
-          "StyleDash recovery backup failed" \
+          "Vibe4You recovery backup failed" \
           "The weekly full disaster-recovery backup failed; the watchdog will retry after its cooldown." \
           5 warning
       fi
 
       recovery_backup_failed=1
     fi
+  fi
+
+  if ! cloudflare_process_ok; then
+    echo "$(date -Iseconds) Cloudflare tunnel process unavailable; restarting" >> "$LOG_FILE"
+    if [ "$cloudflare_unhealthy" -eq 0 ]; then
+      notify cloudflare_tunnel_unhealthy "Vibe4You Cloudflare tunnel unavailable" "The production tunnel stopped; the watchdog is restarting it." 5 warning
+    fi
+    cloudflare_unhealthy=1
+    if "$HOME/bin/start-styledash-cloudflare"; then
+            cloudflare_unhealthy=0
+      notify cloudflare_tunnel_recovered "Vibe4You Cloudflare tunnel recovered" "The production tunnel process is running again." 3 white_check_mark
+    fi
+  else
+        cloudflare_unhealthy=0
   fi
 
   url=''
@@ -186,7 +237,7 @@ while true; do
   if printf '%s' "$url" | grep -Eq '^https://[-a-z0-9]+\.ngrok-free\.(app|dev)$'; then
     printf '%s\n' "$url" > "$URL_FILE"
     if [ "$ngrok_unhealthy" -eq 1 ]; then
-      notify tunnel_recovered "StyleDash tunnel recovered" "The authenticated ngrok tunnel is healthy again." 3 white_check_mark
+      notify tunnel_recovered "Vibe4You tunnel recovered" "The authenticated ngrok tunnel is healthy again." 3 white_check_mark
     fi
     ngrok_failures=0
     ngrok_unhealthy=0
@@ -195,30 +246,33 @@ while true; do
     ngrok_unhealthy=1
     echo "$(date -Iseconds) ngrok local health failure $ngrok_failures/2" >> "$LOG_FILE"
     if [ "$ngrok_failures" -ge 2 ]; then
-      notify tunnel_restart "StyleDash tunnel restarting" "The ngrok agent failed repeated local health checks and is being restarted." 4 warning
+      notify tunnel_restart "Vibe4You tunnel restarting" "The ngrok agent failed repeated local health checks and is being restarted." 4 warning
       "$HOME/bin/stop-styledash-ngrok" || true
       sleep 5
       if ! "$HOME/bin/start-styledash-ngrok"; then
-        notify tunnel_restart_failed "StyleDash tunnel restart failed" "The ngrok agent did not restart successfully." 5 rotating_light
+        notify tunnel_restart_failed "Vibe4You tunnel restart failed" "The ngrok agent did not restart successfully." 5 rotating_light
       fi
       ngrok_failures=0
     fi
   fi
 
   public_counter=$((public_counter + 1))
-  if [ "$public_counter" -ge 30 ] && [ -s "$URL_FILE" ]; then
+  if [ "$public_counter" -ge 30 ]; then
     public_counter=0
-    url="$(cat "$URL_FILE")"
-    if curl -fsS --max-time 12 -H 'ngrok-skip-browser-warning: styledash-health' "$url/" >/dev/null; then
+    if curl -fsS --max-time 12 "$PRIMARY_PUBLIC_URL/api/health" | grep -Fq '"service":"Vibe4You"'; then
       public_failures=0
     else
       public_failures=$((public_failures + 1))
-      echo "$(date -Iseconds) ngrok public health failure $public_failures/2" >> "$LOG_FILE"
+      echo "$(date -Iseconds) primary production origin health failure $public_failures/2" >> "$LOG_FILE"
       if [ "$public_failures" -ge 2 ]; then
-        notify public_tunnel_failed "StyleDash public tunnel unhealthy" "The public site failed repeated external health checks; ngrok is being restarted." 5 rotating_light
-        "$HOME/bin/stop-styledash-ngrok" || true
+        notify public_origin_failed "Vibe4You production origin unhealthy" "vibe4you.in failed repeated external health checks; the Cloudflare tunnel is being restarted." 5 rotating_light
+        if [ -s "$CLOUDFLARE_PID_FILE" ]; then
+          pid="$(cat "$CLOUDFLARE_PID_FILE" 2>/dev/null || true)"
+          [ -n "$pid" ] && kill "$pid" 2>/dev/null || true
+        fi
+        rm -f "$CLOUDFLARE_PID_FILE"
         sleep 5
-        "$HOME/bin/start-styledash-ngrok" || true
+        "$HOME/bin/start-styledash-cloudflare" || true
         public_failures=0
       fi
     fi

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Serve StyleDash and provide its same-origin payment API."""
+"""Serve Vibe4You and provide its same-origin payment API."""
 
 from __future__ import annotations
 
@@ -79,7 +79,7 @@ ACCESS_LOG_TOKEN_PATTERN = re.compile(r"([?&](?:token|reset_token)=)[^&#\s]*", r
 PAYMENT_TEST_PRODUCT_ID = "styledash-payment-test-item"
 PAYMENT_TEST_PRODUCT_SLUG = "styledash-payment-test-item"
 PAYMENT_TEST_ROUTE = f"/payment-test/{PAYMENT_TEST_PRODUCT_SLUG}"
-PAYMENT_TEST_PRODUCT_NAME = "StyleDash Payment Test Item"
+PAYMENT_TEST_PRODUCT_NAME = "Vibe4You Payment Test Item"
 PAYMENT_TEST_VARIANT_ID = "styledash-payment-test-item-validation"
 PAYMENT_TEST_PRICE_RUPEES = 10
 PAYMENT_TEST_AMOUNT_PAISE = 1000
@@ -126,7 +126,7 @@ def _notify_finalized_payment(order: dict[str, Any]) -> None:
 
         owner_notifier().send(
             event="payment_captured",
-            title="StyleDash Payment Received",
+            title="Vibe4You Payment Received",
             message=(
                 f"Order: {order_id}\n"
                 f"Amount: {amount_text}\n"
@@ -140,7 +140,7 @@ def _notify_finalized_payment(order: dict[str, Any]) -> None:
     except Exception:
         # Notification preparation must never affect financial truth.
         print(
-            "StyleDash notification preparation failed "
+            "Vibe4You notification preparation failed "
             "event=payment_captured",
             flush=True,
         )
@@ -157,11 +157,11 @@ def _notify_inventory_alerts(
 
             if kind == "out_of_stock":
                 event = "inventory_out_of_stock"
-                title = "StyleDash Out of Stock"
+                title = "Vibe4You Out of Stock"
                 tags = ["rotating_light"]
             elif kind == "low_stock":
                 event = "inventory_low_stock"
-                title = "StyleDash Low Stock"
+                title = "Vibe4You Low Stock"
                 tags = ["warning"]
             else:
                 continue
@@ -194,7 +194,7 @@ def _notify_inventory_alerts(
 
         except Exception:
             print(
-                "StyleDash notification preparation failed "
+                "Vibe4You notification preparation failed "
                 "event=inventory",
                 flush=True,
             )
@@ -321,7 +321,7 @@ class JsonStateStore:
         try:
             loaded = json.loads(self.path.read_text(encoding="utf-8"))
             if not isinstance(loaded, dict):
-                raise RuntimeError("StyleDash payment state is not a JSON object")
+                raise RuntimeError("Vibe4You payment state is not a JSON object")
             for key, value in default.items():
                 loaded.setdefault(key, value)
             for order_id, order in loaded["orders"].items():
@@ -330,7 +330,7 @@ class JsonStateStore:
                     loaded["processedPayments"].setdefault(payment_id, order_id)
             return loaded
         except (OSError, json.JSONDecodeError) as exc:
-            raise RuntimeError("StyleDash payment state could not be loaded safely") from exc
+            raise RuntimeError("Vibe4You payment state could not be loaded safely") from exc
 
     def save(self) -> None:
         temporary = self.path.with_suffix(f"{self.path.suffix}.tmp")
@@ -462,7 +462,7 @@ class PaymentService:
             raise RuntimeError("STYLEDASH_TEST_PRODUCT_ALLOWED_EMAILS contains an invalid email address") from None
 
     def health(self) -> dict[str, str]:
-        result = {"status": "ok", "service": "StyleDash"}
+        result = {"status": "ok", "service": "Vibe4You"}
         if self.security is not None:
             result["database"] = "ok" if self.security.health() else "error"
         return result
@@ -1635,7 +1635,7 @@ class PaymentService:
                 if result["fullRefund"]:
                     owner_notifier().send(
                         event="refund_processed",
-                        title="StyleDash Refund Processed",
+                        title="Vibe4You Refund Processed",
                         message=(
                             f"Order: {order_id}\n"
                             f"Amount: {amount_text}\n"
@@ -1761,7 +1761,7 @@ class PaymentService:
 
                 owner_notifier().send(
                     event="payment_failed",
-                    title="StyleDash Payment Failed",
+                    title="Vibe4You Payment Failed",
                     message=(
                         f"Order: {style_order_id}\n"
                         f"Payment reference: {safe_payment_ref}\n"
@@ -1871,6 +1871,20 @@ class PaymentService:
 class StyleDashRequestHandler(SimpleHTTPRequestHandler):
     payment_service: PaymentService
     rate_limiter = RateLimiter()
+
+    def guess_type(self, path: str) -> str:
+        content_type = super().guess_type(path)
+        if "charset=" not in content_type and (
+            content_type.startswith("text/")
+            or content_type in {
+                "application/javascript",
+                "application/json",
+                "application/xml",
+                "image/svg+xml",
+            }
+        ):
+            return f"{content_type}; charset=utf-8"
+        return content_type
 
     def end_headers(self) -> None:
         path = urlsplit(self.path).path
@@ -2273,7 +2287,7 @@ class StyleDashRequestHandler(SimpleHTTPRequestHandler):
 
                     owner_notifier().send(
                         event="cod_order_placed",
-                        title="New StyleDash Order",
+                        title="New Vibe4You Order",
                         message=(
                             f"Order: {order.get('id') or '-'}\n"
                             f"Amount: {amount_text}\n"
@@ -2292,7 +2306,7 @@ class StyleDashRequestHandler(SimpleHTTPRequestHandler):
 
                 owner_notifier().send(
                     event="customer_registered",
-                    title="New StyleDash Registration",
+                    title="New Vibe4You Registration",
                     message=(
                         f"Name: {user.get('name') or '-'}\n"
                         f"Email: {mask_email(user.get('email') or '')}\n"
@@ -2332,7 +2346,7 @@ class StyleDashRequestHandler(SimpleHTTPRequestHandler):
                     )
                     owner_notifier().send(
                         event="customer_registered",
-                        title="New StyleDash Registration",
+                        title="New Vibe4You Registration",
                         message=(
                             f"Name: {user.get('name') or '-'}\n"
                             f"{contact}\n"
@@ -2724,7 +2738,7 @@ def main() -> None:
         Path(args.settings).resolve(),
         Path(args.data_directory).resolve(),
     )
-    print(f"Serving StyleDash at http://{args.bind}:{args.port}", flush=True)
+    print(f"Serving Vibe4You at http://{args.bind}:{args.port}", flush=True)
     try:
         server.serve_forever()
     finally:

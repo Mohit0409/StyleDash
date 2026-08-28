@@ -27,7 +27,7 @@ export const Home: React.FC = () => {
 
   return (
     <div className="space-y-12 pb-16">
-      <SEO title="StyleDash - Your look, delivered fast" />
+      <SEO title="Vibe4You - Your look, delivered fast" />
 
       {/* Hero Section */}
       <section className="relative overflow-hidden bg-neutral-950 text-white py-16 lg:py-24 px-4 sm:px-6 lg:px-8">
@@ -160,7 +160,7 @@ export const Home: React.FC = () => {
           <div className="flex items-center justify-between">
             <div>
               <span className="text-xs font-black uppercase text-lime-700 dark:text-lime-400 tracking-wider">Budget Deals</span>
-              <h2 className="text-2xl font-black text-neutral-900 dark:text-white">Styles Under ₹499</h2>
+              <h2 className="text-2xl font-black text-neutral-900 dark:text-white">Styles Under â‚¹499</h2>
             </div>
             <Link to="/products?maxPrice=499" className="text-xs font-bold text-neutral-900 dark:text-white hover:underline flex items-center gap-1">
               Shop All Deals <ArrowRight className="w-3.5 h-3.5" />

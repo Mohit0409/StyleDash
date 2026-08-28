@@ -143,17 +143,17 @@ export const AuthPage: React.FC<{ mode: 'login' | 'register' }> = ({ mode }) => 
   };
 
   return <div className="max-w-md mx-auto px-4 py-12">
-    <SEO title={`${mode === 'login' ? 'Login' : 'Register'} - StyleDash`} />
+    <SEO title={`${mode === 'login' ? 'Login' : 'Register'} - Vibe4You`} />
     <div className="bg-white dark:bg-neutral-900 border dark:border-neutral-800 rounded-3xl p-7 space-y-4 shadow-sm">
       <h1 className="text-2xl font-black">{mode === 'login' ? 'Welcome back' : 'Create your account'}</h1>
       <div className="space-y-2">
-        <button type="button" disabled={authBusy || !firebaseEnabled} onClick={handleGoogle} className="w-full rounded-xl border border-neutral-300 px-3 py-3 font-semibold disabled:opacity-60">{providerBusy === 'google' ? 'Please wait…' : firebaseEnabled ? 'Continue with Google' : 'Google sign-in unavailable'}</button>
+        <button type="button" disabled={authBusy || !firebaseEnabled} onClick={handleGoogle} className="w-full rounded-xl border border-neutral-300 px-3 py-3 font-semibold disabled:opacity-60">{providerBusy === 'google' ? 'Please waitâ€¦' : firebaseEnabled ? 'Continue with Google' : 'Google sign-in unavailable'}</button>
         <div className="rounded-2xl border border-neutral-200 p-3 space-y-3">
           <input minLength={10} maxLength={20} autoComplete="tel" value={phone} onChange={event => setPhone(event.target.value)} placeholder="Mobile number" className="w-full p-3 rounded-xl border dark:bg-neutral-800" />
-          {!otpSent ? <button type="button" disabled={authBusy || !firebaseEnabled} onClick={handlePhoneStart} className="w-full rounded-xl bg-neutral-950 px-3 py-3 font-semibold text-white disabled:opacity-60">{otpBusy ? 'Sending OTP…' : firebaseEnabled ? 'Continue with Mobile' : 'Mobile OTP unavailable'}</button> : <>
+          {!otpSent ? <button type="button" disabled={authBusy || !firebaseEnabled} onClick={handlePhoneStart} className="w-full rounded-xl bg-neutral-950 px-3 py-3 font-semibold text-white disabled:opacity-60">{otpBusy ? 'Sending OTPâ€¦' : firebaseEnabled ? 'Continue with Mobile' : 'Mobile OTP unavailable'}</button> : <>
             <p className="text-xs text-neutral-500">Code sent to {phone.replace(/(\d{2})\d+(\d{2})$/, '$1******$2')}</p>
             <input inputMode="numeric" autoComplete="one-time-code" pattern="[0-9]{6}" maxLength={6} value={otpCode} onChange={event => setOtpCode(event.target.value.replace(/\D/g, ''))} placeholder="Enter OTP" className="w-full p-3 rounded-xl border dark:bg-neutral-800" />
-            <button type="button" disabled={authBusy || otpCode.length !== 6} onClick={handlePhoneConfirm} className="w-full rounded-xl bg-lime-600 px-3 py-3 font-semibold text-white disabled:opacity-60">{providerBusy === 'phone' ? 'Verifying…' : 'Verify OTP'}</button>
+            <button type="button" disabled={authBusy || otpCode.length !== 6} onClick={handlePhoneConfirm} className="w-full rounded-xl bg-lime-600 px-3 py-3 font-semibold text-white disabled:opacity-60">{providerBusy === 'phone' ? 'Verifyingâ€¦' : 'Verify OTP'}</button>
             <div className="flex justify-between text-xs"><button type="button" disabled={authBusy || resendIn > 0} onClick={handlePhoneStart} className="font-bold text-lime-600">{resendIn ? `Resend in ${resendIn}s` : 'Resend OTP'}</button><button type="button" disabled={authBusy} onClick={changePhone} className="font-bold text-lime-600 disabled:opacity-60">Change number</button></div>
           </>}
           <div id="recaptcha-container" />
@@ -170,8 +170,8 @@ export const AuthPage: React.FC<{ mode: 'login' | 'register' }> = ({ mode }) => 
         <input required type="password" minLength={12} maxLength={256} autoComplete={mode === 'login' ? 'current-password' : 'new-password'} value={password} onChange={event => setPassword(event.target.value)} placeholder="Password (12+ characters)" className="w-full p-3 rounded-xl border dark:bg-neutral-800" />
         {mode === 'register' && <p className="text-xs text-neutral-500">Use at least 12 characters. Long passphrases and password-manager passwords are supported.</p>}
         {error && <p role="alert" className="text-sm text-red-600">{error}</p>}
-        <button disabled={authBusy} className="w-full p-3 rounded-xl bg-neutral-950 dark:bg-lime-400 text-white dark:text-neutral-950 font-bold disabled:opacity-60">{loading ? 'Please wait…' : mode === 'login' ? 'Login' : 'Register'}</button>
-        <p className="text-xs text-center">{mode === 'login' ? <><Link className="text-lime-600 font-bold" to="/forgot-password">Forgot password?</Link><span className="mx-2 text-neutral-400">·</span>New here? <Link className="text-lime-600 font-bold" to="/register" state={{ from: destination }}>Register</Link></> : <>Already registered? <Link className="text-lime-600 font-bold" to="/login" state={{ from: destination }}>Login</Link></>}</p>
+        <button disabled={authBusy} className="w-full p-3 rounded-xl bg-neutral-950 dark:bg-lime-400 text-white dark:text-neutral-950 font-bold disabled:opacity-60">{loading ? 'Please waitâ€¦' : mode === 'login' ? 'Login' : 'Register'}</button>
+        <p className="text-xs text-center">{mode === 'login' ? <><Link className="text-lime-600 font-bold" to="/forgot-password">Forgot password?</Link><span className="mx-2 text-neutral-400">Â·</span>New here? <Link className="text-lime-600 font-bold" to="/register" state={{ from: destination }}>Register</Link></> : <>Already registered? <Link className="text-lime-600 font-bold" to="/login" state={{ from: destination }}>Login</Link></>}</p>
       </form>
     </div>
   </div>;

@@ -53,7 +53,7 @@ mkdir -p \
 
 chmod 700 "$WORK" "$VERIFY" "$OUT"
 
-echo "$(date -Iseconds) building StyleDash recovery bundle"
+echo "$(date -Iseconds) building Vibe4You recovery bundle"
 
 cp -a "$HOME/server" "$WORK/home/"
 cp -a "$HOME/admin" "$WORK/home/"
@@ -87,7 +87,7 @@ rclone version > "$WORK/system/rclone-version.txt" 2>&1 || true
 openssl version > "$WORK/system/openssl-version.txt"
 
 cat > "$WORK/RESTORE-NOTES.txt" <<'NOTES'
-StyleDash disaster-recovery bundle.
+Vibe4You disaster-recovery bundle.
 
 Restore sequence:
 1. Install Termux and required packages.
@@ -198,5 +198,5 @@ for path in files[4:]:
 PY
 
 SUCCESS=1
-echo "Full StyleDash recovery backup verified: $STAMP"
+echo "Full Vibe4You recovery backup verified: $STAMP"
 echo "SHA256: $HASH"

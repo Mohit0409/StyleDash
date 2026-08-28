@@ -6,7 +6,7 @@ import { CATEGORIES } from '../data/categories';
 export const Categories: React.FC = () => {
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
-      <SEO title="Fashion Categories - StyleDash" />
+      <SEO title="Fashion Categories - Vibe4You" />
       <h1 className="text-2xl sm:text-3xl font-black text-neutral-900 dark:text-white">All Fashion Categories</h1>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
