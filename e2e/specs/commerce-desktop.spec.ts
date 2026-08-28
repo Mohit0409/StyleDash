@@ -42,7 +42,14 @@ test.beforeAll(async () => {
         },
       });
 
-      expect(response.status()).toBe(201);
+      if (response.status() === 409) {
+        const login = await api.post('/api/auth/login', {
+          data: { email: user.email, password: user.password },
+        });
+        expect(login.status()).toBe(200);
+      } else {
+        expect(response.status()).toBe(201);
+      }
     }
   } finally {
     await api.dispose();
@@ -303,7 +310,7 @@ test('mocked Razorpay cancellation keeps checkout and cart intact', async ({
       CancelledRazorpay;
   });
 
-  await page.getByRole('button', { name: /Pay ₹/ }).click();
+  await page.getByRole('button', { name: /^Pay / }).click();
 
   await expect(page.getByRole('alert')).toHaveText(
     'Payment was cancelled.',
@@ -389,7 +396,7 @@ test('mocked Razorpay failure does not verify or clear the cart', async ({
       FailedRazorpay;
   });
 
-  await page.getByRole('button', { name: /Pay ₹/ }).click();
+  await page.getByRole('button', { name: /^Pay / }).click();
 
   await expect(page.getByRole('alert')).toHaveText(
     'E2E simulated payment decline',
