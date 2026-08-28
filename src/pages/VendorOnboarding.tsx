@@ -84,7 +84,7 @@ const stageIndexFor = (status: ShopApplicationStatus) => ({
   UNDER_REVIEW: 2,
   APPROVED: 3,
   REJECTED: 2,
-  ACTIVE: 4,
+  ACTIVE: 5,
   SUSPENDED: 4,
 }[status]);
 
@@ -198,8 +198,8 @@ export const VendorOnboarding: React.FC = () => {
           <ol className="grid grid-cols-3 gap-2 sm:grid-cols-6">
             {ONBOARDING_STAGES.map((stage, index) => {
               const current = stageIndexFor(application.status);
-              const complete = index <= current || (stage === 'Products' && application.status === 'ACTIVE');
-              const isCurrent = index === current || (stage === 'Products' && application.status === 'ACTIVE');
+              const complete = index <= current;
+              const isCurrent = index === current;
               return (
                 <li key={stage} aria-current={isCurrent ? 'step' : undefined} className="text-center">
                   <span className={`mx-auto flex h-8 w-8 items-center justify-center rounded-full text-xs font-black ${complete ? 'bg-lime-400 text-neutral-950' : 'bg-neutral-100 text-neutral-400 dark:bg-neutral-800'}`}>{index + 1}</span>
