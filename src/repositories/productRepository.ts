@@ -1,5 +1,4 @@
 import { Product } from '../types';
-import { PRODUCTS } from '../data/products';
 import { inventoryRepository } from './inventoryRepository';
 import { shopProductApi } from '../services/businessApi';
 
@@ -71,8 +70,13 @@ const mergeCatalogue = (staticProducts: Product[], shopProducts: Product[]): Pro
   }));
 };
 
+const getStaticProducts = async (): Promise<Product[]> => {
+  const { PRODUCTS } = await import('../data/products');
+  return PRODUCTS.map(normalizeStoreMetadata);
+};
+
 const getCatalogue = async (): Promise<Product[]> => mergeCatalogue(
-  PRODUCTS.map(normalizeStoreMetadata),
+  await getStaticProducts(),
   await getPublishedShopProducts(),
 );
 
