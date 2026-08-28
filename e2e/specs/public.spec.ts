@@ -41,7 +41,9 @@ test('favicon uses the interlocked 44 mark', async ({ request }) => {
   const favicon = await response.text();
 
   expect(response.ok()).toBeTruthy();
-  expect(favicon).toContain('Vibe4You interlocked 44');
+  expect(favicon).toContain('Vibe4You black and gray interlocked 44');
+  expect(favicon).toContain('#171717');
+  expect(favicon).toContain('#aaa8a5');
   expect(favicon).not.toContain('V4Y');
   expect(favicon).not.toContain('SD');
 });
