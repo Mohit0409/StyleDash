@@ -4,7 +4,7 @@ Vibe4You is a production-quality, hyperlocal fashion marketplace built for fast 
 
 ## Features
 
-- **Hyperlocal 60-Min Delivery**: Pincode serviceability verification for Neemuch (`458441`).
+- **Hyperlocal Within-a-Day Delivery**: Pincode serviceability verification for Neemuch (`458441`), with express delivery available on weekends when enabled by the server.
 - **Authoritative Serviceability API**: `/api/serviceability?pincode=<six digits>` checks delivery availability from the same backend configuration used by checkout.
 - **Controlled Payment Validation**: An optional server-gated ₹10 Razorpay validation item is hidden from the catalogue and restricted to privately configured, mailbox-verified authenticated accounts; it never enters fulfillment or fashion inventory.
 - **Complete Fashion Catalogue**: Over 125 clothing, footwear, and accessory products across Men, Women, Kids, and Accessories.

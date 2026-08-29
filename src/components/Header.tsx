@@ -31,7 +31,7 @@ export const Header: React.FC<{ onOpenCart: () => void; onOpenLocation: () => vo
       {/* Top Banner */}
       <div className="bg-neutral-950 text-white text-xs py-1.5 px-4 text-center flex items-center justify-center gap-2">
         <Zap className="w-3.5 h-3.5 text-lime-400 fill-lime-400" />
-        <span><strong>60-MIN EXPRESS DELIVERY</strong> in {CONFIG.SERVICE_CITY} — Multi-Store Local Marketplace!</span>
+        <span><strong>NORMAL DELIVERY WITHIN A DAY · WEEKEND EXPRESS</strong> in {CONFIG.SERVICE_CITY} — Multi-Store Local Marketplace!</span>
       </div>
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">

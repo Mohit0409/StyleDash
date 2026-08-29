@@ -63,6 +63,15 @@ class PaymentServiceTests(unittest.TestCase):
     def tearDown(self) -> None:
         self.temporary.cleanup()
 
+    def test_weekday_express_is_coerced_to_standard_and_weekend_is_available(self):
+        monday = SERVER.datetime(2026, 8, 31, 6, 0, tzinfo=SERVER.timezone.utc)
+        saturday = SERVER.datetime(2026, 8, 29, 6, 0, tzinfo=SERVER.timezone.utc)
+        self.assertFalse(self.service.express_delivery_available(monday))
+        self.assertTrue(self.service.express_delivery_available(saturday))
+        with patch.object(SERVER.PaymentService, "express_delivery_available", return_value=False):
+            quote = self.service.calculate_order(self.payload(deliveryMethod="express"))
+        self.assertEqual(quote["deliveryMethod"], "standard")
+
     def payload(self, **overrides):
         payload = {
             "items": [{"productId": "sd-prod-001", "variantId": "sd-prod-001-var-2", "quantity": 2}],

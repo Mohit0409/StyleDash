@@ -20,7 +20,7 @@ from cryptography.fernet import Fernet
 
 COOKIE_NAME = "__Host-styledash_session"
 EMAIL_PATTERN = re.compile(r"^[^\s@]+@[^\s@]+\.[^\s@]+$")
-PASSWORD_MIN = 12
+PASSWORD_MIN = 8
 PASSWORD_MAX = 256
 CUSTOMER_ABSOLUTE_HOURS = 24 * 7
 CUSTOMER_IDLE_HOURS = 24

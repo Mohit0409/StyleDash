@@ -15,7 +15,7 @@ import threading
 import time
 from http.cookies import SimpleCookie
 from collections import defaultdict, deque
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 from decimal import Decimal, ROUND_HALF_UP
 from functools import partial
 from http import HTTPStatus
@@ -484,6 +484,12 @@ class PaymentService:
         with self._products_lock:
             return self.products
 
+    @staticmethod
+    def express_delivery_available(now: datetime | None = None) -> bool:
+        current = now or datetime.now(timezone.utc)
+        india_time = current.astimezone(timezone(timedelta(hours=5, minutes=30)))
+        return india_time.weekday() >= 5
+
     def is_serviceable_pincode(self, pincode: str) -> bool:
         return _is_six_ascii_digits(pincode) and pincode in self.supported_pincodes
 
@@ -498,8 +504,8 @@ class PaymentService:
             "serviceable": True,
             "city": "Neemuch",
             "state": "Madhya Pradesh",
-            "expressAvailable": True,
-            "estimatedDeliveryMinutes": 60,
+            "expressAvailable": self.express_delivery_available(),
+            "estimatedDeliveryMinutes": 60 if self.express_delivery_available() else None,
         }
 
     def can_access_payment_test_product(self, user: Any) -> bool:
@@ -577,10 +583,13 @@ class PaymentService:
                 product = products.get(product_id)
                 if not product or not product.get("vendorId") or not product.get("variants"):
                     continue
-                result[product_id] = self._inventory(state, product["variants"][0])
+                for variant in product["variants"]:
+                    result[variant["id"]] = self._inventory(state, variant)
         return result
 
-    def set_shop_inventory(self, product_id: str, stock: Any) -> dict[str, Any]:
+    def set_shop_inventory(
+        self, product_id: str, stock: Any, variant_id: str | None = None
+    ) -> dict[str, Any]:
         if (
             isinstance(stock, bool)
             or not isinstance(stock, int)
@@ -604,7 +613,21 @@ class PaymentService:
                 "The published product is not currently active.",
                 "published_product_required",
             )
-        variant = product["variants"][0]
+        if variant_id is None:
+            if len(product["variants"]) != 1:
+                raise SecurityError(
+                    400,
+                    "Choose the size whose stock you want to update.",
+                    "variant_required",
+                )
+            variant = product["variants"][0]
+        else:
+            variant = next(
+                (item for item in product["variants"] if item["id"] == variant_id),
+                None,
+            )
+            if variant is None:
+                raise SecurityError(404, "Product size variant not found.", "variant_not_found")
         inventory_alert = None
         with self.store.lock:
             before = self._inventory(self.store.state, variant)
@@ -618,6 +641,7 @@ class PaymentService:
         return {
             "productId": product_id,
             "variantId": variant["id"],
+            "size": variant.get("size"),
             "before": before,
             "stock": stock,
         }
@@ -659,6 +683,8 @@ class PaymentService:
         delivery_fees = self.settings["deliveryFees"]
         if delivery_method not in delivery_fees:
             raise ApiError(HTTPStatus.UNPROCESSABLE_ENTITY, "Unsupported delivery method.", "invalid_delivery")
+        if delivery_method == "express" and not self.express_delivery_available():
+            delivery_method = "standard"
 
         wallet_amount = payload.get("walletAmount", 0)
         if wallet_amount not in (0, None):
@@ -2139,9 +2165,10 @@ class StyleDashRequestHandler(SimpleHTTPRequestHandler):
                     [product["id"] for product in products]
                 )
                 for product in products:
-                    stock = live_inventory.get(product["id"])
-                    if stock is not None and product.get("variants"):
-                        product["variants"][0]["stock"] = stock
+                    for variant in product.get("variants", []):
+                        stock = live_inventory.get(variant["id"])
+                        if stock is not None:
+                            variant["stock"] = stock
                 self._json_response(
                     HTTPStatus.OK,
                     {"success": True, "products": products},
@@ -2181,8 +2208,12 @@ class StyleDashRequestHandler(SimpleHTTPRequestHandler):
                     [product["id"] for product in products if product["status"] == "PUBLISHED"]
                 )
                 for product in products:
-                    if product["id"] in live_inventory:
-                        product["inventory"] = live_inventory[product["id"]]
+                    for variant in product.get("variants", []):
+                        stock = live_inventory.get(variant["id"])
+                        if stock is not None:
+                            variant["inventory"] = stock
+                    if product.get("variants"):
+                        product["inventory"] = sum(item["inventory"] for item in product["variants"])
                 self._json_response(
                     HTTPStatus.OK,
                     {"success": True, "products": products},
@@ -2611,15 +2642,15 @@ class StyleDashRequestHandler(SimpleHTTPRequestHandler):
                 if not product_id or "/" in product_id:
                     raise SecurityError(404, "Product submission not found.", "product_not_found")
                 payload = self._read_json()
-                if not isinstance(payload, dict) or set(payload) != {"stock"}:
+                if not isinstance(payload, dict) or set(payload) not in ({"stock"}, {"variantId", "stock"}):
                     raise SecurityError(
                         400,
-                        "Provide only the new stock value.",
+                        "Provide the new stock value and, for multi-size products, its variantId.",
                         "invalid_inventory_adjustment",
                     )
                 self._shops().require_seller_published_product(user["id"], product_id)
                 inventory = self.payment_service.set_shop_inventory(
-                    product_id, payload.get("stock")
+                    product_id, payload.get("stock"), payload.get("variantId")
                 )
                 self._json_response(
                     HTTPStatus.OK, {"success": True, "inventory": inventory}

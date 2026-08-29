@@ -347,6 +347,7 @@ class DeploymentAndTaxTests(unittest.TestCase):
             text,
         )
         self.assertIn("styledash_migrations=ok", text)
+        self.assertIn("{1, 2, 3, 4}.issubset(shop_versions)", text)
         self.assertIn("duplicate applications exist for", text)
         self.assertIn(
             "from styledash_firebase import _initialize_app",

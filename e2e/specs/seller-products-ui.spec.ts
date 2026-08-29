@@ -57,8 +57,11 @@ test('approved shop owner can draft and submit but cannot publish a product', as
   await page.getByLabel('Description').fill('A locally submitted product for private review.');
   await page.getByLabel('Price (INR)', { exact: true }).fill('500');
   await page.getByLabel('Original price (INR)').fill('600');
-  await page.getByLabel('Inventory').fill('2');
-  await page.getByLabel('Size').fill('M');
+  await page.getByPlaceholder('Size, e.g. S or XL').fill('M');
+  await page.getByPlaceholder('Stock').fill('2');
+  await page.getByRole('button', { name: '+ Add size' }).click();
+  await page.getByPlaceholder('Size, e.g. S or XL').nth(1).fill('L');
+  await page.getByPlaceholder('Stock').nth(1).fill('3');
   await page.getByLabel('Colour name').fill('Black');
   await page.getByLabel(/HTTPS image URLs/).fill('https://example.test/product.jpg');
   await page.getByRole('button', { name: 'Save Product Draft' }).click();
@@ -67,6 +70,7 @@ test('approved shop owner can draft and submit but cannot publish a product', as
   await expect(page.getByText('DRAFT', { exact: true })).toBeVisible();
   expect(createPayload).not.toHaveProperty('status');
   expect(createPayload).not.toHaveProperty('applicationId');
+  expect(createPayload?.variants).toEqual([{ size: 'M', inventory: 2 }, { size: 'L', inventory: 3 }]);
 
   await page.getByRole('button', { name: 'Submit', exact: true }).click();
   await expect(page.getByText('SUBMITTED', { exact: true })).toBeVisible();
@@ -86,7 +90,7 @@ test('published seller can update stock and submit edit or unpublish requests wi
       brand: 'Local', department: 'women', category: 'Clothing & Fashion',
       pricePaise: 50000, originalPricePaise: 60000, inventory: 2, size: 'M',
       colourName: 'Black', colourHex: '#000000', imageUrls: ['https://example.test/edit.jpg'],
-      attributes: {}, createdAt: '2026-08-20T00:00:00Z', updatedAt: '2026-08-20T00:00:00Z',
+      attributes: {}, variants: [{ id: 'shopprod_edit-var-1', size: 'M', inventory: 2 }], createdAt: '2026-08-20T00:00:00Z', updatedAt: '2026-08-20T00:00:00Z',
     },
     {
       id: 'shopprod_remove', slug: 'remove-live', applicationId: 'shop-1', status: 'PUBLISHED',
@@ -94,7 +98,7 @@ test('published seller can update stock and submit edit or unpublish requests wi
       brand: 'Local', department: 'women', category: 'Clothing & Fashion',
       pricePaise: 70000, originalPricePaise: 80000, inventory: 4, size: 'L',
       colourName: 'Blue', colourHex: '#0000FF', imageUrls: ['https://example.test/remove.jpg'],
-      attributes: {}, createdAt: '2026-08-20T00:00:00Z', updatedAt: '2026-08-20T00:00:00Z',
+      attributes: {}, variants: [{ id: 'shopprod_remove-var-1', size: 'L', inventory: 4 }], createdAt: '2026-08-20T00:00:00Z', updatedAt: '2026-08-20T00:00:00Z',
     },
   ];
 
@@ -114,7 +118,7 @@ test('published seller can update stock and submit edit or unpublish requests wi
     if (path === '/api/shop-product-requests' && method === 'GET') return void await json({ success: true, requests });
     if (path === '/api/shop-products/shopprod_edit/stock' && method === 'PATCH') {
       stockPayload = request.postDataJSON() as Record<string, unknown>;
-      products[0] = { ...products[0], inventory: stockPayload.stock };
+      products[0] = { ...products[0], inventory: stockPayload.stock, variants: [{ id: 'shopprod_edit-var-1', size: 'M', inventory: stockPayload.stock }] };
       return void await json({ success: true, inventory: { productId: 'shopprod_edit', variantId: 'shopprod_edit-var-1', before: 2, stock: stockPayload.stock } });
     }
     if (path === '/api/shop-products/shopprod_edit/edit-request' && method === 'POST') {
@@ -147,9 +151,9 @@ test('published seller can update stock and submit edit or unpublish requests wi
   await page.goto('/partner');
 
   const editCard = page.getByRole('article').filter({ has: page.getByRole('heading', { name: 'Editable Live Product' }) });
-  await editCard.getByRole('button', { name: 'Update Stock' }).click();
-  await expect(editCard.getByText(/Stock: 5/)).toBeVisible();
-  expect(stockPayload).toEqual({ stock: 5 });
+  await editCard.getByRole('button', { name: 'M Stock' }).click();
+  await expect(editCard.getByText('M: 5', { exact: true })).toBeVisible();
+  expect(stockPayload).toEqual({ variantId: 'shopprod_edit-var-1', stock: 5 });
 
   await editCard.getByRole('button', { name: 'Edit Listing' }).click();
   await expect(page.getByRole('heading', { name: 'Request Listing Changes' })).toBeVisible();

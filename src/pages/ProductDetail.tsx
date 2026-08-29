@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+﻿import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { Star, Zap, Heart, ShieldCheck, RefreshCw, ShoppingBag, CheckCircle, ArrowRight } from 'lucide-react';
 import { SEO } from '../components/SEO';
@@ -179,10 +179,10 @@ export const ProductDetail: React.FC = () => {
 
           {/* Pricing */}
           <div className="p-4 bg-neutral-50 dark:bg-neutral-800/50 rounded-2xl border border-neutral-200 dark:border-neutral-800 flex items-baseline gap-3">
-            <span className="text-3xl font-black text-neutral-900 dark:text-white">â‚¹{selectedVariant?.price ?? product.price}</span>
+            <span className="text-3xl font-black text-neutral-900 dark:text-white">₹{selectedVariant?.price ?? product.price}</span>
             {product.originalPrice > product.price && (
               <>
-                <span className="text-sm text-neutral-400 line-through">â‚¹{product.originalPrice}</span>
+                <span className="text-sm text-neutral-400 line-through">₹{product.originalPrice}</span>
                 <span className="text-xs font-black text-rose-500 bg-rose-50 dark:bg-rose-950/40 px-2 py-0.5 rounded-full">
                   {product.discount}% OFF
                 </span>
@@ -250,7 +250,7 @@ export const ProductDetail: React.FC = () => {
               <Zap className="w-4 h-4 fill-lime-500" />
               <span>Dispatched from Neemuch Partner Boutique</span>
             </div>
-            <p>Estimated delivery within <strong>60 minutes</strong> to pincode 458441.</p>
+            <p>Normal delivery within <strong>a day</strong> to pincode 458441. Weekend express is offered at checkout when available.</p>
           </div>
 
           {/* Specifications */}

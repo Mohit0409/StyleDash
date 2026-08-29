@@ -21,7 +21,7 @@ export const SizeGuideModal: React.FC<{ isOpen: boolean; onClose: () => void; de
         </button>
 
         <h3 className="text-xl font-black text-neutral-900 dark:text-white mb-2">Vibe4You Size Guide</h3>
-        <p className="text-xs text-neutral-500 mb-6">Find your perfect fit before ordering for 60-minute doorstep delivery.</p>
+        <p className="text-xs text-neutral-500 mb-6">Find your perfect fit before ordering for local doorstep delivery.</p>
 
         {/* Category Tabs */}
         <div className="flex gap-3 mb-6 border-b border-neutral-200 dark:border-neutral-800">

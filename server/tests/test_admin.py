@@ -115,6 +115,35 @@ class AdminStoreTests(unittest.TestCase):
         actions = {row["action"] for row in self.store.audit()}
         self.assertTrue({"order_status", "inventory_adjustment", "vendor_approved", "customer_disabled"}.issubset(actions))
 
+    def test_private_admin_can_create_owner_store_and_multisize_product(self):
+        app = ADMIN_SERVER.AdminApplication(self.database, self.key, ROOT / "server/payment-data/catalog.json", ROOT / "server/payment-data/settings.json", self.root / "data")
+        owner = app.identity.create_customer_account(self.admin["id"], {
+            "name": "Managed Owner", "email": "managed-owner@example.test", "phone": "9876543210", "password": "TempPass8!",
+        })
+        logged_in, _raw, _csrf = self.customers.login({"email": owner["email"], "password": "TempPass8!"}, "managed-owner")
+        self.assertEqual(logged_in["id"], owner["id"])
+        shop = app.shops.admin_create_application(self.admin["id"], owner["id"], {
+            "shopName": "Managed Local Store", "ownerName": "Managed Owner", "category": "Clothing & Fashion",
+            "description": "A local store managed initially by the private administrator.", "address": "10 Main Market Road",
+            "city": "Neemuch", "state": "Madhya Pradesh", "pincode": "458441", "businessInformation": "Admin-assisted onboarding.",
+        })
+        self.assertEqual(shop["status"], "ACTIVE")
+        product = app.shops.admin_create_product(self.admin["id"], shop["id"], {
+            "name": "Managed Cotton Tee", "description": "Admin-listed local cotton tee with size stock.", "brand": "Local",
+            "department": "unisex", "category": "Clothing & Fashion", "pricePaise": 79900, "originalPricePaise": 99900,
+            "variants": [{"size":"S","inventory":3},{"size":"M","inventory":5},{"size":"L","inventory":2}],
+            "colourName": "Black", "colourHex": "#000000", "imageUrls": ["https://images.example.test/tee.jpg"], "attributes": {},
+        })
+        self.assertEqual(product["status"], "PUBLISHED")
+        self.assertEqual([(v["size"], v["inventory"]) for v in product["variants"]], [("S",3),("M",5),("L",2)])
+        public = next(item for item in app.shops.list_published_products() if item["id"] == product["id"])
+        self.assertEqual([v["size"] for v in public["variants"]], ["S","M","L"])
+        updated = app.shops.admin_update_product(self.admin["id"], product["id"], {"name": "Managed Cotton T-Shirt"})
+        self.assertEqual(updated["name"], "Managed Cotton T-Shirt")
+        app.identity.set_customer_password(self.admin["id"], owner["id"], "NewTemp8!")
+        actions = {row["action"] for row in app.identity.audit()}
+        self.assertTrue({"customer_created","shop_admin_created","shop_product_admin_created","shop_product_admin_updated","customer_password_reset"}.issubset(actions))
+
     def test_order_cancellation_sends_owner_notification(self):
         app = ADMIN_SERVER.AdminApplication(
             self.database,

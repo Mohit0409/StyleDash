@@ -54,7 +54,7 @@ export const LocationSelector: React.FC<{ isOpen: boolean; onClose: () => void }
         </div>
 
         <h3 className="text-lg font-black text-neutral-900 dark:text-white mb-2">Check Delivery Availability</h3>
-        <p className="text-xs text-neutral-500 mb-6">Enter your 6-digit area pincode in {CONFIG.SERVICE_CITY} to verify 60-minute express service.</p>
+        <p className="text-xs text-neutral-500 mb-6">Enter your 6-digit area pincode in {CONFIG.SERVICE_CITY} to check local delivery availability.</p>
 
         <form onSubmit={handleCheck} className="flex gap-2 mb-4">
           <input
@@ -91,8 +91,10 @@ export const LocationSelector: React.FC<{ isOpen: boolean; onClose: () => void }
                 {checkState === 'unavailable' ? 'Could Not Check Availability' : null}
               </p>
               <p className="mt-0.5">
-                {isSuccess && result?.estimatedDeliveryMinutes
-                  ? `Express fashion delivery available within ${result.estimatedDeliveryMinutes} minutes.`
+                {isSuccess
+                  ? result?.expressAvailable && result?.estimatedDeliveryMinutes
+                    ? `Normal delivery is available within a day. Weekend express is also available within ${result.estimatedDeliveryMinutes} minutes.`
+                    : 'Normal delivery is available within a day. Express delivery is disabled Monday–Friday.'
                   : null}
                 {isProblem && checkState === 'unserviceable' ? 'We are not delivering to this pincode yet.' : null}
                 {isProblem && checkState === 'invalid' ? 'Pincodes must contain exactly six numbers.' : null}

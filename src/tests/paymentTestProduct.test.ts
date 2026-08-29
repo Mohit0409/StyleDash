@@ -93,6 +93,6 @@ describe('controlled payment test route isolation', () => {
     expect(api).not.toMatch(/email|userId/);
     expect(page).toContain('onClick={startValidation}');
     expect(page).not.toMatch(/useEffect\([\s\S]*startValidation\(\)/);
-    expect(page).toContain('TEST â€” NO FULFILLMENT REQUIRED');
+    expect(page).toContain('TEST — NO FULFILLMENT REQUIRED');
   });
 });
