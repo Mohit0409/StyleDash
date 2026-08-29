@@ -20,8 +20,7 @@ interface ProductFormState {
   category: string;
   price: string;
   originalPrice: string;
-  inventory: string;
-  size: string;
+  variants: Array<{ size: string; inventory: string }>;
   colourName: string;
   colourHex: string;
   imageUrls: string;
@@ -30,7 +29,7 @@ interface ProductFormState {
 
 const EMPTY_FORM: ProductFormState = {
   name: '', description: '', brand: '', department: 'unisex', category: CATEGORIES[0],
-  price: '', originalPrice: '', inventory: '0', size: '', colourName: '', colourHex: '',
+  price: '', originalPrice: '', variants: [{ size: '', inventory: '0' }], colourName: '', colourHex: '',
   imageUrls: '', material: '',
 };
 
@@ -42,8 +41,9 @@ const toForm = (product: SellerProduct): ProductFormState => ({
   category: product.category,
   price: (product.pricePaise / 100).toFixed(2),
   originalPrice: (product.originalPricePaise / 100).toFixed(2),
-  inventory: String(product.inventory),
-  size: product.size,
+  variants: product.variants?.length
+    ? product.variants.map(variant => ({ size: variant.size, inventory: String(variant.inventory) }))
+    : [{ size: product.size, inventory: String(product.inventory) }],
   colourName: product.colourName,
   colourHex: product.colourHex || '',
   imageUrls: product.imageUrls.join('\n'),
@@ -55,13 +55,25 @@ const toPayload = (form: ProductFormState): SellerProductDraft => {
   const originalPricePaise = form.originalPrice
     ? Math.round(Number(form.originalPrice) * 100)
     : pricePaise;
-  const inventory = Number(form.inventory);
   if (
     !Number.isSafeInteger(pricePaise) || pricePaise < 100
     || !Number.isSafeInteger(originalPricePaise) || originalPricePaise < pricePaise
-    || !Number.isSafeInteger(inventory) || inventory < 0 || inventory > 100_000
   ) {
-    throw new Error('Enter valid price and inventory values.');
+    throw new Error('Enter valid price values.');
+  }
+  const variants = form.variants.map(variant => ({
+    size: variant.size.trim(),
+    inventory: Number(variant.inventory),
+  }));
+  const normalizedSizes = variants.map(variant => variant.size.toLocaleLowerCase());
+  if (
+    variants.length < 1 || variants.length > 20
+    || variants.some(variant => !variant.size || variant.size.length > 40)
+    || variants.some(variant => !Number.isSafeInteger(variant.inventory) || variant.inventory < 0 || variant.inventory > 100_000)
+    || new Set(normalizedSizes).size !== variants.length
+    || variants.reduce((total, variant) => total + variant.inventory, 0) > 100_000
+  ) {
+    throw new Error('Add unique sizes with valid whole-number stock values.');
   }
   const imageUrls = form.imageUrls.split(/\r?\n/).map(value => value.trim()).filter(Boolean);
   if (imageUrls.length < 1 || imageUrls.length > 8 || imageUrls.some(value => {
@@ -77,8 +89,7 @@ const toPayload = (form: ProductFormState): SellerProductDraft => {
     category: form.category,
     pricePaise,
     originalPricePaise,
-    inventory,
-    size: form.size.trim(),
+    variants,
     colourName: form.colourName.trim(),
     colourHex: form.colourHex.trim() || undefined,
     imageUrls,
@@ -94,7 +105,6 @@ const toChangePayload = (payload: SellerProductDraft): SellerProductChangeDraft 
   category: payload.category,
   pricePaise: payload.pricePaise,
   originalPricePaise: payload.originalPricePaise,
-  size: payload.size,
   colourName: payload.colourName,
   colourHex: payload.colourHex,
   imageUrls: payload.imageUrls,
@@ -133,6 +143,23 @@ export const SellerProducts: React.FC = () => {
   const updateForm = (field: keyof ProductFormState, value: string) => {
     setForm(current => ({ ...current, [field]: value }));
   };
+
+  const updateVariant = (index: number, field: 'size' | 'inventory', value: string) => {
+    setForm(current => ({
+      ...current,
+      variants: current.variants.map((variant, position) => position === index ? { ...variant, [field]: value } : variant),
+    }));
+  };
+
+  const addVariant = () => setForm(current => ({
+    ...current,
+    variants: [...current.variants, { size: '', inventory: '0' }],
+  }));
+
+  const removeVariant = (index: number) => setForm(current => ({
+    ...current,
+    variants: current.variants.filter((_, position) => position !== index),
+  }));
 
   const openNew = () => {
     setEditingId(null);
@@ -205,8 +232,8 @@ export const SellerProducts: React.FC = () => {
     }
   };
 
-  const updateStock = async (product: SellerProduct) => {
-    const raw = window.prompt('Enter the current stock quantity:', String(product.inventory));
+  const updateStock = async (product: SellerProduct, variant: SellerProduct['variants'][number]) => {
+    const raw = window.prompt(`Enter current stock for size ${variant.size}:`, String(variant.inventory));
     if (raw === null) return;
     const stock = Number(raw);
     if (!Number.isSafeInteger(stock) || stock < 0 || stock > 100_000) {
@@ -217,9 +244,13 @@ export const SellerProducts: React.FC = () => {
     setError('');
     setMessage('');
     try {
-      const updated = await shopProductApi.setStock(product.id, stock);
-      setProducts(current => current.map(item => item.id === product.id ? { ...item, inventory: updated.stock } : item));
-      setMessage(`Live stock updated to ${updated.stock}.`);
+      const updated = await shopProductApi.setStock(product.id, stock, variant.id);
+      setProducts(current => current.map(item => {
+        if (item.id !== product.id) return item;
+        const variants = item.variants.map(candidate => candidate.id === updated.variantId ? { ...candidate, inventory: updated.stock } : candidate);
+        return { ...item, variants, inventory: variants.reduce((total, candidate) => total + candidate.inventory, 0) };
+      }));
+      setMessage(`Stock for size ${variant.size} updated to ${updated.stock}.`);
     } catch (cause) {
       setError(messageForError(cause, 'Live stock could not be updated.'));
     } finally {
@@ -268,8 +299,20 @@ export const SellerProducts: React.FC = () => {
             <label className="font-bold">Category<select value={form.category} onChange={event => updateForm('category', event.target.value)} className="mt-1 w-full rounded-xl border p-3 dark:bg-neutral-800">{CATEGORIES.map(value => <option key={value} value={value}>{value}</option>)}</select></label>
             <label className="font-bold">Price (INR)<input required type="number" min="1" step="0.01" value={form.price} onChange={event => updateForm('price', event.target.value)} className="mt-1 w-full rounded-xl border p-3 dark:bg-neutral-800" /></label>
             <label className="font-bold">Original price (INR)<input type="number" min="1" step="0.01" value={form.originalPrice} onChange={event => updateForm('originalPrice', event.target.value)} className="mt-1 w-full rounded-xl border p-3 dark:bg-neutral-800" /></label>
-            {formMode === 'draft' ? <label className="font-bold">Inventory<input required type="number" min="0" max="100000" step="1" value={form.inventory} onChange={event => updateForm('inventory', event.target.value)} className="mt-1 w-full rounded-xl border p-3 dark:bg-neutral-800" /></label> : <p className="rounded-xl bg-neutral-50 p-3 text-neutral-600 dark:bg-neutral-800 dark:text-neutral-300"><strong>Inventory:</strong> update live stock separately from the product card.</p>}
-            <label className="font-bold">Size<input required minLength={1} maxLength={40} value={form.size} onChange={event => updateForm('size', event.target.value)} placeholder="M, UK 8, Free Size" className="mt-1 w-full rounded-xl border p-3 dark:bg-neutral-800" /></label>
+            {formMode === 'draft' ? <div className="sm:col-span-2 space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="font-bold">Sizes and stock</span>
+                <button type="button" onClick={addVariant} disabled={form.variants.length >= 20} className="rounded-lg border px-3 py-1.5 font-bold disabled:opacity-50">+ Add size</button>
+              </div>
+              <p className="text-neutral-500">Add one row per size. Stock is tracked separately for every size.</p>
+              <div className="space-y-2">
+                {form.variants.map((variant, index) => <div key={index} className="grid grid-cols-[1fr_1fr_auto] gap-2">
+                  <input required maxLength={40} value={variant.size} onChange={event => updateVariant(index, 'size', event.target.value)} placeholder="Size, e.g. S or XL" className="w-full rounded-xl border p-3 dark:bg-neutral-800" />
+                  <input required type="number" min="0" max="100000" step="1" value={variant.inventory} onChange={event => updateVariant(index, 'inventory', event.target.value)} placeholder="Stock" className="w-full rounded-xl border p-3 dark:bg-neutral-800" />
+                  <button type="button" disabled={form.variants.length === 1} onClick={() => removeVariant(index)} className="rounded-xl border px-3 font-bold text-red-600 disabled:opacity-30" aria-label={`Remove size ${variant.size || index + 1}`}>×</button>
+                </div>)}
+              </div>
+            </div> : <p className="sm:col-span-2 rounded-xl bg-neutral-50 p-3 text-neutral-600 dark:bg-neutral-800 dark:text-neutral-300"><strong>Sizes and inventory:</strong> managed separately from the live product card so listing edits cannot accidentally overwrite stock.</p>}
             <label className="font-bold">Colour name<input required minLength={1} maxLength={80} value={form.colourName} onChange={event => updateForm('colourName', event.target.value)} className="mt-1 w-full rounded-xl border p-3 dark:bg-neutral-800" /></label>
             <label className="font-bold">Colour hex <span className="font-normal text-neutral-500">(optional)</span><input pattern="#[0-9A-Fa-f]{6}" placeholder="#000000" value={form.colourHex} onChange={event => updateForm('colourHex', event.target.value)} className="mt-1 w-full rounded-xl border p-3 dark:bg-neutral-800" /></label>
             <label className="font-bold">Material <span className="font-normal text-neutral-500">(optional)</span><input maxLength={200} value={form.material} onChange={event => updateForm('material', event.target.value)} className="mt-1 w-full rounded-xl border p-3 dark:bg-neutral-800" /></label>
@@ -294,7 +337,8 @@ export const SellerProducts: React.FC = () => {
                 <div>
                   <p className="text-xs font-black uppercase tracking-wider text-neutral-500">{product.status.replace('_', ' ')}</p>
                   <h3 className="font-black">{product.name}</h3>
-                  <p className="text-xs text-neutral-500">INR {(product.pricePaise / 100).toFixed(2)} / {product.size} / {product.colourName} / Stock: {product.inventory}</p>
+                  <p className="text-xs text-neutral-500">₹{(product.pricePaise / 100).toFixed(2)} · {product.colourName} · Total stock: {product.inventory}</p>
+                  <div className="mt-2 flex flex-wrap gap-1.5">{product.variants.map(variant => <span key={variant.id} className="rounded-lg bg-neutral-100 px-2 py-1 text-[11px] font-bold dark:bg-neutral-800">{variant.size}: {variant.inventory}</span>)}</div>
                   {product.status === 'REJECTED' && product.rejectionReason && <p className="mt-2 flex gap-2 text-xs text-amber-700"><AlertTriangle className="w-4 shrink-0" />{product.rejectionReason}</p>}
                   {product.status === 'PUBLISHED' && <p className="mt-2 text-xs font-bold text-emerald-700">Published publicly by the private administrator.</p>}
                   {pendingRequest && <p className="mt-2 rounded-lg bg-amber-50 p-2 text-xs font-bold text-amber-800">{pendingRequest.action.replace('_', ' ')} request {pendingRequest.status.replace('_', ' ').toLowerCase()}. The current listing stays live until approval.</p>}
@@ -303,7 +347,7 @@ export const SellerProducts: React.FC = () => {
                 <div className="flex flex-wrap gap-2">
                   {editable && <button type="button" disabled={busy} onClick={() => openEdit(product)} className="flex items-center gap-1 rounded-lg border px-3 py-2 text-xs font-bold"><Edit3 className="w-3.5" /> Edit</button>}
                   {product.status === 'DRAFT' && <button type="button" disabled={busy} onClick={() => void submitProduct(product.id)} className="flex items-center gap-1 rounded-lg bg-neutral-950 px-3 py-2 text-xs font-bold text-white disabled:opacity-60 dark:bg-lime-400 dark:text-neutral-950"><Send className="w-3.5" /> Submit</button>}
-                  {product.status === 'PUBLISHED' && <button type="button" disabled={busy} onClick={() => void updateStock(product)} className="flex items-center gap-1 rounded-lg border px-3 py-2 text-xs font-bold"><Boxes className="w-3.5" /> Update Stock</button>}
+                  {product.status === 'PUBLISHED' && product.variants.map(variant => <button key={variant.id} type="button" disabled={busy} onClick={() => void updateStock(product, variant)} className="flex items-center gap-1 rounded-lg border px-3 py-2 text-xs font-bold"><Boxes className="w-3.5" /> {variant.size} Stock</button>)}
                   {product.status === 'PUBLISHED' && !pendingRequest && <button type="button" disabled={busy} onClick={() => openChangeRequest(product)} className="flex items-center gap-1 rounded-lg border px-3 py-2 text-xs font-bold"><Edit3 className="w-3.5" /> Edit Listing</button>}
                   {product.status === 'PUBLISHED' && !pendingRequest && <button type="button" disabled={busy} onClick={() => void requestUnpublish(product)} className="flex items-center gap-1 rounded-lg border border-amber-300 px-3 py-2 text-xs font-bold text-amber-800"><PackageMinus className="w-3.5" /> Request Unpublish</button>}
                 </div>

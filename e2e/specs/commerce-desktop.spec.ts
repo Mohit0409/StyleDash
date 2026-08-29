@@ -1,4 +1,4 @@
-import { expect, Page, request as playwrightRequest, test } from '@playwright/test';
+﻿import { expect, Page, request as playwrightRequest, test } from '@playwright/test';
 
 const PRODUCT_NAME = 'Pure Cotton Oversized Graphic Tee';
 const PRODUCT_ROUTE =
@@ -64,7 +64,7 @@ async function loginCustomer(
 
   await page.getByPlaceholder('Email').fill(user.email);
   await page
-    .getByPlaceholder('Password (12+ characters)')
+    .getByPlaceholder('Password (8+ characters)')
     .fill(user.password);
 
   await page.getByRole('button', { name: 'Login' }).click();

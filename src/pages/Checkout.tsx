@@ -38,7 +38,7 @@ export const Checkout: React.FC = () => {
   const [phone, setPhone] = useState(savedAddress?.phone || user?.phone || '');
   const [street, setStreet] = useState(savedAddress?.street || '');
   const [city] = useState(savedAddress?.city || CONFIG.SERVICE_CITY);
-  const [pincode, setPincode] = useState(savedAddress?.pincode || '');
+  const [pincode, setPincode] = useState(savedAddress?.pincode || CONFIG.DEFAULT_PINCODE);
   const [paymentMethod, setPaymentMethod] = useState<'cod' | 'upi' | 'card'>('cod');
   const [placing, setPlacing] = useState(false);
   const [checkoutError, setCheckoutError] = useState('');
@@ -184,22 +184,22 @@ export const Checkout: React.FC = () => {
                   <p className="font-bold text-neutral-900 dark:text-white line-clamp-1">{item.product.name}</p>
                   <p className="text-[10px] text-neutral-500">{item.selectedSize} | {item.selectedColour} x {item.quantity}</p>
                 </div>
-                <span className="font-bold text-neutral-900 dark:text-white whitespace-nowrap">â‚¹{item.unitPrice * item.quantity}</span>
+                <span className="font-bold text-neutral-900 dark:text-white whitespace-nowrap">₹{item.unitPrice * item.quantity}</span>
               </div>
             ))}
           </div>
           <div className="space-y-2 text-xs text-neutral-600 dark:text-neutral-400">
-            <div className="flex justify-between"><span>Subtotal</span><span>â‚¹{subtotal}</span></div>
-            <div className="flex justify-between"><span>Delivery</span><span>{deliveryFee === 0 ? 'FREE' : `â‚¹${deliveryFee}`}</span></div>
-            <div className="flex justify-between"><span>GST Taxes (5%)</span><span>â‚¹{taxes}</span></div>
+            <div className="flex justify-between"><span>Subtotal</span><span>₹{subtotal}</span></div>
+            <div className="flex justify-between"><span>Delivery</span><span>{deliveryFee === 0 ? 'FREE' : `₹${deliveryFee}`}</span></div>
+            <div className="flex justify-between"><span>GST Taxes (5%)</span><span>₹{taxes}</span></div>
             <div className="flex justify-between pt-2 border-t border-neutral-200 dark:border-neutral-800 text-sm font-black text-neutral-900 dark:text-white">
-              <span>Estimated Total</span><span className="text-lime-600 dark:text-lime-400">â‚¹{grandTotal}</span>
+              <span>Estimated Total</span><span className="text-lime-600 dark:text-lime-400">₹{grandTotal}</span>
             </div>
             <p className="text-[10px] leading-relaxed text-neutral-500">Inventory, coupon eligibility and the final payable amount are recalculated securely by the server.</p>
           </div>
           {checkoutError && <p role="alert" className="text-xs font-semibold text-red-600 dark:text-red-400">{checkoutError}</p>}
           <button type="submit" disabled={placing} className="w-full py-4 bg-neutral-950 dark:bg-lime-400 text-white dark:text-neutral-950 font-black text-sm rounded-xl shadow-xl hover:bg-neutral-800 dark:hover:bg-lime-300 transition-all flex items-center justify-center gap-2 disabled:cursor-not-allowed disabled:opacity-60">
-            <span>{placing ? 'Processing securely...' : paymentMethod === 'cod' ? 'Place COD Order' : `Pay â‚¹${grandTotal}`}</span>
+            <span>{placing ? 'Processing securely...' : paymentMethod === 'cod' ? 'Place COD Order' : `Pay ₹${grandTotal}`}</span>
             <ArrowRight className="w-4 h-4" />
           </button>
         </div>

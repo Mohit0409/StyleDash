@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs';
+﻿import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { authApi } from '../services/authApi';
@@ -53,7 +53,7 @@ describe('password recovery routes', () => {
     expect(recovery).toContain("navigate('/reset-password', { replace: true })");
     expect(recovery).not.toContain('location.search');
     expect(recovery).not.toMatch(/localStorage|sessionStorage|console\./);
-    expect(recovery).toContain('minLength={12}');
+    expect(recovery).toContain('minLength={8}');
     expect(recovery).toContain('maxLength={256}');
   });
 });

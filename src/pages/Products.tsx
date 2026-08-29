@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+﻿import React, { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { SlidersHorizontal } from 'lucide-react';
 import { SEO } from '../components/SEO';
@@ -91,7 +91,7 @@ export const Products: React.FC = () => {
             {searchQuery ? `Search results for "${searchQuery}"` : `${department} Fashion Catalogue`}
           </h1>
           <p className="text-xs text-neutral-500 mt-1">
-            Showing <strong>{sortedProducts.length}</strong> available items for 60-minute delivery in Neemuch
+            Showing <strong>{sortedProducts.length}</strong> available items for within-a-day delivery in Neemuch
           </p>
         </div>
 

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+﻿import React, { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { MapPin, Zap, Star, Phone, Mail, Store as StoreIcon } from 'lucide-react';
 import { SEO } from '../components/SEO';
@@ -66,7 +66,7 @@ export const StoreDetail: React.FC = () => {
 
           <div className="flex flex-wrap gap-4 text-xs text-neutral-300 pt-2">
             <span className="flex items-center gap-1"><MapPin className="w-4 h-4 text-lime-400" /> {store.address}</span>
-            <span className="flex items-center gap-1 text-lime-400 font-bold"><Zap className="w-4 h-4 fill-lime-400" /> 60-min Express Delivery</span>
+            <span className="flex items-center gap-1 text-lime-400 font-bold"><Zap className="w-4 h-4 fill-lime-400" /> Normal Delivery Within a Day</span>
           </div>
         </div>
       </div>

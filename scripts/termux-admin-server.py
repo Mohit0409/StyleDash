@@ -334,6 +334,7 @@ class AdminApplication:
         return result
 
     def inventory(self, query: str = "", low_only: bool = False) -> list[dict[str, Any]]:
+        self.payments.refresh_shop_products()
         needle = query.strip().casefold()[:100]
         result = []
         with self.payments.store.lock:
@@ -359,6 +360,7 @@ class AdminApplication:
         variant_id: str,
         delta: Any,
     ) -> dict[str, Any]:
+        self.payments.refresh_shop_products()
         if (
             isinstance(delta, bool)
             or not isinstance(delta, int)
@@ -616,6 +618,24 @@ class AdminHandler(BaseHTTPRequestHandler):
             if path == "/api/admin/logout":
                 self._admin(); self._csrf(); self.application.identity.logout(self._cookie(ADMIN_COOKIE))
                 self._json(200, {"success": True}, [self.application.identity.clear_cookie(ADMIN_COOKIE)]); return
+            if path == "/api/admin/customers":
+                admin, _session = self._admin(); self._csrf()
+                result = self.application.identity.create_customer_account(admin["id"], self._body())
+                self._json(201, {"success": True, "customer": result}); return
+            if path == "/api/admin/vendors":
+                admin, _session = self._admin(); self._csrf(); payload = self._body()
+                owner_user_id = payload.pop("ownerUserId", None)
+                if not isinstance(owner_user_id, str) or not owner_user_id:
+                    raise SecurityError(400, "Choose a store-owner account.", "invalid_customer")
+                result = self._shops().admin_create_application(admin["id"], owner_user_id, payload)
+                self._json(201, {"success": True, "application": result}); return
+            if path == "/api/admin/shop-products":
+                admin, _session = self._admin(); self._csrf(); payload = self._body()
+                application_id = payload.pop("applicationId", None)
+                if not isinstance(application_id, str) or not application_id:
+                    raise SecurityError(400, "Choose a local store.", "vendor_application_not_found")
+                result = self._shops().admin_create_product(admin["id"], application_id, payload)
+                self._json(201, {"success": True, "product": result}); return
             self._json(404, {"success": False, "error": "Not found.", "code": "not_found"})
         except SecurityError as error:
             self._error(error)
@@ -644,6 +664,14 @@ class AdminHandler(BaseHTTPRequestHandler):
                     admin["id"], request_id, payload.get("status"), payload.get("reason")
                 )
                 self._json(200, {"success": True, "request": result}); return
+            if path.startswith("/api/admin/shop-products/") and path.endswith("/details"):
+                product_id = unquote(path.removeprefix("/api/admin/shop-products/").removesuffix("/details"))
+                result = self._shops().admin_update_product(admin["id"], product_id, payload)
+                self._json(200, {"success": True, "product": result}); return
+            if path.startswith("/api/admin/customers/") and path.endswith("/password"):
+                user_id = unquote(path.removeprefix("/api/admin/customers/").removesuffix("/password"))
+                result = self.application.identity.set_customer_password(admin["id"], user_id, payload.get("password"))
+                self._json(200, {"success": True, "customer": result}); return
             if path.startswith("/api/admin/shop-products/"):
                 product_id = unquote(path.removeprefix("/api/admin/shop-products/"))
                 result = self._shops().admin_transition_product(

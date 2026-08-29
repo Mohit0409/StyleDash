@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+﻿import React, { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { ArrowRight, Zap, Sparkles, ChevronRight } from 'lucide-react';
 import { SEO } from '../components/SEO';
@@ -34,7 +34,7 @@ export const Home: React.FC = () => {
         <div className="max-w-7xl mx-auto grid lg:grid-cols-2 gap-12 items-center">
           <div className="space-y-6 z-10">
             <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-lime-400 text-neutral-950 text-xs font-black uppercase tracking-wider">
-              <Zap className="w-3.5 h-3.5 fill-neutral-950" /> 60-Minute Fashion Delivery in {CONFIG.SERVICE_CITY}
+              <Zap className="w-3.5 h-3.5 fill-neutral-950" /> Within-a-Day Fashion Delivery in {CONFIG.SERVICE_CITY}
             </div>
 
             <h1 className="text-4xl sm:text-6xl font-black tracking-tight leading-none">
@@ -63,13 +63,13 @@ export const Home: React.FC = () => {
                 to="/products?filter=express"
                 className="px-6 py-3.5 bg-rose-500 text-white font-black rounded-xl text-sm hover:bg-rose-600 transition-all flex items-center gap-1.5"
               >
-                <Zap className="w-4 h-4 fill-white" /> Express Picks
+                <Zap className="w-4 h-4 fill-white" /> Weekend Express Picks
               </Link>
             </div>
 
             {/* Quick Specs */}
             <div className="pt-6 border-t border-neutral-800 grid grid-cols-3 gap-4 text-xs text-neutral-400">
-              <div><strong className="text-white block text-sm">60 Mins</strong> Hyperlocal Delivery</div>
+              <div><strong className="text-white block text-sm">Within a Day</strong> Local Delivery</div>
               <div><strong className="text-white block text-sm">100% Original</strong> Local Stores</div>
               <div><strong className="text-white block text-sm">7 Days</strong> Easy Size Exchange</div>
             </div>
@@ -139,7 +139,7 @@ export const Home: React.FC = () => {
                 <Zap className="w-5 h-5 fill-neutral-950" />
               </div>
               <div>
-                <h2 className="text-2xl font-black text-neutral-900 dark:text-white">60-Min Express Picks</h2>
+                <h2 className="text-2xl font-black text-neutral-900 dark:text-white">Weekend Express Picks</h2>
                 <p className="text-xs text-neutral-500">In stock nearby and ready for immediate dispatch in Neemuch</p>
               </div>
             </div>
@@ -160,7 +160,7 @@ export const Home: React.FC = () => {
           <div className="flex items-center justify-between">
             <div>
               <span className="text-xs font-black uppercase text-lime-700 dark:text-lime-400 tracking-wider">Budget Deals</span>
-              <h2 className="text-2xl font-black text-neutral-900 dark:text-white">Styles Under â‚¹499</h2>
+              <h2 className="text-2xl font-black text-neutral-900 dark:text-white">Styles Under ₹499</h2>
             </div>
             <Link to="/products?maxPrice=499" className="text-xs font-bold text-neutral-900 dark:text-white hover:underline flex items-center gap-1">
               Shop All Deals <ArrowRight className="w-3.5 h-3.5" />

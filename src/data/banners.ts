@@ -1,4 +1,4 @@
-import { AdSlot } from '../types';
+﻿import { AdSlot } from '../types';
 
 export const BANNERS: AdSlot[] = [
   {
@@ -16,7 +16,7 @@ export const BANNERS: AdSlot[] = [
   },
   {
     id: 'banner-2',
-    title: 'Express 60-Min Fashion Delivery in Neemuch',
+    title: 'Weekend Express Fashion Delivery in Neemuch',
     type: 'banner',
     imageUrl: 'https://images.unsplash.com/photo-1490481651871-ab68de25d43d?auto=format&fit=crop&w=1200&q=80',
     targetUrl: '/express',

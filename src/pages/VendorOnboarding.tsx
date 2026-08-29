@@ -168,7 +168,7 @@ export const VendorOnboarding: React.FC = () => {
   };
 
   if (loading) {
-    return <div className="min-h-[50vh] flex items-center justify-center text-sm font-bold">Loading your shop applicationâ€¦</div>;
+    return <div className="min-h-[50vh] flex items-center justify-center text-sm font-bold">Loading your shop application…</div>;
   }
 
   const editable = !application || application.status === 'DRAFT' || application.status === 'REJECTED';
@@ -284,7 +284,7 @@ export const VendorOnboarding: React.FC = () => {
 
           <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
             <button type="button" disabled={saving} onClick={() => void saveDraft()} className="flex items-center justify-center gap-2 rounded-xl border px-5 py-3 font-bold disabled:opacity-60">
-              <Save className="w-4" /> {saving ? 'Savingâ€¦' : 'Save Draft'}
+              <Save className="w-4" /> {saving ? 'Saving…' : 'Save Draft'}
             </button>
             <button type="submit" disabled={saving} className="flex items-center justify-center gap-2 rounded-xl bg-neutral-950 px-6 py-3 font-black text-white disabled:opacity-60 dark:bg-lime-400 dark:text-neutral-950">
               Submit for Review <ArrowRight className="w-4" />

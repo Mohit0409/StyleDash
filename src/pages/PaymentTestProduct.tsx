@@ -36,7 +36,7 @@ export const PaymentTestProduct: React.FC = () => {
   }, []);
 
   if (loading || authLoading) {
-    return <div className="min-h-[50vh] flex items-center justify-center text-sm font-bold">Checking controlled accessâ€¦</div>;
+    return <div className="min-h-[50vh] flex items-center justify-center text-sm font-bold">Checking controlled access…</div>;
   }
   if (unavailable || !product || !user) return <NotFound />;
 
@@ -77,7 +77,7 @@ export const PaymentTestProduct: React.FC = () => {
       <div className="rounded-3xl border-2 border-red-700 bg-red-50 dark:bg-red-950/30 p-6 space-y-3">
         <div className="flex items-center gap-2 text-red-800 dark:text-red-300">
           <AlertTriangle className="w-6 h-6" />
-          <strong className="text-lg">TEST â€” NO FULFILLMENT REQUIRED</strong>
+          <strong className="text-lg">TEST — NO FULFILLMENT REQUIRED</strong>
         </div>
         <p className="text-sm text-red-800 dark:text-red-200">
           This owner-controlled item validates Razorpay payment processing only. It is not clothing and will never be packed, dispatched, or delivered.
@@ -88,7 +88,7 @@ export const PaymentTestProduct: React.FC = () => {
         <div>
           <p className="text-xs font-black uppercase tracking-widest text-neutral-500">Restricted validation item</p>
           <h1 className="text-2xl font-black text-neutral-950 dark:text-white">{product.name}</h1>
-          <p className="mt-2 text-4xl font-black text-lime-600">â‚¹{product.price}</p>
+          <p className="mt-2 text-4xl font-black text-lime-600">₹{product.price}</p>
         </div>
 
         <div className="space-y-3">
@@ -103,7 +103,7 @@ export const PaymentTestProduct: React.FC = () => {
 
         <p className="flex gap-2 text-xs text-neutral-500">
           <ShieldCheck className="w-4 h-4 shrink-0" />
-          The Vibe4You server fixes the total at â‚¹10 and treats the result as paid only after captured-state verification.
+          The Vibe4You server fixes the total at ₹10 and treats the result as paid only after captured-state verification.
         </p>
 
         {message && <p role="status" className="rounded-xl bg-neutral-100 dark:bg-neutral-800 p-3 text-sm font-semibold">{message}</p>}
@@ -117,7 +117,7 @@ export const PaymentTestProduct: React.FC = () => {
             className="w-full flex items-center justify-center gap-2 rounded-xl bg-neutral-950 dark:bg-lime-400 px-5 py-4 text-sm font-black text-white dark:text-neutral-950 disabled:opacity-60"
           >
             <CreditCard className="w-4 h-4" />
-            {processing ? 'Opening secure checkoutâ€¦' : 'Pay â‚¹10 with Razorpay'}
+            {processing ? 'Opening secure checkout…' : 'Pay ₹10 with Razorpay'}
           </button>
         )}
       </section>

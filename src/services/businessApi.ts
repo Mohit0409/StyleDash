@@ -91,12 +91,22 @@ export const shopProductApi = {
   async requestUnpublish(id: string): Promise<SellerProductChangeRequest> {
     return (await apiJson<{ success: true; request: SellerProductChangeRequest }>(`/api/shop-products/${encodeURIComponent(id)}/unpublish-request`, 'POST', {})).request;
   },
-  async setStock(id: string, stock: number): Promise<SellerInventoryUpdate> {
-    return (await apiJson<{ success: true; inventory: SellerInventoryUpdate }>(`/api/shop-products/${encodeURIComponent(id)}/stock`, 'PATCH', { stock })).inventory;
+  async setStock(id: string, stock: number, variantId?: string): Promise<SellerInventoryUpdate> {
+    const payload = variantId ? { variantId, stock } : { stock };
+    return (await apiJson<{ success: true; inventory: SellerInventoryUpdate }>(`/api/shop-products/${encodeURIComponent(id)}/stock`, 'PATCH', payload)).inventory;
   },
 };
 
 export type SellerProductStatus = 'DRAFT' | 'SUBMITTED' | 'UNDER_REVIEW' | 'APPROVED' | 'PUBLISHED' | 'REJECTED';
+
+export interface SellerProductVariantDraft {
+  size: string;
+  inventory: number;
+}
+
+export interface SellerProductVariant extends SellerProductVariantDraft {
+  id: string;
+}
 
 export interface SellerProductDraft {
   name: string;
@@ -106,18 +116,22 @@ export interface SellerProductDraft {
   category: string;
   pricePaise: number;
   originalPricePaise: number;
-  inventory: number;
-  size: string;
+  variants?: SellerProductVariantDraft[];
+  inventory?: number;
+  size?: string;
   colourName: string;
   colourHex?: string;
   imageUrls: string[];
   attributes: Record<string, string>;
 }
 
-export interface SellerProduct extends SellerProductDraft {
+export interface SellerProduct extends Omit<SellerProductDraft, 'variants' | 'inventory' | 'size'> {
   id: string;
   slug: string;
   applicationId: string;
+  inventory: number;
+  size: string;
+  variants: SellerProductVariant[];
   status: SellerProductStatus;
   rejectionReason?: string | null;
   createdAt: string;
@@ -126,7 +140,7 @@ export interface SellerProduct extends SellerProductDraft {
   publishedAt?: string | null;
 }
 
-export type SellerProductChangeDraft = Omit<SellerProductDraft, 'inventory'>;
+export type SellerProductChangeDraft = Omit<SellerProductDraft, 'variants'>;
 export type SellerProductChangeAction = 'EDIT' | 'UNPUBLISH';
 export type SellerProductChangeStatus = 'SUBMITTED' | 'UNDER_REVIEW' | 'APPROVED' | 'REJECTED';
 

@@ -91,8 +91,9 @@ PRODUCT_PAYLOAD_FIELDS = {
     "size",
     "colourName",
     "colourHex",
+    "variants",
 }
-PRODUCT_CHANGE_PAYLOAD_FIELDS = PRODUCT_PAYLOAD_FIELDS - {"inventory"}
+PRODUCT_CHANGE_PAYLOAD_FIELDS = PRODUCT_PAYLOAD_FIELDS - {"inventory", "variants"}
 DEPARTMENTS = {"men", "women", "kids", "unisex", "footwear", "accessories"}
 COLOUR_HEX_PATTERN = re.compile(r"^#[0-9A-Fa-f]{6}$")
 
@@ -109,6 +110,25 @@ def _row_dict(row: sqlite3.Row) -> dict[str, Any]:
 
 def _store_slug(application_id: str) -> str:
     return f"local-shop-{application_id[-12:]}"
+
+def _row_variants(row: sqlite3.Row) -> list[dict[str, Any]]:
+    raw = row["variants_json"] if "variants_json" in row.keys() else None
+    try:
+        variants = json.loads(raw or "[]")
+    except (TypeError, json.JSONDecodeError):
+        variants = []
+    clean: list[dict[str, Any]] = []
+    if isinstance(variants, list):
+        for item in variants:
+            if not isinstance(item, dict):
+                continue
+            size = item.get("size")
+            inventory = item.get("inventory")
+            if isinstance(size, str) and size.strip() and isinstance(inventory, int) and not isinstance(inventory, bool):
+                clean.append({"size": size.strip(), "inventory": max(0, inventory)})
+    if clean:
+        return clean
+    return [{"size": row["size"], "inventory": row["inventory"]}]
 
 
 class ShopWorkflow:
@@ -147,6 +167,7 @@ class ShopWorkflow:
             self._migrate_applications(db)
             self._migrate_products(db)
             self._migrate_product_change_requests(db)
+            self._migrate_product_variants(db)
             check = db.execute("PRAGMA foreign_key_check").fetchall()
             if check:
                 raise RuntimeError("Shop migration failed foreign key validation")
@@ -359,6 +380,47 @@ class ShopWorkflow:
             )
             db.execute(
                 "INSERT INTO shop_schema_migrations(version,applied_at) VALUES(3,?)",
+                (now,),
+            )
+            db.commit()
+        except Exception:
+            db.rollback()
+            raise
+
+    @staticmethod
+    def _migrate_product_variants(db: sqlite3.Connection) -> None:
+        now = iso(utc_now())
+        db.execute("BEGIN IMMEDIATE")
+        try:
+            if db.execute(
+                "SELECT 1 FROM shop_schema_migrations WHERE version=4"
+            ).fetchone() is not None:
+                db.commit()
+                return
+            columns = {row["name"] for row in db.execute(
+                "PRAGMA table_info(shop_product_submissions)"
+            ).fetchall()}
+            if "variants_json" not in columns:
+                db.execute(
+                    "ALTER TABLE shop_product_submissions "
+                    "ADD COLUMN variants_json TEXT NOT NULL DEFAULT '[]'"
+                )
+            rows = db.execute(
+                "SELECT id,size,inventory,variants_json FROM shop_product_submissions"
+            ).fetchall()
+            for row in rows:
+                try:
+                    existing = json.loads(row["variants_json"] or "[]")
+                except (TypeError, json.JSONDecodeError):
+                    existing = []
+                if existing:
+                    continue
+                db.execute(
+                    "UPDATE shop_product_submissions SET variants_json=? WHERE id=?",
+                    (json.dumps([{"size": row["size"], "inventory": row["inventory"]}], separators=(",", ":")), row["id"]),
+                )
+            db.execute(
+                "INSERT INTO shop_schema_migrations(version,applied_at) VALUES(4,?)",
                 (now,),
             )
             db.commit()
@@ -623,6 +685,45 @@ class ShopWorkflow:
             ).fetchone()
         return self._serialize_application(row)
 
+    def admin_create_application(
+        self, admin_id: str, user_id: str, payload: dict[str, Any]
+    ) -> dict[str, Any]:
+        values = self._application_payload(payload, require_complete=True)
+        application_id = "vendor_" + secrets.token_hex(12)
+        now = iso(utc_now())
+        with self.connect() as db:
+            db.execute("BEGIN IMMEDIATE")
+            self._require_admin(db, admin_id)
+            user = self._registered_customer(db, user_id)
+            if self._customer_application(db, user_id) is not None:
+                db.rollback()
+                raise SecurityError(409, "A shop already exists for this owner account.", "vendor_application_exists")
+            db.execute(
+                """
+                INSERT INTO vendor_applications(
+                  id,submitted_by_user_id,shop_name,owner_name,email,phone,
+                  category,description,address,city,state,pincode,business_information,
+                  status,reviewed_by,created_at,updated_at,submitted_at,reviewed_at,
+                  approved_at,activated_at
+                ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,'ACTIVE',?,?,?,?,?,?,?)
+                """,
+                (
+                    application_id, user_id, values["shop_name"], values["owner_name"],
+                    user["email"], user["phone"], values["category"], values["description"],
+                    values["address"], values["city"], values["state"], values["pincode"],
+                    values["business_information"], admin_id, now, now, now, now, now, now,
+                ),
+            )
+            self._audit_if_available(
+                db, admin_id, "shop_admin_created", "shop_application", application_id,
+                {"ownerUserId": user_id, "status": "ACTIVE"},
+            )
+            db.commit()
+            row = db.execute(
+                "SELECT * FROM vendor_applications WHERE id=?", (application_id,)
+            ).fetchone()
+        return self._serialize_application(row, admin=True)
+
     def admin_list_applications(self, admin_id: str) -> list[dict[str, Any]]:
         with self.connect() as db:
             self._require_admin(db, admin_id)
@@ -725,17 +826,50 @@ class ShopWorkflow:
         original_price = supplied("originalPricePaise", "original_price_paise")
         if original_price is None:
             original_price = price
-        inventory = supplied("inventory", "inventory")
         if isinstance(price, bool) or not isinstance(price, int) or not 100 <= price <= 100_000_000:
             raise SecurityError(400, "Enter a valid product price.", "invalid_product")
-        if isinstance(inventory, bool) or not isinstance(inventory, int) or not 0 <= inventory <= 100_000:
-            raise SecurityError(400, "Enter valid product inventory.", "invalid_product")
         if (
             isinstance(original_price, bool)
             or not isinstance(original_price, int)
             or not price <= original_price <= 100_000_000
         ):
             raise SecurityError(400, "Enter a valid original price.", "invalid_product")
+
+        variants_value = payload.get("variants") if "variants" in payload else None
+        current_variants = _row_variants(current) if current is not None else []
+        legacy_variant_change = "inventory" in payload or (
+            "size" in payload and (len(current_variants) <= 1 or payload.get("size") != current["size"])
+        )
+        if variants_value is not None and legacy_variant_change:
+            raise SecurityError(400, "Use either variants or legacy size/inventory fields.", "invalid_product")
+        if variants_value is None and current is not None and not legacy_variant_change:
+            variants_value = _row_variants(current)
+        elif variants_value is None:
+            variants_value = [{
+                "size": supplied("size", "size"),
+                "inventory": supplied("inventory", "inventory"),
+            }]
+        if not isinstance(variants_value, list) or not 1 <= len(variants_value) <= 20:
+            raise SecurityError(400, "Add between 1 and 20 size variants.", "invalid_product")
+        clean_variants: list[dict[str, Any]] = []
+        seen_sizes: set[str] = set()
+        total_inventory = 0
+        for item in variants_value:
+            if not isinstance(item, dict) or set(item) - {"size", "inventory"}:
+                raise SecurityError(400, "Enter valid size inventory rows.", "invalid_product")
+            size = clean_text(item.get("size"), "size", 1, 40)
+            key = size.casefold()
+            if key in seen_sizes:
+                raise SecurityError(400, "Each size can appear only once.", "invalid_product")
+            seen_sizes.add(key)
+            inventory = item.get("inventory")
+            if isinstance(inventory, bool) or not isinstance(inventory, int) or not 0 <= inventory <= 100_000:
+                raise SecurityError(400, "Enter valid product inventory.", "invalid_product")
+            total_inventory += inventory
+            clean_variants.append({"size": size, "inventory": inventory})
+        if total_inventory > 100_000:
+            raise SecurityError(400, "Total product inventory cannot exceed 100000.", "invalid_product")
+        size_summary = ", ".join(item["size"] for item in clean_variants)
 
         raw_colour_hex = supplied("colourHex", "colour_hex")
         colour_hex = _optional_text(raw_colour_hex, "colour", 7)
@@ -765,6 +899,7 @@ class ShopWorkflow:
             attributes = attributes_value if attributes_value is not None else {}
         if not isinstance(attributes, dict) or len(attributes) > 30:
             raise SecurityError(400, "Enter valid product attributes.", "invalid_product")
+
         clean_attributes: dict[str, str] = {}
         for key, value in attributes.items():
             if not isinstance(key, str) or not isinstance(value, str):
@@ -783,8 +918,9 @@ class ShopWorkflow:
             "category": category,
             "price_paise": price,
             "original_price_paise": original_price,
-            "inventory": inventory,
-            "size": clean_text(supplied("size", "size"), "size", 1, 40),
+            "inventory": total_inventory,
+            "size": size_summary,
+            "variants_json": json.dumps(clean_variants, separators=(",", ":")),
             "colour_name": clean_text(
                 supplied("colourName", "colour_name"), "colour name", 1, 80
             ),
@@ -808,6 +944,10 @@ class ShopWorkflow:
 
     @staticmethod
     def _serialize_product(row: sqlite3.Row, *, admin: bool = False) -> dict[str, Any]:
+        variants = [
+            {"id": f"{row['id']}-var-{index + 1}", "size": item["size"], "inventory": item["inventory"]}
+            for index, item in enumerate(_row_variants(row))
+        ]
         result = {
             "id": row["id"],
             "slug": row["slug"],
@@ -819,8 +959,9 @@ class ShopWorkflow:
             "category": row["category"],
             "pricePaise": row["price_paise"],
             "originalPricePaise": row["original_price_paise"],
-            "inventory": row["inventory"],
-            "size": row["size"],
+            "inventory": sum(item["inventory"] for item in variants),
+            "size": ", ".join(item["size"] for item in variants),
+            "variants": variants,
             "colourName": row["colour_name"],
             "colourHex": row["colour_hex"],
             "imageUrls": json.loads(row["image_urls_json"]),
@@ -945,9 +1086,9 @@ class ShopWorkflow:
                 INSERT INTO shop_product_submissions(
                   id,slug,application_id,submitted_by_user_id,name,description,brand,
                   department,category,price_paise,original_price_paise,inventory,
-                  size,colour_name,colour_hex,image_urls_json,attributes_json,status,
+                  size,variants_json,colour_name,colour_hex,image_urls_json,attributes_json,status,
                   created_at,updated_at
-                ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,'DRAFT',?,?)
+                ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,'DRAFT',?,?)
                 """,
                 (
                     product_id,
@@ -963,6 +1104,7 @@ class ShopWorkflow:
                     values["original_price_paise"],
                     values["inventory"],
                     values["size"],
+                    values["variants_json"],
                     values["colour_name"],
                     values["colour_hex"],
                     values["image_urls_json"],
@@ -1003,7 +1145,7 @@ class ShopWorkflow:
                 """
                 UPDATE shop_product_submissions
                    SET name=?,description=?,brand=?,department=?,category=?,price_paise=?,
-                       original_price_paise=?,inventory=?,size=?,colour_name=?,colour_hex=?,
+                       original_price_paise=?,inventory=?,size=?,variants_json=?,colour_name=?,colour_hex=?,
                        image_urls_json=?,attributes_json=?,status='DRAFT',
                        rejection_reason=NULL,reviewed_by=NULL,reviewed_at=NULL,updated_at=?
                  WHERE id=? AND submitted_by_user_id=?
@@ -1018,6 +1160,7 @@ class ShopWorkflow:
                     values["original_price_paise"],
                     values["inventory"],
                     values["size"],
+                    values["variants_json"],
                     values["colour_name"],
                     values["colour_hex"],
                     values["image_urls_json"],
@@ -1073,6 +1216,103 @@ class ShopWorkflow:
                 "SELECT * FROM shop_product_submissions WHERE id=?", (product_id,)
             ).fetchone()
         return self._serialize_product(row)
+
+    def admin_create_product(
+        self, admin_id: str, application_id: str, payload: dict[str, Any]
+    ) -> dict[str, Any]:
+        values = self._product_payload(payload)
+        product_id = "shopprod_" + secrets.token_hex(12)
+        slug = self._product_slug(values["name"], product_id)
+        now = iso(utc_now())
+        with self.connect() as db:
+            db.execute("BEGIN IMMEDIATE")
+            self._require_admin(db, admin_id)
+            application = db.execute(
+                "SELECT * FROM vendor_applications WHERE id=?", (application_id,)
+            ).fetchone()
+            if application is None:
+                db.rollback()
+                raise SecurityError(404, "Shop application not found.", "vendor_application_not_found")
+            if application["status"] != "ACTIVE":
+                db.rollback()
+                raise SecurityError(409, "Activate the shop before publishing products.", "active_shop_required")
+            if not json.loads(values["image_urls_json"]):
+                db.rollback()
+                raise SecurityError(400, "Add at least one product image.", "product_image_required")
+            db.execute(
+                """
+                INSERT INTO shop_product_submissions(
+                  id,slug,application_id,submitted_by_user_id,name,description,brand,
+                  department,category,price_paise,original_price_paise,inventory,size,
+                  variants_json,colour_name,colour_hex,image_urls_json,attributes_json,
+                  status,reviewed_by,created_at,updated_at,submitted_at,reviewed_at,published_at
+                ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,'PUBLISHED',?,?,?,?,?,?)
+                """,
+                (
+                    product_id, slug, application_id, application["submitted_by_user_id"],
+                    values["name"], values["description"], values["brand"], values["department"],
+                    values["category"], values["price_paise"], values["original_price_paise"],
+                    values["inventory"], values["size"], values["variants_json"],
+                    values["colour_name"], values["colour_hex"], values["image_urls_json"],
+                    values["attributes_json"], admin_id, now, now, now, now, now,
+                ),
+            )
+            self._audit_if_available(
+                db, admin_id, "shop_product_admin_created", "shop_product", product_id,
+                {"applicationId": application_id, "status": "PUBLISHED"},
+            )
+            db.commit()
+            row = db.execute(
+                "SELECT * FROM shop_product_submissions WHERE id=?", (product_id,)
+            ).fetchone()
+        return self._serialize_product(row, admin=True)
+
+    def admin_update_product(
+        self, admin_id: str, product_id: str, payload: dict[str, Any]
+    ) -> dict[str, Any]:
+        with self.connect() as db:
+            db.execute("BEGIN IMMEDIATE")
+            self._require_admin(db, admin_id)
+            current = db.execute(
+                "SELECT * FROM shop_product_submissions WHERE id=?", (product_id,)
+            ).fetchone()
+            if current is None:
+                db.rollback()
+                raise SecurityError(404, "Product submission not found.", "product_not_found")
+            if current["status"] == "PUBLISHED" and ({"variants", "inventory", "size"} & set(payload)):
+                db.rollback()
+                raise SecurityError(
+                    409,
+                    "Unpublish this product before changing its size structure. Live stock can be edited from Inventory.",
+                    "live_variant_change_blocked",
+                )
+            values = self._product_payload(payload, current)
+            now = iso(utc_now())
+            db.execute(
+                """
+                UPDATE shop_product_submissions
+                   SET name=?,description=?,brand=?,department=?,category=?,price_paise=?,
+                       original_price_paise=?,inventory=?,size=?,variants_json=?,colour_name=?,
+                       colour_hex=?,image_urls_json=?,attributes_json=?,reviewed_by=?,reviewed_at=?,updated_at=?
+                 WHERE id=?
+                """,
+                (
+                    values["name"], values["description"], values["brand"], values["department"],
+                    values["category"], values["price_paise"], values["original_price_paise"],
+                    values["inventory"], values["size"], values["variants_json"], values["colour_name"],
+                    values["colour_hex"], values["image_urls_json"], values["attributes_json"],
+                    admin_id, now, now, product_id,
+                ),
+            )
+            self._audit_if_available(
+                db, admin_id, "shop_product_admin_updated", "shop_product", product_id,
+                {"status": current["status"]},
+            )
+            db.commit()
+            row = db.execute(
+                "SELECT * FROM shop_product_submissions WHERE id=?", (product_id,)
+            ).fetchone()
+        return self._serialize_product(row, admin=True)
 
     def admin_list_products(self, admin_id: str) -> list[dict[str, Any]]:
         with self.connect() as db:
@@ -1522,23 +1762,22 @@ class ShopWorkflow:
             if original_price > price
             else 0
         )
-        variant_id = f"{row['id']}-var-1"
-        sku = f"SD-SHOP-{row['id'][-12:].upper()}"
         store_slug = _store_slug(row['application_id'])
-        variant = {
-            "id": variant_id,
-            "sku": sku,
-            "size": row["size"],
-            "colourName": row["colour_name"],
-            "stock": row["inventory"],
-            # The existing inventory API overlays this value. Fail closed until
-            # its server-authoritative response arrives.
-            "available": False,
-            "price": price,
-            "images": images,
-        }
-        if row["colour_hex"]:
-            variant["colourHex"] = row["colour_hex"]
+        variants = []
+        for index, item in enumerate(_row_variants(row)):
+            variant = {
+                "id": f"{row['id']}-var-{index + 1}",
+                "sku": f"SD-SHOP-{row['id'][-12:].upper()}" if index == 0 else f"SD-SHOP-{row['id'][-12:].upper()}-{index + 1}",
+                "size": item["size"],
+                "colourName": row["colour_name"],
+                "stock": item["inventory"],
+                "available": False,
+                "price": price,
+                "images": images,
+            }
+            if row["colour_hex"]:
+                variant["colourHex"] = row["colour_hex"]
+            variants.append(variant)
         return {
             "id": row["id"],
             "slug": row["slug"],
@@ -1557,7 +1796,7 @@ class ShopWorkflow:
             "thumbnail": images[0],
             "rating": 0,
             "reviewCount": 0,
-            "variants": [variant],
+            "variants": variants,
             "tags": ["local-shop"],
             "badge": "Local Shop",
             "newArrival": True,
@@ -1609,13 +1848,14 @@ class ShopWorkflow:
                     "price": price,
                     "variants": [
                         {
-                            "id": f"{row['id']}-var-1",
-                            "sku": f"SD-SHOP-{row['id'][-12:].upper()}",
-                            "size": row["size"],
+                            "id": f"{row['id']}-var-{index + 1}",
+                            "sku": f"SD-SHOP-{row['id'][-12:].upper()}" if index == 0 else f"SD-SHOP-{row['id'][-12:].upper()}-{index + 1}",
+                            "size": item["size"],
                             "colourName": row["colour_name"],
-                            "stock": row["inventory"],
+                            "stock": item["inventory"],
                             "price": price,
                         }
+                        for index, item in enumerate(_row_variants(row))
                     ],
                 }
             )

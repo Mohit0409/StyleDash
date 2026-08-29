@@ -7,18 +7,21 @@ import { authApi } from '../services/authApi';
 import { profileApi } from '../services/businessApi';
 import { ApiError } from '../services/apiClient';
 import { safeLocalReturnPath } from '../utils/navigation';
+import { CONFIG } from '../config';
+import { useToast } from '../context/ToastContext';
 
 export const Profile: React.FC = () => {
   const { user, logout, refresh } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
+  const { showToast } = useToast();
   const returnPath = safeLocalReturnPath((location.state as { from?: string } | null)?.from, '');
   const address = user?.addresses?.find(item => item.isDefault) || user?.addresses?.[0];
   const [name, setName] = useState(user?.name || '');
   const [phone, setPhone] = useState(user?.phone || '');
   const [street, setStreet] = useState(address?.street || '');
-  const [city, setCity] = useState(address?.city || 'Neemuch');
-  const [pincode, setPincode] = useState(address?.pincode || '');
+  const [city, setCity] = useState(address?.city || CONFIG.SERVICE_CITY);
+  const [pincode, setPincode] = useState(address?.pincode || CONFIG.DEFAULT_PINCODE);
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [message, setMessage] = useState('');
@@ -30,7 +33,14 @@ export const Profile: React.FC = () => {
     if (!user) return;
     setName(user.name); setPhone(user.phone || '');
     const saved = user.addresses?.find(item => item.isDefault) || user.addresses?.[0];
-    if (saved) { setStreet(saved.street); setCity(saved.city); setPincode(saved.pincode); }
+    if (saved) {
+      setStreet(saved.street);
+      setCity(saved.city || CONFIG.SERVICE_CITY);
+      setPincode(saved.pincode || CONFIG.DEFAULT_PINCODE);
+    } else {
+      setCity(CONFIG.SERVICE_CITY);
+      setPincode(CONFIG.DEFAULT_PINCODE);
+    }
   }, [user]);
 
   const saveProfile = async (event: React.FormEvent) => {
@@ -40,9 +50,16 @@ export const Profile: React.FC = () => {
         name, phone,
         addresses: street || pincode ? [{ name, phone, street, city, state: 'Madhya Pradesh', pincode, type: 'home', isDefault: true }] : [],
       });
-      await refresh(); setMessage('Profile and delivery address saved.');
+      await refresh();
+      const successMessage = 'Profile and delivery address saved.';
+      setMessage(successMessage);
+      showToast(successMessage, 'success');
       if (returnPath && returnPath !== '/profile') navigate(returnPath, { replace: true });
-    } catch (cause) { setError(cause instanceof ApiError ? cause.message : 'Profile could not be saved.'); }
+    } catch (cause) {
+      const failureMessage = cause instanceof ApiError ? cause.message : 'Profile could not be saved.';
+      setError(failureMessage);
+      showToast(failureMessage, 'error');
+    }
     finally { setSaving(false); }
   };
 
@@ -87,7 +104,7 @@ export const Profile: React.FC = () => {
     {user?.hasPassword ? <form onSubmit={changePassword} className="p-6 bg-white dark:bg-neutral-900 rounded-3xl border dark:border-neutral-800 space-y-4">
       <h2 className="text-xl font-black">Change password</h2>
       <input required type="password" autoComplete="current-password" maxLength={256} value={currentPassword} onChange={event => setCurrentPassword(event.target.value)} placeholder="Current password" className="w-full p-3 rounded-xl border dark:bg-neutral-800" />
-      <input required type="password" autoComplete="new-password" minLength={12} maxLength={256} value={newPassword} onChange={event => setNewPassword(event.target.value)} placeholder="New password (12+ characters)" className="w-full p-3 rounded-xl border dark:bg-neutral-800" />
+      <input required type="password" autoComplete="new-password" minLength={8} maxLength={256} value={newPassword} onChange={event => setNewPassword(event.target.value)} placeholder="New password (8+ characters)" className="w-full p-3 rounded-xl border dark:bg-neutral-800" />
       <button disabled={saving} className="px-5 py-3 rounded-xl border font-bold">Change password</button>
     </form> : <div className="p-6 bg-white dark:bg-neutral-900 rounded-3xl border dark:border-neutral-800 space-y-2">
       <h2 className="text-xl font-black">Sign-in security</h2>

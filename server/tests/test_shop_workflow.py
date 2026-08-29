@@ -172,7 +172,7 @@ class ShopWorkflowTests(unittest.TestCase):
                 [row[0] for row in db.execute(
                     "SELECT version FROM shop_schema_migrations ORDER BY version"
                 )],
-                [1, 2, 3],
+                [1, 2, 3, 4],
             )
             self.assertEqual(db.execute("PRAGMA integrity_check").fetchone()[0], "ok")
             self.assertEqual(db.execute("PRAGMA foreign_key_check").fetchall(), [])
@@ -242,7 +242,7 @@ class ShopWorkflowTests(unittest.TestCase):
         db = sqlite3.connect(concurrent_path)
         self.assertEqual(
             db.execute("SELECT version,COUNT(*) FROM shop_schema_migrations GROUP BY version").fetchall(),
-            [(1, 1), (2, 1), (3, 1)],
+            [(1, 1), (2, 1), (3, 1), (4, 1)],
         )
         self.assertEqual(db.execute("PRAGMA integrity_check").fetchone()[0], "ok")
         db.close()
@@ -506,6 +506,29 @@ class ShopWorkflowTests(unittest.TestCase):
             item for item in self.store.admin_list_products("admin-a") if item["id"] == product["id"]
         )
         self.assertEqual(product_after["status"], "APPROVED")
+
+    def test_multi_size_product_keeps_independent_stock_variants(self) -> None:
+        self.create_active_shop("user-a", "Multi Size Shop")
+        payload = self.complete_product("Variant Kurta")
+        payload.pop("inventory")
+        payload.pop("size")
+        payload["variants"] = [
+            {"size": "S", "inventory": 3},
+            {"size": "M", "inventory": 7},
+            {"size": "L", "inventory": 2},
+            {"size": "XL", "inventory": 1},
+        ]
+        product = self.store.create_product_draft("user-a", payload)
+        self.assertEqual(product["inventory"], 13)
+        self.assertEqual([item["size"] for item in product["variants"]], ["S", "M", "L", "XL"])
+        self.assertEqual([item["inventory"] for item in product["variants"]], [3, 7, 2, 1])
+        self.store.submit_product("user-a", product["id"])
+        for target in ("UNDER_REVIEW", "APPROVED", "PUBLISHED"):
+            self.store.admin_transition_product("admin-a", product["id"], target)
+        public = self.store.list_published_products()[0]
+        self.assertEqual([item["size"] for item in public["variants"]], ["S", "M", "L", "XL"])
+        self.assertEqual([item["stock"] for item in public["variants"]], [3, 7, 2, 1])
+        self.assertEqual([item["id"] for item in public["variants"]], [f"{product['id']}-var-{index}" for index in range(1, 5)])
 
 if __name__ == "__main__":
     unittest.main()

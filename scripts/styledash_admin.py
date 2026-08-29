@@ -18,9 +18,9 @@ from argon2.exceptions import InvalidHashError, VerifyMismatchError
 from cryptography.fernet import Fernet, InvalidToken
 
 try:
-    from styledash_security import ClosingConnection, SecurityError, iso, token_hash, utc_now
+    from styledash_security import (PASSWORD_MAX, PASSWORD_MIN, ClosingConnection, SecurityError, clean_text, iso, normalize_email, normalize_indian_phone, token_hash, utc_now)
 except ModuleNotFoundError:
-    from scripts.styledash_security import ClosingConnection, SecurityError, iso, token_hash, utc_now
+    from scripts.styledash_security import (PASSWORD_MAX, PASSWORD_MIN, ClosingConnection, SecurityError, clean_text, iso, normalize_email, normalize_indian_phone, token_hash, utc_now)
 
 try:
     from styledash_shops import ShopWorkflow
@@ -318,6 +318,59 @@ class AdminStore:
                 (pattern, pattern),
             ).fetchall()
         return [{key: row[key] for key in row.keys()} for row in rows]
+
+    def create_customer_account(self, admin_id: str, payload: dict[str, Any]) -> dict[str, Any]:
+        if not isinstance(payload, dict) or set(payload) - {"name", "email", "phone", "password"}:
+            raise SecurityError(400, "Invalid store-owner account details.", "invalid_customer")
+        name = clean_text(payload.get("name"), "name", 2, 80)
+        email = normalize_email(payload.get("email"))
+        phone_value = payload.get("phone")
+        phone = normalize_indian_phone(phone_value) if phone_value else None
+        password = payload.get("password")
+        if not isinstance(password, str) or not PASSWORD_MIN <= len(password) <= PASSWORD_MAX:
+            raise SecurityError(400, f"Password must be {PASSWORD_MIN}–{PASSWORD_MAX} characters.", "weak_password")
+        now = iso(utc_now())
+        user_id = "usr_" + secrets.token_hex(12)
+        with self.connect() as db:
+            db.execute("BEGIN IMMEDIATE")
+            if db.execute("SELECT 1 FROM users WHERE normalized_email=?", (email,)).fetchone():
+                db.rollback()
+                raise SecurityError(409, "An account with this email already exists.", "email_exists")
+            if phone and db.execute("SELECT 1 FROM users WHERE normalized_phone=?", (phone,)).fetchone():
+                db.rollback()
+                raise SecurityError(409, "An account with this mobile number already exists.", "phone_exists")
+            db.execute(
+                "INSERT INTO users(id,email,normalized_email,password_hash,name,phone,normalized_phone,role,is_active,created_at,updated_at,password_changed_at) "
+                "VALUES(?,?,?,?,?,?,?,'customer',1,?,?,?)",
+                (user_id, email, email, self.passwords.hash(password), name, phone, phone, now, now, now),
+            )
+            self._audit(db, admin_id, "customer_created", "customer", user_id, "success", {"source": "private_admin"})
+            db.commit()
+            row = db.execute(
+                "SELECT id,email,name,phone,is_active,created_at FROM users WHERE id=?",
+                (user_id,),
+            ).fetchone()
+        self._secure_files()
+        return {key: row[key] for key in row.keys()}
+
+    def set_customer_password(self, admin_id: str, user_id: str, password: Any) -> dict[str, Any]:
+        if not isinstance(password, str) or not PASSWORD_MIN <= len(password) <= PASSWORD_MAX:
+            raise SecurityError(400, f"Password must be {PASSWORD_MIN}–{PASSWORD_MAX} characters.", "weak_password")
+        now = iso(utc_now())
+        with self.connect() as db:
+            db.execute("BEGIN IMMEDIATE")
+            user = db.execute("SELECT id,role FROM users WHERE id=?", (user_id,)).fetchone()
+            if user is None or user["role"] != "customer":
+                db.rollback()
+                raise SecurityError(404, "Customer not found.", "customer_not_found")
+            db.execute(
+                "UPDATE users SET password_hash=?,password_changed_at=?,updated_at=? WHERE id=?",
+                (self.passwords.hash(password), now, now, user_id),
+            )
+            db.execute("UPDATE sessions SET revoked_at=? WHERE user_id=? AND revoked_at IS NULL", (now, user_id))
+            self._audit(db, admin_id, "customer_password_reset", "customer", user_id, "success", {"source": "private_admin"})
+            db.commit()
+        return {"id": user_id, "passwordUpdated": True}
 
     def set_customer_active(self, admin_id: str, user_id: str, active: bool) -> dict[str, Any]:
         now = iso(utc_now())

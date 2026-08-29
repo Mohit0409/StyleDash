@@ -13,7 +13,7 @@ test('customer can register and receive a working authenticated session', async 
   await page.getByPlaceholder('Phone number').fill(phone);
   await page.getByPlaceholder('Email').fill(email);
   await page
-    .getByPlaceholder('Password (12+ characters)')
+    .getByPlaceholder('Password (8+ characters)')
     .fill('E2E-only-password-2026!');
 
   await page.getByRole('button', { name: 'Register' }).click();
