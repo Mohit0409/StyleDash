@@ -1,46 +1,30 @@
 import { expect, test } from '@playwright/test';
 
-test('location checker uses server-authoritative serviceability', async ({
-  page,
-}) => {
-  await page.goto('/');
+test('serviceability API remains authoritative for Neemuch and unsupported pincodes', async ({ request }) => {
+  const neemuch = await request.get('/api/serviceability?pincode=458441');
+  expect(neemuch.status()).toBe(200);
+  expect(await neemuch.json()).toMatchObject({
+    success: true,
+    pincode: '458441',
+    serviceable: true,
+    city: 'Neemuch',
+  });
 
-  await page
-    .getByRole('button', { name: /Deliver to:/ })
-    .click();
-
-  const input = page.getByPlaceholder('e.g. 458441');
-
-  await input.fill('458441');
-  await page.getByRole('button', { name: 'Check' }).click();
-
-  await expect(
-    page.getByText('Serviceable in Neemuch'),
-  ).toBeVisible();
-
-  await input.fill('458440');
-  await page.getByRole('button', { name: 'Check' }).click();
-
-  await expect(
-    page.getByText('Pincode Currently Unserviceable'),
-  ).toBeVisible();
+  const unsupported = await request.get('/api/serviceability?pincode=458440');
+  expect(unsupported.status()).toBe(200);
+  expect(await unsupported.json()).toMatchObject({
+    success: true,
+    pincode: '458440',
+    serviceable: false,
+  });
 });
 
-test('location checker fails closed if API is unavailable', async ({
-  page,
-}) => {
+test('shopping header no longer depends on the delivery checker UI', async ({ page }) => {
   await page.route('**/api/serviceability*', route => route.abort());
-
   await page.goto('/');
 
-  await page
-    .getByRole('button', { name: /Deliver to:/ })
-    .click();
-
-  await page.getByPlaceholder('e.g. 458441').fill('458441');
-  await page.getByRole('button', { name: 'Check' }).click();
-
-  await expect(
-    page.getByText('Could Not Check Availability'),
-  ).toBeVisible();
+  await expect(page.getByRole('heading', { name: /Your look/i })).toBeVisible();
+  await expect(page.getByRole('button', { name: /Deliver to:/ })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: /Check delivery availability/ })).toHaveCount(0);
+  await expect(page.getByText(/Deliver to Neemuch \(458441\).*Check area/i)).toHaveCount(0);
 });
