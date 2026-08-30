@@ -14,12 +14,13 @@ export const MainLayout: React.FC = () => {
   return (
     <div className="min-h-screen flex flex-col bg-neutral-50 dark:bg-neutral-950 text-neutral-900 dark:text-neutral-100 transition-colors">
       <NavigationScrollPolicy />
+      <a href="#main-content" className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-[100] focus:rounded-lg focus:bg-white focus:px-4 focus:py-2 focus:font-bold focus:text-neutral-950 focus:shadow-xl">Skip to main content</a>
       <Header
         onOpenCart={() => setIsCartOpen(true)}
         onOpenLocation={() => setIsLocationOpen(true)}
       />
 
-      <main className="flex-1">
+      <main id="main-content" tabIndex={-1} className="flex-1">
         <Outlet />
       </main>
 

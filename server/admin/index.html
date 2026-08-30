@@ -9,7 +9,7 @@
 <body>
   <main class="shell">
     <section id="login-view" class="auth-card">
-      <div class="brand"><span>SD</span><div><strong>Vibe4You</strong><small>Local administration</small></div></div>
+      <div class="brand"><span>V4</span><div><strong>Vibe4You</strong><small>Local administration</small></div></div>
       <h1>Private sign in</h1>
       <p>This service is available only through the Termux SSH tunnel.</p>
       <form id="password-form">
@@ -25,7 +25,7 @@
     </section>
 
     <section id="app-view" hidden>
-      <header><div class="brand"><span>SD</span><div><strong>Vibe4You Admin</strong><small id="admin-name"></small></div></div><button id="logout" class="secondary">Sign out</button></header>
+      <header><div class="brand"><span>V4</span><div><strong>Vibe4You Admin</strong><small id="admin-name"></small></div></div><button id="logout" class="secondary">Sign out</button></header>
       <nav id="tabs">
         <button data-tab="orders" class="active">Orders</button><button data-tab="vendors">Shop Applications</button>
         <button data-tab="shop-products">Shop Products</button><button data-tab="shop-product-requests">Product Requests</button>
@@ -33,9 +33,18 @@
         <button data-tab="payment-alerts">Payment Alerts</button><button data-tab="system">System</button><button data-tab="audit">Audit</button>
       </nav>
       <p id="app-error" class="error" role="alert"></p>
-      <form id="search-form" class="toolbar"><input id="search" maxlength="100" placeholder="Search this section" /><button type="submit">Search</button></form>
+      <p id="app-status" class="status" role="status"></p>
+      <form id="search-form" class="toolbar"><label class="sr-only" for="search">Search this admin section</label><input id="search" maxlength="100" placeholder="Search this section" /><button type="submit">Search</button></form>
       <section id="content" class="panel" aria-live="polite"></section>
     </section>
+    <dialog id="admin-dialog" aria-labelledby="admin-dialog-title">
+      <form id="admin-dialog-form">
+        <h2 id="admin-dialog-title"></h2>
+        <div id="admin-dialog-fields" class="dialog-fields"></div>
+        <p id="admin-dialog-error" class="error" role="alert"></p>
+        <div class="actions"><button id="admin-dialog-submit" type="submit">Continue</button><button id="admin-dialog-cancel" type="button" class="secondary">Cancel</button></div>
+      </form>
+    </dialog>
   </main>
   <script src="/admin.js" defer></script>
 </body>

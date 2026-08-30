@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { ArrowRight, Zap, Sparkles, ChevronRight } from 'lucide-react';
 import { SEO } from '../components/SEO';
@@ -70,7 +70,7 @@ export const Home: React.FC = () => {
             {/* Quick Specs */}
             <div className="pt-6 border-t border-neutral-800 grid grid-cols-3 gap-4 text-xs text-neutral-400">
               <div><strong className="text-white block text-sm">Within a Day</strong> Local Delivery</div>
-              <div><strong className="text-white block text-sm">100% Original</strong> Local Stores</div>
+              <div><strong className="text-white block text-sm">Local Stores</strong> Curated Marketplace</div>
               <div><strong className="text-white block text-sm">7 Days</strong> Easy Size Exchange</div>
             </div>
           </div>
@@ -110,7 +110,7 @@ export const Home: React.FC = () => {
             {[
               { name: "Men's Fashion", dept: 'men', img: 'https://images.unsplash.com/photo-1516826957135-700dedea698c?auto=format&fit=crop&w=500&q=80' },
               { name: "Women's Fashion", dept: 'women', img: 'https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?auto=format&fit=crop&w=500&q=80' },
-              { name: 'Kids Wear', dept: 'kids', img: 'https://images.unsplash.com/photo-1519238263530-99afd11df2ea?auto=format&fit=crop&w=500&q=80' },
+              { name: 'Kids Wear', dept: 'kids', img: 'https://images.unsplash.com/photo-1529374255404-311a2a4f1fd9?auto=format&fit=crop&w=500&q=80' },
               { name: 'Footwear', dept: 'footwear', img: 'https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&w=500&q=80' },
               { name: 'Accessories', dept: 'accessories', img: 'https://images.unsplash.com/photo-1523293182086-7651a899d37f?auto=format&fit=crop&w=500&q=80' }
             ].map(item => (

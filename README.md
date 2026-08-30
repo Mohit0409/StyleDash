@@ -13,7 +13,7 @@ Vibe4You is a production-quality, hyperlocal fashion marketplace built for fast 
 - **Filters & URL Sync**: Filter by department, brand, size, price, and sorting with shareable URL parameters.
 - **Order Tracking & Admin Portal**: Live order status timeline (`placed`, `confirmed`, `packed`, `out_for_delivery`, `delivered`) and admin dashboard.
 - **Marketplace Monetization**: Vendor commission tracking and sponsored placements. Referral and wallet rewards are not currently offered.
-- **Firebase & Local Demo Mode**: Works out of the box in Local/Demo mode without Firebase credentials.
+- **Server-Owned Customer Accounts**: Customer sessions, orders, inventory, and profiles remain server-authoritative; Firebase is used only for verified Google/mobile sign-in where configured.
 
 ## Local Setup
 

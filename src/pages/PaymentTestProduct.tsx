@@ -73,7 +73,7 @@ export const PaymentTestProduct: React.FC = () => {
 
   return (
     <div className="max-w-xl mx-auto px-4 py-10 space-y-6">
-      <SEO title="Controlled payment validation - Vibe4You" description="Restricted Vibe4You payment validation." />
+      <SEO title="Controlled payment validation - Vibe4You" description="Restricted Vibe4You payment validation." noIndex />
       <div className="rounded-3xl border-2 border-red-700 bg-red-50 dark:bg-red-950/30 p-6 space-y-3">
         <div className="flex items-center gap-2 text-red-800 dark:text-red-300">
           <AlertTriangle className="w-6 h-6" />

@@ -1,4 +1,4 @@
-﻿import { expect, test } from '@playwright/test';
+import { expect, test } from '@playwright/test';
 
 test('location checker uses server-authoritative serviceability', async ({
   page,

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { X, Check } from 'lucide-react';
 
 export const SizeGuideModal: React.FC<{ isOpen: boolean; onClose: () => void; department: string }> = ({
@@ -8,19 +8,27 @@ export const SizeGuideModal: React.FC<{ isOpen: boolean; onClose: () => void; de
 }) => {
   const [tab, setTab] = useState<'apparel' | 'footwear'>('apparel');
 
+  useEffect(() => {
+    if (!isOpen) return undefined;
+    const onKeyDown = (event: KeyboardEvent) => { if (event.key === 'Escape') onClose(); };
+    document.addEventListener('keydown', onKeyDown);
+    return () => document.removeEventListener('keydown', onKeyDown);
+  }, [isOpen, onClose]);
+
   if (!isOpen) return null;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in">
-      <div className="bg-white dark:bg-neutral-900 rounded-3xl max-w-2xl w-full p-6 shadow-2xl border border-neutral-200 dark:border-neutral-800 relative max-h-[90vh] overflow-y-auto">
+      <div role="dialog" aria-modal="true" aria-labelledby="size-guide-title" className="bg-white dark:bg-neutral-900 rounded-3xl max-w-2xl w-full p-6 shadow-2xl border border-neutral-200 dark:border-neutral-800 relative max-h-[90vh] overflow-y-auto">
         <button
+          aria-label="Close size guide"
           onClick={onClose}
           className="absolute top-4 right-4 p-2 rounded-full hover:bg-neutral-100 dark:hover:bg-neutral-800 text-neutral-500"
         >
           <X className="w-5 h-5" />
         </button>
 
-        <h3 className="text-xl font-black text-neutral-900 dark:text-white mb-2">Vibe4You Size Guide</h3>
+        <h3 id="size-guide-title" className="text-xl font-black text-neutral-900 dark:text-white mb-2">Vibe4You Size Guide</h3>
         <p className="text-xs text-neutral-500 mb-6">Find your perfect fit before ordering for local doorstep delivery.</p>
 
         {/* Category Tabs */}
@@ -83,7 +91,7 @@ export const SizeGuideModal: React.FC<{ isOpen: boolean; onClose: () => void; de
 
         <div className="mt-6 p-4 bg-neutral-50 dark:bg-neutral-800 rounded-2xl text-xs text-neutral-600 dark:text-neutral-400 space-y-1">
           <p className="font-bold text-neutral-900 dark:text-white">Need a size swap after delivery?</p>
-          <p>Vibe4You offers instant doorstep 7-day size exchanges in Neemuch free of cost!</p>
+          <p>Eligible items may be requested for a size exchange within 7 days. Stock availability, conditions, and pickup/exchange charges may apply.</p>
         </div>
       </div>
     </div>

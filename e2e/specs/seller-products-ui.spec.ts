@@ -144,14 +144,12 @@ test('published seller can update stock and submit edit or unpublish requests wi
     await json({ success: false, error: `Unexpected mocked API request: ${method} ${path}` }, 500);
   });
 
-  page.on('dialog', async dialog => {
-    if (dialog.type() === 'prompt') await dialog.accept('5');
-    else await dialog.accept();
-  });
   await page.goto('/partner');
 
   const editCard = page.getByRole('article').filter({ has: page.getByRole('heading', { name: 'Editable Live Product' }) });
   await editCard.getByRole('button', { name: 'M Stock' }).click();
+  await editCard.getByLabel('Stock for size M').fill('5');
+  await editCard.getByRole('button', { name: 'Save stock' }).click();
   await expect(editCard.getByText('M: 5', { exact: true })).toBeVisible();
   expect(stockPayload).toEqual({ variantId: 'shopprod_edit-var-1', stock: 5 });
 
@@ -167,6 +165,7 @@ test('published seller can update stock and submit edit or unpublish requests wi
 
   const removeCard = page.getByRole('article').filter({ has: page.getByRole('heading', { name: 'Unpublish Live Product' }) });
   await removeCard.getByRole('button', { name: 'Request Unpublish' }).click();
+  await removeCard.getByRole('button', { name: 'Confirm unpublish request' }).click();
   await expect(removeCard.getByText(/UNPUBLISH request submitted/i)).toBeVisible();
   expect(unpublishPayload).toEqual({});
   await expect(page.getByRole('button', { name: /publish/i })).toHaveCount(0);

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { X, MapPin, CheckCircle2, AlertCircle } from 'lucide-react';
 import { serviceAreaRepository } from '../repositories/serviceAreaRepository';
 import { CONFIG } from '../config';
@@ -10,6 +10,13 @@ export const LocationSelector: React.FC<{ isOpen: boolean; onClose: () => void }
   const [pincode, setPincode] = useState(CONFIG.DEFAULT_PINCODE);
   const [result, setResult] = useState<ServiceArea | null>(null);
   const [checkState, setCheckState] = useState<CheckState>('idle');
+
+  useEffect(() => {
+    if (!isOpen) return undefined;
+    const onKeyDown = (event: KeyboardEvent) => { if (event.key === 'Escape') onClose(); };
+    document.addEventListener('keydown', onKeyDown);
+    return () => document.removeEventListener('keydown', onKeyDown);
+  }, [isOpen, onClose]);
 
   if (!isOpen) return null;
 
@@ -44,8 +51,8 @@ export const LocationSelector: React.FC<{ isOpen: boolean; onClose: () => void }
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in">
-      <div className="bg-white dark:bg-neutral-900 rounded-3xl max-w-md w-full p-6 shadow-2xl border border-neutral-200 dark:border-neutral-800 relative">
-        <button onClick={onClose} className="absolute top-4 right-4 p-2 rounded-full hover:bg-neutral-100 dark:hover:bg-neutral-800">
+      <div role="dialog" aria-modal="true" aria-labelledby="location-dialog-title" className="bg-white dark:bg-neutral-900 rounded-3xl max-w-md w-full p-6 shadow-2xl border border-neutral-200 dark:border-neutral-800 relative">
+        <button aria-label="Close delivery availability dialog" onClick={onClose} className="absolute top-4 right-4 p-2 rounded-full hover:bg-neutral-100 dark:hover:bg-neutral-800">
           <X className="w-5 h-5 text-neutral-500" />
         </button>
 
@@ -53,12 +60,13 @@ export const LocationSelector: React.FC<{ isOpen: boolean; onClose: () => void }
           <MapPin className="w-5 h-5" /> Hyperlocal Delivery Check
         </div>
 
-        <h3 className="text-lg font-black text-neutral-900 dark:text-white mb-2">Check Delivery Availability</h3>
+        <h3 id="location-dialog-title" className="text-lg font-black text-neutral-900 dark:text-white mb-2">Check Delivery Availability</h3>
         <p className="text-xs text-neutral-500 mb-6">Enter your 6-digit area pincode in {CONFIG.SERVICE_CITY} to check local delivery availability.</p>
 
         <form onSubmit={handleCheck} className="flex gap-2 mb-4">
           <input
             type="text"
+            aria-label="Delivery pincode"
             inputMode="numeric"
             pattern="[0-9]*"
             maxLength={6}

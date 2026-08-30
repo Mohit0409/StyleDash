@@ -85,7 +85,7 @@ export const Profile: React.FC = () => {
   };
 
   return <div className="max-w-3xl mx-auto px-4 py-8 space-y-6">
-    <SEO title="My Profile - Vibe4You" />
+    <SEO title="My Profile - Vibe4You" noIndex />
     <div><h1 className="text-3xl font-black">My profile</h1><p className="text-sm text-neutral-500">Your account and saved delivery details are stored securely on the Vibe4You server.</p></div>
     {error && <p className="text-sm text-red-600" role="alert">{error}</p>}{message && <p className="text-sm text-green-700" role="status">{message}</p>}
     <form onSubmit={saveProfile} className="p-6 bg-white dark:bg-neutral-900 rounded-3xl border dark:border-neutral-800 space-y-4">
@@ -103,8 +103,8 @@ export const Profile: React.FC = () => {
     </form>
     {user?.hasPassword ? <form onSubmit={changePassword} className="p-6 bg-white dark:bg-neutral-900 rounded-3xl border dark:border-neutral-800 space-y-4">
       <h2 className="text-xl font-black">Change password</h2>
-      <input required type="password" autoComplete="current-password" maxLength={256} value={currentPassword} onChange={event => setCurrentPassword(event.target.value)} placeholder="Current password" className="w-full p-3 rounded-xl border dark:bg-neutral-800" />
-      <input required type="password" autoComplete="new-password" minLength={8} maxLength={256} value={newPassword} onChange={event => setNewPassword(event.target.value)} placeholder="New password (8+ characters)" className="w-full p-3 rounded-xl border dark:bg-neutral-800" />
+      <input aria-label="Current password" required type="password" autoComplete="current-password" maxLength={256} value={currentPassword} onChange={event => setCurrentPassword(event.target.value)} placeholder="Current password" className="w-full p-3 rounded-xl border dark:bg-neutral-800" />
+      <input aria-label="New password" required type="password" autoComplete="new-password" minLength={8} maxLength={256} value={newPassword} onChange={event => setNewPassword(event.target.value)} placeholder="New password (8+ characters)" className="w-full p-3 rounded-xl border dark:bg-neutral-800" />
       <button disabled={saving} className="px-5 py-3 rounded-xl border font-bold">Change password</button>
     </form> : <div className="p-6 bg-white dark:bg-neutral-900 rounded-3xl border dark:border-neutral-800 space-y-2">
       <h2 className="text-xl font-black">Sign-in security</h2>

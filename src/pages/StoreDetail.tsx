@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { MapPin, Zap, Star, Phone, Mail, Store as StoreIcon } from 'lucide-react';
 import { SEO } from '../components/SEO';
@@ -35,7 +35,8 @@ export const StoreDetail: React.FC = () => {
   if (!store) {
     return (
       <div className="max-w-md mx-auto p-12 text-center space-y-4">
-        <h2 className="text-xl font-bold">Store Not Found</h2>
+        <SEO title="Store not found - Vibe4You" description="The requested local store could not be found." noIndex />
+        <h1 className="text-xl font-bold">Store Not Found</h1>
         <Link to="/stores" className="px-6 py-2.5 bg-neutral-950 text-white text-xs font-bold rounded-xl inline-block">
           Browse All Stores
         </Link>

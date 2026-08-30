@@ -125,6 +125,8 @@ export const SellerProducts: React.FC = () => {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
+  const [stockEdit, setStockEdit] = useState<{ productId: string; variantId: string; size: string; value: string } | null>(null);
+  const [unpublishConfirmId, setUnpublishConfirmId] = useState<string | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -232,9 +234,7 @@ export const SellerProducts: React.FC = () => {
     }
   };
 
-  const updateStock = async (product: SellerProduct, variant: SellerProduct['variants'][number]) => {
-    const raw = window.prompt(`Enter current stock for size ${variant.size}:`, String(variant.inventory));
-    if (raw === null) return;
+  const updateStock = async (product: SellerProduct, variant: SellerProduct['variants'][number], raw: string) => {
     const stock = Number(raw);
     if (!Number.isSafeInteger(stock) || stock < 0 || stock > 100_000) {
       setError('Enter a whole-number stock value from 0 to 100000.');
@@ -250,6 +250,7 @@ export const SellerProducts: React.FC = () => {
         const variants = item.variants.map(candidate => candidate.id === updated.variantId ? { ...candidate, inventory: updated.stock } : candidate);
         return { ...item, variants, inventory: variants.reduce((total, candidate) => total + candidate.inventory, 0) };
       }));
+      setStockEdit(null);
       setMessage(`Stock for size ${variant.size} updated to ${updated.stock}.`);
     } catch (cause) {
       setError(messageForError(cause, 'Live stock could not be updated.'));
@@ -259,13 +260,13 @@ export const SellerProducts: React.FC = () => {
   };
 
   const requestUnpublish = async (product: SellerProduct) => {
-    if (!window.confirm(`Request unpublishing ${product.name}? The listing stays live until administrator approval.`)) return;
     setBusy(true);
     setError('');
     setMessage('');
     try {
       const request = await shopProductApi.requestUnpublish(product.id);
       setRequests(current => [request, ...current]);
+      setUnpublishConfirmId(null);
       setMessage('Unpublish request submitted. The product remains live until administrator approval.');
     } catch (cause) {
       setError(messageForError(cause, 'The unpublish request could not be submitted.'));
@@ -307,8 +308,8 @@ export const SellerProducts: React.FC = () => {
               <p className="text-neutral-500">Add one row per size. Stock is tracked separately for every size.</p>
               <div className="space-y-2">
                 {form.variants.map((variant, index) => <div key={index} className="grid grid-cols-[1fr_1fr_auto] gap-2">
-                  <input required maxLength={40} value={variant.size} onChange={event => updateVariant(index, 'size', event.target.value)} placeholder="Size, e.g. S or XL" className="w-full rounded-xl border p-3 dark:bg-neutral-800" />
-                  <input required type="number" min="0" max="100000" step="1" value={variant.inventory} onChange={event => updateVariant(index, 'inventory', event.target.value)} placeholder="Stock" className="w-full rounded-xl border p-3 dark:bg-neutral-800" />
+                  <input aria-label={`Size ${index + 1}`} required maxLength={40} value={variant.size} onChange={event => updateVariant(index, 'size', event.target.value)} placeholder="Size, e.g. S or XL" className="w-full rounded-xl border p-3 dark:bg-neutral-800" />
+                  <input aria-label={`Stock for size ${variant.size || index + 1}`} required type="number" min="0" max="100000" step="1" value={variant.inventory} onChange={event => updateVariant(index, 'inventory', event.target.value)} placeholder="Stock" className="w-full rounded-xl border p-3 dark:bg-neutral-800" />
                   <button type="button" disabled={form.variants.length === 1} onClick={() => removeVariant(index)} className="rounded-xl border px-3 font-bold text-red-600 disabled:opacity-30" aria-label={`Remove size ${variant.size || index + 1}`}>×</button>
                 </div>)}
               </div>
@@ -347,11 +348,24 @@ export const SellerProducts: React.FC = () => {
                 <div className="flex flex-wrap gap-2">
                   {editable && <button type="button" disabled={busy} onClick={() => openEdit(product)} className="flex items-center gap-1 rounded-lg border px-3 py-2 text-xs font-bold"><Edit3 className="w-3.5" /> Edit</button>}
                   {product.status === 'DRAFT' && <button type="button" disabled={busy} onClick={() => void submitProduct(product.id)} className="flex items-center gap-1 rounded-lg bg-neutral-950 px-3 py-2 text-xs font-bold text-white disabled:opacity-60 dark:bg-lime-400 dark:text-neutral-950"><Send className="w-3.5" /> Submit</button>}
-                  {product.status === 'PUBLISHED' && product.variants.map(variant => <button key={variant.id} type="button" disabled={busy} onClick={() => void updateStock(product, variant)} className="flex items-center gap-1 rounded-lg border px-3 py-2 text-xs font-bold"><Boxes className="w-3.5" /> {variant.size} Stock</button>)}
+                  {product.status === 'PUBLISHED' && product.variants.map(variant => <button key={variant.id} type="button" disabled={busy} onClick={() => setStockEdit({ productId: product.id, variantId: variant.id, size: variant.size, value: String(variant.inventory) })} className="flex items-center gap-1 rounded-lg border px-3 py-2 text-xs font-bold"><Boxes className="w-3.5" /> {variant.size} Stock</button>)}
                   {product.status === 'PUBLISHED' && !pendingRequest && <button type="button" disabled={busy} onClick={() => openChangeRequest(product)} className="flex items-center gap-1 rounded-lg border px-3 py-2 text-xs font-bold"><Edit3 className="w-3.5" /> Edit Listing</button>}
-                  {product.status === 'PUBLISHED' && !pendingRequest && <button type="button" disabled={busy} onClick={() => void requestUnpublish(product)} className="flex items-center gap-1 rounded-lg border border-amber-300 px-3 py-2 text-xs font-bold text-amber-800"><PackageMinus className="w-3.5" /> Request Unpublish</button>}
+                  {product.status === 'PUBLISHED' && !pendingRequest && <button type="button" disabled={busy} onClick={() => setUnpublishConfirmId(product.id)} className="flex items-center gap-1 rounded-lg border border-amber-300 px-3 py-2 text-xs font-bold text-amber-800"><PackageMinus className="w-3.5" /> Request Unpublish</button>}
                 </div>
               </div>
+              {stockEdit?.productId === product.id && (() => {
+                const variant = product.variants.find(item => item.id === stockEdit.variantId);
+                if (!variant) return null;
+                return <div className="mt-3 flex flex-wrap items-end gap-2 rounded-xl bg-neutral-50 p-3 dark:bg-neutral-800">
+                  <label className="text-xs font-bold">Stock for size {stockEdit.size}<input aria-label={`Stock for size ${stockEdit.size}`} type="number" min="0" max="100000" step="1" value={stockEdit.value} onChange={event => setStockEdit(current => current ? { ...current, value: event.target.value } : current)} className="mt-1 block w-36 rounded-lg border p-2 dark:bg-neutral-900" /></label>
+                  <button type="button" disabled={busy} onClick={() => void updateStock(product, variant, stockEdit.value)} className="rounded-lg bg-neutral-950 px-3 py-2 text-xs font-bold text-white disabled:opacity-60 dark:bg-lime-400 dark:text-neutral-950">Save stock</button>
+                  <button type="button" disabled={busy} onClick={() => setStockEdit(null)} className="rounded-lg border px-3 py-2 text-xs font-bold">Cancel</button>
+                </div>;
+              })()}
+              {unpublishConfirmId === product.id && <div role="group" aria-label={`Confirm unpublish request for ${product.name}`} className="mt-3 rounded-xl border border-amber-300 bg-amber-50 p-3 text-xs text-amber-900">
+                <p className="font-bold">Request unpublishing {product.name}? The listing stays live until administrator approval.</p>
+                <div className="mt-2 flex gap-2"><button type="button" disabled={busy} onClick={() => void requestUnpublish(product)} className="rounded-lg bg-amber-700 px-3 py-2 font-bold text-white disabled:opacity-60">Confirm unpublish request</button><button type="button" disabled={busy} onClick={() => setUnpublishConfirmId(null)} className="rounded-lg border border-amber-400 px-3 py-2 font-bold">Cancel</button></div>
+              </div>}
             </article>;
           })}</div>}
     </section>

@@ -68,9 +68,17 @@ class PaymentServiceTests(unittest.TestCase):
         saturday = SERVER.datetime(2026, 8, 29, 6, 0, tzinfo=SERVER.timezone.utc)
         self.assertFalse(self.service.express_delivery_available(monday))
         self.assertTrue(self.service.express_delivery_available(saturday))
+        self.assertEqual(self.service.estimated_delivery_label("express"), "60 minutes")
+        self.assertEqual(self.service.estimated_delivery_label("standard"), "within a day")
         with patch.object(SERVER.PaymentService, "express_delivery_available", return_value=False):
             quote = self.service.calculate_order(self.payload(deliveryMethod="express"))
+            cod = self.service.place_cod_order(
+                self.payload(deliveryMethod="express", paymentMethod="cod"),
+                "delivery-standard-test",
+            )
         self.assertEqual(quote["deliveryMethod"], "standard")
+        self.assertEqual(cod["order"]["deliveryMethod"], "standard")
+        self.assertEqual(cod["order"]["estimatedDelivery"], "within a day")
 
     def payload(self, **overrides):
         payload = {
