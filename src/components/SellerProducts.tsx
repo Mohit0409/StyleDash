@@ -66,7 +66,7 @@ const toForm = (product: SellerProduct): ProductFormState => {
     colourHex: product.colourHex || '',
     imageMode,
     imageUrls: linkedImages.join('\n'),
-    uploadedImageUrls: imageMode === 'upload' ? product.imageUrls : [],
+    uploadedImageUrls: imageMode === 'upload' ? uploadedImages : [],
     material: product.attributes.material || '',
   };
 };
