@@ -9,6 +9,10 @@ test('approved shop owner can draft and submit but cannot publish a product', as
     await route.fulfill({ status: 200, contentType: 'image/webp', body: uploadedImageData || Buffer.alloc(0) });
   });
 
+  await page.route('**/media/product-images/**', async route => {
+    await route.fulfill({ status: 200, contentType: 'image/webp', body: Buffer.alloc(8) });
+  });
+
   await page.route('**/api/**', async route => {
     const request = route.request();
     const path = new URL(request.url()).pathname;
@@ -124,7 +128,7 @@ test('published seller can update stock and submit edit or unpublish requests wi
       name: 'Editable Live Product', description: 'Published product that can request reviewed catalogue changes.',
       brand: 'Local', department: 'women', category: 'Clothing & Fashion',
       pricePaise: 50000, originalPricePaise: 60000, inventory: 6, size: 'M, S, L',
-      colourName: 'Black', colourHex: '#000000', imageUrls: ['https://example.test/edit.jpg'],
+      colourName: 'Black', colourHex: '#000000', imageUrls: ['https://pngtree.com/freepng/legacy-product.html', '/media/product-images/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.webp'],
       attributes: {}, variants: [
         { id: 'shopprod_edit-var-1', size: 'M', inventory: 2 },
         { id: 'shopprod_edit-var-2', size: 'S', inventory: 1 },
@@ -140,6 +144,10 @@ test('published seller can update stock and submit edit or unpublish requests wi
       attributes: {}, variants: [{ id: 'shopprod_remove-var-1', size: 'L', inventory: 4 }], createdAt: '2026-08-20T00:00:00Z', updatedAt: '2026-08-20T00:00:00Z',
     },
   ];
+
+  await page.route('**/media/product-images/**', async route => {
+    await route.fulfill({ status: 200, contentType: 'image/webp', body: Buffer.alloc(8) });
+  });
 
   await page.route('**/api/**', async route => {
     const request = route.request();
@@ -197,9 +205,9 @@ test('published seller can update stock and submit edit or unpublish requests wi
 
   await editCard.getByRole('button', { name: 'Edit Listing' }).click();
   await expect(page.getByRole('heading', { name: 'Request Listing Changes' })).toBeVisible();
-  await expect(page.getByRole('radio', { name: 'Image link' })).toHaveAttribute('aria-checked', 'true');
-  await expect(page.getByLabel('HTTPS image URLs')).toHaveValue('https://example.test/edit.jpg');
-  await expect(page.getByLabel('Upload product images')).toHaveCount(0);
+  await expect(page.getByRole('radio', { name: 'Image upload' })).toHaveAttribute('aria-checked', 'true');
+  await expect(page.getByLabel('HTTPS image URLs')).toHaveCount(0);
+  await expect(page.getByAltText('Uploaded product image 1 preview')).toBeVisible();
   await page.getByLabel('Product name').fill('Reviewed Live Product');
   await page.getByLabel('Size 1').fill('M Tall');
   await expect(page.getByLabel('Stock for size M Tall')).toHaveAttribute('readonly', '');
@@ -216,6 +224,7 @@ test('published seller can update stock and submit edit or unpublish requests wi
     { size: 'L', inventory: 3 },
     { size: 'XL', inventory: 4 },
   ]);
+  expect(editPayload?.imageUrls).toEqual(['/media/product-images/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.webp']);
   await expect(editCard.getByRole('button', { name: 'Edit Listing' })).toHaveCount(0);
   await expect(editCard.getByRole('button', { name: 'Request Unpublish' })).toHaveCount(0);
 
