@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { ShoppingBag, Heart, User, Search, MapPin, Zap, Sun, Moon, Store, PlusCircle } from 'lucide-react';
+import { ShoppingBag, Heart, User, Search, Zap, Sun, Moon, Store, PlusCircle } from 'lucide-react';
 import { useCart } from '../context/CartContext';
 import { useWishlist } from '../context/WishlistContext';
 import { useTheme } from '../context/ThemeContext';
@@ -8,10 +8,7 @@ import { CONFIG } from '../config';
 import { useAuth } from '../context/AuthContext';
 import { BrandWordmark } from './BrandWordmark';
 
-export const Header: React.FC<{ onOpenCart: () => void; onOpenLocation: () => void }> = ({
-  onOpenCart,
-  onOpenLocation
-}) => {
+export const Header: React.FC<{ onOpenCart: () => void }> = ({ onOpenCart }) => {
   const navigate = useNavigate();
   const { totalItemsCount } = useCart();
   const { wishlistIds } = useWishlist();
@@ -43,14 +40,6 @@ export const Header: React.FC<{ onOpenCart: () => void; onOpenLocation: () => vo
               <BrandWordmark showTagline className="transition-transform duration-200 group-hover:scale-[1.015]" />
             </Link>
 
-            {/* Location Selector */}
-            <button
-              onClick={onOpenLocation}
-              className="hidden lg:flex items-center gap-2 text-xs font-semibold px-3 py-1.5 rounded-full bg-neutral-100 dark:bg-neutral-800 hover:bg-neutral-200 dark:hover:bg-neutral-700 text-neutral-800 dark:text-neutral-200 transition-colors"
-            >
-              <MapPin className="w-3.5 h-3.5 text-lime-600" />
-              <span>Deliver to: <strong>{CONFIG.SERVICE_CITY} ({CONFIG.DEFAULT_PINCODE})</strong></span>
-            </button>
           </div>
 
           {/* Search Bar */}
@@ -134,16 +123,6 @@ export const Header: React.FC<{ onOpenCart: () => void; onOpenLocation: () => vo
           />
           <Search className="w-4 h-4 text-neutral-400 absolute left-3.5 top-[0.7rem]" />
         </form>
-
-        <button
-          type="button"
-          onClick={onOpenLocation}
-          aria-label={`Check delivery availability for ${CONFIG.DEFAULT_PINCODE}`}
-          className="lg:hidden mb-2 flex w-full items-center justify-center gap-2 rounded-xl bg-neutral-100 px-3 py-2.5 text-xs font-bold text-neutral-800 transition-colors hover:bg-neutral-200 dark:bg-neutral-800 dark:text-neutral-200 dark:hover:bg-neutral-700"
-        >
-          <MapPin className="w-4 h-4 text-lime-600" />
-          Deliver to {CONFIG.SERVICE_CITY} ({CONFIG.DEFAULT_PINCODE}) ? Check area
-        </button>
 
         {/* Category Navigation Bar */}
         <nav className="flex items-center gap-6 py-2.5 overflow-x-auto no-scrollbar border-t border-neutral-100 dark:border-neutral-800 text-xs font-bold text-neutral-700 dark:text-neutral-300">

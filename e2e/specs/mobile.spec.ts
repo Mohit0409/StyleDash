@@ -30,12 +30,23 @@ test('mobile legal and support routes render without 404', async ({
 });
 
 
-test('mobile users can check delivery availability', async ({ page }) => {
+test('mobile header omits the delivery checker while Neemuch remains serviceable', async ({ page, request }) => {
   await page.goto('/');
-  await page.getByRole('button', { name: /Check delivery availability/ }).click();
-  const dialog = page.getByRole('dialog', { name: 'Check Delivery Availability' });
-  await expect(dialog).toBeVisible();
-  await dialog.getByLabel('Delivery pincode').fill('458441');
-  await dialog.getByRole('button', { name: 'Check' }).click();
-  await expect(dialog.getByText('Serviceable in Neemuch')).toBeVisible();
+
+  await expect(
+    page.getByRole('button', { name: /Check delivery availability/ }),
+  ).toHaveCount(0);
+  await expect(
+    page.getByText(/Deliver to Neemuch \(458441\).*Check area/i),
+  ).toHaveCount(0);
+
+  const response = await request.get('/api/serviceability?pincode=458441');
+  expect(response.status()).toBe(200);
+  await expect(response).toBeOK();
+  expect(await response.json()).toMatchObject({
+    success: true,
+    pincode: '458441',
+    serviceable: true,
+    city: 'Neemuch',
+  });
 });

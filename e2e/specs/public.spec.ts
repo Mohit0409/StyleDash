@@ -176,3 +176,15 @@ test('robots and sitemap expose only intended public discovery metadata', async 
   expect(xml).not.toContain('/profile');
   expect(xml).not.toContain('/checkout');
 });
+
+test('header omits delivery-area controls while Neemuch serviceability remains available', async ({ page, request }) => {
+  await page.goto('/');
+
+  await expect(page.getByRole('button', { name: /Check delivery availability/ })).toHaveCount(0);
+  await expect(page.getByText(/Deliver to Neemuch \(458441\).*Check area/i)).toHaveCount(0);
+  await expect(page.getByText(/Deliver to:\s*Neemuch \(458441\)/i)).toHaveCount(0);
+
+  const response = await request.get('/api/serviceability?pincode=458441');
+  expect(response.status()).toBe(200);
+  expect(await response.json()).toMatchObject({ serviceable: true, pincode: '458441', city: 'Neemuch' });
+});
