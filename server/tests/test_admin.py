@@ -115,6 +115,52 @@ class AdminStoreTests(unittest.TestCase):
         actions = {row["action"] for row in self.store.audit()}
         self.assertTrue({"order_status", "inventory_adjustment", "vendor_approved", "customer_disabled"}.issubset(actions))
 
+    def test_private_admin_owner_mobile_required_email_optional_and_otp_binds(self):
+        owner = self.store.create_customer_account(self.admin["id"], {
+            "name": "Phone First Owner", "phone": "9876501234", "password": "TempPass8!",
+        })
+        self.assertIsNone(owner["email"])
+        self.assertEqual(owner["phone"], "+919876501234")
+        self.assert_error(
+            "invalid_phone",
+            lambda: self.store.create_customer_account(self.admin["id"], {
+                "name": "Missing Phone", "email": "missing-phone@example.test", "password": "TempPass8!",
+            }),
+        )
+        self.customers.firebase_verifier = lambda _token: {
+            "uid": "firebase-phone-first-owner",
+            "phone_number": "+919876501234",
+            "firebase": {"sign_in_provider": "phone"},
+        }
+        logged_in, _raw, _csrf, created = self.customers.federated_session(
+            "phone", {"idToken": "x" * 24}
+        )
+        self.assertEqual(logged_in["id"], owner["id"])
+        self.assertFalse(created)
+        with self.store.connect() as db:
+            identity = db.execute(
+                "SELECT provider_subject,verified_phone FROM customer_auth_identities WHERE user_id=? AND provider='phone'",
+                (owner["id"],),
+            ).fetchone()
+        self.assertEqual(identity["provider_subject"], "firebase-phone-first-owner")
+        self.assertEqual(identity["verified_phone"], "+919876501234")
+        self.assertEqual(self.store.customers("501234")[0]["id"], owner["id"])
+        app = ADMIN_SERVER.AdminApplication(
+            self.database, self.key, ROOT / "server/payment-data/catalog.json",
+            ROOT / "server/payment-data/settings.json", self.root / "data-phone-owner",
+        )
+        shop = app.shops.admin_create_application(self.admin["id"], owner["id"], {
+            "shopName": "Phone First Store", "ownerName": "Phone First Owner",
+            "category": "Clothing & Fashion",
+            "description": "A local store whose owner signs in primarily with mobile OTP.",
+            "address": "12 Neemuch Main Market", "city": "Neemuch",
+            "state": "Madhya Pradesh", "pincode": "458441",
+            "businessInformation": "Admin-assisted phone-first onboarding.",
+        })
+        self.assertEqual(shop["status"], "ACTIVE")
+        self.assertIsNone(shop["registeredEmail"])
+        self.assertEqual(shop["registeredMobile"], "+919876501234")
+
     def test_private_admin_can_create_owner_store_and_multisize_product(self):
         app = ADMIN_SERVER.AdminApplication(self.database, self.key, ROOT / "server/payment-data/catalog.json", ROOT / "server/payment-data/settings.json", self.root / "data")
         owner = app.identity.create_customer_account(self.admin["id"], {
@@ -495,6 +541,14 @@ class AdminStoreTests(unittest.TestCase):
         self.assertIn("NO FULFILLMENT REQUIRED", admin_ui)
         self.assertIn("Do not pack, dispatch, deliver, or adjust fashion inventory.", admin_ui)
         self.assertIn("paymentTest?", admin_ui)
+        self.assertIn("Mobile number (required; used for OTP login)", admin_ui)
+        self.assertIn("Store owner email (optional)", admin_ui)
+        self.assertIn('data-order-filter="status"', admin_ui)
+        self.assertIn('data-order-filter="payment"', admin_ui)
+        self.assertIn('data-order-filter="fulfillment"', admin_ui)
+        self.assertIn("payment_pending:'amber'", admin_ui)
+        self.assertIn("delivered:'green'", admin_ui)
+        self.assertIn("cancelled:'red'", admin_ui)
         self.assertNotIn("prompt(", admin_ui)
         self.assertNotIn("alert(", admin_ui)
         self.assertNotIn("confirm(", admin_ui)
@@ -504,6 +558,10 @@ class AdminStoreTests(unittest.TestCase):
         self.assertIn('role="status"', admin_index)
         self.assertNotIn("th:nth-child(n+4)", admin_css)
         self.assertIn("table{min-width:680px}", admin_css)
+        self.assertIn(".order-filters{", admin_css)
+        self.assertIn(".status-badge{", admin_css)
+        self.assertIn(".tone-green{", admin_css)
+        self.assertIn(".tone-red{", admin_css)
 
 
 class AdminHttpTests(unittest.TestCase):
