@@ -314,8 +314,10 @@ class AdminStore:
         pattern = f"%{query.strip().casefold()[:100]}%"
         with self.connect() as db:
             rows = db.execute(
-                "SELECT id,email,name,phone,is_active,created_at FROM users WHERE email LIKE ? OR lower(name) LIKE ? ORDER BY created_at DESC LIMIT 200",
-                (pattern, pattern),
+                "SELECT id,email,name,phone,is_active,created_at FROM users "
+                "WHERE lower(COALESCE(email,'')) LIKE ? OR lower(name) LIKE ? OR COALESCE(phone,'') LIKE ? "
+                "ORDER BY created_at DESC LIMIT 200",
+                (pattern, pattern, pattern),
             ).fetchall()
         return [{key: row[key] for key in row.keys()} for row in rows]
 
@@ -323,20 +325,27 @@ class AdminStore:
         if not isinstance(payload, dict) or set(payload) - {"name", "email", "phone", "password"}:
             raise SecurityError(400, "Invalid store-owner account details.", "invalid_customer")
         name = clean_text(payload.get("name"), "name", 2, 80)
-        email = normalize_email(payload.get("email"))
-        phone_value = payload.get("phone")
-        phone = normalize_indian_phone(phone_value) if phone_value else None
+        email_value = payload.get("email")
+        email = normalize_email(email_value) if isinstance(email_value, str) and email_value.strip() else None
+        phone = normalize_indian_phone(payload.get("phone"))
         password = payload.get("password")
         if not isinstance(password, str) or not PASSWORD_MIN <= len(password) <= PASSWORD_MAX:
-            raise SecurityError(400, f"Password must be {PASSWORD_MIN}–{PASSWORD_MAX} characters.", "weak_password")
+            raise SecurityError(400, f"Password must be {PASSWORD_MIN}-{PASSWORD_MAX} characters.", "weak_password")
         now = iso(utc_now())
         user_id = "usr_" + secrets.token_hex(12)
+        phone_identity_id = "cai_" + secrets.token_hex(12)
         with self.connect() as db:
             db.execute("BEGIN IMMEDIATE")
-            if db.execute("SELECT 1 FROM users WHERE normalized_email=?", (email,)).fetchone():
+            if email and db.execute("SELECT 1 FROM users WHERE normalized_email=?", (email,)).fetchone():
                 db.rollback()
                 raise SecurityError(409, "An account with this email already exists.", "email_exists")
-            if phone and db.execute("SELECT 1 FROM users WHERE normalized_phone=?", (phone,)).fetchone():
+            if db.execute("SELECT 1 FROM users WHERE normalized_phone=?", (phone,)).fetchone():
+                db.rollback()
+                raise SecurityError(409, "An account with this mobile number already exists.", "phone_exists")
+            if db.execute(
+                "SELECT 1 FROM customer_auth_identities WHERE provider='phone' AND verified_phone=?",
+                (phone,),
+            ).fetchone():
                 db.rollback()
                 raise SecurityError(409, "An account with this mobile number already exists.", "phone_exists")
             db.execute(
@@ -344,7 +353,15 @@ class AdminStore:
                 "VALUES(?,?,?,?,?,?,?,'customer',1,?,?,?)",
                 (user_id, email, email, self.passwords.hash(password), name, phone, phone, now, now, now),
             )
-            self._audit(db, admin_id, "customer_created", "customer", user_id, "success", {"source": "private_admin"})
+            db.execute(
+                "INSERT INTO customer_auth_identities(id,user_id,provider,provider_subject,verified_phone,created_at,last_used_at) "
+                "VALUES(?,?,'phone',?,?,?,?)",
+                (phone_identity_id, user_id, f"admin-pending:{user_id}", phone, now, now),
+            )
+            self._audit(
+                db, admin_id, "customer_created", "customer", user_id, "success",
+                {"source": "private_admin", "primary_sign_in": "phone_otp"},
+            )
             db.commit()
             row = db.execute(
                 "SELECT id,email,name,phone,is_active,created_at FROM users WHERE id=?",

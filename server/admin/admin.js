@@ -1,5 +1,7 @@
 let csrfToken = '';
 let activeTab = 'orders';
+let currentOrders = [];
+let orderFilters = {status:'all', payment:'all', fulfillment:'all'};
 
 const byId = id => document.getElementById(id);
 const escapeText = value => String(value ?? '').replace(/[&<>"']/g, character => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[character]));
@@ -35,6 +37,7 @@ byId('totp-form').addEventListener('submit', async event => {
 byId('logout').addEventListener('click', async () => { try { await api('/api/admin/logout',{method:'POST',body:'{}'}); } finally { location.reload(); } });
 byId('tabs').addEventListener('click', event => { const button=event.target.closest('[data-tab]'); if(!button)return; activeTab=button.dataset.tab; document.querySelectorAll('[data-tab]').forEach(item=>item.classList.toggle('active',item===button)); loadTab(activeTab); });
 byId('search-form').addEventListener('submit', event => { event.preventDefault(); loadTab(activeTab); });
+byId('content').addEventListener('change', event => { const control=event.target.closest('[data-order-filter]'); if(!control)return; orderFilters[control.dataset.orderFilter]=control.value; renderOrdersView(); });
 
 function status(message) { byId('app-status').textContent = message || ''; }
 function formDialog(title, fields, submitLabel='Continue') {
@@ -82,12 +85,12 @@ function parseVariants(raw) {
 async function createOwnerAccount(){
   const values=await formDialog('Create store owner account',[
     {name:'name',label:'Store owner full name',required:true,maxLength:80},
-    {name:'email',label:'Store owner email (used for login)',type:'email',required:true,maxLength:254},
-    {name:'phone',label:'Mobile number (optional)',maxLength:20},
-    {name:'password',label:'Temporary password (8+ characters)',type:'password',required:true,minLength:8,maxLength:256},
+    {name:'phone',label:'Mobile number (required; used for OTP login)',required:true,maxLength:20},
+    {name:'email',label:'Store owner email (optional)',type:'email',maxLength:254},
+    {name:'password',label:'Temporary password (8+ characters; email login if provided)',type:'password',required:true,minLength:8,maxLength:256},
   ],'Create owner account'); if(!values)return;
-  await api('/api/admin/customers',{method:'POST',body:JSON.stringify({name:values.name,email:values.email,phone:values.phone||undefined,password:values.password})});
-  status(`Owner account created for ${values.email}. Share the temporary password securely.`);
+  await api('/api/admin/customers',{method:'POST',body:JSON.stringify({name:values.name,email:values.email||undefined,phone:values.phone,password:values.password})});
+  status(`Owner account created for ${values.phone}. Mobile OTP login is ready${values.email?'; email/password login is also available.':'.'}`);
 }
 async function resetCustomerPassword(userId){
   const values=await formDialog('Reset customer password',[{name:'password',label:'New temporary password (8+ characters)',type:'password',required:true,minLength:8,maxLength:256}],'Reset password'); if(!values)return;
@@ -153,6 +156,7 @@ byId('content').addEventListener('click', async event => {
   button.disabled=true; error(''); status('');
   try {
     const action=button.dataset.action;
+    if(action==='clear-order-filters'){orderFilters={status:'all',payment:'all',fulfillment:'all'};renderOrdersView();return;}
     if(action==='create-owner') await createOwnerAccount();
     if(action==='reset-customer-password') await resetCustomerPassword(button.dataset.id);
     if(action==='create-store') await createLocalStore();
@@ -194,7 +198,23 @@ function orderActions(order){
     : actions;
 }
 
-function renderOrders(orders){byId('content').innerHTML=`<h2>Recent orders</h2><div class="grid">${orders.map(order=>{const paymentTest=order.isPaymentTestOrder===true||order.fulfillmentRequired===false;return `<article class="card">${paymentTest?'<div class="payment-test-banner"><strong>TEST</strong><strong>NO FULFILLMENT REQUIRED</strong></div>':''}<h3>${escapeText(order.id)}</h3><div class="facts"><div class="fact"><small>Customer</small><strong>${escapeText(order.address?.name)}</strong><small>${escapeText(order.address?.phone)}</small></div><div class="fact"><small>Amount</small><strong>₹${escapeText(order.grandTotal)}</strong></div><div class="fact"><small>Payment</small><strong>${escapeText(order.paymentStatus)}</strong><small>${escapeText(order.razorpayOrderId||'')} ${escapeText(order.razorpayPaymentId||order.paymentMethod)}</small></div><div class="fact"><small>Status</small><strong>${escapeText(order.status)}</strong></div></div><p class="muted">${escapeText(order.address?.street)}, ${escapeText(order.address?.city)} ${escapeText(order.address?.pincode)}</p><pre>${escapeText((order.items||[]).map(item=>`${item.productName||item.name||item.productId} · ${item.size||''} ${item.colourName||item.colour||''} × ${item.quantity}`).join('\n'))}</pre>${paymentTest?'<p class="payment-test-note">Payment validation record only. Do not pack, dispatch, deliver, or adjust fashion inventory.</p>':`<div class="actions">${orderActions(order).map(status=>`<button data-action="order-status" data-id="${escapeText(order.id)}" data-value="${status}">${status.replaceAll('_',' ')}</button>`).join('')}</div>`}</article>`;}).join('')||'<p>No orders found.</p>'}</div>`;}
+function statusTone(value){return ({payment_pending:'amber',payment_review_required:'rose',placed:'sky',confirmed:'blue',preparing:'violet',packed:'indigo',out_for_delivery:'teal',delivered:'green',cancelled:'red',payment_test_completed:'slate',pending:'yellow',paid:'lime',failed:'crimson',refunded:'purple',refund_pending:'orange',partially_refunded:'fuchsia',review_required:'pink'})[String(value||'').toLowerCase()]||'slate';}
+function statusBadge(value){const text=String(value||'unknown');return `<span class="status-badge tone-${statusTone(text)}">${escapeText(text.replaceAll('_',' '))}</span>`;}
+function filterOptions(values,selected){return ['all',...Array.from(new Set(values.filter(Boolean))).sort()].map(value=>`<option value="${escapeText(value)}"${value===selected?' selected':''}>${value==='all'?'All':escapeText(value.replaceAll('_',' '))}</option>`).join('');}
+function renderOrders(orders){currentOrders=Array.isArray(orders)?orders:[];renderOrdersView();}
+function renderOrdersView(){
+  const filtered=currentOrders.filter(order=>{
+    const paymentTest=order.isPaymentTestOrder===true||order.fulfillmentRequired===false;
+    if(orderFilters.status!=='all'&&order.status!==orderFilters.status)return false;
+    if(orderFilters.payment!=='all'&&order.paymentStatus!==orderFilters.payment)return false;
+    if(orderFilters.fulfillment==='required'&&paymentTest)return false;
+    if(orderFilters.fulfillment==='test'&&!paymentTest)return false;
+    return true;
+  });
+  const orderStatuses=currentOrders.map(order=>order.status);
+  const paymentStatuses=currentOrders.map(order=>order.paymentStatus);
+  byId('content').innerHTML=`<h2>Recent orders</h2><section class="order-filters" aria-label="Order filters"><label>Order status<select data-order-filter="status">${filterOptions(orderStatuses,orderFilters.status)}</select></label><label>Payment status<select data-order-filter="payment">${filterOptions(paymentStatuses,orderFilters.payment)}</select></label><label>Fulfillment<select data-order-filter="fulfillment"><option value="all"${orderFilters.fulfillment==='all'?' selected':''}>All</option><option value="required"${orderFilters.fulfillment==='required'?' selected':''}>Customer orders</option><option value="test"${orderFilters.fulfillment==='test'?' selected':''}>Payment tests</option></select></label><div class="order-filter-summary"><span><strong>${filtered.length}</strong> of ${currentOrders.length} orders</span><button class="secondary" data-action="clear-order-filters">Clear filters</button></div></section><div class="grid">${filtered.map(order=>{const paymentTest=order.isPaymentTestOrder===true||order.fulfillmentRequired===false;const tone=statusTone(order.status);return `<article class="card order-card order-tone-${tone}">${paymentTest?'<div class="payment-test-banner"><strong>TEST</strong><strong>NO FULFILLMENT REQUIRED</strong></div>':''}<h3>${escapeText(order.id)}</h3><div class="facts"><div class="fact"><small>Customer</small><strong>${escapeText(order.address?.name)}</strong><small>${escapeText(order.address?.phone)}</small></div><div class="fact"><small>Amount</small><strong>₹${escapeText(order.grandTotal)}</strong></div><div class="fact"><small>Payment</small>${statusBadge(order.paymentStatus)}<small>${escapeText(order.razorpayOrderId||'')} ${escapeText(order.razorpayPaymentId||order.paymentMethod)}</small></div><div class="fact"><small>Status</small>${statusBadge(order.status)}</div></div><p class="muted">${escapeText(order.address?.street)}, ${escapeText(order.address?.city)} ${escapeText(order.address?.pincode)}</p><pre>${escapeText((order.items||[]).map(item=>`${item.productName||item.name||item.productId} · ${item.size||''} ${item.colourName||item.colour||''} × ${item.quantity}`).join('\n'))}</pre>${paymentTest?'<p class="payment-test-note">Payment validation record only. Do not pack, dispatch, deliver, or adjust fashion inventory.</p>':`<div class="actions">${orderActions(order).map(status=>`<button data-action="order-status" data-id="${escapeText(order.id)}" data-value="${status}">${status.replaceAll('_',' ')}</button>`).join('')}</div>`}</article>`;}).join('')||'<p>No orders match the selected filters.</p>'}</div>`;
+}
 function applicationTransitions(status){return {SUBMITTED:['UNDER_REVIEW'],UNDER_REVIEW:['APPROVED','REJECTED'],APPROVED:['ACTIVE'],ACTIVE:['SUSPENDED'],SUSPENDED:['ACTIVE']}[status]||[];}
 function productTransitions(status){return {SUBMITTED:['UNDER_REVIEW'],UNDER_REVIEW:['APPROVED','REJECTED'],APPROVED:['PUBLISHED'],PUBLISHED:['APPROVED']}[status]||[];}
 function productRequestTransitions(status){return {SUBMITTED:['UNDER_REVIEW'],UNDER_REVIEW:['APPROVED','REJECTED']}[status]||[];}
