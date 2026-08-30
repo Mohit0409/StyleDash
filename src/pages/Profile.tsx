@@ -20,8 +20,8 @@ export const Profile: React.FC = () => {
   const [name, setName] = useState(user?.name || '');
   const [phone, setPhone] = useState(user?.phone || '');
   const [street, setStreet] = useState(address?.street || '');
-  const [city, setCity] = useState(address?.city || CONFIG.SERVICE_CITY);
-  const [pincode, setPincode] = useState(address?.pincode || CONFIG.DEFAULT_PINCODE);
+  const city = CONFIG.SERVICE_CITY;
+  const pincode = CONFIG.DEFAULT_PINCODE;
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [message, setMessage] = useState('');
@@ -33,14 +33,7 @@ export const Profile: React.FC = () => {
     if (!user) return;
     setName(user.name); setPhone(user.phone || '');
     const saved = user.addresses?.find(item => item.isDefault) || user.addresses?.[0];
-    if (saved) {
-      setStreet(saved.street);
-      setCity(saved.city || CONFIG.SERVICE_CITY);
-      setPincode(saved.pincode || CONFIG.DEFAULT_PINCODE);
-    } else {
-      setCity(CONFIG.SERVICE_CITY);
-      setPincode(CONFIG.DEFAULT_PINCODE);
-    }
+    setStreet(saved?.street || '');
   }, [user]);
 
   const saveProfile = async (event: React.FormEvent) => {
@@ -48,7 +41,7 @@ export const Profile: React.FC = () => {
     try {
       await profileApi.update({
         name, phone,
-        addresses: street || pincode ? [{ name, phone, street, city, state: 'Madhya Pradesh', pincode, type: 'home', isDefault: true }] : [],
+        addresses: street ? [{ name, phone, street, city, state: 'Madhya Pradesh', pincode, type: 'home', isDefault: true }] : [],
       });
       await refresh();
       const successMessage = 'Profile and delivery address saved.';
@@ -90,14 +83,15 @@ export const Profile: React.FC = () => {
     {error && <p className="text-sm text-red-600" role="alert">{error}</p>}{message && <p className="text-sm text-green-700" role="status">{message}</p>}
     <form onSubmit={saveProfile} className="p-6 bg-white dark:bg-neutral-900 rounded-3xl border dark:border-neutral-800 space-y-4">
       <h2 className="text-xl font-black">Contact and delivery address</h2>
+      <p className="text-xs text-neutral-500">Current delivery area: {CONFIG.SERVICE_CITY} ({CONFIG.DEFAULT_PINCODE}).</p>
       <p className="text-xs text-neutral-500">Signed in as {user?.email || user?.phone}.</p>
       {!user?.email && <div className="rounded-2xl border border-neutral-200 dark:border-neutral-800 p-4 space-y-2"><p className="text-sm font-semibold">Add Gmail to this account</p><p className="text-xs text-neutral-500">Link a verified Google account so you can sign in with Gmail without creating a duplicate Vibe4You account.</p><button type="button" disabled={linkingGoogle || saving} onClick={linkGoogle} className="px-4 py-2 rounded-xl border font-bold disabled:opacity-60">{linkingGoogle ? 'Linking Google…' : 'Link Google account'}</button></div>}
       <div className="grid sm:grid-cols-2 gap-4">
         <label className="text-xs font-bold">Full name<input required minLength={2} maxLength={80} value={name} onChange={event => setName(event.target.value)} className="mt-1 w-full p-3 rounded-xl border dark:bg-neutral-800" /></label>
         <label className="text-xs font-bold">Phone<input required minLength={10} maxLength={20} value={phone} onChange={event => setPhone(event.target.value)} className="mt-1 w-full p-3 rounded-xl border dark:bg-neutral-800" /></label>
         <label className="text-xs font-bold sm:col-span-2">Street address and landmark<input required minLength={5} maxLength={200} value={street} onChange={event => setStreet(event.target.value)} className="mt-1 w-full p-3 rounded-xl border dark:bg-neutral-800" /></label>
-        <label className="text-xs font-bold">City<input required minLength={2} maxLength={80} value={city} onChange={event => setCity(event.target.value)} className="mt-1 w-full p-3 rounded-xl border dark:bg-neutral-800" /></label>
-        <label className="text-xs font-bold">Pincode<input required pattern="[0-9]{6}" maxLength={6} inputMode="numeric" value={pincode} onChange={event => setPincode(event.target.value.replace(/\D/g, ''))} className="mt-1 w-full p-3 rounded-xl border dark:bg-neutral-800" /></label>
+        <label className="text-xs font-bold">City<input readOnly value={city} className="mt-1 w-full p-3 rounded-xl border bg-neutral-100 text-neutral-500 dark:bg-neutral-900 dark:border-neutral-800" /></label>
+        <label className="text-xs font-bold">Pincode<input readOnly value={pincode} className="mt-1 w-full p-3 rounded-xl border bg-neutral-100 text-neutral-500 dark:bg-neutral-900 dark:border-neutral-800" /></label>
       </div>
       <button disabled={saving} className="flex items-center gap-2 bg-neutral-950 text-white dark:bg-lime-400 dark:text-black px-5 py-3 rounded-xl font-bold"><Save className="w-4" />Save profile</button>
     </form>
