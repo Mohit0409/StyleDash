@@ -14,13 +14,15 @@ const CATEGORIES = ['Clothing & Fashion', 'Footwear', 'Electronics', 'Home & Liv
 const DEPARTMENTS = ['men', 'women', 'kids', 'unisex', 'footwear', 'accessories'] as const;
 const INTERNAL_PRODUCT_IMAGE = /^\/media\/product-images\/[0-9a-f]{32}\.(?:webp|jpg|png)$/;
 
-const validImageReference = (value: string) => {
-  if (INTERNAL_PRODUCT_IMAGE.test(value)) return true;
+const validExternalImageLink = (value: string) => {
   try {
     const url = new URL(value);
     return url.protocol === 'https:' && !/\.html?$/i.test(url.pathname);
   } catch { return false; }
 };
+
+const validImageReference = (value: string) =>
+  INTERNAL_PRODUCT_IMAGE.test(value) || validExternalImageLink(value);
 
 interface ProductFormState {
   name: string;
@@ -33,32 +35,41 @@ interface ProductFormState {
   variants: Array<{ size: string; inventory: string }>;
   colourName: string;
   colourHex: string;
+  imageMode: 'links' | 'upload';
   imageUrls: string;
+  uploadedImageUrls: string[];
   material: string;
 }
 
 const EMPTY_FORM: ProductFormState = {
   name: '', description: '', brand: '', department: 'unisex', category: CATEGORIES[0],
   price: '', originalPrice: '', variants: [{ size: '', inventory: '0' }], colourName: '', colourHex: '',
-  imageUrls: '', material: '',
+  imageMode: 'links', imageUrls: '', uploadedImageUrls: [], material: '',
 };
 
-const toForm = (product: SellerProduct): ProductFormState => ({
-  name: product.name,
-  description: product.description,
-  brand: product.brand || '',
-  department: product.department,
-  category: product.category,
-  price: (product.pricePaise / 100).toFixed(2),
-  originalPrice: (product.originalPricePaise / 100).toFixed(2),
-  variants: product.variants?.length
-    ? product.variants.map(variant => ({ size: variant.size, inventory: String(variant.inventory) }))
-    : [{ size: product.size, inventory: String(product.inventory) }],
-  colourName: product.colourName,
-  colourHex: product.colourHex || '',
-  imageUrls: product.imageUrls.join('\n'),
-  material: product.attributes.material || '',
-});
+const toForm = (product: SellerProduct): ProductFormState => {
+  const uploadedImages = product.imageUrls.filter(value => INTERNAL_PRODUCT_IMAGE.test(value));
+  const linkedImages = product.imageUrls.filter(value => !INTERNAL_PRODUCT_IMAGE.test(value));
+  const imageMode: ProductFormState['imageMode'] = uploadedImages.length > 0 ? 'upload' : 'links';
+  return {
+    name: product.name,
+    description: product.description,
+    brand: product.brand || '',
+    department: product.department,
+    category: product.category,
+    price: (product.pricePaise / 100).toFixed(2),
+    originalPrice: (product.originalPricePaise / 100).toFixed(2),
+    variants: product.variants?.length
+      ? product.variants.map(variant => ({ size: variant.size, inventory: String(variant.inventory) }))
+      : [{ size: product.size, inventory: String(product.inventory) }],
+    colourName: product.colourName,
+    colourHex: product.colourHex || '',
+    imageMode,
+    imageUrls: linkedImages.join('\n'),
+    uploadedImageUrls: imageMode === 'upload' ? product.imageUrls : [],
+    material: product.attributes.material || '',
+  };
+};
 
 const toPayload = (form: ProductFormState): SellerProductDraft => {
   const pricePaise = Math.round(Number(form.price) * 100);
@@ -85,9 +96,15 @@ const toPayload = (form: ProductFormState): SellerProductDraft => {
   ) {
     throw new Error('Add unique sizes with valid whole-number stock values.');
   }
-  const imageUrls = form.imageUrls.split(/\r?\n/).map(value => value.trim()).filter(Boolean);
-  if (imageUrls.length < 1 || imageUrls.length > 8 || imageUrls.some(value => !validImageReference(value))) {
-    throw new Error('Add 1?8 images using direct HTTPS image links or uploaded images. Webpage (.html) links are not images.');
+  const imageUrls = form.imageMode === 'links'
+    ? form.imageUrls.split(/\r?\n/).map(value => value.trim()).filter(Boolean)
+    : form.uploadedImageUrls;
+  if (form.imageMode === 'links') {
+    if (imageUrls.length < 1 || imageUrls.length > 8 || imageUrls.some(value => !validExternalImageLink(value))) {
+      throw new Error('Add 1-8 direct HTTPS image links. Webpage (.html) links are not images.');
+    }
+  } else if (imageUrls.length < 1 || imageUrls.length > 8 || imageUrls.some(value => !validImageReference(value))) {
+    throw new Error('Upload 1-8 product images.');
   }
   return {
     name: form.name.trim(),
@@ -209,7 +226,7 @@ export const SellerProducts: React.FC = () => {
 
   const uploadImages = async (files: FileList | null) => {
     if (!files?.length) return;
-    const existing = form.imageUrls.split(/\r?\n/).map(value => value.trim()).filter(Boolean);
+    const existing = form.uploadedImageUrls;
     if (existing.length + files.length > 8) {
       setError('A product can have at most 8 images.');
       return;
@@ -228,16 +245,29 @@ export const SellerProducts: React.FC = () => {
         });
         uploaded.push(image.url);
       }
-      setForm(current => {
-        const currentImages = current.imageUrls.split(/\r?\n/).map(value => value.trim()).filter(Boolean);
-        return { ...current, imageUrls: [...currentImages, ...uploaded].join('\n') };
-      });
+      setForm(current => ({
+        ...current,
+        uploadedImageUrls: [...current.uploadedImageUrls, ...uploaded],
+      }));
       setMessage(`${uploaded.length} image${uploaded.length === 1 ? '' : 's'} optimized and uploaded.`);
     } catch (cause) {
       setError(messageForError(cause, 'The image could not be optimized or uploaded.'));
     } finally {
       setUploadBusy(false);
     }
+  };
+
+  const setImageMode = (imageMode: ProductFormState['imageMode']) => {
+    setForm(current => ({ ...current, imageMode }));
+    setError('');
+    setMessage('');
+  };
+
+  const removeUploadedImage = (index: number) => {
+    setForm(current => ({
+      ...current,
+      uploadedImageUrls: current.uploadedImageUrls.filter((_, position) => position !== index),
+    }));
   };
 
   const saveProduct = async (event: React.FormEvent) => {
@@ -376,21 +406,31 @@ export const SellerProducts: React.FC = () => {
             <label className="font-bold">Colour hex <span className="font-normal text-neutral-500">(optional)</span><input pattern="#[0-9A-Fa-f]{6}" placeholder="#000000" value={form.colourHex} onChange={event => updateForm('colourHex', event.target.value)} className="mt-1 w-full rounded-xl border p-3 dark:bg-neutral-800" /></label>
             <label className="font-bold">Material <span className="font-normal text-neutral-500">(optional)</span><input maxLength={200} value={form.material} onChange={event => updateForm('material', event.target.value)} className="mt-1 w-full rounded-xl border p-3 dark:bg-neutral-800" /></label>
             <label className="font-bold sm:col-span-2">Description<textarea required minLength={10} maxLength={2000} rows={3} value={form.description} onChange={event => updateForm('description', event.target.value)} className="mt-1 w-full rounded-xl border p-3 dark:bg-neutral-800" /></label>
-            <div className="sm:col-span-2 space-y-2 rounded-xl border border-neutral-200 p-3 dark:border-neutral-700">
-              <label className="block font-bold">Image links <span className="font-normal text-neutral-500">(direct HTTPS image URLs, one per line; link or upload, 1?8 total)</span><textarea aria-label="HTTPS image URLs" rows={3} value={form.imageUrls} onChange={event => updateForm('imageUrls', event.target.value)} placeholder="https://example.com/product.jpg" className="mt-1 w-full rounded-xl border p-3 dark:bg-neutral-800" /></label>
-              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                <div>
-                  <p className="font-bold">Or upload product images</p>
-                  <p className="text-[11px] text-neutral-500">A pasted link must open the image itself, not a webpage such as a .html product/gallery page.</p>
-                  <p className="text-[11px] text-neutral-500">JPEG, PNG or WebP. Images are resized to max 1600 px and compressed to WebP, targeting about 350 KB with a 500 KB hard limit.</p>
-                </div>
-                <label className="inline-flex cursor-pointer items-center justify-center rounded-xl border px-4 py-2.5 font-bold">
-                  {uploadBusy ? 'Optimizing?' : 'Upload images'}
-                  <input aria-label="Upload product images" type="file" multiple accept="image/jpeg,image/png,image/webp" disabled={busy || uploadBusy} onChange={event => { void uploadImages(event.target.files); event.currentTarget.value = ''; }} className="sr-only" />
-                </label>
+            <fieldset className="sm:col-span-2 space-y-3 rounded-xl border border-neutral-200 p-3 dark:border-neutral-700">
+              <legend className="px-1 font-bold">Product images</legend>
+              <p className="text-[11px] text-neutral-500">Choose one method: use direct image links or upload product images. Only the selected method is submitted.</p>
+              <div className="grid grid-cols-2 gap-2" role="radiogroup" aria-label="Product image source">
+                <button type="button" role="radio" aria-checked={form.imageMode === 'links'} onClick={() => setImageMode('links')} className={`rounded-xl border px-3 py-2.5 font-bold ${form.imageMode === 'links' ? 'border-neutral-950 bg-neutral-950 text-white dark:border-lime-400 dark:bg-lime-400 dark:text-neutral-950' : ''}`}>Image link</button>
+                <button type="button" role="radio" aria-checked={form.imageMode === 'upload'} onClick={() => setImageMode('upload')} className={`rounded-xl border px-3 py-2.5 font-bold ${form.imageMode === 'upload' ? 'border-neutral-950 bg-neutral-950 text-white dark:border-lime-400 dark:bg-lime-400 dark:text-neutral-950' : ''}`}>Image upload</button>
               </div>
-              {form.imageUrls.trim() && <div className="flex flex-wrap gap-2">{form.imageUrls.split(/\r?\n/).map(value => value.trim()).filter(validImageReference).map((value, index) => <img key={`${value}-${index}`} src={value} alt={`Product image ${index + 1} preview`} loading="lazy" className="h-16 w-16 rounded-lg border object-cover" />)}</div>}
-            </div>
+              {form.imageMode === 'links' ? (
+                <label className="block font-bold">Direct HTTPS image links <span className="font-normal text-neutral-500">(one per line, 1-8)</span><textarea aria-label="HTTPS image URLs" rows={3} value={form.imageUrls} onChange={event => updateForm('imageUrls', event.target.value)} placeholder="https://example.com/product.jpg" className="mt-1 w-full rounded-xl border p-3 dark:bg-neutral-800" /><span className="mt-1 block text-[11px] font-normal text-neutral-500">Each link must open the image itself, not a webpage such as a .html product/gallery page.</span></label>
+              ) : (
+                <div className="space-y-3">
+                  <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                      <p className="font-bold">Upload product images</p>
+                      <p className="text-[11px] text-neutral-500">JPEG, PNG or WebP. Images are resized to max 1600 px and compressed to WebP, targeting about 350 KB with a 500 KB hard limit.</p>
+                    </div>
+                    <label className="inline-flex cursor-pointer items-center justify-center rounded-xl border px-4 py-2.5 font-bold">
+                      {uploadBusy ? 'Optimizing...' : 'Choose images'}
+                      <input aria-label="Upload product images" type="file" multiple accept="image/jpeg,image/png,image/webp" disabled={busy || uploadBusy} onChange={event => { void uploadImages(event.target.files); event.currentTarget.value = ''; }} className="sr-only" />
+                    </label>
+                  </div>
+                  {form.uploadedImageUrls.length > 0 ? <div className="flex flex-wrap gap-2">{form.uploadedImageUrls.map((value, index) => <div key={`${value}-${index}`} className="relative"><img src={value} alt={`Uploaded product image ${index + 1} preview`} loading="lazy" className="h-16 w-16 rounded-lg border object-cover" /><button type="button" onClick={() => removeUploadedImage(index)} aria-label={`Remove uploaded image ${index + 1}`} className="absolute -right-1 -top-1 rounded-full border bg-white px-1.5 py-0.5 text-[10px] font-black text-red-600 shadow">x</button></div>)}</div> : <p className="text-[11px] text-neutral-500">No images uploaded yet.</p>}
+                </div>
+              )}
+            </fieldset>
           </div>
           <div className="flex justify-end gap-3">
             <button type="button" onClick={() => setFormOpen(false)} className="rounded-xl border px-4 py-2.5 text-xs font-bold">Cancel</button>
