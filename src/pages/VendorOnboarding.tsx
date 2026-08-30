@@ -179,7 +179,7 @@ export const VendorOnboarding: React.FC = () => {
 
   return (
     <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
-      <SEO title="List Your Shop - Vibe4You" />
+      <SEO title="List Your Shop - Vibe4You" noIndex />
 
       <div className="text-center space-y-2">
         <div className="w-16 h-16 bg-lime-400 text-neutral-950 rounded-3xl flex items-center justify-center mx-auto shadow-xl">

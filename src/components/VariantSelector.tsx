@@ -71,7 +71,7 @@ export const VariantSelector: React.FC<VariantSelectorProps> = ({
           {onOpenSizeGuide && (
             <button
               onClick={onOpenSizeGuide}
-              className="text-xs text-lime-600 dark:text-lime-400 font-bold hover:underline"
+              className="min-h-8 px-1 text-xs text-lime-600 dark:text-lime-400 font-bold hover:underline"
             >
               Size Guide & Measurements
             </button>

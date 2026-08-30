@@ -77,6 +77,7 @@ Object.assign(env, {
 
   STYLEDASH_SUPPORTED_PINCODES: '458441',
   STYLEDASH_PUBLIC_ORIGIN: 'http://127.0.0.1:4173',
+  STYLEDASH_TRUST_LOOPBACK_PROXY: '1',
 
   // Enable the feature so authorization—not merely the flag—is exercised.
   STYLEDASH_ENABLE_TEST_PRODUCT: 'true',

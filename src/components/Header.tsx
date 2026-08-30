@@ -59,6 +59,7 @@ export const Header: React.FC<{ onOpenCart: () => void; onOpenLocation: () => vo
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
+              aria-label="Search products, brands, or local Neemuch stores"
               placeholder="Search products, brands, or local Neemuch stores..."
               className="w-full pl-10 pr-4 py-2 rounded-full border border-neutral-300 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-800 text-neutral-900 dark:text-white placeholder-neutral-400 focus:outline-none focus:ring-2 focus:ring-lime-400 text-sm transition-all"
             />
@@ -79,6 +80,7 @@ export const Header: React.FC<{ onOpenCart: () => void; onOpenLocation: () => vo
             <button
               onClick={toggleTheme}
               className="p-2 rounded-full hover:bg-neutral-100 dark:hover:bg-neutral-800 text-neutral-700 dark:text-neutral-300 transition-colors"
+              aria-label={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
               title="Toggle Dark Mode"
             >
               {isDark ? <Sun className="w-5 h-5 text-amber-400" /> : <Moon className="w-5 h-5" />}
@@ -87,6 +89,7 @@ export const Header: React.FC<{ onOpenCart: () => void; onOpenLocation: () => vo
             <Link
               to="/wishlist"
               className="p-2 rounded-full hover:bg-neutral-100 dark:hover:bg-neutral-800 text-neutral-700 dark:text-neutral-300 relative transition-colors"
+              aria-label={`Wishlist${wishlistIds.length ? `, ${wishlistIds.length} saved` : ''}`}
               title="Wishlist"
             >
               <Heart className="w-5 h-5" />
@@ -100,6 +103,7 @@ export const Header: React.FC<{ onOpenCart: () => void; onOpenLocation: () => vo
             <Link
               to="/profile"
               className="p-2 rounded-full hover:bg-neutral-100 dark:hover:bg-neutral-800 text-neutral-700 dark:text-neutral-300 transition-colors"
+              aria-label={user ? 'Profile and account' : 'Sign in or open account'}
               title="Profile / Account"
             >
               <User className="w-5 h-5" />
@@ -124,11 +128,22 @@ export const Header: React.FC<{ onOpenCart: () => void; onOpenLocation: () => vo
             type="search"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
+            aria-label="Search products and brands"
             placeholder="Search products and brands"
             className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-neutral-300 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-800 text-neutral-900 dark:text-white placeholder-neutral-400 focus:outline-none focus:ring-2 focus:ring-lime-400 text-sm"
           />
           <Search className="w-4 h-4 text-neutral-400 absolute left-3.5 top-[0.7rem]" />
         </form>
+
+        <button
+          type="button"
+          onClick={onOpenLocation}
+          aria-label={`Check delivery availability for ${CONFIG.DEFAULT_PINCODE}`}
+          className="lg:hidden mb-2 flex w-full items-center justify-center gap-2 rounded-xl bg-neutral-100 px-3 py-2.5 text-xs font-bold text-neutral-800 transition-colors hover:bg-neutral-200 dark:bg-neutral-800 dark:text-neutral-200 dark:hover:bg-neutral-700"
+        >
+          <MapPin className="w-4 h-4 text-lime-600" />
+          Deliver to {CONFIG.SERVICE_CITY} ({CONFIG.DEFAULT_PINCODE}) ? Check area
+        </button>
 
         {/* Category Navigation Bar */}
         <nav className="flex items-center gap-6 py-2.5 overflow-x-auto no-scrollbar border-t border-neutral-100 dark:border-neutral-800 text-xs font-bold text-neutral-700 dark:text-neutral-300">

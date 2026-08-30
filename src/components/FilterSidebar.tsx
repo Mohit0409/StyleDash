@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { X, SlidersHorizontal, RotateCcw } from 'lucide-react';
 
 interface FilterSidebarProps {
@@ -36,6 +36,13 @@ export const FilterSidebar: React.FC<FilterSidebarProps> = ({
   isOpenMobile,
   onCloseMobile
 }) => {
+  useEffect(() => {
+    if (!isOpenMobile) return undefined;
+    const onKeyDown = (event: KeyboardEvent) => { if (event.key === 'Escape') onCloseMobile?.(); };
+    document.addEventListener('keydown', onKeyDown);
+    return () => document.removeEventListener('keydown', onKeyDown);
+  }, [isOpenMobile, onCloseMobile]);
+
   const content = (
     <div className="space-y-6 text-sm text-neutral-800 dark:text-neutral-200">
       
@@ -57,6 +64,7 @@ export const FilterSidebar: React.FC<FilterSidebarProps> = ({
       <div>
         <label className="block text-xs font-bold uppercase tracking-wider text-neutral-500 mb-2">Sort By</label>
         <select
+          aria-label="Sort products"
           value={sortBy}
           onChange={(e) => setSortBy(e.target.value)}
           className="w-full p-2.5 rounded-xl border border-neutral-300 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-800 font-medium text-xs focus:ring-2 focus:ring-lime-400"
@@ -117,6 +125,7 @@ export const FilterSidebar: React.FC<FilterSidebarProps> = ({
           <span className="text-xs font-black text-lime-600 dark:text-lime-400">₹{maxPrice}</span>
         </div>
         <input
+          aria-label="Maximum price"
           type="range"
           min={299}
           max={4999}
@@ -162,10 +171,10 @@ export const FilterSidebar: React.FC<FilterSidebarProps> = ({
       {/* Mobile Drawer */}
       {isOpenMobile && (
         <div className="fixed inset-0 z-50 lg:hidden flex bg-black/60 backdrop-blur-sm animate-fade-in">
-          <div className="w-80 bg-white dark:bg-neutral-900 h-full p-6 overflow-y-auto shadow-2xl flex flex-col justify-between">
+          <div role="dialog" aria-modal="true" aria-labelledby="mobile-filter-heading" className="w-80 bg-white dark:bg-neutral-900 h-full p-6 overflow-y-auto shadow-2xl flex flex-col justify-between">
             <div>
               <div className="flex items-center justify-between mb-6">
-                <span className="font-extrabold text-lg text-neutral-900 dark:text-white">Filter & Sort</span>
+                <span id="mobile-filter-heading" className="font-extrabold text-lg text-neutral-900 dark:text-white">Filter & Sort</span>
                 <button aria-label="Close filters" onClick={onCloseMobile} className="p-2 rounded-full hover:bg-neutral-100 dark:hover:bg-neutral-800">
                   <X className="w-5 h-5" />
                 </button>

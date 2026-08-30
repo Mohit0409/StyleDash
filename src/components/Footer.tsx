@@ -35,9 +35,9 @@ export const Footer: React.FC = () => {
             <div className="p-3 bg-neutral-900 rounded-full text-lime-400">
               <ShieldCheck className="w-6 h-6" />
             </div>
-            <h4 className="font-bold text-white text-sm">Quality Checked</h4>
+            <h4 className="font-bold text-white text-sm">Local Selection</h4>
             <p className="text-xs text-neutral-400">
-              Curated from participating local stores
+              Listings from participating local stores
             </p>
           </div>
           <div className="flex flex-col items-center gap-2">

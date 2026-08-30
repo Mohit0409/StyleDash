@@ -6,6 +6,7 @@ interface SEOProps {
   image?: string;
   type?: 'website' | 'product';
   jsonLd?: Record<string, unknown>;
+  noIndex?: boolean;
 }
 
 const PRODUCTION_ORIGIN = 'https://vibe4you.in';
@@ -30,6 +31,7 @@ export const SEO: React.FC<SEOProps> = ({
   image,
   type = 'website',
   jsonLd,
+  noIndex = false,
 }) => {
   useEffect(() => {
     const resolvedTitle = title.includes('Vibe4You') ? title : `${title} | Vibe4You`;
@@ -45,6 +47,8 @@ export const SEO: React.FC<SEOProps> = ({
     ensureMeta('name', 'twitter:card', imageUrl ? 'summary_large_image' : 'summary');
     ensureMeta('name', 'twitter:title', resolvedTitle);
     ensureMeta('name', 'twitter:description', description);
+    if (noIndex) ensureMeta('name', 'robots', 'noindex,nofollow');
+    else removeMeta('name', 'robots');
 
     if (imageUrl) {
       ensureMeta('property', 'og:image', imageUrl);
@@ -75,7 +79,7 @@ export const SEO: React.FC<SEOProps> = ({
     return () => {
       document.getElementById('styledash-seo-jsonld')?.remove();
     };
-  }, [title, description, image, type, jsonLd]);
+  }, [title, description, image, type, jsonLd, noIndex]);
 
   return null;
 };

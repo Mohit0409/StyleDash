@@ -495,6 +495,15 @@ class AdminStoreTests(unittest.TestCase):
         self.assertIn("NO FULFILLMENT REQUIRED", admin_ui)
         self.assertIn("Do not pack, dispatch, deliver, or adjust fashion inventory.", admin_ui)
         self.assertIn("paymentTest?", admin_ui)
+        self.assertNotIn("prompt(", admin_ui)
+        self.assertNotIn("alert(", admin_ui)
+        self.assertNotIn("confirm(", admin_ui)
+        admin_index = (ROOT / "server/admin/index.html").read_text(encoding="utf-8")
+        admin_css = (ROOT / "server/admin/admin.css").read_text(encoding="utf-8")
+        self.assertIn('id="admin-dialog"', admin_index)
+        self.assertIn('role="status"', admin_index)
+        self.assertNotIn("th:nth-child(n+4)", admin_css)
+        self.assertIn("table{min-width:680px}", admin_css)
 
 
 class AdminHttpTests(unittest.TestCase):

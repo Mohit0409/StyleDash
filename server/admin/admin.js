@@ -36,10 +36,37 @@ byId('logout').addEventListener('click', async () => { try { await api('/api/adm
 byId('tabs').addEventListener('click', event => { const button=event.target.closest('[data-tab]'); if(!button)return; activeTab=button.dataset.tab; document.querySelectorAll('[data-tab]').forEach(item=>item.classList.toggle('active',item===button)); loadTab(activeTab); });
 byId('search-form').addEventListener('submit', event => { event.preventDefault(); loadTab(activeTab); });
 
-function ask(label, fallback='') {
-  const value=prompt(label,fallback);
-  if(value===null)return null;
-  return value.trim();
+function status(message) { byId('app-status').textContent = message || ''; }
+function formDialog(title, fields, submitLabel='Continue') {
+  return new Promise(resolve => {
+    const dialog=byId('admin-dialog');
+    const form=byId('admin-dialog-form');
+    const fieldsRoot=byId('admin-dialog-fields');
+    byId('admin-dialog-title').textContent=title;
+    byId('admin-dialog-submit').textContent=submitLabel;
+    byId('admin-dialog-error').textContent='';
+    fieldsRoot.replaceChildren();
+    for(const field of fields){
+      const label=document.createElement('label'); label.textContent=field.label;
+      const control=field.type==='textarea'?document.createElement('textarea'):document.createElement('input');
+      control.name=field.name; control.value=field.value??''; control.required=field.required===true;
+      if(field.type&&field.type!=='textarea')control.type=field.type;
+      if(field.placeholder)control.placeholder=field.placeholder;
+      if(field.minLength)control.minLength=field.minLength;
+      if(field.maxLength)control.maxLength=field.maxLength;
+      if(field.min!==undefined)control.min=String(field.min);
+      if(field.max!==undefined)control.max=String(field.max);
+      if(field.step!==undefined)control.step=String(field.step);
+      label.appendChild(control); fieldsRoot.appendChild(label);
+    }
+    let settled=false;
+    const finish=value=>{if(settled)return;settled=true;form.onsubmit=null;byId('admin-dialog-cancel').onclick=null;dialog.oncancel=null;if(dialog.open)dialog.close();resolve(value);};
+    form.onsubmit=event=>{event.preventDefault();if(!form.reportValidity())return;finish(Object.fromEntries(new FormData(form).entries()));};
+    byId('admin-dialog-cancel').onclick=()=>finish(null);
+    dialog.oncancel=event=>{event.preventDefault();finish(null);};
+    dialog.showModal();
+    fieldsRoot.querySelector('input,textarea')?.focus();
+  });
 }
 function parseVariants(raw) {
   const rows=String(raw||'').split(',').map(value=>value.trim()).filter(Boolean).map(value=>{
@@ -53,61 +80,77 @@ function parseVariants(raw) {
   return rows;
 }
 async function createOwnerAccount(){
-  const name=ask('Store owner full name:'); if(!name)return;
-  const email=ask('Store owner email (used for login):'); if(!email)return;
-  const phone=ask('Mobile number (optional):')||'';
-  const password=ask('Temporary password (8+ characters):'); if(!password)return;
-  await api('/api/admin/customers',{method:'POST',body:JSON.stringify({name,email,phone:phone||undefined,password})});
-  alert(`Owner account created for ${email}. Share the temporary password securely.`);
+  const values=await formDialog('Create store owner account',[
+    {name:'name',label:'Store owner full name',required:true,maxLength:80},
+    {name:'email',label:'Store owner email (used for login)',type:'email',required:true,maxLength:254},
+    {name:'phone',label:'Mobile number (optional)',maxLength:20},
+    {name:'password',label:'Temporary password (8+ characters)',type:'password',required:true,minLength:8,maxLength:256},
+  ],'Create owner account'); if(!values)return;
+  await api('/api/admin/customers',{method:'POST',body:JSON.stringify({name:values.name,email:values.email,phone:values.phone||undefined,password:values.password})});
+  status(`Owner account created for ${values.email}. Share the temporary password securely.`);
 }
 async function resetCustomerPassword(userId){
-  const password=ask('New temporary password (8+ characters):'); if(!password)return;
-  await api(`/api/admin/customers/${encodeURIComponent(userId)}/password`,{method:'PATCH',body:JSON.stringify({password})});
-  alert('Temporary password updated. Existing sessions were signed out.');
+  const values=await formDialog('Reset customer password',[{name:'password',label:'New temporary password (8+ characters)',type:'password',required:true,minLength:8,maxLength:256}],'Reset password'); if(!values)return;
+  await api(`/api/admin/customers/${encodeURIComponent(userId)}/password`,{method:'PATCH',body:JSON.stringify({password:values.password})});
+  status('Temporary password updated. Existing sessions were signed out.');
 }
 async function createLocalStore(){
-  const ownerUserId=ask('Owner customer ID (copy from Customers tab):'); if(!ownerUserId)return;
-  const shopName=ask('Store name:'); if(!shopName)return;
-  const ownerName=ask('Owner name:'); if(!ownerName)return;
-  const category=ask('Category:','Clothing & Fashion'); if(!category)return;
-  const description=ask('Store description:'); if(!description)return;
-  const address=ask('Store address:'); if(!address)return;
-  const city=ask('City:','Neemuch')||'Neemuch';
-  const state=ask('State:','Madhya Pradesh')||'Madhya Pradesh';
-  const pincode=ask('Pincode:','458441')||'458441';
-  const businessInformation=ask('Business information (optional):')||'';
-  await api('/api/admin/vendors',{method:'POST',body:JSON.stringify({ownerUserId,shopName,ownerName,category,description,address,city,state,pincode,businessInformation})});
-  alert(`${shopName} created and activated.`);
+  const values=await formDialog('Create local store',[
+    {name:'ownerUserId',label:'Owner customer ID',required:true,maxLength:128},
+    {name:'shopName',label:'Store name',required:true,maxLength:100},
+    {name:'ownerName',label:'Owner name',required:true,maxLength:80},
+    {name:'category',label:'Category',required:true,value:'Clothing & Fashion',maxLength:80},
+    {name:'description',label:'Store description',type:'textarea',required:true,maxLength:1000},
+    {name:'address',label:'Store address',type:'textarea',required:true,maxLength:250},
+    {name:'city',label:'City',required:true,value:'Neemuch',maxLength:80},
+    {name:'state',label:'State',required:true,value:'Madhya Pradesh',maxLength:80},
+    {name:'pincode',label:'Pincode',required:true,value:'458441',maxLength:6},
+    {name:'businessInformation',label:'Business information (optional)',type:'textarea',maxLength:1000},
+  ],'Create and activate store'); if(!values)return;
+  await api('/api/admin/vendors',{method:'POST',body:JSON.stringify(values)});
+  status(`${values.shopName} created and activated.`);
 }
 async function createStoreProduct(){
-  const applicationId=ask('Store application ID (copy from Shop Applications):'); if(!applicationId)return;
-  const name=ask('Product name:'); if(!name)return;
-  const description=ask('Product description:'); if(!description)return;
-  const brand=ask('Brand (optional):')||'';
-  const department=ask('Department: men, women, kids, unisex, footwear, accessories','unisex')||'unisex';
-  const category=ask('Category:','Clothing & Fashion')||'Clothing & Fashion';
-  const price=Number(ask('Selling price in rupees:')); if(!Number.isFinite(price)||price<1)throw new Error('Enter a valid selling price.');
-  const originalRaw=ask('Original/MRP price in rupees:',String(price)); const originalPrice=Number(originalRaw||price);
-  const variants=parseVariants(ask('Sizes and stock, e.g. S:5, M:8, L:3:'));
-  const colourName=ask('Colour name:','Multi')||'Multi';
-  const colourHex=ask('Colour hex (optional, e.g. #000000):')||'';
-  const images=ask('HTTPS image URLs separated by commas:'); if(!images)return;
-  const imageUrls=images.split(',').map(value=>value.trim()).filter(Boolean);
-  const payload={applicationId,name,description,brand:brand||undefined,department,category,pricePaise:Math.round(price*100),originalPricePaise:Math.round(originalPrice*100),variants,colourName,colourHex:colourHex||undefined,imageUrls,attributes:{}};
+  const values=await formDialog('Add product for local store',[
+    {name:'applicationId',label:'Store application ID',required:true,maxLength:128},
+    {name:'name',label:'Product name',required:true,maxLength:140},
+    {name:'description',label:'Product description',type:'textarea',required:true,maxLength:2000},
+    {name:'brand',label:'Brand (optional)',maxLength:100},
+    {name:'department',label:'Department',required:true,value:'unisex',placeholder:'men, women, kids, unisex, footwear, accessories'},
+    {name:'category',label:'Category',required:true,value:'Clothing & Fashion'},
+    {name:'price',label:'Selling price in rupees',type:'number',required:true,min:1,step:'0.01'},
+    {name:'originalPrice',label:'Original/MRP price in rupees',type:'number',min:1,step:'0.01'},
+    {name:'variants',label:'Sizes and stock (S:5, M:8, L:3)',required:true,placeholder:'S:5, M:8, L:3'},
+    {name:'colourName',label:'Colour name',required:true,value:'Multi'},
+    {name:'colourHex',label:'Colour hex (optional)',placeholder:'#000000'},
+    {name:'images',label:'HTTPS image URLs separated by commas',type:'textarea',required:true},
+  ],'Publish product'); if(!values)return;
+  const price=Number(values.price); const originalPrice=Number(values.originalPrice||values.price);
+  if(!Number.isFinite(price)||price<1||!Number.isFinite(originalPrice)||originalPrice<price)throw new Error('Enter valid selling and original prices.');
+  const variants=parseVariants(values.variants);
+  const imageUrls=values.images.split(',').map(value=>value.trim()).filter(Boolean);
+  const payload={applicationId:values.applicationId,name:values.name,description:values.description,brand:values.brand||undefined,department:values.department,category:values.category,pricePaise:Math.round(price*100),originalPricePaise:Math.round(originalPrice*100),variants,colourName:values.colourName,colourHex:values.colourHex||undefined,imageUrls,attributes:{}};
   await api('/api/admin/shop-products',{method:'POST',body:JSON.stringify(payload)});
-  alert(`${name} published for the selected local store.`);
+  status(`${values.name} published for the selected local store.`);
 }
 async function editStoreProduct(button){
-  const name=ask('Product name:',button.dataset.name||''); if(name===null)return;
-  const description=ask('Description:',button.dataset.description||''); if(description===null)return;
-  const price=ask('Selling price in rupees:',button.dataset.price||''); if(price===null)return;
-  const original=ask('Original/MRP price in rupees:',button.dataset.original||price); if(original===null)return;
-  const payload={name,description,pricePaise:Math.round(Number(price)*100),originalPricePaise:Math.round(Number(original)*100)};
+  const values=await formDialog('Edit product details',[
+    {name:'name',label:'Product name',required:true,value:button.dataset.name||'',maxLength:140},
+    {name:'description',label:'Description',type:'textarea',required:true,value:button.dataset.description||'',maxLength:2000},
+    {name:'price',label:'Selling price in rupees',type:'number',required:true,value:button.dataset.price||'',min:1,step:'0.01'},
+    {name:'original',label:'Original/MRP price in rupees',type:'number',required:true,value:button.dataset.original||button.dataset.price||'',min:1,step:'0.01'},
+  ],'Save details'); if(!values)return;
+  const price=Number(values.price); const original=Number(values.original);
+  if(!Number.isFinite(price)||price<1||!Number.isFinite(original)||original<price)throw new Error('Enter valid selling and original prices.');
+  const payload={name:values.name,description:values.description,pricePaise:Math.round(price*100),originalPricePaise:Math.round(original*100)};
   await api(`/api/admin/shop-products/${encodeURIComponent(button.dataset.id)}/details`,{method:'PATCH',body:JSON.stringify(payload)});
+  status('Product details updated.');
 }
+async function reasonFor(title){const values=await formDialog(title,[{name:'reason',label:'Reason',type:'textarea',required:true,maxLength:1000}],'Continue');return values?.reason||null;}
+async function inventoryAdjustment(){const values=await formDialog('Adjust inventory',[{name:'delta',label:'Stock adjustment (for example 5 or -2)',type:'number',required:true,step:'1'}],'Apply adjustment');if(!values)return null;const delta=Number(values.delta);if(!Number.isSafeInteger(delta))throw new Error('Enter a whole-number stock adjustment.');return delta;}
 byId('content').addEventListener('click', async event => {
   const button=event.target.closest('[data-action]'); if(!button)return;
-  button.disabled=true; error('');
+  button.disabled=true; error(''); status('');
   try {
     const action=button.dataset.action;
     if(action==='create-owner') await createOwnerAccount();
@@ -116,10 +159,10 @@ byId('content').addEventListener('click', async event => {
     if(action==='create-shop-product') await createStoreProduct();
     if(action==='edit-shop-product') await editStoreProduct(button);
     if(action==='order-status') await api(`/api/admin/orders/${encodeURIComponent(button.dataset.id)}/status`,{method:'PATCH',body:JSON.stringify({status:button.dataset.value})});
-    if(action==='vendor') { const status=button.dataset.value; const reason=['REJECTED','SUSPENDED'].includes(status)?prompt(`Enter the ${status.toLowerCase()} reason:`):null; if(['REJECTED','SUSPENDED'].includes(status)&&!reason)return; await api(`/api/admin/vendors/${encodeURIComponent(button.dataset.id)}`,{method:'PATCH',body:JSON.stringify({status,reason})}); }
-    if(action==='shop-product') { const status=button.dataset.value; const reason=status==='REJECTED'?prompt('Enter the rejection reason:'):null; if(status==='REJECTED'&&!reason)return; await api(`/api/admin/shop-products/${encodeURIComponent(button.dataset.id)}`,{method:'PATCH',body:JSON.stringify({status,reason})}); }
-    if(action==='shop-product-request') { const status=button.dataset.value; const reason=status==='REJECTED'?prompt('Enter the rejection reason:'):null; if(status==='REJECTED'&&!reason)return; await api(`/api/admin/shop-product-requests/${encodeURIComponent(button.dataset.id)}`,{method:'PATCH',body:JSON.stringify({status,reason})}); }
-    if(action==='inventory') { const raw=prompt('Enter stock adjustment, for example 5 or -2:'); if(raw===null)return; await api(`/api/admin/inventory/${encodeURIComponent(button.dataset.id)}`,{method:'PATCH',body:JSON.stringify({delta:Number(raw)})}); }
+    if(action==='vendor') { const nextStatus=button.dataset.value; let reason=null; if(['REJECTED','SUSPENDED'].includes(nextStatus)){reason=await reasonFor(`Enter the ${nextStatus.toLowerCase()} reason`);if(!reason)return;} await api(`/api/admin/vendors/${encodeURIComponent(button.dataset.id)}`,{method:'PATCH',body:JSON.stringify({status:nextStatus,reason})}); status('Shop application status updated.'); }
+    if(action==='shop-product') { const nextStatus=button.dataset.value; let reason=null; if(nextStatus==='REJECTED'){reason=await reasonFor('Enter the product rejection reason');if(!reason)return;} await api(`/api/admin/shop-products/${encodeURIComponent(button.dataset.id)}`,{method:'PATCH',body:JSON.stringify({status:nextStatus,reason})}); status('Shop product status updated.'); }
+    if(action==='shop-product-request') { const nextStatus=button.dataset.value; let reason=null; if(nextStatus==='REJECTED'){reason=await reasonFor('Enter the product-request rejection reason');if(!reason)return;} await api(`/api/admin/shop-product-requests/${encodeURIComponent(button.dataset.id)}`,{method:'PATCH',body:JSON.stringify({status:nextStatus,reason})}); status('Product request status updated.'); }
+    if(action==='inventory') { const delta=await inventoryAdjustment(); if(delta===null)return; await api(`/api/admin/inventory/${encodeURIComponent(button.dataset.id)}`,{method:'PATCH',body:JSON.stringify({delta})}); status('Inventory adjustment saved.'); }
     if(action==='customer') await api(`/api/admin/customers/${encodeURIComponent(button.dataset.id)}`,{method:'PATCH',body:JSON.stringify({active:button.dataset.value==='true'})});
     await loadTab(activeTab);
   } catch(cause){error(cause.message);} finally{button.disabled=false;}

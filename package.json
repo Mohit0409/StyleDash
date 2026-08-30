@@ -15,7 +15,9 @@
     "build:e2e": "tsc -b && vite build",
     "test:e2e:desktop": "npm run build:e2e && playwright test --project=desktop-chromium",
     "test:e2e:mobile": "npm run build:e2e && playwright test --project=mobile-chromium",
-    "test:payment-api": "vitest run src/tests/paymentApi.test.ts"
+    "test:payment-api": "vitest run src/tests/paymentApi.test.ts",
+    "verify:fast": "node scripts/verify-fast.mjs",
+    "verify:full": "npm run verify:fast && npm run test:e2e"
   },
   "dependencies": {
     "clsx": "^2.1.1",

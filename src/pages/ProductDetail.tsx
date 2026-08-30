@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { Star, Zap, Heart, ShieldCheck, RefreshCw, ShoppingBag, CheckCircle, ArrowRight } from 'lucide-react';
 import { SEO } from '../components/SEO';
@@ -54,7 +54,8 @@ export const ProductDetail: React.FC = () => {
   if (!product) {
     return (
       <div className="max-w-7xl mx-auto p-12 text-center space-y-4">
-        <h2 className="text-2xl font-black">Product Not Found</h2>
+        <SEO title="Product not found - Vibe4You" description="The requested fashion item could not be found." noIndex />
+        <h1 className="text-2xl font-black">Product Not Found</h1>
         <p className="text-xs text-neutral-500">The fashion item you are looking for is no longer available.</p>
         <Link to="/products" className="inline-block px-6 py-2.5 bg-neutral-950 text-white text-xs font-bold rounded-xl">
           Browse Fashion Catalogue
@@ -223,7 +224,7 @@ export const ProductDetail: React.FC = () => {
               disabled={!selectedVariant || selectedVariant.available !== true}
               className="flex-1 py-4 bg-neutral-950 dark:bg-lime-400 text-white dark:text-neutral-950 font-black text-sm rounded-2xl shadow-xl hover:bg-neutral-800 dark:hover:bg-lime-300 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
             >
-              <ShoppingBag className="w-4 h-4" /> Add to StyleCart
+              <ShoppingBag className="w-4 h-4" /> Add to Cart
             </button>
 
             <button

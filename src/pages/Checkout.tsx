@@ -46,7 +46,8 @@ export const Checkout: React.FC = () => {
   if (items.length === 0) {
     return (
       <div className="max-w-md mx-auto p-12 text-center space-y-4">
-        <h2 className="text-xl font-bold">Your cart is empty</h2>
+        <SEO title="Checkout - Vibe4You" noIndex />
+        <h1 className="text-xl font-bold">Your cart is empty</h1>
         <button onClick={() => navigate('/products')} className="px-6 py-2.5 bg-neutral-950 text-white text-xs font-bold rounded-xl">
           Shop Fashion Catalogue
         </button>
@@ -125,7 +126,7 @@ export const Checkout: React.FC = () => {
 
   return (
     <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
-      <SEO title="Checkout - Vibe4You" />
+      <SEO title="Checkout - Vibe4You" noIndex />
       <h1 className="text-2xl sm:text-3xl font-black text-neutral-900 dark:text-white">Secure Checkout</h1>
 
       <form onSubmit={handlePlaceOrder} className="grid md:grid-cols-3 gap-8">

@@ -1,4 +1,4 @@
-﻿import { expect, Page, request as playwrightRequest, test } from '@playwright/test';
+import { expect, Page, request as playwrightRequest, test } from '@playwright/test';
 
 const PRODUCT_NAME = 'Pure Cotton Oversized Graphic Tee';
 const PRODUCT_ROUTE =
@@ -29,6 +29,7 @@ const USER_B: E2EUser = {
 test.beforeAll(async () => {
   const api = await playwrightRequest.newContext({
     baseURL: 'http://127.0.0.1:4173',
+    extraHTTPHeaders: { 'X-Forwarded-For': '198.51.100.12' },
   });
 
   try {
@@ -84,7 +85,7 @@ async function addKnownProduct(page: Page) {
   ).toBeVisible();
 
   const addButton = page.getByRole('button', {
-    name: /Add to StyleCart/,
+    name: /Add to Cart/,
   });
 
   await expect(addButton).toBeEnabled();
@@ -157,10 +158,10 @@ test('product can enter cart only after authoritative inventory succeeds', async
   await page.getByRole('button', { name: /^Cart\s+\d+$/ }).click();
 
   const drawer = page.locator('div.fixed').filter({
-    hasText: 'Your StyleCart',
+    hasText: 'Your Cart',
   });
 
-  await expect(drawer.getByText('Your StyleCart')).toBeVisible();
+  await expect(drawer.getByText('Your Cart')).toBeVisible();
 
   await expect(
     drawer.getByText(PRODUCT_NAME, { exact: true }),
@@ -186,7 +187,7 @@ test('product UI fails closed when inventory API is unavailable', async ({
   ).toBeVisible();
 
   await expect(
-    page.getByRole('button', { name: /Add to StyleCart/ }),
+    page.getByRole('button', { name: /Add to Cart/ }),
   ).toBeDisabled();
 
   await expect(

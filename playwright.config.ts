@@ -45,6 +45,7 @@ export default defineConfig({
       testIgnore: /mobile\.spec\.ts/,
       use: {
         ...devices['Desktop Chrome'],
+        extraHTTPHeaders: { 'X-Forwarded-For': '198.51.100.10' },
       },
     },
     {
@@ -52,6 +53,7 @@ export default defineConfig({
       testIgnore: /(serviceability|commerce-desktop)\.spec\.ts/,
       use: {
         ...devices['Pixel 7'],
+        extraHTTPHeaders: { 'X-Forwarded-For': '198.51.100.11' },
       },
     },
   ],

@@ -1,4 +1,4 @@
-﻿const LEGACY_GUEST_WISHLIST_KEY = 'sd_wishlist_ids';
+const LEGACY_GUEST_WISHLIST_KEY = 'sd_wishlist_ids';
 
 const wishlistKey = (userId: string): string =>
   userId === 'guest'

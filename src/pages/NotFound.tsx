@@ -1,9 +1,11 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
+import { SEO } from '../components/SEO';
 
 export const NotFound: React.FC = () => {
   return (
     <div className="max-w-md mx-auto py-24 text-center space-y-4">
+      <SEO title="Page not found - Vibe4You" description="The requested Vibe4You page could not be found." noIndex />
       <h1 className="text-6xl font-black text-neutral-900 dark:text-white">404</h1>
       <h2 className="text-xl font-bold">Page Not Found</h2>
       <p className="text-xs text-neutral-500">The fashion route you requested does not exist on Vibe4You.</p>

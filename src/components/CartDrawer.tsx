@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { X, Trash2, Plus, Minus, Zap, ArrowRight, Tag, ShieldCheck } from 'lucide-react';
 import { useCart } from '../context/CartContext';
@@ -21,21 +21,28 @@ export const CartDrawer: React.FC<{ isOpen: boolean; onClose: () => void }> = ({
   } = useCart();
   const expressAvailable = isExpressDeliveryAvailable();
 
+  useEffect(() => {
+    if (!isOpen) return undefined;
+    const onKeyDown = (event: KeyboardEvent) => { if (event.key === 'Escape') onClose(); };
+    document.addEventListener('keydown', onKeyDown);
+    return () => document.removeEventListener('keydown', onKeyDown);
+  }, [isOpen, onClose]);
+
   if (!isOpen) return null;
 
   return (
     <div className="fixed inset-0 z-50 flex justify-end bg-black/60 backdrop-blur-sm animate-fade-in">
-      <div className="w-full max-w-md bg-white dark:bg-neutral-900 h-full flex flex-col shadow-2xl border-l border-neutral-200 dark:border-neutral-800">
+      <div role="dialog" aria-modal="true" aria-labelledby="cart-drawer-title" className="w-full max-w-md bg-white dark:bg-neutral-900 h-full flex flex-col shadow-2xl border-l border-neutral-200 dark:border-neutral-800">
 
         {/* Header */}
         <div className="p-4 sm:p-6 border-b border-neutral-200 dark:border-neutral-800 flex items-center justify-between bg-neutral-50 dark:bg-neutral-950">
           <div className="flex items-center gap-2">
-            <span className="font-black text-lg text-neutral-900 dark:text-white">Your StyleCart</span>
+            <span id="cart-drawer-title" className="font-black text-lg text-neutral-900 dark:text-white">Your Cart</span>
             <span className="bg-lime-400 text-neutral-950 font-extrabold text-xs px-2.5 py-0.5 rounded-full">
               {totalItemsCount} items
             </span>
           </div>
-          <button onClick={onClose} className="p-2 rounded-full hover:bg-neutral-200 dark:hover:bg-neutral-800 text-neutral-500">
+          <button aria-label="Close cart" onClick={onClose} className="p-2 rounded-full hover:bg-neutral-200 dark:hover:bg-neutral-800 text-neutral-500">
             <X className="w-5 h-5" />
           </button>
         </div>
@@ -87,6 +94,7 @@ export const CartDrawer: React.FC<{ isOpen: boolean; onClose: () => void }> = ({
                         <h5 className="font-semibold text-xs text-neutral-900 dark:text-white line-clamp-1">{item.product.name}</h5>
                       </div>
                       <button
+                        aria-label={`Remove ${item.product.name} from cart`}
                         onClick={() => removeItem(item.lineId)}
                         className="text-neutral-400 hover:text-rose-500 p-1"
                       >
@@ -111,11 +119,11 @@ export const CartDrawer: React.FC<{ isOpen: boolean; onClose: () => void }> = ({
 
                     {/* Quantity Controls */}
                     <div className="flex items-center gap-2 bg-white dark:bg-neutral-700 border border-neutral-300 dark:border-neutral-600 rounded-lg px-2 py-1">
-                      <button onClick={() => updateQuantity(item.lineId, item.quantity - 1)} className="p-0.5 text-neutral-600 dark:text-neutral-200">
+                      <button aria-label={`Decrease ${item.product.name} quantity`} onClick={() => updateQuantity(item.lineId, item.quantity - 1)} className="p-0.5 text-neutral-600 dark:text-neutral-200">
                         <Minus className="w-3 h-3" />
                       </button>
                       <span className="text-xs font-bold text-neutral-900 dark:text-white w-4 text-center">{item.quantity}</span>
-                      <button onClick={() => updateQuantity(item.lineId, item.quantity + 1)} className="p-0.5 text-neutral-600 dark:text-neutral-200">
+                      <button aria-label={`Increase ${item.product.name} quantity`} onClick={() => updateQuantity(item.lineId, item.quantity + 1)} className="p-0.5 text-neutral-600 dark:text-neutral-200">
                         <Plus className="w-3 h-3" />
                       </button>
                     </div>

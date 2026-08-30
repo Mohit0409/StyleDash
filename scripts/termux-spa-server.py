@@ -490,6 +490,10 @@ class PaymentService:
         india_time = current.astimezone(timezone(timedelta(hours=5, minutes=30)))
         return india_time.weekday() >= 5
 
+    @staticmethod
+    def estimated_delivery_label(delivery_method: str) -> str:
+        return "60 minutes" if delivery_method == "express" else "within a day"
+
     def is_serviceable_pincode(self, pincode: str) -> bool:
         return _is_six_ascii_digits(pincode) and pincode in self.supported_pincodes
 
@@ -890,7 +894,7 @@ class PaymentService:
                 "paymentMethod": str(payload.get("paymentMethod") or "card"),
                 "paymentStatus": "pending",
                 "status": "payment_pending",
-                "estimatedDelivery": "60 minutes",
+                "estimatedDelivery": self.estimated_delivery_label(calculated["deliveryMethod"]),
                 "statusHistory": [{"status": "payment_pending", "timestamp": now, "note": "Awaiting verified payment"}],
                 "createdAt": now,
                 "updatedAt": now,
@@ -1857,7 +1861,7 @@ class PaymentService:
                 "paymentStatus": "pending",
                 "status": "placed",
                 "inventoryCommitted": True,
-                "estimatedDelivery": "60 minutes",
+                "estimatedDelivery": self.estimated_delivery_label(calculated["deliveryMethod"]),
                 "statusHistory": [{
                     "status": "placed",
                     "timestamp": now,
