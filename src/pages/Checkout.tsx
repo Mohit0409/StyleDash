@@ -37,8 +37,8 @@ export const Checkout: React.FC = () => {
   const [name, setName] = useState(savedAddress?.name || user?.name || '');
   const [phone, setPhone] = useState(savedAddress?.phone || user?.phone || '');
   const [street, setStreet] = useState(savedAddress?.street || '');
-  const [city] = useState(savedAddress?.city || CONFIG.SERVICE_CITY);
-  const [pincode, setPincode] = useState(savedAddress?.pincode || CONFIG.DEFAULT_PINCODE);
+  const city = CONFIG.SERVICE_CITY;
+  const pincode = CONFIG.DEFAULT_PINCODE;
   const [paymentMethod, setPaymentMethod] = useState<'cod' | 'upi' | 'card'>('cod');
   const [placing, setPlacing] = useState(false);
   const [checkoutError, setCheckoutError] = useState('');
@@ -133,6 +133,7 @@ export const Checkout: React.FC = () => {
         <div className="md:col-span-2 space-y-6">
           <div className="bg-white dark:bg-neutral-900 p-6 rounded-3xl border border-neutral-200 dark:border-neutral-800 space-y-4 shadow-sm">
             <h3 className="font-extrabold text-base text-neutral-900 dark:text-white">1. Delivery Address ({CONFIG.SERVICE_CITY})</h3>
+            <p className="text-xs text-neutral-500">Vibe4You currently delivers only in {CONFIG.SERVICE_CITY} ({CONFIG.DEFAULT_PINCODE}).</p>
             <div className="grid sm:grid-cols-2 gap-4 text-xs">
               <div>
                 <label className="block font-bold text-neutral-600 dark:text-neutral-400 mb-1" htmlFor="checkout-name">Full Name</label>
@@ -152,7 +153,7 @@ export const Checkout: React.FC = () => {
               </div>
               <div>
                 <label className="block font-bold text-neutral-600 dark:text-neutral-400 mb-1" htmlFor="checkout-pincode">Pincode</label>
-                <input id="checkout-pincode" required autoComplete="postal-code" inputMode="numeric" pattern="[0-9]{6}" maxLength={6} type="text" value={pincode} onChange={(event) => setPincode(event.target.value.replace(/\D/g, ''))} className="w-full p-2.5 rounded-xl border border-neutral-300 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-800 font-bold" />
+                <input id="checkout-pincode" readOnly type="text" value={pincode} className="w-full p-2.5 rounded-xl border border-neutral-200 dark:border-neutral-800 bg-neutral-100 dark:bg-neutral-900 font-bold text-neutral-500" />
               </div>
             </div>
           </div>

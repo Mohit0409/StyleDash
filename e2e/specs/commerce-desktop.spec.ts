@@ -111,8 +111,32 @@ async function prepareCheckout(page: Page, label: string) {
   await page
     .getByLabel('Street Address & Landmark')
     .fill('45 E2E Test Street, Neemuch');
-  await page.getByLabel('Pincode').fill('458441');
+  await expect(page.getByLabel('City')).toHaveValue('Neemuch');
+  await expect(page.getByLabel('City')).toHaveAttribute('readonly', '');
+  await expect(page.getByLabel('Pincode')).toHaveValue('458441');
+  await expect(page.getByLabel('Pincode')).toHaveAttribute('readonly', '');
 }
+
+test('single-city launch fixes profile and checkout delivery area to Neemuch 458441', async ({ page }) => {
+  await loginCustomer(page, USER_A);
+
+  await page.goto('/profile');
+  await expect(page.getByLabel('City')).toHaveValue('Neemuch');
+  await expect(page.getByLabel('City')).toHaveAttribute('readonly', '');
+  await expect(page.getByLabel('Pincode')).toHaveValue('458441');
+  await expect(page.getByLabel('Pincode')).toHaveAttribute('readonly', '');
+  await page.getByText('Street address and landmark').locator('input').fill('45 Single Zone Test Street');
+  await page.getByRole('button', { name: 'Save profile' }).click();
+  await expect(page.getByRole('status')).toHaveText('Profile and delivery address saved.');
+  await expect(page.getByLabel('City')).toHaveValue('Neemuch');
+  await expect(page.getByLabel('Pincode')).toHaveValue('458441');
+
+  await addKnownProduct(page);
+  await page.goto('/checkout');
+  await expect(page.getByLabel('City')).toHaveValue('Neemuch');
+  await expect(page.getByLabel('Pincode')).toHaveValue('458441');
+  await expect(page.getByText('Vibe4You currently delivers only in Neemuch (458441).')).toBeVisible();
+});
 
 test('authoritative inventory exposes in-stock and out-of-stock variants', async ({
   request,

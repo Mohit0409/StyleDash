@@ -65,7 +65,7 @@ export const CartDrawer: React.FC<{ isOpen: boolean; onClose: () => void }> = ({
                 <Tag className="w-10 h-10" />
               </div>
               <h4 className="font-bold text-lg text-neutral-900 dark:text-white mb-1">Your cart is empty</h4>
-              <p className="text-xs text-neutral-500 mb-6">Discover trending fashion essentials with normal delivery within a day.</p>
+              <p className="text-xs text-neutral-500 mb-6">Delivery is available in {CONFIG.SERVICE_CITY} ({CONFIG.DEFAULT_PINCODE}), with normal delivery within a day.</p>
               <button
                 onClick={() => { onClose(); navigate('/products'); }}
                 className="px-6 py-2.5 bg-neutral-950 dark:bg-lime-400 text-white dark:text-neutral-950 font-bold text-xs rounded-xl"
@@ -165,7 +165,7 @@ export const CartDrawer: React.FC<{ isOpen: boolean; onClose: () => void }> = ({
                 </button>
               </div>
             </div>
-            <p className="text-[11px] text-neutral-500">{deliveryAvailabilityMessage()}</p>
+            <p className="text-[11px] text-neutral-500">{deliveryAvailabilityMessage()} Delivery is available in {CONFIG.SERVICE_CITY} ({CONFIG.DEFAULT_PINCODE}).</p>
 
             {/* Price Breakdown */}
             <div className="space-y-1.5 text-xs text-neutral-600 dark:text-neutral-400">
