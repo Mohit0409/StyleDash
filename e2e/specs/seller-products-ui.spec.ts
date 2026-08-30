@@ -3,6 +3,11 @@ import { expect, test } from '@playwright/test';
 test('approved shop owner can draft and submit but cannot publish a product', async ({ page }) => {
   let product: Record<string, unknown> | null = null;
   let createPayload: Record<string, unknown> | null = null;
+  let uploadedImageData: Buffer | null = null;
+
+  await page.route('**/media/product-images/**', async route => {
+    await route.fulfill({ status: 200, contentType: 'image/webp', body: uploadedImageData || Buffer.alloc(0) });
+  });
 
   await page.route('**/api/**', async route => {
     const request = route.request();
@@ -29,6 +34,14 @@ test('approved shop owner can draft and submit but cannot publish a product', as
     }
     if (path === '/api/shop-product-requests' && method === 'GET') {
       await json({ success: true, requests: [] });
+      return;
+    }
+    if (path === '/api/shop-product-images' && method === 'POST') {
+      const upload = request.postDataJSON() as Record<string, unknown>;
+      expect(upload.contentType).toBe('image/webp');
+      expect(typeof upload.dataBase64).toBe('string');
+      uploadedImageData = Buffer.from(String(upload.dataBase64), 'base64');
+      await json({ success: true, image: { url: '/media/product-images/0123456789abcdef0123456789abcdef.webp', bytes: 120, contentType: 'image/webp' } }, 201);
       return;
     }
     if (path === '/api/shop-products' && method === 'POST') {
@@ -63,7 +76,12 @@ test('approved shop owner can draft and submit but cannot publish a product', as
   await page.getByPlaceholder('Size, e.g. S or XL').nth(1).fill('L');
   await page.getByPlaceholder('Stock').nth(1).fill('3');
   await page.getByLabel('Colour name').fill('Black');
-  await page.getByLabel(/HTTPS image URLs/).fill('https://example.test/product.jpg');
+  await page.getByLabel('Upload product images').setInputFiles({
+    name: 'local-product.png',
+    mimeType: 'image/png',
+    buffer: Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=', 'base64'),
+  });
+  await expect(page.getByText('1 image optimized and uploaded.')).toBeVisible();
   await page.getByRole('button', { name: 'Save Product Draft' }).click();
 
   await expect(page.getByRole('heading', { name: 'Local Product' })).toBeVisible();
@@ -71,6 +89,7 @@ test('approved shop owner can draft and submit but cannot publish a product', as
   expect(createPayload).not.toHaveProperty('status');
   expect(createPayload).not.toHaveProperty('applicationId');
   expect(createPayload?.variants).toEqual([{ size: 'M', inventory: 2 }, { size: 'L', inventory: 3 }]);
+  expect(createPayload?.imageUrls).toEqual(['/media/product-images/0123456789abcdef0123456789abcdef.webp']);
 
   await page.getByRole('button', { name: 'Submit', exact: true }).click();
   await expect(page.getByText('SUBMITTED', { exact: true })).toBeVisible();
@@ -88,9 +107,13 @@ test('published seller can update stock and submit edit or unpublish requests wi
       id: 'shopprod_edit', slug: 'edit-live', applicationId: 'shop-1', status: 'PUBLISHED',
       name: 'Editable Live Product', description: 'Published product that can request reviewed catalogue changes.',
       brand: 'Local', department: 'women', category: 'Clothing & Fashion',
-      pricePaise: 50000, originalPricePaise: 60000, inventory: 2, size: 'M',
+      pricePaise: 50000, originalPricePaise: 60000, inventory: 6, size: 'M, S, L',
       colourName: 'Black', colourHex: '#000000', imageUrls: ['https://example.test/edit.jpg'],
-      attributes: {}, variants: [{ id: 'shopprod_edit-var-1', size: 'M', inventory: 2 }], createdAt: '2026-08-20T00:00:00Z', updatedAt: '2026-08-20T00:00:00Z',
+      attributes: {}, variants: [
+        { id: 'shopprod_edit-var-1', size: 'M', inventory: 2 },
+        { id: 'shopprod_edit-var-2', size: 'S', inventory: 1 },
+        { id: 'shopprod_edit-var-3', size: 'L', inventory: 3 },
+      ], createdAt: '2026-08-20T00:00:00Z', updatedAt: '2026-08-20T00:00:00Z',
     },
     {
       id: 'shopprod_remove', slug: 'remove-live', applicationId: 'shop-1', status: 'PUBLISHED',
@@ -118,7 +141,10 @@ test('published seller can update stock and submit edit or unpublish requests wi
     if (path === '/api/shop-product-requests' && method === 'GET') return void await json({ success: true, requests });
     if (path === '/api/shop-products/shopprod_edit/stock' && method === 'PATCH') {
       stockPayload = request.postDataJSON() as Record<string, unknown>;
-      products[0] = { ...products[0], inventory: stockPayload.stock, variants: [{ id: 'shopprod_edit-var-1', size: 'M', inventory: stockPayload.stock }] };
+      const variants = (products[0].variants as Array<Record<string, unknown>>).map(variant =>
+        variant.id === 'shopprod_edit-var-1' ? { ...variant, inventory: stockPayload?.stock } : variant
+      );
+      products[0] = { ...products[0], inventory: 9, variants };
       return void await json({ success: true, inventory: { productId: 'shopprod_edit', variantId: 'shopprod_edit-var-1', before: 2, stock: stockPayload.stock } });
     }
     if (path === '/api/shop-products/shopprod_edit/edit-request' && method === 'POST') {
@@ -156,10 +182,21 @@ test('published seller can update stock and submit edit or unpublish requests wi
   await editCard.getByRole('button', { name: 'Edit Listing' }).click();
   await expect(page.getByRole('heading', { name: 'Request Listing Changes' })).toBeVisible();
   await page.getByLabel('Product name').fill('Reviewed Live Product');
+  await page.getByLabel('Size 1').fill('M Tall');
+  await expect(page.getByLabel('Stock for size M Tall')).toHaveAttribute('readonly', '');
+  await page.getByRole('button', { name: '+ Add size' }).click();
+  await page.getByLabel('Size 4', { exact: true }).fill('XL');
+  await page.getByLabel('Stock for size XL').fill('4');
   await page.getByRole('button', { name: 'Submit Listing Changes' }).click();
   await expect(editCard.getByText(/EDIT request submitted/i)).toBeVisible();
   expect(editPayload).not.toHaveProperty('inventory');
   expect(editPayload?.name).toBe('Reviewed Live Product');
+  expect(editPayload?.variants).toEqual([
+    { size: 'M Tall', inventory: 5 },
+    { size: 'S', inventory: 1 },
+    { size: 'L', inventory: 3 },
+    { size: 'XL', inventory: 4 },
+  ]);
   await expect(editCard.getByRole('button', { name: 'Edit Listing' })).toHaveCount(0);
   await expect(editCard.getByRole('button', { name: 'Request Unpublish' })).toHaveCount(0);
 

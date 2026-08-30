@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import base64
 import hashlib
 import hmac
 import http.client
@@ -2055,6 +2056,30 @@ class HttpApiTests(unittest.TestCase):
         self.service.shops.admin_transition_application(
             "http-admin", application_id, "ACTIVE"
         )
+
+        png = base64.b64decode(
+            "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII="
+        )
+        upload_payload = {
+            "fileName": "seller-photo.png",
+            "contentType": "image/png",
+            "dataBase64": base64.b64encode(png).decode(),
+        }
+        status, anonymous_upload, _headers = self.post_json(
+            "/api/shop-product-images", upload_payload
+        )
+        self.assertEqual((status, anonymous_upload["code"]), (401, "authentication_required"))
+        status, uploaded, _headers = self.post_json(
+            "/api/shop-product-images", upload_payload, session_headers
+        )
+        self.assertEqual(status, 201)
+        uploaded_url = uploaded["image"]["url"]
+        self.assertRegex(uploaded_url, r"^/media/product-images/[0-9a-f]{32}\.png$")
+        with urllib.request.urlopen(f"{self.base_url}{uploaded_url}") as image_response:
+            self.assertEqual(image_response.read(), png)
+            self.assertEqual(image_response.headers.get_content_type(), "image/png")
+            self.assertIn("immutable", image_response.headers["Cache-Control"])
+
         product_payload = {
             "name": "HTTP Published Kurta",
             "description": "A reviewed local cotton kurta available through the HTTP catalogue.",
@@ -2064,7 +2089,7 @@ class HttpApiTests(unittest.TestCase):
             "pricePaise": 159900,
             "originalPricePaise": 179900,
             "inventory": 8,
-            "imageUrls": ["https://images.example.test/http-kurta.jpg"],
+            "imageUrls": [uploaded_url],
             "attributes": {"material": "Cotton"},
             "size": "M",
             "colourName": "Blue",
@@ -2096,7 +2121,7 @@ class HttpApiTests(unittest.TestCase):
         public_store = stores_response["stores"][0]
         self.assertEqual(public_store["slug"], public_product["storeSlug"])
         self.assertEqual(public_store["storeName"], complete["shopName"])
-        self.assertEqual(public_store["bannerImage"], product_payload["imageUrls"][0])
+        self.assertEqual(public_store["bannerImage"], uploaded_url)
         self.assertNotIn("registeredEmail", public_store)
         self.assertNotIn("registeredMobile", public_store)
         self.assertNotIn("businessInformation", public_store)
