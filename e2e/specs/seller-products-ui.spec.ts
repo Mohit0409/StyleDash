@@ -76,12 +76,21 @@ test('approved shop owner can draft and submit but cannot publish a product', as
   await page.getByPlaceholder('Size, e.g. S or XL').nth(1).fill('L');
   await page.getByPlaceholder('Stock').nth(1).fill('3');
   await page.getByLabel('Colour name').fill('Black');
+  await expect(page.getByRole('radio', { name: 'Image link' })).toHaveAttribute('aria-checked', 'true');
+  await expect(page.getByLabel('HTTPS image URLs')).toBeVisible();
+  await page.getByRole('radio', { name: 'Image upload' }).click();
+  await expect(page.getByLabel('HTTPS image URLs')).toHaveCount(0);
   await page.getByLabel('Upload product images').setInputFiles({
     name: 'local-product.png',
     mimeType: 'image/png',
     buffer: Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=', 'base64'),
   });
   await expect(page.getByText('1 image optimized and uploaded.')).toBeVisible();
+  await expect(page.getByAltText('Uploaded product image 1 preview')).toBeVisible();
+  await page.getByRole('radio', { name: 'Image link' }).click();
+  await expect(page.getByLabel('HTTPS image URLs')).toHaveValue('');
+  await page.getByRole('radio', { name: 'Image upload' }).click();
+  await expect(page.getByAltText('Uploaded product image 1 preview')).toBeVisible();
   await page.getByRole('button', { name: 'Save Product Draft' }).click();
 
   await expect(page.getByRole('heading', { name: 'Local Product' })).toBeVisible();
@@ -90,6 +99,13 @@ test('approved shop owner can draft and submit but cannot publish a product', as
   expect(createPayload).not.toHaveProperty('applicationId');
   expect(createPayload?.variants).toEqual([{ size: 'M', inventory: 2 }, { size: 'L', inventory: 3 }]);
   expect(createPayload?.imageUrls).toEqual(['/media/product-images/0123456789abcdef0123456789abcdef.webp']);
+
+  const draftCard = page.getByRole('article').filter({ has: page.getByRole('heading', { name: 'Local Product' }) });
+  await draftCard.getByRole('button', { name: 'Edit', exact: true }).click();
+  await expect(page.getByRole('radio', { name: 'Image upload' })).toHaveAttribute('aria-checked', 'true');
+  await expect(page.getByLabel('HTTPS image URLs')).toHaveCount(0);
+  await expect(page.getByAltText('Uploaded product image 1 preview')).toBeVisible();
+  await page.getByRole('button', { name: 'Cancel', exact: true }).click();
 
   await page.getByRole('button', { name: 'Submit', exact: true }).click();
   await expect(page.getByText('SUBMITTED', { exact: true })).toBeVisible();
@@ -181,6 +197,9 @@ test('published seller can update stock and submit edit or unpublish requests wi
 
   await editCard.getByRole('button', { name: 'Edit Listing' }).click();
   await expect(page.getByRole('heading', { name: 'Request Listing Changes' })).toBeVisible();
+  await expect(page.getByRole('radio', { name: 'Image link' })).toHaveAttribute('aria-checked', 'true');
+  await expect(page.getByLabel('HTTPS image URLs')).toHaveValue('https://example.test/edit.jpg');
+  await expect(page.getByLabel('Upload product images')).toHaveCount(0);
   await page.getByLabel('Product name').fill('Reviewed Live Product');
   await page.getByLabel('Size 1').fill('M Tall');
   await expect(page.getByLabel('Stock for size M Tall')).toHaveAttribute('readonly', '');
