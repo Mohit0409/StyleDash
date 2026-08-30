@@ -15,6 +15,7 @@ DATA_ROOT="$HOME/.local/share/styledash"
 BACKUP_ROOT="$DATA_ROOT/backups"
 DB="$DATA_ROOT/styledash.db"
 STATE="$DATA_ROOT/runtime/orders.json"
+PRODUCT_IMAGES="$DATA_ROOT/product-images"
 PRIVATE_CONFIG_DIR="$HOME/.config/styledash"
 SECRETS_FILE="$PRIVATE_CONFIG_DIR/secrets.env"
 RUN_DIR="$HOME/run"
@@ -67,6 +68,12 @@ fi
 if [ -f "$STATE" ]; then
   cp -p "$STATE" "$target/orders.json"
   chmod 600 "$target/orders.json"
+fi
+
+if [ -d "$PRODUCT_IMAGES" ]; then
+  mkdir -p "$target/product-images"
+  cp -a "$PRODUCT_IMAGES/." "$target/product-images/"
+  chmod 700 "$target/product-images"
 fi
 
 python3 - "$BACKUP_ROOT" <<'PY'

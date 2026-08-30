@@ -4,6 +4,8 @@
 from __future__ import annotations
 
 import argparse
+import base64
+import binascii
 import hashlib
 import hmac
 import json
@@ -57,6 +59,9 @@ except ImportError:  # The static site and COD can still start without the SDK.
 
 
 MAX_BODY_BYTES = 64 * 1024
+PRODUCT_IMAGE_MAX_BYTES = 500 * 1024
+PRODUCT_IMAGE_REQUEST_MAX_BYTES = 700 * 1024
+PRODUCT_IMAGE_ROUTE_PATTERN = re.compile(r"^/media/product-images/([0-9a-f]{32}\.(?:webp|jpg|png))$")
 API_PREFIX = "/api/"
 # Firebase/Google endpoints are added narrowly (never a wildcard) and only to
 # support the Google + Phone-OTP identity flows; Firebase is never granted
@@ -1900,6 +1905,7 @@ class PaymentService:
 
 class StyleDashRequestHandler(SimpleHTTPRequestHandler):
     payment_service: PaymentService
+    product_image_directory: Path
     rate_limiter = RateLimiter()
 
     def guess_type(self, path: str) -> str:
@@ -1918,7 +1924,7 @@ class StyleDashRequestHandler(SimpleHTTPRequestHandler):
 
     def end_headers(self) -> None:
         path = urlsplit(self.path).path
-        if path.startswith("/assets/"):
+        if path.startswith(("/assets/", "/media/product-images/")):
             self.send_header("Cache-Control", "public, max-age=31536000, immutable")
         self.send_header("X-Content-Type-Options", "nosniff")
         self.send_header("Referrer-Policy", "strict-origin-when-cross-origin")
@@ -1957,6 +1963,81 @@ class StyleDashRequestHandler(SimpleHTTPRequestHandler):
     @staticmethod
     def _public_origin() -> str:
         return os.environ.get("STYLEDASH_PUBLIC_ORIGIN", "").rstrip("/")
+
+    def _product_image_file(self, request_path: str) -> tuple[Path, str] | None:
+        match = PRODUCT_IMAGE_ROUTE_PATTERN.fullmatch(request_path)
+        if match is None:
+            return None
+        filename = match.group(1)
+        target = (self.product_image_directory / filename).resolve()
+        if target.parent != self.product_image_directory.resolve():
+            return None
+        content_type = {"webp": "image/webp", "jpg": "image/jpeg", "png": "image/png"}[target.suffix.lstrip(".")]
+        return target, content_type
+
+    def _serve_product_image(self, request_path: str, *, head_only: bool = False) -> None:
+        resolved = self._product_image_file(request_path)
+        if resolved is None or not resolved[0].is_file():
+            raise ApiError(HTTPStatus.NOT_FOUND, "Image not found.", "not_found")
+        target, content_type = resolved
+        body = b"" if head_only else target.read_bytes()
+        size = target.stat().st_size
+        self.send_response(HTTPStatus.OK)
+        self.send_header("Content-Type", content_type)
+        self.send_header("Content-Length", str(size))
+        self.end_headers()
+        if not head_only:
+            self.wfile.write(body)
+
+    def _store_product_image(self, payload: dict[str, Any]) -> dict[str, Any]:
+        if set(payload) != {"fileName", "contentType", "dataBase64"}:
+            raise SecurityError(400, "Invalid image upload.", "invalid_product_image")
+        file_name = payload.get("fileName")
+        content_type = payload.get("contentType")
+        encoded = payload.get("dataBase64")
+        if not isinstance(file_name, str) or not 1 <= len(file_name) <= 120:
+            raise SecurityError(400, "Invalid image filename.", "invalid_product_image")
+        extensions = {"image/webp": "webp", "image/jpeg": "jpg", "image/png": "png"}
+        extension = extensions.get(content_type)
+        if extension is None or not isinstance(encoded, str) or not encoded:
+            raise SecurityError(400, "Upload a JPEG, PNG or WebP image.", "invalid_product_image")
+        try:
+            content = base64.b64decode(encoded, validate=True)
+        except (binascii.Error, ValueError):
+            raise SecurityError(400, "Invalid image data.", "invalid_product_image") from None
+        if not 32 <= len(content) <= PRODUCT_IMAGE_MAX_BYTES:
+            raise SecurityError(413, "The optimized image must be 500 KB or smaller.", "product_image_too_large")
+        magic_ok = (
+            (content_type == "image/jpeg" and content.startswith(b"\xff\xd8\xff"))
+            or (content_type == "image/png" and content.startswith(b"\x89PNG\r\n\x1a\n"))
+            or (content_type == "image/webp" and len(content) >= 12 and content[:4] == b"RIFF" and content[8:12] == b"WEBP")
+        )
+        if not magic_ok:
+            raise SecurityError(400, "The uploaded file does not match its image type.", "invalid_product_image")
+        digest = hashlib.sha256(content).hexdigest()[:32]
+        self.product_image_directory.mkdir(parents=True, exist_ok=True)
+        try:
+            os.chmod(self.product_image_directory, 0o700)
+        except OSError:
+            pass
+        target = self.product_image_directory / f"{digest}.{extension}"
+        if not target.exists():
+            temporary = self.product_image_directory / f".{digest}.{secrets.token_hex(6)}.tmp"
+            temporary.write_bytes(content)
+            try:
+                os.chmod(temporary, 0o644)
+            except OSError:
+                pass
+            os.replace(temporary, target)
+        return {"url": f"/media/product-images/{target.name}", "bytes": len(content), "contentType": content_type}
+
+    def _require_product_image_seller(self) -> dict[str, Any]:
+        user, _session = self._current_user()
+        self._csrf()
+        application = self._shops().get_application(user["id"])
+        if not application or application.get("status") not in {"APPROVED", "ACTIVE"}:
+            raise SecurityError(403, "An approved shop is required before uploading product images.", "approved_shop_required")
+        return user
 
     def _redirect_to_canonical_host(self) -> bool:
         origin = self._public_origin()
@@ -2072,8 +2153,8 @@ class StyleDashRequestHandler(SimpleHTTPRequestHandler):
         client = forwarded if trusted_proxy and forwarded and len(forwarded) <= 64 else peer
         return f"{route}:{client}"
 
-    def _read_json(self) -> dict[str, Any]:
-        raw_body = self._read_raw_body()
+    def _read_json(self, maximum_bytes: int = MAX_BODY_BYTES) -> dict[str, Any]:
+        raw_body = self._read_raw_body(maximum_bytes)
         try:
             payload = json.loads(raw_body.decode("utf-8"))
         except (UnicodeDecodeError, json.JSONDecodeError):
@@ -2082,7 +2163,7 @@ class StyleDashRequestHandler(SimpleHTTPRequestHandler):
             raise ApiError(HTTPStatus.BAD_REQUEST, "A JSON object is required.", "malformed_request")
         return payload
 
-    def _read_raw_body(self) -> bytes:
+    def _read_raw_body(self, maximum_bytes: int = MAX_BODY_BYTES) -> bytes:
         content_type = self.headers.get("Content-Type", "").split(";", 1)[0].strip().lower()
         if content_type != "application/json":
             raise ApiError(HTTPStatus.UNSUPPORTED_MEDIA_TYPE, "Content-Type must be application/json.", "invalid_content_type")
@@ -2093,7 +2174,7 @@ class StyleDashRequestHandler(SimpleHTTPRequestHandler):
             length = int(raw_length)
         except ValueError:
             raise ApiError(HTTPStatus.BAD_REQUEST, "Invalid Content-Length.", "malformed_request") from None
-        if length <= 0 or length > MAX_BODY_BYTES:
+        if length <= 0 or length > maximum_bytes:
             raise ApiError(HTTPStatus.REQUEST_ENTITY_TOO_LARGE, "Request body is too large.", "body_too_large")
         return self.rfile.read(length)
 
@@ -2120,6 +2201,9 @@ class StyleDashRequestHandler(SimpleHTTPRequestHandler):
                 return
             if self._sensitive_path(path):
                 self._json_response(HTTPStatus.NOT_FOUND, {"success": False, "error": "Not found.", "code": "not_found"})
+                return
+            if path.startswith("/media/product-images/"):
+                self._serve_product_image(path)
                 return
             if path == "/payment-test" or path.startswith("/payment-test/"):
                 if path != PAYMENT_TEST_ROUTE:
@@ -2253,6 +2337,12 @@ class StyleDashRequestHandler(SimpleHTTPRequestHandler):
             return
         if self._sensitive_path(path):
             self._json_response(HTTPStatus.NOT_FOUND, {"success": False, "error": "Not found.", "code": "not_found"}, head_only=True)
+            return
+        if path.startswith("/media/product-images/"):
+            try:
+                self._serve_product_image(path, head_only=True)
+            except ApiError as error:
+                self._json_response(error.status, {"success": False, "error": error.message, "code": error.code}, head_only=True)
             return
         if path == "/payment-test" or path.startswith("/payment-test/"):
             if path != PAYMENT_TEST_ROUTE:
@@ -2523,6 +2613,12 @@ class StyleDashRequestHandler(SimpleHTTPRequestHandler):
                     HTTPStatus.OK, {"success": True, "application": result}
                 )
                 return
+            if path == "/api/shop-product-images":
+                self._rate_limit(path, 8)
+                self._require_product_image_seller()
+                image = self._store_product_image(self._read_json(PRODUCT_IMAGE_REQUEST_MAX_BYTES))
+                self._json_response(HTTPStatus.CREATED, {"success": True, "image": image})
+                return
             if path == "/api/shop-products":
                 self._rate_limit(path, 10)
                 user, _session = self._current_user()
@@ -2753,7 +2849,15 @@ def create_server(
     class BoundStyleDashRequestHandler(StyleDashRequestHandler):
         pass
 
+    data_root = data_directory.parent if data_directory.name == "runtime" else data_directory
+    product_image_directory = (data_root / "product-images").resolve()
+    product_image_directory.mkdir(parents=True, exist_ok=True)
+    try:
+        os.chmod(product_image_directory, 0o700)
+    except OSError:
+        pass
     BoundStyleDashRequestHandler.payment_service = payment_service
+    BoundStyleDashRequestHandler.product_image_directory = product_image_directory
     BoundStyleDashRequestHandler.rate_limiter = RateLimiter()
     handler = partial(BoundStyleDashRequestHandler, directory=str(directory))
     server = ThreadingHTTPServer((bind, port), handler)

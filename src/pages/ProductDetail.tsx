@@ -101,7 +101,7 @@ export const ProductDetail: React.FC = () => {
           '@type': 'Product',
           name: product.name,
           description: product.shortDescription,
-          image: product.images,
+          image: product.images.map(image => new URL(image, 'https://vibe4you.in').href),
           sku: product.id,
           brand: product.brand ? { '@type': 'Brand', name: product.brand } : undefined,
           offers: {

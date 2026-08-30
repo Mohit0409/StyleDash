@@ -95,6 +95,9 @@ export const shopProductApi = {
     const payload = variantId ? { variantId, stock } : { stock };
     return (await apiJson<{ success: true; inventory: SellerInventoryUpdate }>(`/api/shop-products/${encodeURIComponent(id)}/stock`, 'PATCH', payload)).inventory;
   },
+  async uploadImage(payload: { fileName: string; contentType: string; dataBase64: string }): Promise<SellerProductImageUpload> {
+    return (await apiJson<{ success: true; image: SellerProductImageUpload }>('/api/shop-product-images', 'POST', payload)).image;
+  },
 };
 
 export type SellerProductStatus = 'DRAFT' | 'SUBMITTED' | 'UNDER_REVIEW' | 'APPROVED' | 'PUBLISHED' | 'REJECTED';
@@ -140,7 +143,7 @@ export interface SellerProduct extends Omit<SellerProductDraft, 'variants' | 'in
   publishedAt?: string | null;
 }
 
-export type SellerProductChangeDraft = Omit<SellerProductDraft, 'variants'>;
+export type SellerProductChangeDraft = Omit<SellerProductDraft, 'inventory' | 'size'>;
 export type SellerProductChangeAction = 'EDIT' | 'UNPUBLISH';
 export type SellerProductChangeStatus = 'SUBMITTED' | 'UNDER_REVIEW' | 'APPROVED' | 'REJECTED';
 
@@ -164,6 +167,12 @@ export interface SellerInventoryUpdate {
   variantId: string;
   before: number;
   stock: number;
+}
+
+export interface SellerProductImageUpload {
+  url: string;
+  bytes: number;
+  contentType: 'image/webp' | 'image/jpeg' | 'image/png';
 }
 
 export const profileApi = {

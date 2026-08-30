@@ -490,6 +490,39 @@ class ShopWorkflowTests(unittest.TestCase):
         self.assertEqual(rejected["rejectionReason"], "Use the approved catalogue wording.")
         self.assertEqual(self.store.list_published_products()[0]["name"], "Original Live Kurta")
 
+        self.assert_error(
+            "published_variant_removal_blocked",
+            lambda: self.store.create_product_edit_request(
+                "user-a", product["id"], {"variants": []}
+            ),
+        )
+        variant_change = self.store.create_product_edit_request(
+            "user-a", product["id"],
+            {"variants": [
+                {"size": "M Tall", "inventory": 999},
+                {"size": "XL", "inventory": 4},
+            ]},
+        )
+        self.assertEqual(
+            variant_change["proposedProduct"]["variants"],
+            [{"size": "M Tall", "inventory": 8}, {"size": "XL", "inventory": 4}],
+        )
+        self.assertEqual(
+            [item["size"] for item in self.store.list_published_products()[0]["variants"]],
+            ["M"],
+        )
+        self.store.admin_transition_product_change_request(
+            "admin-a", variant_change["id"], "UNDER_REVIEW"
+        )
+        self.store.admin_transition_product_change_request(
+            "admin-a", variant_change["id"], "APPROVED"
+        )
+        resized_public = self.store.list_published_products()[0]
+        self.assertEqual(
+            [(item["size"], item["stock"]) for item in resized_public["variants"]],
+            [("M Tall", 8), ("XL", 4)],
+        )
+
         second = self.store.create_product_edit_request(
             "user-a", product["id"], {"name": "Approved Live Kurta", "pricePaise": 149900}
         )

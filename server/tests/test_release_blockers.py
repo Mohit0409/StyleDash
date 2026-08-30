@@ -363,6 +363,9 @@ class DeploymentAndTaxTests(unittest.TestCase):
             'cp -a "$DATA_ROOT/$authoritative_config" "$BACKUP/data/$authoritative_config"',
             text,
         )
+        backup_text = (ROOT / "scripts/termux/backup-styledash-data").read_text(encoding="utf-8")
+        self.assertIn('PRODUCT_IMAGES="$DATA_ROOT/product-images"', backup_text)
+        self.assertIn('cp -a "$PRODUCT_IMAGES/." "$target/product-images/"', backup_text)
 
     def test_boot_uses_only_the_managed_ngrok_stack(self):
         text = (ROOT / "scripts/termux/boot-start-styledash").read_text(encoding="utf-8")

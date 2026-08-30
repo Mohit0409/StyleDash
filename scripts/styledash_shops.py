@@ -93,9 +93,10 @@ PRODUCT_PAYLOAD_FIELDS = {
     "colourHex",
     "variants",
 }
-PRODUCT_CHANGE_PAYLOAD_FIELDS = PRODUCT_PAYLOAD_FIELDS - {"inventory", "variants"}
+PRODUCT_CHANGE_PAYLOAD_FIELDS = PRODUCT_PAYLOAD_FIELDS - {"inventory", "size"}
 DEPARTMENTS = {"men", "women", "kids", "unisex", "footwear", "accessories"}
 COLOUR_HEX_PATTERN = re.compile(r"^#[0-9A-Fa-f]{6}$")
+PRODUCT_MEDIA_PATH_PATTERN = re.compile(r"^/media/product-images/[0-9a-f]{32}\.(?:webp|jpg|png)$")
 
 
 def _optional_text(value: Any, label: str, maximum: int) -> str | None:
@@ -887,9 +888,20 @@ class ShopWorkflow:
         for value in image_urls:
             if not isinstance(value, str) or len(value) > 500:
                 raise SecurityError(400, "Enter valid product images.", "invalid_product")
+            if PRODUCT_MEDIA_PATH_PATTERN.fullmatch(value):
+                clean_images.append(value)
+                continue
             parsed = urlsplit(value)
-            if parsed.scheme != "https" or not parsed.netloc:
-                raise SecurityError(400, "Product images must use HTTPS.", "invalid_product")
+            if (
+                parsed.scheme != "https"
+                or not parsed.netloc
+                or re.search(r"\.html?$", parsed.path, re.IGNORECASE)
+            ):
+                raise SecurityError(
+                    400,
+                    "Product image links must point directly to an HTTPS image, not a webpage, or use an uploaded Vibe4You image.",
+                    "invalid_product",
+                )
             clean_images.append(value)
 
         attributes_value = payload.get("attributes") if "attributes" in payload else None
@@ -993,7 +1005,7 @@ class ShopWorkflow:
             "category": values["category"],
             "pricePaise": values["price_paise"],
             "originalPricePaise": values["original_price_paise"],
-            "size": values["size"],
+            "variants": json.loads(values["variants_json"]),
             "colourName": values["colour_name"],
             "colourHex": values["colour_hex"],
             "imageUrls": json.loads(values["image_urls_json"]),
@@ -1454,7 +1466,26 @@ class ShopWorkflow:
                         "invalid_product_change",
                     )
                 candidate = dict(payload)
-                candidate["inventory"] = current["inventory"]
+                if "variants" in candidate:
+                    proposed_variants = candidate["variants"]
+                    current_variants = _row_variants(current)
+                    if not isinstance(proposed_variants, list) or len(proposed_variants) < len(current_variants):
+                        db.rollback()
+                        raise SecurityError(
+                            409,
+                            "Existing published sizes cannot be removed. Set stock to 0 instead; you can rename sizes or add new sizes.",
+                            "published_variant_removal_blocked",
+                        )
+                    normalized_variants: list[dict[str, Any]] = []
+                    for index, item in enumerate(proposed_variants):
+                        if not isinstance(item, dict):
+                            db.rollback()
+                            raise SecurityError(400, "Enter valid size inventory rows.", "invalid_product_change")
+                        normalized = dict(item)
+                        if index < len(current_variants):
+                            normalized["inventory"] = current_variants[index]["inventory"]
+                        normalized_variants.append(normalized)
+                    candidate["variants"] = normalized_variants
                 values = self._product_payload(candidate, current)
                 if not json.loads(values["image_urls_json"]):
                     db.rollback()
@@ -1614,7 +1645,6 @@ class ShopWorkflow:
                 if request["action"] == "EDIT":
                     proposed = json.loads(request["payload_json"] or "{}")
                     candidate = dict(proposed)
-                    candidate["inventory"] = current["inventory"]
                     values = self._product_payload(candidate, current)
                     if not json.loads(values["image_urls_json"]):
                         db.rollback()
@@ -1627,8 +1657,8 @@ class ShopWorkflow:
                         """
                         UPDATE shop_product_submissions
                            SET name=?,description=?,brand=?,department=?,category=?,
-                               price_paise=?,original_price_paise=?,size=?,colour_name=?,
-                               colour_hex=?,image_urls_json=?,attributes_json=?,
+                               price_paise=?,original_price_paise=?,inventory=?,size=?,variants_json=?,
+                               colour_name=?,colour_hex=?,image_urls_json=?,attributes_json=?,
                                reviewed_by=?,reviewed_at=?,updated_at=?
                          WHERE id=?
                         """,
@@ -1640,7 +1670,9 @@ class ShopWorkflow:
                             values["category"],
                             values["price_paise"],
                             values["original_price_paise"],
+                            values["inventory"],
                             values["size"],
+                            values["variants_json"],
                             values["colour_name"],
                             values["colour_hex"],
                             values["image_urls_json"],
