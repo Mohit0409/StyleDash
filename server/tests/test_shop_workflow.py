@@ -1,4 +1,5 @@
 import sqlite3
+import json
 import tempfile
 import threading
 import unittest
@@ -246,6 +247,47 @@ class ShopWorkflowTests(unittest.TestCase):
         )
         self.assertEqual(db.execute("PRAGMA integrity_check").fetchone()[0], "ok")
         db.close()
+
+
+    def test_variant_migration_repairs_marker_schema_mismatch(self) -> None:
+        self.create_active_shop("user-a", "Repair Shop")
+        product = self.store.create_product_draft("user-a", self.complete_product("Legacy Variant Product"))
+        with self.store.connect() as db:
+            self.assertIsNotNone(db.execute("SELECT 1 FROM shop_schema_migrations WHERE version=4").fetchone())
+            db.execute("ALTER TABLE shop_product_submissions DROP COLUMN variants_json")
+        repaired = ShopWorkflow(self.path)
+        with repaired.connect() as db:
+            columns = {row[1] for row in db.execute("PRAGMA table_info(shop_product_submissions)")}
+            self.assertIn("variants_json", columns)
+            raw = db.execute("SELECT variants_json FROM shop_product_submissions WHERE id=?", (product["id"],)).fetchone()[0]
+        self.assertEqual(json.loads(raw), [{"size": "M", "inventory": 8}])
+        payload = self.complete_product("Repaired Multi Size Product")
+        payload.pop("inventory")
+        payload.pop("size")
+        payload["variants"] = [{"size": "M", "inventory": 2}, {"size": "L", "inventory": 3}]
+        created = repaired.create_product_draft("user-a", payload)
+        self.assertEqual([(item["size"], item["inventory"]) for item in created["variants"]], [("M", 2), ("L", 3)])
+
+    def test_edit_with_uploaded_image_discards_legacy_webpage_url(self) -> None:
+        self.create_active_shop("user-a", "Legacy Image Shop")
+        product = self.store.create_product_draft("user-a", self.complete_product("Legacy Image Product"))
+        self.store.submit_product("user-a", product["id"])
+        for target in ("UNDER_REVIEW", "APPROVED", "PUBLISHED"):
+            product = self.store.admin_transition_product("admin-a", product["id"], target)
+        legacy_url = "https://pngtree.com/freepng/stacked-jeans_3160982.html"
+        uploaded_url = "/media/product-images/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.webp"
+        with self.store.connect() as db:
+            db.execute("UPDATE shop_product_submissions SET image_urls_json=? WHERE id=?", (json.dumps([legacy_url]), product["id"]))
+        self.assert_error(
+            "invalid_product",
+            lambda: self.store.create_product_edit_request("user-a", product["id"], {"name": "Still Invalid", "imageUrls": [legacy_url]}),
+        )
+        request = self.store.create_product_edit_request(
+            "user-a",
+            product["id"],
+            {"name": "Repaired Image Product", "imageUrls": [legacy_url, uploaded_url]},
+        )
+        self.assertEqual(request["proposedProduct"]["imageUrls"], [uploaded_url])
 
     def test_incremental_draft_rejection_resubmission_and_suspension(self) -> None:
         draft = self.store.create_draft("user-a", {"shopName": "Partial Shop"})
