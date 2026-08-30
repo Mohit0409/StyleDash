@@ -393,11 +393,13 @@ class ShopWorkflow:
         now = iso(utc_now())
         db.execute("BEGIN IMMEDIATE")
         try:
-            if db.execute(
+            # Historical production databases may already contain a version-4
+            # marker from an older migration sequence while still lacking the
+            # variants_json column. Treat the physical schema as authoritative
+            # and repair it idempotently instead of trusting the marker alone.
+            marker_exists = db.execute(
                 "SELECT 1 FROM shop_schema_migrations WHERE version=4"
-            ).fetchone() is not None:
-                db.commit()
-                return
+            ).fetchone() is not None
             columns = {row["name"] for row in db.execute(
                 "PRAGMA table_info(shop_product_submissions)"
             ).fetchall()}
@@ -420,10 +422,11 @@ class ShopWorkflow:
                     "UPDATE shop_product_submissions SET variants_json=? WHERE id=?",
                     (json.dumps([{"size": row["size"], "inventory": row["inventory"]}], separators=(",", ":")), row["id"]),
                 )
-            db.execute(
-                "INSERT INTO shop_schema_migrations(version,applied_at) VALUES(4,?)",
-                (now,),
-            )
+            if not marker_exists:
+                db.execute(
+                    "INSERT INTO shop_schema_migrations(version,applied_at) VALUES(4,?)",
+                    (now,),
+                )
             db.commit()
         except Exception:
             db.rollback()
@@ -807,7 +810,10 @@ class ShopWorkflow:
 
     @staticmethod
     def _product_payload(
-        payload: dict[str, Any], current: sqlite3.Row | None = None
+        payload: dict[str, Any],
+        current: sqlite3.Row | None = None,
+        *,
+        allow_legacy_current_images: bool = False,
     ) -> dict[str, Any]:
         if not isinstance(payload, dict) or set(payload) - PRODUCT_PAYLOAD_FIELDS:
             raise SecurityError(400, "Unsupported product field.", "invalid_product")
@@ -878,13 +884,18 @@ class ShopWorkflow:
             raise SecurityError(400, "Enter a valid colour.", "invalid_product")
 
         image_value = payload.get("imageUrls") if "imageUrls" in payload else None
-        if image_value is None and current is not None:
+        preserving_current_images = image_value is None and current is not None
+        if preserving_current_images:
             image_urls = json.loads(current["image_urls_json"])
         else:
             image_urls = image_value
         if not isinstance(image_urls, list) or len(image_urls) > 8:
             raise SecurityError(400, "Enter valid product images.", "invalid_product")
         clean_images: list[str] = []
+        has_uploaded_image = any(
+            isinstance(value, str) and PRODUCT_MEDIA_PATH_PATTERN.fullmatch(value)
+            for value in image_urls
+        )
         for value in image_urls:
             if not isinstance(value, str) or len(value) > 500:
                 raise SecurityError(400, "Enter valid product images.", "invalid_product")
@@ -897,6 +908,16 @@ class ShopWorkflow:
                 or not parsed.netloc
                 or re.search(r"\.html?$", parsed.path, re.IGNORECASE)
             ):
+                # Older published products can contain webpage URLs that were
+                # accepted before direct-image validation existed. If the seller
+                # has supplied a new uploaded Vibe4You image, silently discard
+                # only those legacy invalid URL strings so stale browser state
+                # cannot block a legitimate repair edit.
+                if has_uploaded_image:
+                    continue
+                if allow_legacy_current_images and preserving_current_images:
+                    clean_images.append(value)
+                    continue
                 raise SecurityError(
                     400,
                     "Product image links must point directly to an HTTPS image, not a webpage, or use an uploaded Vibe4You image.",
@@ -1496,7 +1517,7 @@ class ShopWorkflow:
                     )
                 proposed = self._product_values_to_change_payload(values)
                 current_values = self._product_values_to_change_payload(
-                    self._product_payload({}, current)
+                    self._product_payload({}, current, allow_legacy_current_images=True)
                 )
                 if proposed == current_values:
                     db.rollback()

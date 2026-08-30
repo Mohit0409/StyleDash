@@ -256,12 +256,15 @@ connection = sqlite3.connect(sys.argv[1])
 try:
     identity_versions = {row[0] for row in connection.execute("SELECT version FROM schema_migrations")}
     shop_versions = {row[0] for row in connection.execute("SELECT version FROM shop_schema_migrations")}
+    shop_product_columns = {row[1] for row in connection.execute("PRAGMA table_info(shop_product_submissions)")}
     integrity = connection.execute("PRAGMA integrity_check").fetchone()[0]
     foreign_keys = connection.execute("PRAGMA foreign_key_check").fetchall()
 finally:
     connection.close()
 if 6 not in identity_versions or not {1, 2, 3, 4}.issubset(shop_versions):
     raise SystemExit("Vibe4You schema migrations are incomplete")
+if "variants_json" not in shop_product_columns:
+    raise SystemExit("Vibe4You product variant schema is incomplete")
 if integrity != "ok" or foreign_keys:
     raise SystemExit("Vibe4You post-migration database validation failed")
 print("styledash_migrations=ok")
