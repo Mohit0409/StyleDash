@@ -532,22 +532,35 @@ class ShopWorkflowTests(unittest.TestCase):
         self.assertEqual(rejected["rejectionReason"], "Use the approved catalogue wording.")
         self.assertEqual(self.store.list_published_products()[0]["name"], "Original Live Kurta")
 
+        original_variant = self.store.list_published_products()[0]["variants"][0]
+        original_variant_id = original_variant["id"]
         self.assert_error(
-            "published_variant_removal_blocked",
+            "published_variant_has_stock",
             lambda: self.store.create_product_edit_request(
-                "user-a", product["id"], {"variants": []}
+                "user-a", product["id"], {"variants": [{"size": "XL", "inventory": 4}]},
+                {original_variant_id: 8},
+            ),
+        )
+        self.assert_error(
+            "published_variant_rename_blocked",
+            lambda: self.store.create_product_edit_request(
+                "user-a", product["id"],
+                {"variants": [{"id": original_variant_id, "size": "M Tall", "inventory": 0}]},
+                {original_variant_id: 0},
             ),
         )
         variant_change = self.store.create_product_edit_request(
-            "user-a", product["id"],
-            {"variants": [
-                {"size": "M Tall", "inventory": 999},
-                {"size": "XL", "inventory": 4},
-            ]},
+            "user-a", product["id"], {"variants": [{"size": "XL", "inventory": 4}]},
+            {original_variant_id: 0},
         )
+        proposed_variants = variant_change["proposedProduct"]["variants"]
+        active_variant = next(item for item in proposed_variants if item["active"])
+        retired_variant = next(item for item in proposed_variants if not item["active"])
+        self.assertEqual((active_variant["size"], active_variant["inventory"]), ("XL", 4))
+        self.assertTrue(active_variant["id"].startswith("shopvar_"))
         self.assertEqual(
-            variant_change["proposedProduct"]["variants"],
-            [{"size": "M Tall", "inventory": 8}, {"size": "XL", "inventory": 4}],
+            retired_variant,
+            {"id": original_variant_id, "size": "M", "inventory": 0, "active": False},
         )
         self.assertEqual(
             [item["size"] for item in self.store.list_published_products()[0]["variants"]],
@@ -562,7 +575,16 @@ class ShopWorkflowTests(unittest.TestCase):
         resized_public = self.store.list_published_products()[0]
         self.assertEqual(
             [(item["size"], item["stock"]) for item in resized_public["variants"]],
-            [("M Tall", 8), ("XL", 4)],
+            [("XL", 4)],
+        )
+        catalog_variants = self.store.payment_catalog_products()[0]["variants"]
+        self.assertEqual(
+            next(item for item in catalog_variants if item["id"] == original_variant_id)["active"],
+            False,
+        )
+        self.assertEqual(
+            next(item for item in catalog_variants if item["size"] == "XL")["active"],
+            True,
         )
 
         second = self.store.create_product_edit_request(

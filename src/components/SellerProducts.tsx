@@ -32,7 +32,7 @@ interface ProductFormState {
   category: string;
   price: string;
   originalPrice: string;
-  variants: Array<{ size: string; inventory: string }>;
+  variants: Array<{ id?: string; size: string; inventory: string }>;
   colourName: string;
   colourHex: string;
   imageMode: 'links' | 'upload';
@@ -60,7 +60,7 @@ const toForm = (product: SellerProduct): ProductFormState => {
     price: (product.pricePaise / 100).toFixed(2),
     originalPrice: (product.originalPricePaise / 100).toFixed(2),
     variants: product.variants?.length
-      ? product.variants.map(variant => ({ size: variant.size, inventory: String(variant.inventory) }))
+      ? product.variants.map(variant => ({ id: variant.id, size: variant.size, inventory: String(variant.inventory) }))
       : [{ size: product.size, inventory: String(product.inventory) }],
     colourName: product.colourName,
     colourHex: product.colourHex || '',
@@ -83,6 +83,7 @@ const toPayload = (form: ProductFormState): SellerProductDraft => {
     throw new Error('Enter valid price values.');
   }
   const variants = form.variants.map(variant => ({
+    ...(variant.id ? { id: variant.id } : {}),
     size: variant.size.trim(),
     inventory: Number(variant.inventory),
   }));
@@ -167,7 +168,6 @@ export const SellerProducts: React.FC = () => {
   const [form, setForm] = useState<ProductFormState>(EMPTY_FORM);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [formMode, setFormMode] = useState<'draft' | 'change'>('draft');
-  const [changeBaseVariantCount, setChangeBaseVariantCount] = useState(0);
   const [formOpen, setFormOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
@@ -211,7 +211,13 @@ export const SellerProducts: React.FC = () => {
   }));
 
   const removeVariant = (index: number) => {
-    if (formMode === 'change' && index < changeBaseVariantCount) return;
+    const variant = form.variants[index];
+    if (!variant || form.variants.length === 1) return;
+    if (formMode === 'change' && variant.id && Number(variant.inventory) !== 0) {
+      setError(`Set stock for size ${variant.size} to 0 using its Stock button before removing it.`);
+      return;
+    }
+    setError('');
     setForm(current => ({
       ...current,
       variants: current.variants.filter((_, position) => position !== index),
@@ -221,7 +227,6 @@ export const SellerProducts: React.FC = () => {
   const openNew = () => {
     setEditingId(null);
     setFormMode('draft');
-    setChangeBaseVariantCount(0);
     setForm(EMPTY_FORM);
     setFormOpen(true);
     setError('');
@@ -231,8 +236,9 @@ export const SellerProducts: React.FC = () => {
   const openEdit = (product: SellerProduct) => {
     setEditingId(product.id);
     setFormMode('draft');
-    setChangeBaseVariantCount(0);
-    setForm(toForm(product));
+    const draftForm = toForm(product);
+    draftForm.variants = draftForm.variants.map(({ size, inventory }) => ({ size, inventory }));
+    setForm(draftForm);
     setFormOpen(true);
     setError('');
     setMessage('');
@@ -241,7 +247,6 @@ export const SellerProducts: React.FC = () => {
   const openChangeRequest = (product: SellerProduct) => {
     setEditingId(product.id);
     setFormMode('change');
-    setChangeBaseVariantCount(product.variants.length);
     setForm(toForm(product));
     setFormOpen(true);
     setError('');
@@ -328,7 +333,6 @@ export const SellerProducts: React.FC = () => {
       setFormOpen(false);
       setEditingId(null);
       setFormMode('draft');
-      setChangeBaseVariantCount(0);
       setForm(EMPTY_FORM);
     } catch (cause) {
       setError(messageForError(cause, formMode === 'change' ? 'The listing change request could not be submitted.' : 'The product draft could not be saved.'));
@@ -455,17 +459,15 @@ export const SellerProducts: React.FC = () => {
                 <button type="button" onClick={addVariant} disabled={form.variants.length >= 20} className="rounded-lg border px-3 py-1.5 font-bold disabled:opacity-50">+ Add size</button>
               </div>
               <p className="text-neutral-500">{formMode === 'change'
-                ? 'Rename an existing size or add a new size. Existing live stock stays controlled by the Stock buttons; a newly added size can set its starting stock. Existing published size rows cannot be removed.'
-                : 'Add one row per size. Stock is tracked separately for every size.'}</p>
+                ? 'Add new sizes anytime. To remove a published size, first set its live stock to 0 using the Stock button, then remove the row here. Existing published size names are locked to protect historical orders.'
+                : 'Add one row per size. Stock is tracked separately for every size, and draft size names can be edited freely.'}</p>
               <div className="space-y-2">
                 {form.variants.map((variant, index) => {
-                  const existingPublishedVariant = formMode === 'change' && index < changeBaseVariantCount;
-                  return <div key={index} className="grid grid-cols-[1fr_1fr_auto] gap-2">
-                    <input aria-label={`Size ${index + 1}`} required maxLength={40} value={variant.size} onChange={event => updateVariant(index, 'size', event.target.value)} placeholder="Size, e.g. S or XL" className="w-full rounded-xl border p-3 dark:bg-neutral-800" />
+                  const existingPublishedVariant = formMode === 'change' && Boolean(variant.id);
+                  return <div key={variant.id || index} className="grid grid-cols-[1fr_1fr_auto] gap-2">
+                    <input aria-label={`Size ${index + 1}`} required maxLength={40} readOnly={existingPublishedVariant} title={existingPublishedVariant ? 'Published size names are locked. Remove this zero-stock size and add the corrected size instead.' : undefined} value={variant.size} onChange={event => { if (!existingPublishedVariant) updateVariant(index, 'size', event.target.value); }} placeholder="Size, e.g. S or XL" className="w-full rounded-xl border p-3 read-only:bg-neutral-100 read-only:text-neutral-500 dark:bg-neutral-800 dark:read-only:bg-neutral-900" />
                     <input aria-label={`Stock for size ${variant.size || index + 1}`} title={existingPublishedVariant ? 'Use the Stock button on the product card to change live stock.' : undefined} required type="number" min="0" max="100000" step="1" readOnly={existingPublishedVariant} value={variant.inventory} onChange={event => { if (!existingPublishedVariant) updateVariant(index, 'inventory', event.target.value); }} placeholder="Stock" className="w-full rounded-xl border p-3 read-only:bg-neutral-100 read-only:text-neutral-500 dark:bg-neutral-800 dark:read-only:bg-neutral-900" />
-                    {(!existingPublishedVariant)
-                      ? <button type="button" disabled={formMode === 'draft' && form.variants.length === 1} onClick={() => removeVariant(index)} className="rounded-xl border px-3 font-bold text-red-600 disabled:opacity-30" aria-label={`Remove size ${variant.size || index + 1}`}>?</button>
-                      : <span aria-hidden="true" className="w-9" />}
+                    <button type="button" disabled={form.variants.length === 1} onClick={() => removeVariant(index)} className="rounded-xl border px-3 font-bold text-red-600 disabled:opacity-30" aria-label={`Remove size ${variant.size || index + 1}`}>×</button>
                   </div>;
                 })}
               </div>
@@ -546,7 +548,7 @@ export const SellerProducts: React.FC = () => {
                 <div className="flex flex-wrap gap-2">
                   {editable && <button type="button" disabled={busy} onClick={() => openEdit(product)} className="flex items-center gap-1 rounded-lg border px-3 py-2 text-xs font-bold"><Edit3 className="w-3.5" /> Edit</button>}
                   {product.status === 'DRAFT' && <button type="button" disabled={busy} onClick={() => void submitProduct(product.id)} className="flex items-center gap-1 rounded-lg bg-neutral-950 px-3 py-2 text-xs font-bold text-white disabled:opacity-60 dark:bg-lime-400 dark:text-neutral-950"><Send className="w-3.5" /> Submit</button>}
-                  {product.status === 'PUBLISHED' && product.variants.map(variant => <button key={variant.id} type="button" disabled={busy} onClick={() => setStockEdit({ productId: product.id, variantId: variant.id, size: variant.size, value: String(variant.inventory) })} className="flex items-center gap-1 rounded-lg border px-3 py-2 text-xs font-bold"><Boxes className="w-3.5" /> {variant.size} Stock</button>)}
+                  {product.status === 'PUBLISHED' && !pendingRequest && product.variants.map(variant => <button key={variant.id} type="button" disabled={busy} onClick={() => setStockEdit({ productId: product.id, variantId: variant.id, size: variant.size, value: String(variant.inventory) })} className="flex items-center gap-1 rounded-lg border px-3 py-2 text-xs font-bold"><Boxes className="w-3.5" /> {variant.size} Stock</button>)}
                   {product.status === 'PUBLISHED' && !pendingRequest && <button type="button" disabled={busy} onClick={() => openChangeRequest(product)} className="flex items-center gap-1 rounded-lg border px-3 py-2 text-xs font-bold"><Edit3 className="w-3.5" /> Edit Listing</button>}
                   {product.status === 'PUBLISHED' && !pendingRequest && <button type="button" disabled={busy} onClick={() => setUnpublishConfirmId(product.id)} className="flex items-center gap-1 rounded-lg border border-amber-300 px-3 py-2 text-xs font-bold text-amber-800"><PackageMinus className="w-3.5" /> Request Unpublish</button>}
                 </div>

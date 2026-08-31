@@ -143,7 +143,9 @@ export interface SellerProduct extends Omit<SellerProductDraft, 'variants' | 'in
   publishedAt?: string | null;
 }
 
-export type SellerProductChangeDraft = Omit<SellerProductDraft, 'inventory' | 'size'>;
+export type SellerProductChangeDraft = Omit<SellerProductDraft, 'inventory' | 'size' | 'variants'> & {
+  variants?: Array<SellerProductVariantDraft & { id?: string }>;
+};
 export type SellerProductChangeAction = 'EDIT' | 'UNPUBLISH';
 export type SellerProductChangeStatus = 'SUBMITTED' | 'UNDER_REVIEW' | 'APPROVED' | 'REJECTED';
 
