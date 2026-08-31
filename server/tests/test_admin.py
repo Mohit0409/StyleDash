@@ -190,6 +190,48 @@ class AdminStoreTests(unittest.TestCase):
         actions = {row["action"] for row in app.identity.audit()}
         self.assertTrue({"customer_created","shop_admin_created","shop_product_admin_created","shop_product_admin_updated","customer_password_reset"}.issubset(actions))
 
+    def test_approved_size_change_syncs_new_and_retired_inventory(self):
+        app = ADMIN_SERVER.AdminApplication(
+            self.database, self.key, ROOT / "server/payment-data/catalog.json",
+            ROOT / "server/payment-data/settings.json", self.root / "data-size-change",
+        )
+        owner = app.identity.create_customer_account(self.admin["id"], {
+            "name": "Size Owner", "email": "size-owner@example.test",
+            "phone": "9876543211", "password": "TempPass8!",
+        })
+        shop = app.shops.admin_create_application(self.admin["id"], owner["id"], {
+            "shopName": "Size Change Store", "ownerName": "Size Owner",
+            "category": "Clothing & Fashion", "description": "A store testing safe published size changes.",
+            "address": "11 Main Market Road", "city": "Neemuch",
+            "state": "Madhya Pradesh", "pincode": "458441",
+        })
+        product = app.shops.admin_create_product(self.admin["id"], shop["id"], {
+            "name": "Size Change Tee", "description": "Published tee used to verify size replacement inventory safety.",
+            "brand": "Local", "department": "unisex", "category": "Clothing & Fashion",
+            "pricePaise": 79900, "originalPricePaise": 99900,
+            "variants": [{"size": "M", "inventory": 2}], "colourName": "Black",
+            "colourHex": "#000000", "imageUrls": ["https://images.example.test/size-tee.jpg"], "attributes": {},
+        })
+        app.payments.refresh_shop_products()
+        old_id = product["variants"][0]["id"]
+        app.payments.set_shop_inventory(product["id"], 0, old_id)
+        live = app.payments.shop_inventory_snapshot([product["id"]])
+        request = app.shops.create_product_edit_request(
+            owner["id"], product["id"], {"variants": [{"size": "XL", "inventory": 4}]}, live,
+        )
+        app.transition_shop_product_request(self.admin["id"], request["id"], "UNDER_REVIEW")
+        approved = app.transition_shop_product_request(self.admin["id"], request["id"], "APPROVED")
+        self.assertEqual(approved["status"], "APPROVED")
+        app.payments.refresh_shop_products()
+        variants = app.payments.product_snapshot()[product["id"]]["variants"]
+        retired = next(item for item in variants if item["id"] == old_id)
+        added = next(item for item in variants if item["size"] == "XL")
+        self.assertFalse(retired["active"])
+        self.assertTrue(added["active"])
+        with app.payments.store.lock:
+            self.assertEqual(app.payments.store.state["inventory"].get(old_id), 0)
+            self.assertEqual(app.payments.store.state["inventory"].get(added["id"]), 4)
+
     def test_order_cancellation_sends_owner_notification(self):
         app = ADMIN_SERVER.AdminApplication(
             self.database,

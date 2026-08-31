@@ -168,7 +168,7 @@ test('published seller can update stock and submit edit or unpublish requests wi
       const variants = (products[0].variants as Array<Record<string, unknown>>).map(variant =>
         variant.id === 'shopprod_edit-var-1' ? { ...variant, inventory: stockPayload?.stock } : variant
       );
-      products[0] = { ...products[0], inventory: 9, variants };
+      products[0] = { ...products[0], inventory: variants.reduce((total, variant) => total + Number(variant.inventory), 0), variants };
       return void await json({ success: true, inventory: { productId: 'shopprod_edit', variantId: 'shopprod_edit-var-1', before: 2, stock: stockPayload.stock } });
     }
     if (path === '/api/shop-products/shopprod_edit/edit-request' && method === 'POST') {
@@ -198,10 +198,10 @@ test('published seller can update stock and submit edit or unpublish requests wi
 
   const editCard = page.getByRole('article').filter({ has: page.getByRole('heading', { name: 'Editable Live Product' }) });
   await editCard.getByRole('button', { name: 'M Stock' }).click();
-  await editCard.getByLabel('Stock for size M').fill('5');
+  await editCard.getByLabel('Stock for size M').fill('0');
   await editCard.getByRole('button', { name: 'Save stock' }).click();
-  await expect(editCard.getByText('M: 5', { exact: true })).toBeVisible();
-  expect(stockPayload).toEqual({ variantId: 'shopprod_edit-var-1', stock: 5 });
+  await expect(editCard.getByText('M: 0', { exact: true })).toBeVisible();
+  expect(stockPayload).toEqual({ variantId: 'shopprod_edit-var-1', stock: 0 });
 
   await editCard.getByRole('button', { name: 'Edit Listing' }).click();
   await expect(page.getByRole('heading', { name: 'Request Listing Changes' })).toBeVisible();
@@ -209,19 +209,22 @@ test('published seller can update stock and submit edit or unpublish requests wi
   await expect(page.getByLabel('HTTPS image URLs')).toHaveCount(0);
   await expect(page.getByAltText('Uploaded product image 1 preview')).toBeVisible();
   await page.getByLabel('Product name').fill('Reviewed Live Product');
-  await page.getByLabel('Size 1').fill('M Tall');
-  await expect(page.getByLabel('Stock for size M Tall')).toHaveAttribute('readonly', '');
+  await expect(page.getByLabel('Size 1')).toHaveAttribute('readonly', '');
+  await expect(page.getByLabel('Stock for size M')).toHaveAttribute('readonly', '');
+  await page.getByRole('button', { name: 'Remove size S' }).click();
+  await expect(page.getByRole('alert')).toContainText('Set stock for size S to 0');
+  await page.getByRole('button', { name: 'Remove size M' }).click();
+  await expect(page.getByLabel('Size 1')).toHaveValue('S');
   await page.getByRole('button', { name: '+ Add size' }).click();
-  await page.getByLabel('Size 4', { exact: true }).fill('XL');
+  await page.getByLabel('Size 3', { exact: true }).fill('XL');
   await page.getByLabel('Stock for size XL').fill('4');
   await page.getByRole('button', { name: 'Submit Listing Changes' }).click();
   await expect(editCard.getByText(/EDIT request submitted/i)).toBeVisible();
   expect(editPayload).not.toHaveProperty('inventory');
   expect(editPayload?.name).toBe('Reviewed Live Product');
   expect(editPayload?.variants).toEqual([
-    { size: 'M Tall', inventory: 5 },
-    { size: 'S', inventory: 1 },
-    { size: 'L', inventory: 3 },
+    { id: 'shopprod_edit-var-2', size: 'S', inventory: 1 },
+    { id: 'shopprod_edit-var-3', size: 'L', inventory: 3 },
     { size: 'XL', inventory: 4 },
   ]);
   expect(editPayload?.imageUrls).toEqual(['/media/product-images/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.webp']);

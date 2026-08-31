@@ -573,6 +573,8 @@ class PaymentService:
                 if not product.get("active") or (product_filter is not None and product["id"] not in product_filter):
                     continue
                 for variant in product["variants"]:
+                    if variant.get("active") is False:
+                        continue
                     if variant_id is not None and variant["id"] != variant_id:
                         continue
                     availability.append({
@@ -622,17 +624,18 @@ class PaymentService:
                 "The published product is not currently active.",
                 "published_product_required",
             )
+        active_variants = [item for item in product["variants"] if item.get("active") is not False]
         if variant_id is None:
-            if len(product["variants"]) != 1:
+            if len(active_variants) != 1:
                 raise SecurityError(
                     400,
                     "Choose the size whose stock you want to update.",
                     "variant_required",
                 )
-            variant = product["variants"][0]
+            variant = active_variants[0]
         else:
             variant = next(
-                (item for item in product["variants"] if item["id"] == variant_id),
+                (item for item in active_variants if item["id"] == variant_id),
                 None,
             )
             if variant is None:
@@ -726,7 +729,7 @@ class PaymentService:
                     (candidate for candidate in product["variants"] if candidate["id"] == variant_id),
                     None,
                 )
-                if variant is None:
+                if variant is None or variant.get("active") is False:
                     raise ApiError(HTTPStatus.UNPROCESSABLE_ENTITY, "A product option is unavailable.", "invalid_variant")
                 if isinstance(quantity, bool) or not isinstance(quantity, int) or not 1 <= quantity <= max_quantity:
                     raise ApiError(HTTPStatus.UNPROCESSABLE_ENTITY, "Invalid item quantity.", "invalid_quantity")
@@ -2651,8 +2654,9 @@ class StyleDashRequestHandler(SimpleHTTPRequestHandler):
                 )
                 if not product_id or "/" in product_id:
                     raise SecurityError(404, "Product submission not found.", "product_not_found")
+                live_inventory = self.payment_service.shop_inventory_snapshot([product_id])
                 result = self._shops().create_product_edit_request(
-                    user["id"], product_id, self._read_json()
+                    user["id"], product_id, self._read_json(), live_inventory
                 )
                 self._json_response(
                     HTTPStatus.CREATED, {"success": True, "request": result}
@@ -2748,7 +2752,7 @@ class StyleDashRequestHandler(SimpleHTTPRequestHandler):
                         "Provide the new stock value and, for multi-size products, its variantId.",
                         "invalid_inventory_adjustment",
                     )
-                self._shops().require_seller_published_product(user["id"], product_id)
+                self._shops().require_seller_stock_update_allowed(user["id"], product_id)
                 inventory = self.payment_service.set_shop_inventory(
                     product_id, payload.get("stock"), payload.get("variantId")
                 )
