@@ -1,15 +1,18 @@
 import React, { useEffect, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
-import { SlidersHorizontal } from 'lucide-react';
+import { Link, useSearchParams } from 'react-router-dom';
+import { MapPin, SlidersHorizontal, Store, Zap } from 'lucide-react';
 import { SEO } from '../components/SEO';
 import { ProductCard } from '../components/ProductCard';
 import { FilterSidebar } from '../components/FilterSidebar';
-import { Product } from '../types';
+import { Product, VendorStore } from '../types';
 import { productRepository } from '../repositories/productRepository';
+import { vendorRepository } from '../repositories/vendorRepository';
 
 export const Products: React.FC = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const [products, setProducts] = useState<Product[]>([]);
+  const [stores, setStores] = useState<VendorStore[]>([]);
+  const [storesLoading, setStoresLoading] = useState(false);
   const [loading, setLoading] = useState(true);
   const [mobileFilterOpen, setMobileFilterOpen] = useState(false);
 
@@ -30,6 +33,41 @@ export const Products: React.FC = () => {
       setLoading(false);
     });
   }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    if (!searchQuery.trim()) {
+      setStores([]);
+      setStoresLoading(false);
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    setStores([]);
+    setStoresLoading(true);
+    vendorRepository.getAllStores()
+      .then(data => {
+        if (!cancelled) {
+          setStores(data.filter(store => store.approved && store.active));
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setStores([]);
+        }
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setStoresLoading(false);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [searchQuery]);
 
   const updateParam = (key: string, value: string) => {
     const newParams = new URLSearchParams(searchParams);
@@ -60,7 +98,8 @@ export const Products: React.FC = () => {
       const matchBrand = p.brand.toLowerCase().includes(q);
       const matchCategory = p.category.toLowerCase().includes(q);
       const matchTag = p.tags.some(t => t.toLowerCase().includes(q));
-      if (!matchName && !matchBrand && !matchCategory && !matchTag) return false;
+      const matchStore = p.storeName?.toLowerCase().includes(q) ?? false;
+      if (!matchName && !matchBrand && !matchCategory && !matchTag && !matchStore) return false;
     }
 
     if (filterBadge === 'express' && !p.expressDelivery) return false;
@@ -69,6 +108,14 @@ export const Products: React.FC = () => {
 
     return true;
   });
+
+  const matchingStores = searchQuery
+    ? stores.filter(store => {
+        const q = searchQuery.toLowerCase();
+        return [store.storeName, store.category, store.description, store.address, store.city]
+          .some(value => value?.toLowerCase().includes(q));
+      })
+    : [];
 
   // Sorting logic
   const sortedProducts = [...filteredProducts].sort((a, b) => {
@@ -91,7 +138,11 @@ export const Products: React.FC = () => {
             {searchQuery ? `Search results for "${searchQuery}"` : `${department} Fashion Catalogue`}
           </h1>
           <p className="text-xs text-neutral-500 mt-1">
-            Showing <strong>{sortedProducts.length}</strong> available items for within-a-day delivery in Neemuch
+            {searchQuery ? (
+              <>Found <strong>{matchingStores.length}</strong> local store{matchingStores.length === 1 ? '' : 's'} and <strong>{sortedProducts.length}</strong> available product{sortedProducts.length === 1 ? '' : 's'} in Neemuch</>
+            ) : (
+              <>Showing <strong>{sortedProducts.length}</strong> available items for within-a-day delivery in Neemuch</>
+            )}
           </p>
         </div>
 
@@ -103,6 +154,30 @@ export const Products: React.FC = () => {
           <SlidersHorizontal className="w-4 h-4" /> Filter & Sort
         </button>
       </div>
+
+      {searchQuery && matchingStores.length > 0 && (
+        <section aria-labelledby="matching-local-stores" className="space-y-3">
+          <div className="flex items-center gap-2">
+            <Store className="w-5 h-5 text-lime-600" />
+            <h2 id="matching-local-stores" className="text-lg font-black text-neutral-900 dark:text-white">Matching Local Stores</h2>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {matchingStores.map(store => (
+              <Link key={store.id} to={`/store/${store.slug}`} aria-label={`Visit ${store.storeName} storefront`} className="group flex items-center gap-4 rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 p-4 hover:border-lime-400 hover:shadow-md transition-all">
+                <div className="w-14 h-14 shrink-0 rounded-xl bg-neutral-100 dark:bg-neutral-800 overflow-hidden flex items-center justify-center">
+                  {store.logoImage ? <img src={store.logoImage} alt="" loading="lazy" decoding="async" className="w-full h-full object-cover" /> : <Store className="w-6 h-6 text-neutral-400" />}
+                </div>
+                <div className="min-w-0">
+                  <h3 className="font-extrabold text-neutral-900 dark:text-white truncate group-hover:text-lime-600">{store.storeName}</h3>
+                  <p className="text-xs text-neutral-500 truncate">{store.category}</p>
+                  <p className="mt-1 flex items-center gap-1 text-xs text-neutral-500 truncate"><MapPin className="w-3 h-3 shrink-0" /> {store.address}</p>
+                  <p className="mt-1 flex items-center gap-1 text-[11px] font-bold text-emerald-600 dark:text-emerald-400"><Zap className="w-3 h-3" /> Within-a-Day Local Delivery</p>
+                </div>
+              </Link>
+            ))}
+          </div>
+        </section>
+      )}
 
       <div className="flex gap-8 items-start">
         {/* Filter Sidebar */}
@@ -132,7 +207,7 @@ export const Products: React.FC = () => {
                 <div key={i} className="aspect-[3/4] bg-neutral-200 dark:bg-neutral-800 rounded-2xl animate-pulse" />
               ))}
             </div>
-          ) : sortedProducts.length === 0 ? (
+          ) : sortedProducts.length === 0 && matchingStores.length === 0 && !storesLoading ? (
             <div className="text-center py-20 bg-white dark:bg-neutral-900 rounded-3xl border border-neutral-200 dark:border-neutral-800 p-8">
               <h3 className="font-extrabold text-lg text-neutral-900 dark:text-white mb-2">No matching products found</h3>
               <p className="text-xs text-neutral-500 mb-6">Try relaxing your search terms or clearing filters to view more items.</p>

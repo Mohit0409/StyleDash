@@ -7,7 +7,7 @@ test('mobile homepage and search work', async ({ page }) => {
     page.getByRole('heading', { name: /Your look/i }),
   ).toBeVisible();
 
-  const search = page.getByPlaceholder('Search products and brands');
+  const search = page.locator('header input[aria-label="Search products, brands, or local Neemuch stores"]:visible');
 
   await search.fill('shirt');
   await search.press('Enter');
