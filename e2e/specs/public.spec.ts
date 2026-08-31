@@ -133,6 +133,56 @@ test('category subcategory links apply the selected filters', async ({ page }) =
   await expect(page.getByRole('heading', { name: 'Textured Linen Spread Collar Shirt' })).toHaveCount(0);
 });
 
+test('global search returns matching local stores', async ({ page }) => {
+  await page.route('**/api/stores/active', route => route.fulfill({
+    status: 200,
+    contentType: 'application/json',
+    body: JSON.stringify({ success: true, stores: [
+      {
+        id: 'store-royals', slug: 'royals', storeName: 'royals', category: 'Clothing & Fashion',
+        address: 'Neemuch', pincode: '458441', city: 'Neemuch', deliveryMinutes: 60,
+        description: 'Local fashion store', active: true, approved: true, createdAt: '2026-01-01T00:00:00Z'
+      },
+      {
+        id: 'store-inactive', slug: 'inactive-royals', storeName: 'Inactive Royals', category: 'Clothing & Fashion',
+        address: 'Neemuch', pincode: '458441', city: 'Neemuch', deliveryMinutes: 60,
+        description: 'Inactive local fashion store', active: false, approved: true, createdAt: '2026-01-01T00:00:00Z'
+      },
+      {
+        id: 'store-unapproved', slug: 'unapproved-royals', storeName: 'Unapproved Royals', category: 'Clothing & Fashion',
+        address: 'Neemuch', pincode: '458441', city: 'Neemuch', deliveryMinutes: 60,
+        description: 'Unapproved local fashion store', active: true, approved: false, createdAt: '2026-01-01T00:00:00Z'
+      },
+    ] }),
+  }));
+
+  await page.goto('/');
+  const search = page.locator('header input[aria-label="Search products, brands, or local Neemuch stores"]:visible');
+  await search.fill('royals');
+  await search.press('Enter');
+
+  await expect(page).toHaveURL(/products\?search=royals/);
+  await expect(page.getByRole('heading', { name: 'Matching Local Stores' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'royals', exact: true })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Visit royals storefront' })).toHaveAttribute('href', '/store/royals');
+  await expect(page.getByRole('heading', { name: 'Inactive Royals', exact: true })).toHaveCount(0);
+  await expect(page.getByRole('heading', { name: 'Unapproved Royals', exact: true })).toHaveCount(0);
+});
+
+test('catalogue browsing does not fetch active stores without search', async ({ page }) => {
+  let activeStoreRequests = 0;
+  page.on('request', request => {
+    if (new URL(request.url()).pathname === '/api/stores/active') {
+      activeStoreRequests += 1;
+    }
+  });
+
+  await page.goto('/products?dept=men&sort=price-asc');
+  await page.waitForLoadState('networkidle');
+
+  expect(activeStoreRequests).toBe(0);
+});
+
 test('wishlist icon buttons expose accessible names', async ({ page }) => {
   await page.goto('/');
 
