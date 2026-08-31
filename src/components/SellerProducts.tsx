@@ -151,6 +151,7 @@ export const SellerProducts: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [uploadBusy, setUploadBusy] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState('');
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
   const [stockEdit, setStockEdit] = useState<{ productId: string; variantId: string; size: string; value: string } | null>(null);
@@ -236,7 +237,9 @@ export const SellerProducts: React.FC = () => {
     setMessage('');
     try {
       const uploaded: string[] = [];
-      for (const file of Array.from(files)) {
+      const selectedFiles = Array.from(files);
+      for (const [index, file] of selectedFiles.entries()) {
+        setUploadProgress(`Optimizing image ${index + 1} of ${selectedFiles.length}…`);
         const prepared = await prepareProductImage(file);
         const image = await shopProductApi.uploadImage({
           fileName: prepared.fileName,
@@ -249,10 +252,11 @@ export const SellerProducts: React.FC = () => {
         ...current,
         uploadedImageUrls: [...current.uploadedImageUrls, ...uploaded],
       }));
-      setMessage(`${uploaded.length} image${uploaded.length === 1 ? '' : 's'} optimized and uploaded.`);
+      setMessage(`${uploaded.length} image${uploaded.length === 1 ? '' : 's'} optimized and uploaded. Drag order is controlled with the arrow buttons below; image 1 is the main product image.`);
     } catch (cause) {
       setError(messageForError(cause, 'The image could not be optimized or uploaded.'));
     } finally {
+      setUploadProgress('');
       setUploadBusy(false);
     }
   };
@@ -261,6 +265,16 @@ export const SellerProducts: React.FC = () => {
     setForm(current => ({ ...current, imageMode }));
     setError('');
     setMessage('');
+  };
+
+  const moveUploadedImage = (index: number, direction: -1 | 1) => {
+    setForm(current => {
+      const target = index + direction;
+      if (target < 0 || target >= current.uploadedImageUrls.length) return current;
+      const uploadedImageUrls = [...current.uploadedImageUrls];
+      [uploadedImageUrls[index], uploadedImageUrls[target]] = [uploadedImageUrls[target], uploadedImageUrls[index]];
+      return { ...current, uploadedImageUrls };
+    });
   };
 
   const removeUploadedImage = (index: number) => {
@@ -427,7 +441,24 @@ export const SellerProducts: React.FC = () => {
                       <input aria-label="Upload product images" type="file" multiple accept="image/jpeg,image/png,image/webp" disabled={busy || uploadBusy} onChange={event => { void uploadImages(event.target.files); event.currentTarget.value = ''; }} className="sr-only" />
                     </label>
                   </div>
-                  {form.uploadedImageUrls.length > 0 ? <div className="flex flex-wrap gap-2">{form.uploadedImageUrls.map((value, index) => <div key={`${value}-${index}`} className="relative"><img src={value} alt={`Uploaded product image ${index + 1} preview`} loading="lazy" className="h-16 w-16 rounded-lg border object-cover" /><button type="button" onClick={() => removeUploadedImage(index)} aria-label={`Remove uploaded image ${index + 1}`} className="absolute -right-1 -top-1 rounded-full border bg-white px-1.5 py-0.5 text-[10px] font-black text-red-600 shadow">x</button></div>)}</div> : <p className="text-[11px] text-neutral-500">No images uploaded yet.</p>}
+                  {uploadProgress && <p role="status" className="text-[11px] font-bold text-neutral-700 dark:text-neutral-200">{uploadProgress}</p>}
+                  {form.uploadedImageUrls.length > 0 ? (
+                    <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                      {form.uploadedImageUrls.map((value, index) => (
+                        <div key={`${value}-${index}`} className="rounded-xl border p-2 dark:border-neutral-700">
+                          <div className="relative">
+                            <img src={value} alt={`Uploaded product image ${index + 1} preview`} loading="lazy" className="aspect-square w-full rounded-lg border object-cover" />
+                            {index === 0 && <span className="absolute bottom-1 left-1 rounded-md bg-neutral-950/90 px-1.5 py-0.5 text-[9px] font-black text-white">MAIN</span>}
+                          </div>
+                          <div className="mt-2 grid grid-cols-3 gap-1">
+                            <button type="button" disabled={index === 0} onClick={() => moveUploadedImage(index, -1)} aria-label={`Move uploaded image ${index + 1} left`} className="rounded-lg border py-1 font-black disabled:opacity-30">←</button>
+                            <button type="button" disabled={index === form.uploadedImageUrls.length - 1} onClick={() => moveUploadedImage(index, 1)} aria-label={`Move uploaded image ${index + 1} right`} className="rounded-lg border py-1 font-black disabled:opacity-30">→</button>
+                            <button type="button" onClick={() => removeUploadedImage(index)} aria-label={`Remove uploaded image ${index + 1}`} className="rounded-lg border py-1 font-black text-red-600">×</button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : <p className="text-[11px] text-neutral-500">No images uploaded yet.</p>}
                 </div>
               )}
             </fieldset>

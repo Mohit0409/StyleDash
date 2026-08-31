@@ -4,13 +4,10 @@ test('approved shop owner can draft and submit but cannot publish a product', as
   let product: Record<string, unknown> | null = null;
   let createPayload: Record<string, unknown> | null = null;
   let uploadedImageData: Buffer | null = null;
+  let uploadCount = 0;
 
   await page.route('**/media/product-images/**', async route => {
     await route.fulfill({ status: 200, contentType: 'image/webp', body: uploadedImageData || Buffer.alloc(0) });
-  });
-
-  await page.route('**/media/product-images/**', async route => {
-    await route.fulfill({ status: 200, contentType: 'image/webp', body: Buffer.alloc(8) });
   });
 
   await page.route('**/api/**', async route => {
@@ -45,7 +42,9 @@ test('approved shop owner can draft and submit but cannot publish a product', as
       expect(upload.contentType).toBe('image/webp');
       expect(typeof upload.dataBase64).toBe('string');
       uploadedImageData = Buffer.from(String(upload.dataBase64), 'base64');
-      await json({ success: true, image: { url: '/media/product-images/0123456789abcdef0123456789abcdef.webp', bytes: 120, contentType: 'image/webp' } }, 201);
+      uploadCount += 1;
+      const digest = String(uploadCount).padStart(32, '0');
+      await json({ success: true, image: { url: `/media/product-images/${digest}.webp`, bytes: uploadedImageData.length, contentType: 'image/webp' } }, 201);
       return;
     }
     if (path === '/api/shop-products' && method === 'POST') {
@@ -84,13 +83,16 @@ test('approved shop owner can draft and submit but cannot publish a product', as
   await expect(page.getByLabel('HTTPS image URLs')).toBeVisible();
   await page.getByRole('radio', { name: 'Image upload' }).click();
   await expect(page.getByLabel('HTTPS image URLs')).toHaveCount(0);
-  await page.getByLabel('Upload product images').setInputFiles({
-    name: 'local-product.png',
-    mimeType: 'image/png',
-    buffer: Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=', 'base64'),
-  });
-  await expect(page.getByText('1 image optimized and uploaded.')).toBeVisible();
+  const tinyPng = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=', 'base64');
+  await page.getByLabel('Upload product images').setInputFiles([
+    { name: 'local-product-1.png', mimeType: 'image/png', buffer: tinyPng },
+    { name: 'local-product-2.png', mimeType: 'image/png', buffer: tinyPng },
+  ]);
+  await expect(page.getByText(/2 images optimized and uploaded/)).toBeVisible();
   await expect(page.getByAltText('Uploaded product image 1 preview')).toBeVisible();
+  await expect(page.getByAltText('Uploaded product image 2 preview')).toBeVisible();
+  await expect(page.getByText('MAIN', { exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Move uploaded image 2 left' }).click();
   await page.getByRole('radio', { name: 'Image link' }).click();
   await expect(page.getByLabel('HTTPS image URLs')).toHaveValue('');
   await page.getByRole('radio', { name: 'Image upload' }).click();
@@ -102,7 +104,10 @@ test('approved shop owner can draft and submit but cannot publish a product', as
   expect(createPayload).not.toHaveProperty('status');
   expect(createPayload).not.toHaveProperty('applicationId');
   expect(createPayload?.variants).toEqual([{ size: 'M', inventory: 2 }, { size: 'L', inventory: 3 }]);
-  expect(createPayload?.imageUrls).toEqual(['/media/product-images/0123456789abcdef0123456789abcdef.webp']);
+  expect(createPayload?.imageUrls).toEqual([
+    '/media/product-images/00000000000000000000000000000002.webp',
+    '/media/product-images/00000000000000000000000000000001.webp',
+  ]);
 
   const draftCard = page.getByRole('article').filter({ has: page.getByRole('heading', { name: 'Local Product' }) });
   await draftCard.getByRole('button', { name: 'Edit', exact: true }).click();
