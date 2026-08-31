@@ -1023,7 +1023,8 @@ class PaymentServiceTests(unittest.TestCase):
 
 
     def test_server_calculates_trusted_amount_in_paise(self) -> None:
-        response = self.service.create_razorpay_order(self.payload(), "checkout-test-001")
+        with patch.object(SERVER.PaymentService, "express_delivery_available", return_value=True):
+            response = self.service.create_razorpay_order(self.payload(), "checkout-test-001")
         self.assertEqual(response["trustedTotals"], {
             "subtotal": 946,
             "discount": 0,
@@ -1268,8 +1269,9 @@ class PaymentServiceTests(unittest.TestCase):
 
     def test_cod_is_server_authoritative_and_idempotent(self) -> None:
         payload = self.payload(paymentMethod="cod")
-        first = self.service.place_cod_order(payload, "checkout-cod-001")
-        second = self.service.place_cod_order(payload, "checkout-cod-001")
+        with patch.object(SERVER.PaymentService, "express_delivery_available", return_value=True):
+            first = self.service.place_cod_order(payload, "checkout-cod-001")
+            second = self.service.place_cod_order(payload, "checkout-cod-001")
         self.assertEqual(first["order"]["grandTotal"], 1072)
         self.assertEqual(first["order"]["paymentStatus"], "pending")
         self.assertTrue(second["idempotent"])
@@ -2287,7 +2289,8 @@ class HttpApiTests(unittest.TestCase):
     def test_public_serviceability_endpoint_is_read_only_and_safe(self) -> None:
         state_before = json.loads(json.dumps(self.service.store.state))
 
-        status, supported, _headers = self.get_json("/api/serviceability?pincode=458441")
+        with patch.object(SERVER.PaymentService, "express_delivery_available", return_value=True):
+            status, supported, _headers = self.get_json("/api/serviceability?pincode=458441")
         self.assertEqual(status, 200)
         self.assertEqual(supported["serviceable"], True)
         self.assertEqual(supported["city"], "Neemuch")
