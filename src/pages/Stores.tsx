@@ -53,6 +53,7 @@ export const Stores: React.FC = () => {
               <div className="absolute top-3 left-3 bg-neutral-950/80 backdrop-blur-md text-white text-[10px] font-black px-2.5 py-1 rounded-full border border-neutral-700">
                 {store.category}
               </div>
+              {store.logoImage && <img src={store.logoImage} alt={`${store.storeName} logo`} loading="lazy" decoding="async" className="absolute bottom-3 right-3 h-14 w-14 rounded-2xl border-2 border-white bg-white object-cover shadow-lg" />}
             </div>
 
             <div className="p-6 flex-1 flex flex-col justify-between space-y-4">

@@ -347,9 +347,11 @@ class DeploymentAndTaxTests(unittest.TestCase):
             text,
         )
         self.assertIn("styledash_migrations=ok", text)
-        self.assertIn("{1, 2, 3, 4}.issubset(shop_versions)", text)
+        self.assertIn("{1, 2, 3, 4, 5}.issubset(shop_versions)", text)
         self.assertIn('PRAGMA table_info(shop_product_submissions)', text)
         self.assertIn('"variants_json" not in shop_product_columns', text)
+        self.assertIn('PRAGMA table_info(vendor_applications)', text)
+        self.assertIn('{"banner_image_url", "logo_image_url"}.issubset(shop_application_columns)', text)
         self.assertIn("duplicate applications exist for", text)
         self.assertIn(
             "from styledash_firebase import _initialize_app",

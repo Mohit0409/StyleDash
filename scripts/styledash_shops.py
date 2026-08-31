@@ -185,6 +185,7 @@ class ShopWorkflow:
             self._migrate_products(db)
             self._migrate_product_change_requests(db)
             self._migrate_product_variants(db)
+            self._migrate_store_branding(db)
             check = db.execute("PRAGMA foreign_key_check").fetchall()
             if check:
                 raise RuntimeError("Shop migration failed foreign key validation")
@@ -209,6 +210,8 @@ class ShopWorkflow:
               state TEXT NOT NULL,
               pincode TEXT NOT NULL,
               business_information TEXT,
+              banner_image_url TEXT,
+              logo_image_url TEXT,
               status TEXT NOT NULL DEFAULT 'DRAFT' CHECK(status IN ({statuses})),
               rejection_reason TEXT,
               suspension_reason TEXT,
@@ -449,6 +452,31 @@ class ShopWorkflow:
             raise
 
     @staticmethod
+    def _migrate_store_branding(db: sqlite3.Connection) -> None:
+        now = iso(utc_now())
+        db.execute("BEGIN IMMEDIATE")
+        try:
+            marker_exists = db.execute(
+                "SELECT 1 FROM shop_schema_migrations WHERE version=5"
+            ).fetchone() is not None
+            columns = {row["name"] for row in db.execute(
+                "PRAGMA table_info(vendor_applications)"
+            ).fetchall()}
+            if "banner_image_url" not in columns:
+                db.execute("ALTER TABLE vendor_applications ADD COLUMN banner_image_url TEXT")
+            if "logo_image_url" not in columns:
+                db.execute("ALTER TABLE vendor_applications ADD COLUMN logo_image_url TEXT")
+            if not marker_exists:
+                db.execute(
+                    "INSERT INTO shop_schema_migrations(version,applied_at) VALUES(5,?)",
+                    (now,),
+                )
+            db.commit()
+        except Exception:
+            db.rollback()
+            raise
+
+    @staticmethod
     def _application_payload(
         payload: dict[str, Any],
         current: sqlite3.Row | None = None,
@@ -543,6 +571,8 @@ class ShopWorkflow:
             "state": row["state"],
             "pincode": row["pincode"],
             "businessInformation": row["business_information"],
+            "bannerImage": row["banner_image_url"],
+            "logoImage": row["logo_image_url"],
             "rejectionReason": row["rejection_reason"] if row["status"] == "REJECTED" else None,
             "createdAt": row["created_at"],
             "updatedAt": row["updated_at"],
@@ -566,6 +596,39 @@ class ShopWorkflow:
         with self.connect() as db:
             row = self._customer_application(db, user_id)
         return self._serialize_application(row) if row is not None else None
+
+    def update_store_branding(self, user_id: str, payload: dict[str, Any]) -> dict[str, Any]:
+        allowed = {"bannerImage", "logoImage"}
+        if not isinstance(payload, dict) or not payload or set(payload) - allowed:
+            raise SecurityError(400, "Invalid store branding update.", "invalid_store_branding")
+
+        def clean_image(value: Any, label: str) -> str | None:
+            if value is None or value == "":
+                return None
+            if not isinstance(value, str) or not PRODUCT_MEDIA_PATH_PATTERN.fullmatch(value):
+                raise SecurityError(400, f"Upload a valid {label} image.", "invalid_store_branding")
+            return value
+
+        now = iso(utc_now())
+        with self.connect() as db:
+            db.execute("BEGIN IMMEDIATE")
+            current = self._customer_application(db, user_id)
+            if current is None:
+                db.rollback()
+                raise SecurityError(404, "Shop application not found.", "vendor_application_not_found")
+            if current["status"] not in {"APPROVED", "ACTIVE"}:
+                db.rollback()
+                raise SecurityError(409, "Store branding can be changed after shop approval.", "approved_shop_required")
+            banner = clean_image(payload.get("bannerImage", current["banner_image_url"]), "store cover")
+            logo = clean_image(payload.get("logoImage", current["logo_image_url"]), "store logo")
+            db.execute(
+                "UPDATE vendor_applications SET banner_image_url=?,logo_image_url=?,updated_at=? "
+                "WHERE id=? AND submitted_by_user_id=?",
+                (banner, logo, now, current["id"], user_id),
+            )
+            db.commit()
+            row = db.execute("SELECT * FROM vendor_applications WHERE id=?", (current["id"],)).fetchone()
+        return self._serialize_application(row)
 
     def create_draft(self, user_id: str, payload: dict[str, Any]) -> dict[str, Any]:
         values = self._application_payload(payload)
@@ -1878,7 +1941,7 @@ class ShopWorkflow:
             rows = db.execute(
                 """
                 SELECT a.id,a.shop_name,a.category,a.description,a.address,a.city,a.pincode,
-                       a.created_at,a.updated_at,
+                       a.banner_image_url,a.logo_image_url,a.created_at,a.updated_at,
                        (SELECT p.image_urls_json FROM shop_product_submissions p
                          WHERE p.application_id=a.id AND p.status='PUBLISHED'
                          ORDER BY p.published_at DESC LIMIT 1) AS image_urls_json
@@ -1898,7 +1961,9 @@ class ShopWorkflow:
                 "storeName": row["shop_name"], "category": row["category"],
                 "description": row["description"], "address": row["address"],
                 "city": row["city"], "pincode": row["pincode"],
-                "deliveryMinutes": 60, "bannerImage": image, "logoImage": image,
+                "deliveryMinutes": 60,
+                "bannerImage": row["banner_image_url"] or image,
+                "logoImage": row["logo_image_url"] or image,
                 "active": True, "approved": True, "createdAt": row["created_at"],
             })
         return stores

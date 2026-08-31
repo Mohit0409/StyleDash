@@ -55,6 +55,7 @@ export const StoreDetail: React.FC = () => {
         ) : (
           <div className="absolute inset-0 flex items-center justify-center bg-neutral-800"><StoreIcon className="w-20 h-20 text-neutral-600" /></div>
         )}
+        {store.logoImage && <img src={store.logoImage} alt={`${store.storeName} logo`} className="absolute right-5 top-5 z-10 h-16 w-16 rounded-2xl border-2 border-white bg-white object-cover shadow-xl sm:h-20 sm:w-20" />}
         <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/40 to-transparent flex flex-col justify-end p-6 sm:p-10 space-y-2 text-white">
           <div className="flex items-center gap-2">
             <span className="px-3 py-1 bg-lime-400 text-neutral-950 text-xs font-black rounded-full uppercase">{store.category}</span>
