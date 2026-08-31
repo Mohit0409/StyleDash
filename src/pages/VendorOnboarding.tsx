@@ -12,6 +12,7 @@ import { useToast } from '../context/ToastContext';
 import { useAuth } from '../context/AuthContext';
 import { CONFIG } from '../config';
 import { SellerProducts } from '../components/SellerProducts';
+import { StoreBranding } from '../components/StoreBranding';
 
 const CATEGORIES = [
   'Clothing & Fashion',
@@ -302,7 +303,12 @@ export const VendorOnboarding: React.FC = () => {
         </section>
       )}
 
-      {application && ['APPROVED', 'ACTIVE'].includes(application.status) && <SellerProducts />}
+      {application && ['APPROVED', 'ACTIVE'].includes(application.status) && (
+        <>
+          <StoreBranding application={application} onChange={setApplication} />
+          <SellerProducts />
+        </>
+      )}
     </div>
   );
 };

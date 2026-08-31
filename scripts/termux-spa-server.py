@@ -2613,7 +2613,7 @@ class StyleDashRequestHandler(SimpleHTTPRequestHandler):
                     HTTPStatus.OK, {"success": True, "application": result}
                 )
                 return
-            if path == "/api/shop-product-images":
+            if path in {"/api/shop-product-images", "/api/shop-branding-images"}:
                 self._rate_limit(path, 8)
                 self._require_product_image_seller()
                 image = self._store_product_image(self._read_json(PRODUCT_IMAGE_REQUEST_MAX_BYTES))
@@ -2722,6 +2722,15 @@ class StyleDashRequestHandler(SimpleHTTPRequestHandler):
                 self._csrf()
                 profile = self._security().update_profile(user["id"], self._read_json())
                 self._json_response(HTTPStatus.OK, {"success": True, "profile": profile})
+                return
+            if path == "/api/vendor-applications/me/branding":
+                self._rate_limit(path, 20)
+                user, _session = self._current_user()
+                self._csrf()
+                application = self._shops().update_store_branding(user["id"], self._read_json())
+                self._json_response(
+                    HTTPStatus.OK, {"success": True, "application": application}
+                )
                 return
             if path == "/api/vendor-applications/me":
                 self._rate_limit(path, 20)

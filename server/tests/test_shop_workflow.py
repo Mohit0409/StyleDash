@@ -173,7 +173,7 @@ class ShopWorkflowTests(unittest.TestCase):
                 [row[0] for row in db.execute(
                     "SELECT version FROM shop_schema_migrations ORDER BY version"
                 )],
-                [1, 2, 3, 4],
+                [1, 2, 3, 4, 5],
             )
             self.assertEqual(db.execute("PRAGMA integrity_check").fetchone()[0], "ok")
             self.assertEqual(db.execute("PRAGMA foreign_key_check").fetchall(), [])
@@ -243,11 +243,46 @@ class ShopWorkflowTests(unittest.TestCase):
         db = sqlite3.connect(concurrent_path)
         self.assertEqual(
             db.execute("SELECT version,COUNT(*) FROM shop_schema_migrations GROUP BY version").fetchall(),
-            [(1, 1), (2, 1), (3, 1), (4, 1)],
+            [(1, 1), (2, 1), (3, 1), (4, 1), (5, 1)],
         )
         self.assertEqual(db.execute("PRAGMA integrity_check").fetchone()[0], "ok")
         db.close()
 
+
+    def test_store_branding_migration_repairs_marker_schema_mismatch(self) -> None:
+        self.create_active_shop("user-a", "Branding Repair Shop")
+        with self.store.connect() as db:
+            self.assertIsNotNone(db.execute("SELECT 1 FROM shop_schema_migrations WHERE version=5").fetchone())
+            db.execute("ALTER TABLE vendor_applications DROP COLUMN banner_image_url")
+            db.execute("ALTER TABLE vendor_applications DROP COLUMN logo_image_url")
+        repaired = ShopWorkflow(self.path)
+        with repaired.connect() as db:
+            columns = {row[1] for row in db.execute("PRAGMA table_info(vendor_applications)")}
+        self.assertTrue({"banner_image_url", "logo_image_url"}.issubset(columns))
+
+    def test_approved_owner_can_manage_store_branding_with_safe_fallbacks(self) -> None:
+        draft = self.store.create_draft("user-a", self.complete_application("Branding Shop"))
+        self.assert_error(
+            "approved_shop_required",
+            lambda: self.store.update_store_branding("user-a", {"bannerImage": None}),
+        )
+        self.store.submit_application("user-a")
+        self.store.admin_transition_application("admin-a", draft["id"], "UNDER_REVIEW")
+        approved = self.store.admin_transition_application("admin-a", draft["id"], "APPROVED")
+        banner = "/media/product-images/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.webp"
+        logo = "/media/product-images/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb.png"
+        branded = self.store.update_store_branding("user-a", {"bannerImage": banner, "logoImage": logo})
+        self.assertEqual((branded["bannerImage"], branded["logoImage"]), (banner, logo))
+        self.assert_error(
+            "invalid_store_branding",
+            lambda: self.store.update_store_branding("user-a", {"logoImage": "https://example.test/logo.png"}),
+        )
+        self.store.admin_transition_application("admin-a", approved["id"], "ACTIVE")
+        public = self.store.list_active_stores()[0]
+        self.assertEqual((public["bannerImage"], public["logoImage"]), (banner, logo))
+        cleared = self.store.update_store_branding("user-a", {"logoImage": None})
+        self.assertIsNone(cleared["logoImage"])
+        self.assertEqual(cleared["bannerImage"], banner)
 
     def test_variant_migration_repairs_marker_schema_mismatch(self) -> None:
         self.create_active_shop("user-a", "Repair Shop")

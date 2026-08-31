@@ -2082,6 +2082,30 @@ class HttpApiTests(unittest.TestCase):
             self.assertEqual(image_response.headers.get_content_type(), "image/png")
             self.assertIn("immutable", image_response.headers["Cache-Control"])
 
+        branding_bytes = png + b"store-branding"
+        branding_payload = {
+            "fileName": "store-cover.png",
+            "contentType": "image/png",
+            "dataBase64": base64.b64encode(branding_bytes).decode(),
+        }
+        status, anonymous_branding_upload, _headers = self.post_json(
+            "/api/shop-branding-images", branding_payload
+        )
+        self.assertEqual((status, anonymous_branding_upload["code"]), (401, "authentication_required"))
+        status, branding_uploaded, _headers = self.post_json(
+            "/api/shop-branding-images", branding_payload, session_headers
+        )
+        self.assertEqual(status, 201)
+        branding_url = branding_uploaded["image"]["url"]
+        self.assertNotEqual(branding_url, uploaded_url)
+        status, branded, _headers = self.patch_json(
+            "/api/vendor-applications/me/branding",
+            {"bannerImage": branding_url, "logoImage": branding_url},
+            session_headers,
+        )
+        self.assertEqual(status, 200)
+        self.assertEqual((branded["application"]["bannerImage"], branded["application"]["logoImage"]), (branding_url, branding_url))
+
         product_payload = {
             "name": "HTTP Published Kurta",
             "description": "A reviewed local cotton kurta available through the HTTP catalogue.",
@@ -2123,7 +2147,8 @@ class HttpApiTests(unittest.TestCase):
         public_store = stores_response["stores"][0]
         self.assertEqual(public_store["slug"], public_product["storeSlug"])
         self.assertEqual(public_store["storeName"], complete["shopName"])
-        self.assertEqual(public_store["bannerImage"], uploaded_url)
+        self.assertEqual(public_store["bannerImage"], branding_url)
+        self.assertEqual(public_store["logoImage"], branding_url)
         self.assertNotIn("registeredEmail", public_store)
         self.assertNotIn("registeredMobile", public_store)
         self.assertNotIn("businessInformation", public_store)
