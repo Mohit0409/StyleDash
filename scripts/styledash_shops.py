@@ -186,6 +186,9 @@ class ShopWorkflow:
             self._migrate_product_change_requests(db)
             self._migrate_product_variants(db)
             self._migrate_store_branding(db)
+            integrity = [row[0] for row in db.execute("PRAGMA integrity_check").fetchall()]
+            if integrity != ["ok"]:
+                raise RuntimeError("Shop migration failed SQLite integrity validation")
             check = db.execute("PRAGMA foreign_key_check").fetchall()
             if check:
                 raise RuntimeError("Shop migration failed foreign key validation")

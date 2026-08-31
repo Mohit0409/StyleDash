@@ -1998,7 +1998,13 @@ class StyleDashRequestHandler(SimpleHTTPRequestHandler):
         file_name = payload.get("fileName")
         content_type = payload.get("contentType")
         encoded = payload.get("dataBase64")
-        if not isinstance(file_name, str) or not 1 <= len(file_name) <= 120:
+        if (
+            not isinstance(file_name, str)
+            or not 1 <= len(file_name) <= 120
+            or "/" in file_name
+            or "\\" in file_name
+            or any(ord(character) < 32 for character in file_name)
+        ):
             raise SecurityError(400, "Invalid image filename.", "invalid_product_image")
         extensions = {"image/webp": "webp", "image/jpeg": "jpg", "image/png": "png"}
         extension = extensions.get(content_type)
@@ -2041,6 +2047,25 @@ class StyleDashRequestHandler(SimpleHTTPRequestHandler):
         if not application or application.get("status") not in {"APPROVED", "ACTIVE"}:
             raise SecurityError(403, "An approved shop is required before uploading product images.", "approved_shop_required")
         return user
+
+    def _require_uploaded_store_branding(self, payload: Any) -> None:
+        """Reject remote, malformed, or missing media before branding persistence."""
+        if not isinstance(payload, dict):
+            return
+        for field in ("bannerImage", "logoImage"):
+            value = payload.get(field)
+            if value in (None, ""):
+                continue
+            if not isinstance(value, str):
+                continue
+            resolved = self._product_image_file(value)
+            if resolved is None or not resolved[0].is_file():
+                label = "store cover" if field == "bannerImage" else "store logo"
+                raise SecurityError(
+                    400,
+                    f"Upload a valid {label} image.",
+                    "invalid_store_branding",
+                )
 
     def _redirect_to_canonical_host(self) -> bool:
         origin = self._public_origin()
@@ -2731,7 +2756,9 @@ class StyleDashRequestHandler(SimpleHTTPRequestHandler):
                 self._rate_limit(path, 20)
                 user, _session = self._current_user()
                 self._csrf()
-                application = self._shops().update_store_branding(user["id"], self._read_json())
+                payload = self._read_json()
+                self._require_uploaded_store_branding(payload)
+                application = self._shops().update_store_branding(user["id"], payload)
                 self._json_response(
                     HTTPStatus.OK, {"success": True, "application": application}
                 )
