@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { AlertTriangle, Boxes, Edit3, PackageMinus, PackagePlus, Send } from 'lucide-react';
+import { AlertTriangle, Boxes, Edit3, PackageMinus, PackagePlus, Search, Send } from 'lucide-react';
 import { ApiError } from '../services/apiClient';
 import { blobToBase64, prepareProductImage } from '../utils/productImage';
 import {
@@ -94,7 +94,13 @@ const toPayload = (form: ProductFormState): SellerProductDraft => {
     || new Set(normalizedSizes).size !== variants.length
     || variants.reduce((total, variant) => total + variant.inventory, 0) > 100_000
   ) {
-    throw new Error('Add unique sizes with valid whole-number stock values.');
+    if (variants.length < 1) throw new Error('Add at least one size.');
+    if (variants.length > 20) throw new Error('A product can have at most 20 sizes.');
+    if (variants.some(variant => !variant.size)) throw new Error('Every size row needs a size name.');
+    if (variants.some(variant => variant.size.length > 40)) throw new Error('Size names must be 40 characters or fewer.');
+    if (variants.some(variant => !Number.isSafeInteger(variant.inventory) || variant.inventory < 0 || variant.inventory > 100_000)) throw new Error('Stock for every size must be a whole number from 0 to 100000.');
+    if (new Set(normalizedSizes).size !== variants.length) throw new Error('Each size can appear only once. Remove or rename the duplicate size.');
+    throw new Error('Total stock across all sizes cannot exceed 100000.');
   }
   const imageUrls = form.imageMode === 'links'
     ? form.imageUrls.split(/\r?\n/).map(value => value.trim()).filter(Boolean)
@@ -140,6 +146,21 @@ const toChangePayload = (payload: SellerProductDraft): SellerProductChangeDraft 
 const messageForError = (cause: unknown, fallback: string) =>
   cause instanceof ApiError || cause instanceof Error ? cause.message : fallback;
 
+type SellerProductView = 'all' | 'live' | 'out' | 'draft' | 'review';
+
+const productView = (product: SellerProduct): Exclude<SellerProductView, 'all'> => {
+  if (product.status === 'PUBLISHED') return product.inventory > 0 ? 'live' : 'out';
+  if (product.status === 'DRAFT' || product.status === 'REJECTED') return 'draft';
+  return 'review';
+};
+
+const productStateLabel = (product: SellerProduct) => {
+  if (product.status === 'PUBLISHED') return product.inventory > 0 ? 'Live' : 'Out of stock';
+  if (product.status === 'REJECTED') return 'Needs changes';
+  if (product.status === 'DRAFT') return 'Draft';
+  return 'In review';
+};
+
 export const SellerProducts: React.FC = () => {
   const [products, setProducts] = useState<SellerProduct[]>([]);
   const [requests, setRequests] = useState<SellerProductChangeRequest[]>([]);
@@ -154,6 +175,8 @@ export const SellerProducts: React.FC = () => {
   const [uploadProgress, setUploadProgress] = useState('');
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
+  const [productQuery, setProductQuery] = useState('');
+  const [productFilter, setProductFilter] = useState<SellerProductView>('all');
   const [stockEdit, setStockEdit] = useState<{ productId: string; variantId: string; size: string; value: string } | null>(null);
   const [unpublishConfirmId, setUnpublishConfirmId] = useState<string | null>(null);
 
@@ -370,6 +393,22 @@ export const SellerProducts: React.FC = () => {
     }
   };
 
+
+  const normalizedQuery = productQuery.trim().toLocaleLowerCase();
+  const filteredProducts = products.filter(product => {
+    if (productFilter !== 'all' && productView(product) !== productFilter) return false;
+    if (!normalizedQuery) return true;
+    return [product.name, product.brand, product.category, product.size]
+      .filter(Boolean)
+      .some(value => String(value).toLocaleLowerCase().includes(normalizedQuery));
+  });
+  const productCounts = {
+    live: products.filter(product => productView(product) === 'live').length,
+    out: products.filter(product => productView(product) === 'out').length,
+    draft: products.filter(product => productView(product) === 'draft').length,
+    review: products.filter(product => productView(product) === 'review').length,
+  };
+
   return (
     <section className="space-y-5 rounded-3xl border border-neutral-200 bg-white p-6 dark:border-neutral-800 dark:bg-neutral-900" aria-labelledby="seller-products-heading">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
@@ -385,11 +424,26 @@ export const SellerProducts: React.FC = () => {
       {error && <p role="alert" className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">{error}</p>}
       {message && <p role="status" className="rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800">{message}</p>}
 
+      {products.length > 0 && (
+        <div className="space-y-3 rounded-2xl bg-neutral-50 p-3 dark:bg-neutral-800/60">
+          <div className="grid grid-cols-2 gap-2 text-center text-xs sm:grid-cols-4">
+            <button type="button" onClick={() => setProductFilter('live')} className="rounded-xl border bg-white p-2 dark:bg-neutral-900"><strong className="block text-base">{productCounts.live}</strong>Live</button>
+            <button type="button" onClick={() => setProductFilter('out')} className="rounded-xl border bg-white p-2 dark:bg-neutral-900"><strong className="block text-base">{productCounts.out}</strong>Out of stock</button>
+            <button type="button" onClick={() => setProductFilter('draft')} className="rounded-xl border bg-white p-2 dark:bg-neutral-900"><strong className="block text-base">{productCounts.draft}</strong>Draft / changes</button>
+            <button type="button" onClick={() => setProductFilter('review')} className="rounded-xl border bg-white p-2 dark:bg-neutral-900"><strong className="block text-base">{productCounts.review}</strong>In review</button>
+          </div>
+          <div className="grid gap-2 sm:grid-cols-[1fr_auto]">
+            <label className="relative"><span className="sr-only">Search your products</span><Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-neutral-400" /><input aria-label="Search your products" value={productQuery} onChange={event => setProductQuery(event.target.value)} placeholder="Search product, brand, category or size" className="w-full rounded-xl border bg-white py-2.5 pl-9 pr-3 text-xs dark:bg-neutral-900" /></label>
+            <select aria-label="Filter products by status" value={productFilter} onChange={event => setProductFilter(event.target.value as SellerProductView)} className="rounded-xl border bg-white px-3 py-2.5 text-xs font-bold dark:bg-neutral-900"><option value="all">All products</option><option value="live">Live</option><option value="out">Out of stock</option><option value="draft">Draft / needs changes</option><option value="review">In review</option></select>
+          </div>
+        </div>
+      )}
+
       {formOpen && (
         <form onSubmit={saveProduct} className="space-y-4 rounded-2xl border p-4 dark:border-neutral-700">
           <h3 className="font-black">{formMode === 'change' ? 'Request Listing Changes' : editingId ? 'Edit Product Draft' : 'Create Product Draft'}</h3>
           <div className="grid gap-3 text-xs sm:grid-cols-2">
-            <label className="font-bold">Product name<input required minLength={2} maxLength={140} value={form.name} onChange={event => updateForm('name', event.target.value)} className="mt-1 w-full rounded-xl border p-3 dark:bg-neutral-800" /></label>
+            <label className="font-bold">Product name<input autoFocus required minLength={2} maxLength={140} value={form.name} onChange={event => updateForm('name', event.target.value)} className="mt-1 w-full rounded-xl border p-3 dark:bg-neutral-800" /></label>
             <label className="font-bold">Brand <span className="font-normal text-neutral-500">(optional)</span><input maxLength={100} value={form.brand} onChange={event => updateForm('brand', event.target.value)} className="mt-1 w-full rounded-xl border p-3 dark:bg-neutral-800" /></label>
             <label className="font-bold">Department<select value={form.department} onChange={event => updateForm('department', event.target.value)} className="mt-1 w-full rounded-xl border p-3 dark:bg-neutral-800">{DEPARTMENTS.map(value => <option key={value} value={value}>{value}</option>)}</select></label>
             <label className="font-bold">Category<select value={form.category} onChange={event => updateForm('category', event.target.value)} className="mt-1 w-full rounded-xl border p-3 dark:bg-neutral-800">{CATEGORIES.map(value => <option key={value} value={value}>{value}</option>)}</select></label>
@@ -472,14 +526,15 @@ export const SellerProducts: React.FC = () => {
 
       {loading ? <p className="text-sm text-neutral-500">Loading product submissions…</p>
         : products.length === 0 ? <p className="rounded-2xl bg-neutral-50 p-4 text-sm text-neutral-500 dark:bg-neutral-800">No product drafts yet.</p>
-          : <div className="space-y-3">{products.map(product => {
+          : filteredProducts.length === 0 ? <p className="rounded-2xl bg-neutral-50 p-4 text-sm text-neutral-500 dark:bg-neutral-800">No products match this search or filter.</p>
+            : <div className="space-y-3">{filteredProducts.map(product => {
             const editable = product.status === 'DRAFT' || product.status === 'REJECTED';
             const latestRequest = requests.find(request => request.productId === product.id);
             const pendingRequest = latestRequest && ['SUBMITTED', 'UNDER_REVIEW'].includes(latestRequest.status) ? latestRequest : null;
             return <article key={product.id} className="rounded-2xl border p-4 dark:border-neutral-700">
               <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                 <div>
-                  <p className="text-xs font-black uppercase tracking-wider text-neutral-500">{product.status.replace('_', ' ')}</p>
+                  <p className="text-xs font-black uppercase tracking-wider text-neutral-500">{productStateLabel(product)}</p>
                   <h3 className="font-black">{product.name}</h3>
                   <p className="text-xs text-neutral-500">₹{(product.pricePaise / 100).toFixed(2)} · {product.colourName} · Total stock: {product.inventory}</p>
                   <div className="mt-2 flex flex-wrap gap-1.5">{product.variants.map(variant => <span key={variant.id} className="rounded-lg bg-neutral-100 px-2 py-1 text-[11px] font-bold dark:bg-neutral-800">{variant.size}: {variant.inventory}</span>)}</div>

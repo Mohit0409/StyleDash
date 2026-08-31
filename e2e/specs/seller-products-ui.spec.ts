@@ -79,6 +79,10 @@ test('approved shop owner can draft and submit but cannot publish a product', as
   await page.getByPlaceholder('Size, e.g. S or XL').nth(1).fill('L');
   await page.getByPlaceholder('Stock').nth(1).fill('3');
   await page.getByLabel('Colour name').fill('Black');
+  await page.getByPlaceholder('Size, e.g. S or XL').nth(1).fill('M');
+  await page.getByRole('button', { name: 'Save Product Draft' }).click();
+  await expect(page.getByRole('alert')).toContainText('Each size can appear only once');
+  await page.getByPlaceholder('Size, e.g. S or XL').nth(1).fill('L');
   await expect(page.getByRole('radio', { name: 'Image link' })).toHaveAttribute('aria-checked', 'true');
   await expect(page.getByLabel('HTTPS image URLs')).toBeVisible();
   await page.getByRole('radio', { name: 'Image upload' }).click();
@@ -100,7 +104,7 @@ test('approved shop owner can draft and submit but cannot publish a product', as
   await page.getByRole('button', { name: 'Save Product Draft' }).click();
 
   await expect(page.getByRole('heading', { name: 'Local Product' })).toBeVisible();
-  await expect(page.getByText('DRAFT', { exact: true })).toBeVisible();
+  await expect(page.getByText('Draft', { exact: true })).toBeVisible();
   expect(createPayload).not.toHaveProperty('status');
   expect(createPayload).not.toHaveProperty('applicationId');
   expect(createPayload?.variants).toEqual([{ size: 'M', inventory: 2 }, { size: 'L', inventory: 3 }]);
@@ -117,7 +121,7 @@ test('approved shop owner can draft and submit but cannot publish a product', as
   await page.getByRole('button', { name: 'Cancel', exact: true }).click();
 
   await page.getByRole('button', { name: 'Submit', exact: true }).click();
-  await expect(page.getByText('SUBMITTED', { exact: true })).toBeVisible();
+  await expect(draftCard.getByText('In review', { exact: true })).toBeVisible();
   await expect(page.getByRole('button', { name: /publish/i })).toHaveCount(0);
 });
 
@@ -144,9 +148,9 @@ test('published seller can update stock and submit edit or unpublish requests wi
       id: 'shopprod_remove', slug: 'remove-live', applicationId: 'shop-1', status: 'PUBLISHED',
       name: 'Unpublish Live Product', description: 'Published product that can request administrator unpublishing.',
       brand: 'Local', department: 'women', category: 'Clothing & Fashion',
-      pricePaise: 70000, originalPricePaise: 80000, inventory: 4, size: 'L',
+      pricePaise: 70000, originalPricePaise: 80000, inventory: 0, size: 'L',
       colourName: 'Blue', colourHex: '#0000FF', imageUrls: ['https://example.test/remove.jpg'],
-      attributes: {}, variants: [{ id: 'shopprod_remove-var-1', size: 'L', inventory: 4 }], createdAt: '2026-08-20T00:00:00Z', updatedAt: '2026-08-20T00:00:00Z',
+      attributes: {}, variants: [{ id: 'shopprod_remove-var-1', size: 'L', inventory: 0 }], createdAt: '2026-08-20T00:00:00Z', updatedAt: '2026-08-20T00:00:00Z',
     },
   ];
 
@@ -200,6 +204,17 @@ test('published seller can update stock and submit edit or unpublish requests wi
   });
 
   await page.goto('/partner');
+
+  await expect(page.getByRole('button', { name: /1\s+Live/i })).toBeVisible();
+  await expect(page.getByRole('button', { name: /1\s+Out of stock/i })).toBeVisible();
+  await page.getByLabel('Filter products by status').selectOption('out');
+  await expect(page.getByRole('heading', { name: 'Unpublish Live Product' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Editable Live Product' })).toHaveCount(0);
+  await page.getByLabel('Filter products by status').selectOption('all');
+  await page.getByLabel('Search your products').fill('Editable');
+  await expect(page.getByRole('heading', { name: 'Editable Live Product' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Unpublish Live Product' })).toHaveCount(0);
+  await page.getByLabel('Search your products').fill('');
 
   const editCard = page.getByRole('article').filter({ has: page.getByRole('heading', { name: 'Editable Live Product' }) });
   await editCard.getByRole('button', { name: 'M Stock' }).click();
