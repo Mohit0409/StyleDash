@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Store, MapPin, Zap, Star, ChevronRight, PlusCircle } from 'lucide-react';
+import { MapPin, Zap, Star, ChevronRight, PlusCircle } from 'lucide-react';
 import { SEO } from '../components/SEO';
+import { StoreImage } from '../components/StoreImage';
 import { vendorRepository } from '../repositories/vendorRepository';
 import { VendorStore } from '../types';
 import { CONFIG } from '../config';
@@ -45,15 +46,27 @@ export const Stores: React.FC = () => {
         {stores.map(store => (
           <div key={store.id} className="group bg-white dark:bg-neutral-900 rounded-3xl border border-neutral-200 dark:border-neutral-800 overflow-hidden shadow-sm hover:shadow-xl transition-all duration-300 flex flex-col">
             <div className="relative aspect-[16/9] bg-neutral-100 dark:bg-neutral-800 overflow-hidden">
-              {store.bannerImage ? (
-                <img src={store.bannerImage} alt={store.storeName} loading="lazy" decoding="async" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
-              ) : (
-                <div className="w-full h-full flex items-center justify-center bg-neutral-200 dark:bg-neutral-800"><Store className="w-12 h-12 text-neutral-400" /></div>
-              )}
+              <StoreImage
+                src={store.bannerImage}
+                alt={store.storeName}
+                storeName={store.storeName}
+                kind="cover"
+                loading="lazy"
+                decoding="async"
+                className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
+              />
               <div className="absolute top-3 left-3 bg-neutral-950/80 backdrop-blur-md text-white text-[10px] font-black px-2.5 py-1 rounded-full border border-neutral-700">
                 {store.category}
               </div>
-              {store.logoImage && <img src={store.logoImage} alt={`${store.storeName} logo`} loading="lazy" decoding="async" className="absolute bottom-3 right-3 h-14 w-14 rounded-2xl border-2 border-white bg-white object-cover shadow-lg" />}
+              <StoreImage
+                src={store.logoImage}
+                alt={`${store.storeName} logo`}
+                storeName={store.storeName}
+                kind="logo"
+                loading="lazy"
+                decoding="async"
+                className="absolute bottom-3 right-3 h-14 w-14 rounded-2xl border-2 border-white bg-white object-cover shadow-lg"
+              />
             </div>
 
             <div className="p-6 flex-1 flex flex-col justify-between space-y-4">

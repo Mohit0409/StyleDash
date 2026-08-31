@@ -246,6 +246,7 @@ class ShopWorkflowTests(unittest.TestCase):
             [(1, 1), (2, 1), (3, 1), (4, 1), (5, 1)],
         )
         self.assertEqual(db.execute("PRAGMA integrity_check").fetchone()[0], "ok")
+        self.assertEqual(db.execute("PRAGMA foreign_key_check").fetchall(), [])
         db.close()
 
 
@@ -258,6 +259,8 @@ class ShopWorkflowTests(unittest.TestCase):
         repaired = ShopWorkflow(self.path)
         with repaired.connect() as db:
             columns = {row[1] for row in db.execute("PRAGMA table_info(vendor_applications)")}
+            self.assertEqual(db.execute("PRAGMA integrity_check").fetchone()[0], "ok")
+            self.assertEqual(db.execute("PRAGMA foreign_key_check").fetchall(), [])
         self.assertTrue({"banner_image_url", "logo_image_url"}.issubset(columns))
 
     def test_approved_owner_can_manage_store_branding_with_safe_fallbacks(self) -> None:
@@ -277,12 +280,25 @@ class ShopWorkflowTests(unittest.TestCase):
             "invalid_store_branding",
             lambda: self.store.update_store_branding("user-a", {"logoImage": "https://example.test/logo.png"}),
         )
+        self.assert_error(
+            "invalid_store_branding",
+            lambda: self.store.update_store_branding(
+                "user-a", {"applicationId": approved["id"], "logoImage": logo}
+            ),
+        )
         self.store.admin_transition_application("admin-a", approved["id"], "ACTIVE")
         public = self.store.list_active_stores()[0]
         self.assertEqual((public["bannerImage"], public["logoImage"]), (banner, logo))
         cleared = self.store.update_store_branding("user-a", {"logoImage": None})
         self.assertIsNone(cleared["logoImage"])
         self.assertEqual(cleared["bannerImage"], banner)
+
+        other = self.create_active_shop("user-b", "Other Owner Shop")
+        other_banner = "/media/product-images/cccccccccccccccccccccccccccccccc.jpg"
+        self.store.update_store_branding("user-b", {"bannerImage": other_banner})
+        self.assertEqual(self.store.get_application("user-b")["bannerImage"], other_banner)
+        self.assertEqual(self.store.get_application("user-a")["bannerImage"], banner)
+        self.assertNotEqual(other["id"], approved["id"])
 
     def test_variant_migration_repairs_marker_schema_mismatch(self) -> None:
         self.create_active_shop("user-a", "Repair Shop")

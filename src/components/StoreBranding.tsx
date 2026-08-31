@@ -1,11 +1,12 @@
 import React, { useEffect, useState } from 'react';
-import { ImagePlus, Save, Store, Trash2 } from 'lucide-react';
+import { ImagePlus, Save, Trash2 } from 'lucide-react';
 import { ApiError } from '../services/apiClient';
 import {
   type ShopApplication,
   vendorApplicationApi,
 } from '../services/businessApi';
 import { blobToBase64, prepareProductImage } from '../utils/productImage';
+import { StoreImage } from './StoreImage';
 
 interface StoreBrandingProps {
   application: ShopApplication;
@@ -80,37 +81,37 @@ export const StoreBranding: React.FC<StoreBrandingProps> = ({ application, onCha
         <div className="space-y-3">
           <div className="flex items-center justify-between gap-3">
             <div>
-              <h3 className="text-sm font-black">Store cover</h3>
-              <p className="text-[11px] text-neutral-500">Wide banner shown on your storefront and store cards.</p>
+              <h3 className="text-sm font-black">Store Cover</h3>
+              <p className="text-[11px] text-neutral-500">Choose a wide image, ideally around 21:9.</p>
             </div>
-            {bannerImage && <button type="button" disabled={busy} onClick={() => { setBannerImage(null); setMessage('Store cover removed from this draft. Save branding to apply.'); }} className="inline-flex items-center gap-1 rounded-lg border px-2.5 py-1.5 text-[11px] font-bold text-red-600 disabled:opacity-50"><Trash2 className="w-3.5" /> Remove</button>}
+            {bannerImage && <button type="button" aria-label="Remove store cover" disabled={busy} onClick={() => { setBannerImage(null); setMessage('Store cover removed from this draft. Save branding to apply.'); }} className="inline-flex items-center gap-1 rounded-lg border px-2.5 py-1.5 text-[11px] font-bold text-red-600 disabled:opacity-50"><Trash2 className="w-3.5" /> Remove</button>}
           </div>
           <div className="relative aspect-[21/9] overflow-hidden rounded-2xl border bg-neutral-100 dark:border-neutral-700 dark:bg-neutral-800">
-            {bannerImage ? <img src={bannerImage} alt="Store cover preview" className="h-full w-full object-cover" /> : <div className="flex h-full items-center justify-center"><Store className="h-12 w-12 text-neutral-400" /></div>}
+            <StoreImage src={bannerImage} alt="Store cover preview" storeName={application.shopName} kind="cover" className="h-full w-full object-cover" />
           </div>
           <label className="inline-flex cursor-pointer items-center gap-2 rounded-xl border px-4 py-2.5 text-xs font-bold">
-            <ImagePlus className="w-4" /> {uploading === 'banner' ? 'Optimizing cover…' : bannerImage ? 'Replace cover' : 'Upload cover'}
+            <ImagePlus className="w-4" /> {uploading === 'banner' ? 'Preparing cover…' : bannerImage ? 'Replace Cover' : 'Upload Cover'}
             <input aria-label="Upload store cover image" type="file" accept="image/jpeg,image/png,image/webp" disabled={busy} onChange={event => { void upload('banner', event.target.files); event.currentTarget.value = ''; }} className="sr-only" />
           </label>
         </div>
         <div className="space-y-3">
           <div className="flex items-center justify-between gap-3">
             <div>
-              <h3 className="text-sm font-black">Store logo</h3>
-              <p className="text-[11px] text-neutral-500">Square logo used in search and store identity.</p>
+              <h3 className="text-sm font-black">Store Logo</h3>
+              <p className="text-[11px] text-neutral-500">Choose a square image for the clearest result.</p>
             </div>
-            {logoImage && <button type="button" disabled={busy} onClick={() => { setLogoImage(null); setMessage('Store logo removed from this draft. Save branding to apply.'); }} className="inline-flex items-center gap-1 rounded-lg border px-2.5 py-1.5 text-[11px] font-bold text-red-600 disabled:opacity-50"><Trash2 className="w-3.5" /> Remove</button>}
+            {logoImage && <button type="button" aria-label="Remove store logo" disabled={busy} onClick={() => { setLogoImage(null); setMessage('Store logo removed from this draft. Save branding to apply.'); }} className="inline-flex items-center gap-1 rounded-lg border px-2.5 py-1.5 text-[11px] font-bold text-red-600 disabled:opacity-50"><Trash2 className="w-3.5" /> Remove</button>}
           </div>
           <div className="mx-auto aspect-square w-full max-w-[220px] overflow-hidden rounded-3xl border bg-neutral-100 dark:border-neutral-700 dark:bg-neutral-800">
-            {logoImage ? <img src={logoImage} alt="Store logo preview" className="h-full w-full object-cover" /> : <div className="flex h-full items-center justify-center"><Store className="h-12 w-12 text-neutral-400" /></div>}
+            <StoreImage src={logoImage} alt="Store logo preview" storeName={application.shopName} kind="logo" className="h-full w-full object-cover" />
           </div>
           <label className="inline-flex cursor-pointer items-center gap-2 rounded-xl border px-4 py-2.5 text-xs font-bold">
-            <ImagePlus className="w-4" /> {uploading === 'logo' ? 'Optimizing logo…' : logoImage ? 'Replace logo' : 'Upload logo'}
+            <ImagePlus className="w-4" /> {uploading === 'logo' ? 'Preparing logo…' : logoImage ? 'Replace Logo' : 'Upload Logo'}
             <input aria-label="Upload store logo image" type="file" accept="image/jpeg,image/png,image/webp" disabled={busy} onChange={event => { void upload('logo', event.target.files); event.currentTarget.value = ''; }} className="sr-only" />
           </label>
         </div>
       </div>
-      <p className="text-[11px] text-neutral-500">JPEG, PNG or WebP. Images are resized to a maximum of 1600 px and compressed before upload so branding does not slow the storefront.</p>
+      <p className="text-[11px] text-neutral-500">JPEG, PNG or WebP. Vibe4You prepares the image automatically before upload.</p>
       <div className="flex justify-end">
         <button type="button" onClick={() => void save()} disabled={busy} className="inline-flex items-center gap-2 rounded-xl bg-neutral-950 px-5 py-2.5 text-xs font-black text-white disabled:opacity-60 dark:bg-lime-400 dark:text-neutral-950"><Save className="w-4" /> {saving ? 'Saving…' : 'Save Store Branding'}</button>
       </div>
