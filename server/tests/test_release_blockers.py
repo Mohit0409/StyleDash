@@ -386,6 +386,11 @@ class DeploymentAndTaxTests(unittest.TestCase):
         text = (ROOT / "scripts/termux/boot-start-styledash").read_text(encoding="utf-8")
         self.assertIn('"$HOME/bin/start-styledash-stack"', text)
         self.assertNotIn("cloudflare", text.casefold())
+        self.assertIn('source "$PREFIX/etc/profile.d/start-services.sh"', text)
+        self.assertIn('if sv status sshd >/dev/null 2>&1; then', text)
+        self.assertIn('SSHD_READY=1', text)
+        self.assertIn('if [ "$SSHD_READY" -eq 1 ] && sv up sshd; then', text)
+        self.assertNotIn('source "$PREFIX/etc/profile.d/start-services.sh"\nsv up sshd || true', text)
 
         verifier = (ROOT / "scripts/termux/verify-styledash-processes").read_text(encoding="utf-8")
         self.assertIn("styledash_cloudflare=absent", verifier)
