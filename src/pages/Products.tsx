@@ -3,6 +3,7 @@ import { Link, useSearchParams } from 'react-router-dom';
 import { MapPin, SlidersHorizontal, Store, Zap } from 'lucide-react';
 import { SEO } from '../components/SEO';
 import { ProductCard } from '../components/ProductCard';
+import { StoreImage } from '../components/StoreImage';
 import { FilterSidebar } from '../components/FilterSidebar';
 import { Product, VendorStore } from '../types';
 import { productRepository } from '../repositories/productRepository';
@@ -164,9 +165,15 @@ export const Products: React.FC = () => {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {matchingStores.map(store => (
               <Link key={store.id} to={`/store/${store.slug}`} aria-label={`Visit ${store.storeName} storefront`} className="group flex items-center gap-4 rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 p-4 hover:border-lime-400 hover:shadow-md transition-all">
-                <div className="w-14 h-14 shrink-0 rounded-xl bg-neutral-100 dark:bg-neutral-800 overflow-hidden flex items-center justify-center">
-                  {store.logoImage ? <img src={store.logoImage} alt="" loading="lazy" decoding="async" className="w-full h-full object-cover" /> : <Store className="w-6 h-6 text-neutral-400" />}
-                </div>
+                <StoreImage
+                  src={store.logoImage}
+                  alt=""
+                  storeName={store.storeName}
+                  kind="logo"
+                  loading="lazy"
+                  decoding="async"
+                  className="h-14 w-14 shrink-0 rounded-xl object-cover"
+                />
                 <div className="min-w-0">
                   <h3 className="font-extrabold text-neutral-900 dark:text-white truncate group-hover:text-lime-600">{store.storeName}</h3>
                   <p className="text-xs text-neutral-500 truncate">{store.category}</p>

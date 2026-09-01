@@ -135,6 +135,28 @@ describe('shop application API', () => {
     expect(String(init.body)).not.toContain('registeredMobile');
   });
 
+  it('uses CSRF-protected store branding upload and update endpoints', async () => {
+    setCsrfToken('csrf-branding-test');
+    const image = { url: '/media/product-images/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.webp', bytes: 1234, contentType: 'image/webp' as const };
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(async endpoint => {
+      if (String(endpoint) === '/api/shop-branding-images') return jsonResponse({ success: true, image }, 201);
+      return jsonResponse({ success: true, application: { ...application, status: 'ACTIVE', bannerImage: image.url, logoImage: null } });
+    });
+
+    await expect(vendorApplicationApi.uploadBrandingImage({ fileName: 'cover.webp', contentType: 'image/webp', dataBase64: 'AAAA' })).resolves.toEqual(image);
+    await vendorApplicationApi.updateBranding({ bannerImage: image.url, logoImage: null });
+
+    expect(fetchSpy.mock.calls.map(([endpoint]) => endpoint)).toEqual([
+      '/api/shop-branding-images', '/api/vendor-applications/me/branding',
+    ]);
+    expect((fetchSpy.mock.calls[0][1] as RequestInit).method).toBe('POST');
+    expect((fetchSpy.mock.calls[1][1] as RequestInit).method).toBe('PATCH');
+    for (const [, init] of fetchSpy.mock.calls as Array<[RequestInfo | URL, RequestInit]>) {
+      expect(new Headers(init.headers).get('X-CSRF-Token')).toBe('csrf-branding-test');
+      expect(init.credentials).toBe('include');
+    }
+  });
+
   it('uses authenticated CSRF-protected transition endpoints for update and submit', async () => {
     setCsrfToken('csrf-shop-test');
     const fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(async () => jsonResponse({ success: true, application }));

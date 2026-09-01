@@ -4,13 +4,10 @@ test('approved shop owner can draft and submit but cannot publish a product', as
   let product: Record<string, unknown> | null = null;
   let createPayload: Record<string, unknown> | null = null;
   let uploadedImageData: Buffer | null = null;
+  let uploadCount = 0;
 
   await page.route('**/media/product-images/**', async route => {
     await route.fulfill({ status: 200, contentType: 'image/webp', body: uploadedImageData || Buffer.alloc(0) });
-  });
-
-  await page.route('**/media/product-images/**', async route => {
-    await route.fulfill({ status: 200, contentType: 'image/webp', body: Buffer.alloc(8) });
   });
 
   await page.route('**/api/**', async route => {
@@ -45,7 +42,9 @@ test('approved shop owner can draft and submit but cannot publish a product', as
       expect(upload.contentType).toBe('image/webp');
       expect(typeof upload.dataBase64).toBe('string');
       uploadedImageData = Buffer.from(String(upload.dataBase64), 'base64');
-      await json({ success: true, image: { url: '/media/product-images/0123456789abcdef0123456789abcdef.webp', bytes: 120, contentType: 'image/webp' } }, 201);
+      uploadCount += 1;
+      const digest = String(uploadCount).padStart(32, '0');
+      await json({ success: true, image: { url: `/media/product-images/${digest}.webp`, bytes: uploadedImageData.length, contentType: 'image/webp' } }, 201);
       return;
     }
     if (path === '/api/shop-products' && method === 'POST') {
@@ -80,17 +79,24 @@ test('approved shop owner can draft and submit but cannot publish a product', as
   await page.getByPlaceholder('Size, e.g. S or XL').nth(1).fill('L');
   await page.getByPlaceholder('Stock').nth(1).fill('3');
   await page.getByLabel('Colour name').fill('Black');
+  await page.getByPlaceholder('Size, e.g. S or XL').nth(1).fill('M');
+  await page.getByRole('button', { name: 'Save Product Draft' }).click();
+  await expect(page.getByRole('alert')).toContainText('Each size can appear only once');
+  await page.getByPlaceholder('Size, e.g. S or XL').nth(1).fill('L');
   await expect(page.getByRole('radio', { name: 'Image link' })).toHaveAttribute('aria-checked', 'true');
   await expect(page.getByLabel('HTTPS image URLs')).toBeVisible();
   await page.getByRole('radio', { name: 'Image upload' }).click();
   await expect(page.getByLabel('HTTPS image URLs')).toHaveCount(0);
-  await page.getByLabel('Upload product images').setInputFiles({
-    name: 'local-product.png',
-    mimeType: 'image/png',
-    buffer: Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=', 'base64'),
-  });
-  await expect(page.getByText('1 image optimized and uploaded.')).toBeVisible();
+  const tinyPng = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=', 'base64');
+  await page.getByLabel('Upload product images').setInputFiles([
+    { name: 'local-product-1.png', mimeType: 'image/png', buffer: tinyPng },
+    { name: 'local-product-2.png', mimeType: 'image/png', buffer: tinyPng },
+  ]);
+  await expect(page.getByText(/2 images optimized and uploaded/)).toBeVisible();
   await expect(page.getByAltText('Uploaded product image 1 preview')).toBeVisible();
+  await expect(page.getByAltText('Uploaded product image 2 preview')).toBeVisible();
+  await expect(page.getByText('MAIN', { exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Move uploaded image 2 left' }).click();
   await page.getByRole('radio', { name: 'Image link' }).click();
   await expect(page.getByLabel('HTTPS image URLs')).toHaveValue('');
   await page.getByRole('radio', { name: 'Image upload' }).click();
@@ -98,11 +104,14 @@ test('approved shop owner can draft and submit but cannot publish a product', as
   await page.getByRole('button', { name: 'Save Product Draft' }).click();
 
   await expect(page.getByRole('heading', { name: 'Local Product' })).toBeVisible();
-  await expect(page.getByText('DRAFT', { exact: true })).toBeVisible();
+  await expect(page.getByText('Draft', { exact: true })).toBeVisible();
   expect(createPayload).not.toHaveProperty('status');
   expect(createPayload).not.toHaveProperty('applicationId');
   expect(createPayload?.variants).toEqual([{ size: 'M', inventory: 2 }, { size: 'L', inventory: 3 }]);
-  expect(createPayload?.imageUrls).toEqual(['/media/product-images/0123456789abcdef0123456789abcdef.webp']);
+  expect(createPayload?.imageUrls).toEqual([
+    '/media/product-images/00000000000000000000000000000002.webp',
+    '/media/product-images/00000000000000000000000000000001.webp',
+  ]);
 
   const draftCard = page.getByRole('article').filter({ has: page.getByRole('heading', { name: 'Local Product' }) });
   await draftCard.getByRole('button', { name: 'Edit', exact: true }).click();
@@ -112,7 +121,7 @@ test('approved shop owner can draft and submit but cannot publish a product', as
   await page.getByRole('button', { name: 'Cancel', exact: true }).click();
 
   await page.getByRole('button', { name: 'Submit', exact: true }).click();
-  await expect(page.getByText('SUBMITTED', { exact: true })).toBeVisible();
+  await expect(draftCard.getByText('In review', { exact: true })).toBeVisible();
   await expect(page.getByRole('button', { name: /publish/i })).toHaveCount(0);
 });
 
@@ -139,9 +148,9 @@ test('published seller can update stock and submit edit or unpublish requests wi
       id: 'shopprod_remove', slug: 'remove-live', applicationId: 'shop-1', status: 'PUBLISHED',
       name: 'Unpublish Live Product', description: 'Published product that can request administrator unpublishing.',
       brand: 'Local', department: 'women', category: 'Clothing & Fashion',
-      pricePaise: 70000, originalPricePaise: 80000, inventory: 4, size: 'L',
+      pricePaise: 70000, originalPricePaise: 80000, inventory: 0, size: 'L',
       colourName: 'Blue', colourHex: '#0000FF', imageUrls: ['https://example.test/remove.jpg'],
-      attributes: {}, variants: [{ id: 'shopprod_remove-var-1', size: 'L', inventory: 4 }], createdAt: '2026-08-20T00:00:00Z', updatedAt: '2026-08-20T00:00:00Z',
+      attributes: {}, variants: [{ id: 'shopprod_remove-var-1', size: 'L', inventory: 0 }], createdAt: '2026-08-20T00:00:00Z', updatedAt: '2026-08-20T00:00:00Z',
     },
   ];
 
@@ -168,7 +177,7 @@ test('published seller can update stock and submit edit or unpublish requests wi
       const variants = (products[0].variants as Array<Record<string, unknown>>).map(variant =>
         variant.id === 'shopprod_edit-var-1' ? { ...variant, inventory: stockPayload?.stock } : variant
       );
-      products[0] = { ...products[0], inventory: 9, variants };
+      products[0] = { ...products[0], inventory: variants.reduce((total, variant) => total + Number(variant.inventory), 0), variants };
       return void await json({ success: true, inventory: { productId: 'shopprod_edit', variantId: 'shopprod_edit-var-1', before: 2, stock: stockPayload.stock } });
     }
     if (path === '/api/shop-products/shopprod_edit/edit-request' && method === 'POST') {
@@ -196,12 +205,23 @@ test('published seller can update stock and submit edit or unpublish requests wi
 
   await page.goto('/partner');
 
+  await expect(page.getByRole('button', { name: /1\s+Live/i })).toBeVisible();
+  await expect(page.getByRole('button', { name: /1\s+Out of stock/i })).toBeVisible();
+  await page.getByLabel('Filter products by status').selectOption('out');
+  await expect(page.getByRole('heading', { name: 'Unpublish Live Product' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Editable Live Product' })).toHaveCount(0);
+  await page.getByLabel('Filter products by status').selectOption('all');
+  await page.getByLabel('Search your products').fill('Editable');
+  await expect(page.getByRole('heading', { name: 'Editable Live Product' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Unpublish Live Product' })).toHaveCount(0);
+  await page.getByLabel('Search your products').fill('');
+
   const editCard = page.getByRole('article').filter({ has: page.getByRole('heading', { name: 'Editable Live Product' }) });
   await editCard.getByRole('button', { name: 'M Stock' }).click();
-  await editCard.getByLabel('Stock for size M').fill('5');
+  await editCard.getByLabel('Stock for size M').fill('0');
   await editCard.getByRole('button', { name: 'Save stock' }).click();
-  await expect(editCard.getByText('M: 5', { exact: true })).toBeVisible();
-  expect(stockPayload).toEqual({ variantId: 'shopprod_edit-var-1', stock: 5 });
+  await expect(editCard.getByText('M: 0', { exact: true })).toBeVisible();
+  expect(stockPayload).toEqual({ variantId: 'shopprod_edit-var-1', stock: 0 });
 
   await editCard.getByRole('button', { name: 'Edit Listing' }).click();
   await expect(page.getByRole('heading', { name: 'Request Listing Changes' })).toBeVisible();
@@ -209,19 +229,22 @@ test('published seller can update stock and submit edit or unpublish requests wi
   await expect(page.getByLabel('HTTPS image URLs')).toHaveCount(0);
   await expect(page.getByAltText('Uploaded product image 1 preview')).toBeVisible();
   await page.getByLabel('Product name').fill('Reviewed Live Product');
-  await page.getByLabel('Size 1').fill('M Tall');
-  await expect(page.getByLabel('Stock for size M Tall')).toHaveAttribute('readonly', '');
+  await expect(page.getByLabel('Size 1')).toHaveAttribute('readonly', '');
+  await expect(page.getByLabel('Stock for size M')).toHaveAttribute('readonly', '');
+  await page.getByRole('button', { name: 'Remove size S' }).click();
+  await expect(page.getByRole('alert')).toContainText('Set stock for size S to 0');
+  await page.getByRole('button', { name: 'Remove size M' }).click();
+  await expect(page.getByLabel('Size 1')).toHaveValue('S');
   await page.getByRole('button', { name: '+ Add size' }).click();
-  await page.getByLabel('Size 4', { exact: true }).fill('XL');
+  await page.getByLabel('Size 3', { exact: true }).fill('XL');
   await page.getByLabel('Stock for size XL').fill('4');
   await page.getByRole('button', { name: 'Submit Listing Changes' }).click();
   await expect(editCard.getByText(/EDIT request submitted/i)).toBeVisible();
   expect(editPayload).not.toHaveProperty('inventory');
   expect(editPayload?.name).toBe('Reviewed Live Product');
   expect(editPayload?.variants).toEqual([
-    { size: 'M Tall', inventory: 5 },
-    { size: 'S', inventory: 1 },
-    { size: 'L', inventory: 3 },
+    { id: 'shopprod_edit-var-2', size: 'S', inventory: 1 },
+    { id: 'shopprod_edit-var-3', size: 'L', inventory: 3 },
     { size: 'XL', inventory: 4 },
   ]);
   expect(editPayload?.imageUrls).toEqual(['/media/product-images/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.webp']);

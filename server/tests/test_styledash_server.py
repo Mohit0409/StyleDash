@@ -2043,6 +2043,19 @@ class HttpApiTests(unittest.TestCase):
         )
         self.assertEqual((status, submitted["application"]["status"]), (200, "SUBMITTED"))
 
+        pending_png = base64.b64decode(
+            "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII="
+        )
+        pending_upload = {
+            "fileName": "pending-store.png",
+            "contentType": "image/png",
+            "dataBase64": base64.b64encode(pending_png).decode(),
+        }
+        status, approval_required, _headers = self.post_json(
+            "/api/shop-branding-images", pending_upload, session_headers
+        )
+        self.assertEqual((status, approval_required["code"]), (403, "approved_shop_required"))
+
         with self.service.security.connect() as db:
             db.execute(
                 "CREATE TABLE IF NOT EXISTS admin_users("
@@ -2081,6 +2094,92 @@ class HttpApiTests(unittest.TestCase):
             self.assertEqual(image_response.read(), png)
             self.assertEqual(image_response.headers.get_content_type(), "image/png")
             self.assertIn("immutable", image_response.headers["Cache-Control"])
+
+        branding_bytes = png + b"store-branding"
+        branding_payload = {
+            "fileName": "store-cover.png",
+            "contentType": "image/png",
+            "dataBase64": base64.b64encode(branding_bytes).decode(),
+        }
+        status, anonymous_branding_upload, _headers = self.post_json(
+            "/api/shop-branding-images", branding_payload
+        )
+        self.assertEqual((status, anonymous_branding_upload["code"]), (401, "authentication_required"))
+        status, missing_branding_csrf, _headers = self.post_json(
+            "/api/shop-branding-images",
+            branding_payload,
+            {"Cookie": session_headers["Cookie"], "Origin": "https://styledash.test"},
+        )
+        self.assertEqual((status, missing_branding_csrf["code"]), (403, "csrf_failed"))
+        status, invalid_branding_type, _headers = self.post_json(
+            "/api/shop-branding-images",
+            {**branding_payload, "contentType": "image/gif"},
+            session_headers,
+        )
+        self.assertEqual((status, invalid_branding_type["code"]), (400, "invalid_product_image"))
+        status, invalid_branding_magic, _headers = self.post_json(
+            "/api/shop-branding-images",
+            {
+                **branding_payload,
+                "dataBase64": base64.b64encode(b"not an image despite its declared mime type").decode(),
+            },
+            session_headers,
+        )
+        self.assertEqual((status, invalid_branding_magic["code"]), (400, "invalid_product_image"))
+        status, invalid_branding_filename, _headers = self.post_json(
+            "/api/shop-branding-images",
+            {**branding_payload, "fileName": "../outside.png"},
+            session_headers,
+        )
+        self.assertEqual((status, invalid_branding_filename["code"]), (400, "invalid_product_image"))
+        oversized = b"\x89PNG\r\n\x1a\n" + bytes(500 * 1024 - 7)
+        status, oversized_branding, _headers = self.post_json(
+            "/api/shop-branding-images",
+            {**branding_payload, "dataBase64": base64.b64encode(oversized).decode()},
+            session_headers,
+        )
+        self.assertEqual((status, oversized_branding["code"]), (413, "product_image_too_large"))
+        status, branding_uploaded, _headers = self.post_json(
+            "/api/shop-branding-images", branding_payload, session_headers
+        )
+        self.assertEqual(status, 201)
+        branding_url = branding_uploaded["image"]["url"]
+        self.assertNotEqual(branding_url, uploaded_url)
+        status, missing_branding_file, _headers = self.patch_json(
+            "/api/vendor-applications/me/branding",
+            {"bannerImage": "/media/product-images/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.webp"},
+            session_headers,
+        )
+        self.assertEqual((status, missing_branding_file["code"]), (400, "invalid_store_branding"))
+        status, external_branding, _headers = self.patch_json(
+            "/api/vendor-applications/me/branding",
+            {"bannerImage": "https://example.test/store-cover.webp"},
+            session_headers,
+        )
+        self.assertEqual((status, external_branding["code"]), (400, "invalid_store_branding"))
+        status, injected_branding, _headers = self.patch_json(
+            "/api/vendor-applications/me/branding",
+            {"bannerImage": branding_url, "status": "ACTIVE", "submittedByUserId": "other"},
+            session_headers,
+        )
+        self.assertEqual((status, injected_branding["code"]), (400, "invalid_store_branding"))
+        status, missing_patch_csrf, _headers = self.patch_json(
+            "/api/vendor-applications/me/branding",
+            {"bannerImage": branding_url},
+            {"Cookie": session_headers["Cookie"], "Origin": "https://styledash.test"},
+        )
+        self.assertEqual((status, missing_patch_csrf["code"]), (403, "csrf_failed"))
+        status, branded, _headers = self.patch_json(
+            "/api/vendor-applications/me/branding",
+            {"bannerImage": branding_url, "logoImage": branding_url},
+            session_headers,
+        )
+        self.assertEqual(status, 200)
+        self.assertEqual((branded["application"]["bannerImage"], branded["application"]["logoImage"]), (branding_url, branding_url))
+        status, rate_limited, _headers = self.post_json(
+            "/api/shop-branding-images", branding_payload, session_headers
+        )
+        self.assertEqual((status, rate_limited["code"]), (429, "rate_limited"))
 
         product_payload = {
             "name": "HTTP Published Kurta",
@@ -2123,7 +2222,8 @@ class HttpApiTests(unittest.TestCase):
         public_store = stores_response["stores"][0]
         self.assertEqual(public_store["slug"], public_product["storeSlug"])
         self.assertEqual(public_store["storeName"], complete["shopName"])
-        self.assertEqual(public_store["bannerImage"], uploaded_url)
+        self.assertEqual(public_store["bannerImage"], branding_url)
+        self.assertEqual(public_store["logoImage"], branding_url)
         self.assertNotIn("registeredEmail", public_store)
         self.assertNotIn("registeredMobile", public_store)
         self.assertNotIn("businessInformation", public_store)

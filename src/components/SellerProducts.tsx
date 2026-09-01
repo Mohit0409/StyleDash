@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { AlertTriangle, Boxes, Edit3, PackageMinus, PackagePlus, Send } from 'lucide-react';
+import { AlertTriangle, Boxes, Edit3, PackageMinus, PackagePlus, Search, Send } from 'lucide-react';
 import { ApiError } from '../services/apiClient';
 import { blobToBase64, prepareProductImage } from '../utils/productImage';
 import {
@@ -32,7 +32,7 @@ interface ProductFormState {
   category: string;
   price: string;
   originalPrice: string;
-  variants: Array<{ size: string; inventory: string }>;
+  variants: Array<{ id?: string; size: string; inventory: string }>;
   colourName: string;
   colourHex: string;
   imageMode: 'links' | 'upload';
@@ -60,7 +60,7 @@ const toForm = (product: SellerProduct): ProductFormState => {
     price: (product.pricePaise / 100).toFixed(2),
     originalPrice: (product.originalPricePaise / 100).toFixed(2),
     variants: product.variants?.length
-      ? product.variants.map(variant => ({ size: variant.size, inventory: String(variant.inventory) }))
+      ? product.variants.map(variant => ({ id: variant.id, size: variant.size, inventory: String(variant.inventory) }))
       : [{ size: product.size, inventory: String(product.inventory) }],
     colourName: product.colourName,
     colourHex: product.colourHex || '',
@@ -83,6 +83,7 @@ const toPayload = (form: ProductFormState): SellerProductDraft => {
     throw new Error('Enter valid price values.');
   }
   const variants = form.variants.map(variant => ({
+    ...(variant.id ? { id: variant.id } : {}),
     size: variant.size.trim(),
     inventory: Number(variant.inventory),
   }));
@@ -94,7 +95,13 @@ const toPayload = (form: ProductFormState): SellerProductDraft => {
     || new Set(normalizedSizes).size !== variants.length
     || variants.reduce((total, variant) => total + variant.inventory, 0) > 100_000
   ) {
-    throw new Error('Add unique sizes with valid whole-number stock values.');
+    if (variants.length < 1) throw new Error('Add at least one size.');
+    if (variants.length > 20) throw new Error('A product can have at most 20 sizes.');
+    if (variants.some(variant => !variant.size)) throw new Error('Every size row needs a size name.');
+    if (variants.some(variant => variant.size.length > 40)) throw new Error('Size names must be 40 characters or fewer.');
+    if (variants.some(variant => !Number.isSafeInteger(variant.inventory) || variant.inventory < 0 || variant.inventory > 100_000)) throw new Error('Stock for every size must be a whole number from 0 to 100000.');
+    if (new Set(normalizedSizes).size !== variants.length) throw new Error('Each size can appear only once. Remove or rename the duplicate size.');
+    throw new Error('Total stock across all sizes cannot exceed 100000.');
   }
   const imageUrls = form.imageMode === 'links'
     ? form.imageUrls.split(/\r?\n/).map(value => value.trim()).filter(Boolean)
@@ -140,19 +147,36 @@ const toChangePayload = (payload: SellerProductDraft): SellerProductChangeDraft 
 const messageForError = (cause: unknown, fallback: string) =>
   cause instanceof ApiError || cause instanceof Error ? cause.message : fallback;
 
+type SellerProductView = 'all' | 'live' | 'out' | 'draft' | 'review';
+
+const productView = (product: SellerProduct): Exclude<SellerProductView, 'all'> => {
+  if (product.status === 'PUBLISHED') return product.inventory > 0 ? 'live' : 'out';
+  if (product.status === 'DRAFT' || product.status === 'REJECTED') return 'draft';
+  return 'review';
+};
+
+const productStateLabel = (product: SellerProduct) => {
+  if (product.status === 'PUBLISHED') return product.inventory > 0 ? 'Live' : 'Out of stock';
+  if (product.status === 'REJECTED') return 'Needs changes';
+  if (product.status === 'DRAFT') return 'Draft';
+  return 'In review';
+};
+
 export const SellerProducts: React.FC = () => {
   const [products, setProducts] = useState<SellerProduct[]>([]);
   const [requests, setRequests] = useState<SellerProductChangeRequest[]>([]);
   const [form, setForm] = useState<ProductFormState>(EMPTY_FORM);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [formMode, setFormMode] = useState<'draft' | 'change'>('draft');
-  const [changeBaseVariantCount, setChangeBaseVariantCount] = useState(0);
   const [formOpen, setFormOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [uploadBusy, setUploadBusy] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState('');
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
+  const [productQuery, setProductQuery] = useState('');
+  const [productFilter, setProductFilter] = useState<SellerProductView>('all');
   const [stockEdit, setStockEdit] = useState<{ productId: string; variantId: string; size: string; value: string } | null>(null);
   const [unpublishConfirmId, setUnpublishConfirmId] = useState<string | null>(null);
 
@@ -187,7 +211,13 @@ export const SellerProducts: React.FC = () => {
   }));
 
   const removeVariant = (index: number) => {
-    if (formMode === 'change' && index < changeBaseVariantCount) return;
+    const variant = form.variants[index];
+    if (!variant || form.variants.length === 1) return;
+    if (formMode === 'change' && variant.id && Number(variant.inventory) !== 0) {
+      setError(`Set stock for size ${variant.size} to 0 using its Stock button before removing it.`);
+      return;
+    }
+    setError('');
     setForm(current => ({
       ...current,
       variants: current.variants.filter((_, position) => position !== index),
@@ -197,7 +227,6 @@ export const SellerProducts: React.FC = () => {
   const openNew = () => {
     setEditingId(null);
     setFormMode('draft');
-    setChangeBaseVariantCount(0);
     setForm(EMPTY_FORM);
     setFormOpen(true);
     setError('');
@@ -207,8 +236,9 @@ export const SellerProducts: React.FC = () => {
   const openEdit = (product: SellerProduct) => {
     setEditingId(product.id);
     setFormMode('draft');
-    setChangeBaseVariantCount(0);
-    setForm(toForm(product));
+    const draftForm = toForm(product);
+    draftForm.variants = draftForm.variants.map(({ size, inventory }) => ({ size, inventory }));
+    setForm(draftForm);
     setFormOpen(true);
     setError('');
     setMessage('');
@@ -217,7 +247,6 @@ export const SellerProducts: React.FC = () => {
   const openChangeRequest = (product: SellerProduct) => {
     setEditingId(product.id);
     setFormMode('change');
-    setChangeBaseVariantCount(product.variants.length);
     setForm(toForm(product));
     setFormOpen(true);
     setError('');
@@ -236,7 +265,9 @@ export const SellerProducts: React.FC = () => {
     setMessage('');
     try {
       const uploaded: string[] = [];
-      for (const file of Array.from(files)) {
+      const selectedFiles = Array.from(files);
+      for (const [index, file] of selectedFiles.entries()) {
+        setUploadProgress(`Optimizing image ${index + 1} of ${selectedFiles.length}…`);
         const prepared = await prepareProductImage(file);
         const image = await shopProductApi.uploadImage({
           fileName: prepared.fileName,
@@ -249,10 +280,11 @@ export const SellerProducts: React.FC = () => {
         ...current,
         uploadedImageUrls: [...current.uploadedImageUrls, ...uploaded],
       }));
-      setMessage(`${uploaded.length} image${uploaded.length === 1 ? '' : 's'} optimized and uploaded.`);
+      setMessage(`${uploaded.length} image${uploaded.length === 1 ? '' : 's'} optimized and uploaded. Drag order is controlled with the arrow buttons below; image 1 is the main product image.`);
     } catch (cause) {
       setError(messageForError(cause, 'The image could not be optimized or uploaded.'));
     } finally {
+      setUploadProgress('');
       setUploadBusy(false);
     }
   };
@@ -261,6 +293,16 @@ export const SellerProducts: React.FC = () => {
     setForm(current => ({ ...current, imageMode }));
     setError('');
     setMessage('');
+  };
+
+  const moveUploadedImage = (index: number, direction: -1 | 1) => {
+    setForm(current => {
+      const target = index + direction;
+      if (target < 0 || target >= current.uploadedImageUrls.length) return current;
+      const uploadedImageUrls = [...current.uploadedImageUrls];
+      [uploadedImageUrls[index], uploadedImageUrls[target]] = [uploadedImageUrls[target], uploadedImageUrls[index]];
+      return { ...current, uploadedImageUrls };
+    });
   };
 
   const removeUploadedImage = (index: number) => {
@@ -291,7 +333,6 @@ export const SellerProducts: React.FC = () => {
       setFormOpen(false);
       setEditingId(null);
       setFormMode('draft');
-      setChangeBaseVariantCount(0);
       setForm(EMPTY_FORM);
     } catch (cause) {
       setError(messageForError(cause, formMode === 'change' ? 'The listing change request could not be submitted.' : 'The product draft could not be saved.'));
@@ -356,6 +397,22 @@ export const SellerProducts: React.FC = () => {
     }
   };
 
+
+  const normalizedQuery = productQuery.trim().toLocaleLowerCase();
+  const filteredProducts = products.filter(product => {
+    if (productFilter !== 'all' && productView(product) !== productFilter) return false;
+    if (!normalizedQuery) return true;
+    return [product.name, product.brand, product.category, product.size]
+      .filter(Boolean)
+      .some(value => String(value).toLocaleLowerCase().includes(normalizedQuery));
+  });
+  const productCounts = {
+    live: products.filter(product => productView(product) === 'live').length,
+    out: products.filter(product => productView(product) === 'out').length,
+    draft: products.filter(product => productView(product) === 'draft').length,
+    review: products.filter(product => productView(product) === 'review').length,
+  };
+
   return (
     <section className="space-y-5 rounded-3xl border border-neutral-200 bg-white p-6 dark:border-neutral-800 dark:bg-neutral-900" aria-labelledby="seller-products-heading">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
@@ -371,11 +428,26 @@ export const SellerProducts: React.FC = () => {
       {error && <p role="alert" className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">{error}</p>}
       {message && <p role="status" className="rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800">{message}</p>}
 
+      {products.length > 0 && (
+        <div className="space-y-3 rounded-2xl bg-neutral-50 p-3 dark:bg-neutral-800/60">
+          <div className="grid grid-cols-2 gap-2 text-center text-xs sm:grid-cols-4">
+            <button type="button" onClick={() => setProductFilter('live')} className="rounded-xl border bg-white p-2 dark:bg-neutral-900"><strong className="block text-base">{productCounts.live}</strong>Live</button>
+            <button type="button" onClick={() => setProductFilter('out')} className="rounded-xl border bg-white p-2 dark:bg-neutral-900"><strong className="block text-base">{productCounts.out}</strong>Out of stock</button>
+            <button type="button" onClick={() => setProductFilter('draft')} className="rounded-xl border bg-white p-2 dark:bg-neutral-900"><strong className="block text-base">{productCounts.draft}</strong>Draft / changes</button>
+            <button type="button" onClick={() => setProductFilter('review')} className="rounded-xl border bg-white p-2 dark:bg-neutral-900"><strong className="block text-base">{productCounts.review}</strong>In review</button>
+          </div>
+          <div className="grid gap-2 sm:grid-cols-[1fr_auto]">
+            <label className="relative"><span className="sr-only">Search your products</span><Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-neutral-400" /><input aria-label="Search your products" value={productQuery} onChange={event => setProductQuery(event.target.value)} placeholder="Search product, brand, category or size" className="w-full rounded-xl border bg-white py-2.5 pl-9 pr-3 text-xs dark:bg-neutral-900" /></label>
+            <select aria-label="Filter products by status" value={productFilter} onChange={event => setProductFilter(event.target.value as SellerProductView)} className="rounded-xl border bg-white px-3 py-2.5 text-xs font-bold dark:bg-neutral-900"><option value="all">All products</option><option value="live">Live</option><option value="out">Out of stock</option><option value="draft">Draft / needs changes</option><option value="review">In review</option></select>
+          </div>
+        </div>
+      )}
+
       {formOpen && (
         <form onSubmit={saveProduct} className="space-y-4 rounded-2xl border p-4 dark:border-neutral-700">
           <h3 className="font-black">{formMode === 'change' ? 'Request Listing Changes' : editingId ? 'Edit Product Draft' : 'Create Product Draft'}</h3>
           <div className="grid gap-3 text-xs sm:grid-cols-2">
-            <label className="font-bold">Product name<input required minLength={2} maxLength={140} value={form.name} onChange={event => updateForm('name', event.target.value)} className="mt-1 w-full rounded-xl border p-3 dark:bg-neutral-800" /></label>
+            <label className="font-bold">Product name<input autoFocus required minLength={2} maxLength={140} value={form.name} onChange={event => updateForm('name', event.target.value)} className="mt-1 w-full rounded-xl border p-3 dark:bg-neutral-800" /></label>
             <label className="font-bold">Brand <span className="font-normal text-neutral-500">(optional)</span><input maxLength={100} value={form.brand} onChange={event => updateForm('brand', event.target.value)} className="mt-1 w-full rounded-xl border p-3 dark:bg-neutral-800" /></label>
             <label className="font-bold">Department<select value={form.department} onChange={event => updateForm('department', event.target.value)} className="mt-1 w-full rounded-xl border p-3 dark:bg-neutral-800">{DEPARTMENTS.map(value => <option key={value} value={value}>{value}</option>)}</select></label>
             <label className="font-bold">Category<select value={form.category} onChange={event => updateForm('category', event.target.value)} className="mt-1 w-full rounded-xl border p-3 dark:bg-neutral-800">{CATEGORIES.map(value => <option key={value} value={value}>{value}</option>)}</select></label>
@@ -387,17 +459,15 @@ export const SellerProducts: React.FC = () => {
                 <button type="button" onClick={addVariant} disabled={form.variants.length >= 20} className="rounded-lg border px-3 py-1.5 font-bold disabled:opacity-50">+ Add size</button>
               </div>
               <p className="text-neutral-500">{formMode === 'change'
-                ? 'Rename an existing size or add a new size. Existing live stock stays controlled by the Stock buttons; a newly added size can set its starting stock. Existing published size rows cannot be removed.'
-                : 'Add one row per size. Stock is tracked separately for every size.'}</p>
+                ? 'Add new sizes anytime. To remove a published size, first set its live stock to 0 using the Stock button, then remove the row here. Existing published size names are locked to protect historical orders.'
+                : 'Add one row per size. Stock is tracked separately for every size, and draft size names can be edited freely.'}</p>
               <div className="space-y-2">
                 {form.variants.map((variant, index) => {
-                  const existingPublishedVariant = formMode === 'change' && index < changeBaseVariantCount;
-                  return <div key={index} className="grid grid-cols-[1fr_1fr_auto] gap-2">
-                    <input aria-label={`Size ${index + 1}`} required maxLength={40} value={variant.size} onChange={event => updateVariant(index, 'size', event.target.value)} placeholder="Size, e.g. S or XL" className="w-full rounded-xl border p-3 dark:bg-neutral-800" />
+                  const existingPublishedVariant = formMode === 'change' && Boolean(variant.id);
+                  return <div key={variant.id || index} className="grid grid-cols-[1fr_1fr_auto] gap-2">
+                    <input aria-label={`Size ${index + 1}`} required maxLength={40} readOnly={existingPublishedVariant} title={existingPublishedVariant ? 'Published size names are locked. Remove this zero-stock size and add the corrected size instead.' : undefined} value={variant.size} onChange={event => { if (!existingPublishedVariant) updateVariant(index, 'size', event.target.value); }} placeholder="Size, e.g. S or XL" className="w-full rounded-xl border p-3 read-only:bg-neutral-100 read-only:text-neutral-500 dark:bg-neutral-800 dark:read-only:bg-neutral-900" />
                     <input aria-label={`Stock for size ${variant.size || index + 1}`} title={existingPublishedVariant ? 'Use the Stock button on the product card to change live stock.' : undefined} required type="number" min="0" max="100000" step="1" readOnly={existingPublishedVariant} value={variant.inventory} onChange={event => { if (!existingPublishedVariant) updateVariant(index, 'inventory', event.target.value); }} placeholder="Stock" className="w-full rounded-xl border p-3 read-only:bg-neutral-100 read-only:text-neutral-500 dark:bg-neutral-800 dark:read-only:bg-neutral-900" />
-                    {(!existingPublishedVariant)
-                      ? <button type="button" disabled={formMode === 'draft' && form.variants.length === 1} onClick={() => removeVariant(index)} className="rounded-xl border px-3 font-bold text-red-600 disabled:opacity-30" aria-label={`Remove size ${variant.size || index + 1}`}>?</button>
-                      : <span aria-hidden="true" className="w-9" />}
+                    <button type="button" disabled={form.variants.length === 1} onClick={() => removeVariant(index)} className="rounded-xl border px-3 font-bold text-red-600 disabled:opacity-30" aria-label={`Remove size ${variant.size || index + 1}`}>×</button>
                   </div>;
                 })}
               </div>
@@ -427,7 +497,24 @@ export const SellerProducts: React.FC = () => {
                       <input aria-label="Upload product images" type="file" multiple accept="image/jpeg,image/png,image/webp" disabled={busy || uploadBusy} onChange={event => { void uploadImages(event.target.files); event.currentTarget.value = ''; }} className="sr-only" />
                     </label>
                   </div>
-                  {form.uploadedImageUrls.length > 0 ? <div className="flex flex-wrap gap-2">{form.uploadedImageUrls.map((value, index) => <div key={`${value}-${index}`} className="relative"><img src={value} alt={`Uploaded product image ${index + 1} preview`} loading="lazy" className="h-16 w-16 rounded-lg border object-cover" /><button type="button" onClick={() => removeUploadedImage(index)} aria-label={`Remove uploaded image ${index + 1}`} className="absolute -right-1 -top-1 rounded-full border bg-white px-1.5 py-0.5 text-[10px] font-black text-red-600 shadow">x</button></div>)}</div> : <p className="text-[11px] text-neutral-500">No images uploaded yet.</p>}
+                  {uploadProgress && <p role="status" className="text-[11px] font-bold text-neutral-700 dark:text-neutral-200">{uploadProgress}</p>}
+                  {form.uploadedImageUrls.length > 0 ? (
+                    <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                      {form.uploadedImageUrls.map((value, index) => (
+                        <div key={`${value}-${index}`} className="rounded-xl border p-2 dark:border-neutral-700">
+                          <div className="relative">
+                            <img src={value} alt={`Uploaded product image ${index + 1} preview`} loading="lazy" className="aspect-square w-full rounded-lg border object-cover" />
+                            {index === 0 && <span className="absolute bottom-1 left-1 rounded-md bg-neutral-950/90 px-1.5 py-0.5 text-[9px] font-black text-white">MAIN</span>}
+                          </div>
+                          <div className="mt-2 grid grid-cols-3 gap-1">
+                            <button type="button" disabled={index === 0} onClick={() => moveUploadedImage(index, -1)} aria-label={`Move uploaded image ${index + 1} left`} className="rounded-lg border py-1 font-black disabled:opacity-30">←</button>
+                            <button type="button" disabled={index === form.uploadedImageUrls.length - 1} onClick={() => moveUploadedImage(index, 1)} aria-label={`Move uploaded image ${index + 1} right`} className="rounded-lg border py-1 font-black disabled:opacity-30">→</button>
+                            <button type="button" onClick={() => removeUploadedImage(index)} aria-label={`Remove uploaded image ${index + 1}`} className="rounded-lg border py-1 font-black text-red-600">×</button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : <p className="text-[11px] text-neutral-500">No images uploaded yet.</p>}
                 </div>
               )}
             </fieldset>
@@ -441,14 +528,15 @@ export const SellerProducts: React.FC = () => {
 
       {loading ? <p className="text-sm text-neutral-500">Loading product submissions…</p>
         : products.length === 0 ? <p className="rounded-2xl bg-neutral-50 p-4 text-sm text-neutral-500 dark:bg-neutral-800">No product drafts yet.</p>
-          : <div className="space-y-3">{products.map(product => {
+          : filteredProducts.length === 0 ? <p className="rounded-2xl bg-neutral-50 p-4 text-sm text-neutral-500 dark:bg-neutral-800">No products match this search or filter.</p>
+            : <div className="space-y-3">{filteredProducts.map(product => {
             const editable = product.status === 'DRAFT' || product.status === 'REJECTED';
             const latestRequest = requests.find(request => request.productId === product.id);
             const pendingRequest = latestRequest && ['SUBMITTED', 'UNDER_REVIEW'].includes(latestRequest.status) ? latestRequest : null;
             return <article key={product.id} className="rounded-2xl border p-4 dark:border-neutral-700">
               <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                 <div>
-                  <p className="text-xs font-black uppercase tracking-wider text-neutral-500">{product.status.replace('_', ' ')}</p>
+                  <p className="text-xs font-black uppercase tracking-wider text-neutral-500">{productStateLabel(product)}</p>
                   <h3 className="font-black">{product.name}</h3>
                   <p className="text-xs text-neutral-500">₹{(product.pricePaise / 100).toFixed(2)} · {product.colourName} · Total stock: {product.inventory}</p>
                   <div className="mt-2 flex flex-wrap gap-1.5">{product.variants.map(variant => <span key={variant.id} className="rounded-lg bg-neutral-100 px-2 py-1 text-[11px] font-bold dark:bg-neutral-800">{variant.size}: {variant.inventory}</span>)}</div>
@@ -460,7 +548,7 @@ export const SellerProducts: React.FC = () => {
                 <div className="flex flex-wrap gap-2">
                   {editable && <button type="button" disabled={busy} onClick={() => openEdit(product)} className="flex items-center gap-1 rounded-lg border px-3 py-2 text-xs font-bold"><Edit3 className="w-3.5" /> Edit</button>}
                   {product.status === 'DRAFT' && <button type="button" disabled={busy} onClick={() => void submitProduct(product.id)} className="flex items-center gap-1 rounded-lg bg-neutral-950 px-3 py-2 text-xs font-bold text-white disabled:opacity-60 dark:bg-lime-400 dark:text-neutral-950"><Send className="w-3.5" /> Submit</button>}
-                  {product.status === 'PUBLISHED' && product.variants.map(variant => <button key={variant.id} type="button" disabled={busy} onClick={() => setStockEdit({ productId: product.id, variantId: variant.id, size: variant.size, value: String(variant.inventory) })} className="flex items-center gap-1 rounded-lg border px-3 py-2 text-xs font-bold"><Boxes className="w-3.5" /> {variant.size} Stock</button>)}
+                  {product.status === 'PUBLISHED' && !pendingRequest && product.variants.map(variant => <button key={variant.id} type="button" disabled={busy} onClick={() => setStockEdit({ productId: product.id, variantId: variant.id, size: variant.size, value: String(variant.inventory) })} className="flex items-center gap-1 rounded-lg border px-3 py-2 text-xs font-bold"><Boxes className="w-3.5" /> {variant.size} Stock</button>)}
                   {product.status === 'PUBLISHED' && !pendingRequest && <button type="button" disabled={busy} onClick={() => openChangeRequest(product)} className="flex items-center gap-1 rounded-lg border px-3 py-2 text-xs font-bold"><Edit3 className="w-3.5" /> Edit Listing</button>}
                   {product.status === 'PUBLISHED' && !pendingRequest && <button type="button" disabled={busy} onClick={() => setUnpublishConfirmId(product.id)} className="flex items-center gap-1 rounded-lg border border-amber-300 px-3 py-2 text-xs font-bold text-amber-800"><PackageMinus className="w-3.5" /> Request Unpublish</button>}
                 </div>

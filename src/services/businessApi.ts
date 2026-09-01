@@ -34,6 +34,8 @@ export interface ShopApplication {
   state: string;
   pincode: string;
   businessInformation?: string | null;
+  bannerImage?: string | null;
+  logoImage?: string | null;
   rejectionReason?: string | null;
   createdAt: string;
   updatedAt: string;
@@ -44,6 +46,17 @@ export type ShopApplicationDraft = Pick<
   ShopApplication,
   'shopName' | 'ownerName' | 'category' | 'description' | 'address' | 'city' | 'state' | 'pincode'
 > & { businessInformation?: string };
+
+export interface StoreBrandingDraft {
+  bannerImage: string | null;
+  logoImage: string | null;
+}
+
+export interface StoreBrandingImageUpload {
+  url: string;
+  bytes: number;
+  contentType: 'image/webp' | 'image/jpeg' | 'image/png';
+}
 
 export const vendorApplicationApi = {
   async mine(): Promise<ShopApplication | null> {
@@ -57,6 +70,12 @@ export const vendorApplicationApi = {
   },
   async submit(): Promise<ShopApplication> {
     return (await apiJson<{ success: true; application: ShopApplication }>('/api/vendor-applications/me/submit', 'POST', {})).application;
+  },
+  async updateBranding(payload: StoreBrandingDraft): Promise<ShopApplication> {
+    return (await apiJson<{ success: true; application: ShopApplication }>('/api/vendor-applications/me/branding', 'PATCH', payload)).application;
+  },
+  async uploadBrandingImage(payload: { fileName: string; contentType: string; dataBase64: string }): Promise<StoreBrandingImageUpload> {
+    return (await apiJson<{ success: true; image: StoreBrandingImageUpload }>('/api/shop-branding-images', 'POST', payload)).image;
   },
 };
 
@@ -143,7 +162,9 @@ export interface SellerProduct extends Omit<SellerProductDraft, 'variants' | 'in
   publishedAt?: string | null;
 }
 
-export type SellerProductChangeDraft = Omit<SellerProductDraft, 'inventory' | 'size'>;
+export type SellerProductChangeDraft = Omit<SellerProductDraft, 'inventory' | 'size' | 'variants'> & {
+  variants?: Array<SellerProductVariantDraft & { id?: string }>;
+};
 export type SellerProductChangeAction = 'EDIT' | 'UNPUBLISH';
 export type SellerProductChangeStatus = 'SUBMITTED' | 'UNDER_REVIEW' | 'APPROVED' | 'REJECTED';
 

@@ -173,7 +173,7 @@ class ShopWorkflowTests(unittest.TestCase):
                 [row[0] for row in db.execute(
                     "SELECT version FROM shop_schema_migrations ORDER BY version"
                 )],
-                [1, 2, 3, 4],
+                [1, 2, 3, 4, 5],
             )
             self.assertEqual(db.execute("PRAGMA integrity_check").fetchone()[0], "ok")
             self.assertEqual(db.execute("PRAGMA foreign_key_check").fetchall(), [])
@@ -243,11 +243,62 @@ class ShopWorkflowTests(unittest.TestCase):
         db = sqlite3.connect(concurrent_path)
         self.assertEqual(
             db.execute("SELECT version,COUNT(*) FROM shop_schema_migrations GROUP BY version").fetchall(),
-            [(1, 1), (2, 1), (3, 1), (4, 1)],
+            [(1, 1), (2, 1), (3, 1), (4, 1), (5, 1)],
         )
         self.assertEqual(db.execute("PRAGMA integrity_check").fetchone()[0], "ok")
+        self.assertEqual(db.execute("PRAGMA foreign_key_check").fetchall(), [])
         db.close()
 
+
+    def test_store_branding_migration_repairs_marker_schema_mismatch(self) -> None:
+        self.create_active_shop("user-a", "Branding Repair Shop")
+        with self.store.connect() as db:
+            self.assertIsNotNone(db.execute("SELECT 1 FROM shop_schema_migrations WHERE version=5").fetchone())
+            db.execute("ALTER TABLE vendor_applications DROP COLUMN banner_image_url")
+            db.execute("ALTER TABLE vendor_applications DROP COLUMN logo_image_url")
+        repaired = ShopWorkflow(self.path)
+        with repaired.connect() as db:
+            columns = {row[1] for row in db.execute("PRAGMA table_info(vendor_applications)")}
+            self.assertEqual(db.execute("PRAGMA integrity_check").fetchone()[0], "ok")
+            self.assertEqual(db.execute("PRAGMA foreign_key_check").fetchall(), [])
+        self.assertTrue({"banner_image_url", "logo_image_url"}.issubset(columns))
+
+    def test_approved_owner_can_manage_store_branding_with_safe_fallbacks(self) -> None:
+        draft = self.store.create_draft("user-a", self.complete_application("Branding Shop"))
+        self.assert_error(
+            "approved_shop_required",
+            lambda: self.store.update_store_branding("user-a", {"bannerImage": None}),
+        )
+        self.store.submit_application("user-a")
+        self.store.admin_transition_application("admin-a", draft["id"], "UNDER_REVIEW")
+        approved = self.store.admin_transition_application("admin-a", draft["id"], "APPROVED")
+        banner = "/media/product-images/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.webp"
+        logo = "/media/product-images/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb.png"
+        branded = self.store.update_store_branding("user-a", {"bannerImage": banner, "logoImage": logo})
+        self.assertEqual((branded["bannerImage"], branded["logoImage"]), (banner, logo))
+        self.assert_error(
+            "invalid_store_branding",
+            lambda: self.store.update_store_branding("user-a", {"logoImage": "https://example.test/logo.png"}),
+        )
+        self.assert_error(
+            "invalid_store_branding",
+            lambda: self.store.update_store_branding(
+                "user-a", {"applicationId": approved["id"], "logoImage": logo}
+            ),
+        )
+        self.store.admin_transition_application("admin-a", approved["id"], "ACTIVE")
+        public = self.store.list_active_stores()[0]
+        self.assertEqual((public["bannerImage"], public["logoImage"]), (banner, logo))
+        cleared = self.store.update_store_branding("user-a", {"logoImage": None})
+        self.assertIsNone(cleared["logoImage"])
+        self.assertEqual(cleared["bannerImage"], banner)
+
+        other = self.create_active_shop("user-b", "Other Owner Shop")
+        other_banner = "/media/product-images/cccccccccccccccccccccccccccccccc.jpg"
+        self.store.update_store_branding("user-b", {"bannerImage": other_banner})
+        self.assertEqual(self.store.get_application("user-b")["bannerImage"], other_banner)
+        self.assertEqual(self.store.get_application("user-a")["bannerImage"], banner)
+        self.assertNotEqual(other["id"], approved["id"])
 
     def test_variant_migration_repairs_marker_schema_mismatch(self) -> None:
         self.create_active_shop("user-a", "Repair Shop")
@@ -479,6 +530,58 @@ class ShopWorkflowTests(unittest.TestCase):
             {image_less["id"], product["id"]},
         )
 
+    def test_private_admin_size_replacement_never_reuses_retired_variant_identity(self) -> None:
+        self.create_active_shop("user-a", "Immutable Variant Shop")
+        product = self.store.create_product_draft(
+            "user-a", self.complete_product("Immutable Variant Kurta")
+        )
+        self.store.submit_product("user-a", product["id"])
+        for target in ("UNDER_REVIEW", "APPROVED", "PUBLISHED"):
+            product = self.store.admin_transition_product(
+                "admin-a", product["id"], target
+            )
+
+        original_id = product["variants"][0]["id"]
+        self.store.admin_transition_product("admin-a", product["id"], "APPROVED")
+        replaced = self.store.admin_update_product(
+            "admin-a",
+            product["id"],
+            {"variants": [{"size": "XL", "inventory": 4}]},
+        )
+        active = replaced["variants"][0]
+        replacement_catalog = next(
+            item
+            for item in self.store.payment_catalog_products()
+            if item["id"] == product["id"]
+        )["variants"]
+        retired = next(
+            item for item in replacement_catalog if item["id"] == original_id
+        )
+        self.assertEqual((active["size"], active["inventory"]), ("XL", 4))
+        self.assertTrue(active["id"].startswith("shopvar_"))
+        self.assertNotEqual(active["id"], original_id)
+        self.assertEqual(
+            (
+                retired["id"],
+                retired["size"],
+                retired["colourName"],
+                retired["stock"],
+                retired["active"],
+            ),
+            (original_id, "M", "Blue", 8, False),
+        )
+
+        self.store.admin_transition_product("admin-a", product["id"], "PUBLISHED")
+        public_variant = self.store.list_published_products()[0]["variants"][0]
+        self.assertEqual(
+            (public_variant["id"], public_variant["size"], public_variant["stock"]),
+            (active["id"], "XL", 4),
+        )
+        catalog = self.store.payment_catalog_products()[0]["variants"]
+        self.assertFalse(
+            next(item for item in catalog if item["id"] == original_id)["active"]
+        )
+
     def test_published_product_change_requests_preserve_live_version_until_approval(self) -> None:
         self.create_active_shop("user-a", "Managed Publishing Shop")
         self.create_active_shop("user-b", "Other Seller Shop")
@@ -532,22 +635,35 @@ class ShopWorkflowTests(unittest.TestCase):
         self.assertEqual(rejected["rejectionReason"], "Use the approved catalogue wording.")
         self.assertEqual(self.store.list_published_products()[0]["name"], "Original Live Kurta")
 
+        original_variant = self.store.list_published_products()[0]["variants"][0]
+        original_variant_id = original_variant["id"]
         self.assert_error(
-            "published_variant_removal_blocked",
+            "published_variant_has_stock",
             lambda: self.store.create_product_edit_request(
-                "user-a", product["id"], {"variants": []}
+                "user-a", product["id"], {"variants": [{"size": "XL", "inventory": 4}]},
+                {original_variant_id: 8},
+            ),
+        )
+        self.assert_error(
+            "published_variant_rename_blocked",
+            lambda: self.store.create_product_edit_request(
+                "user-a", product["id"],
+                {"variants": [{"id": original_variant_id, "size": "M Tall", "inventory": 0}]},
+                {original_variant_id: 0},
             ),
         )
         variant_change = self.store.create_product_edit_request(
-            "user-a", product["id"],
-            {"variants": [
-                {"size": "M Tall", "inventory": 999},
-                {"size": "XL", "inventory": 4},
-            ]},
+            "user-a", product["id"], {"variants": [{"size": "XL", "inventory": 4}]},
+            {original_variant_id: 0},
         )
+        proposed_variants = variant_change["proposedProduct"]["variants"]
+        active_variant = next(item for item in proposed_variants if item["active"])
+        retired_variant = next(item for item in proposed_variants if not item["active"])
+        self.assertEqual((active_variant["size"], active_variant["inventory"]), ("XL", 4))
+        self.assertTrue(active_variant["id"].startswith("shopvar_"))
         self.assertEqual(
-            variant_change["proposedProduct"]["variants"],
-            [{"size": "M Tall", "inventory": 8}, {"size": "XL", "inventory": 4}],
+            retired_variant,
+            {"id": original_variant_id, "size": "M", "inventory": 0, "active": False},
         )
         self.assertEqual(
             [item["size"] for item in self.store.list_published_products()[0]["variants"]],
@@ -557,12 +673,24 @@ class ShopWorkflowTests(unittest.TestCase):
             "admin-a", variant_change["id"], "UNDER_REVIEW"
         )
         self.store.admin_transition_product_change_request(
-            "admin-a", variant_change["id"], "APPROVED"
+            "admin-a",
+            variant_change["id"],
+            "APPROVED",
+            live_inventory={original_variant_id: 0},
         )
         resized_public = self.store.list_published_products()[0]
         self.assertEqual(
             [(item["size"], item["stock"]) for item in resized_public["variants"]],
-            [("M Tall", 8), ("XL", 4)],
+            [("XL", 4)],
+        )
+        catalog_variants = self.store.payment_catalog_products()[0]["variants"]
+        self.assertEqual(
+            next(item for item in catalog_variants if item["id"] == original_variant_id)["active"],
+            False,
+        )
+        self.assertEqual(
+            next(item for item in catalog_variants if item["size"] == "XL")["active"],
+            True,
         )
 
         second = self.store.create_product_edit_request(

@@ -1,8 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { MapPin, Zap, Star, Phone, Mail, Store as StoreIcon } from 'lucide-react';
+import { MapPin, Zap, Star, Phone, Mail } from 'lucide-react';
 import { SEO } from '../components/SEO';
 import { ProductCard } from '../components/ProductCard';
+import { StoreImage } from '../components/StoreImage';
 import { vendorRepository } from '../repositories/vendorRepository';
 import { productRepository } from '../repositories/productRepository';
 import { VendorStore, Product } from '../types';
@@ -50,11 +51,20 @@ export const StoreDetail: React.FC = () => {
 
       {/* Store Cover Banner */}
       <div className="relative rounded-3xl overflow-hidden aspect-[21/9] bg-neutral-900 border border-neutral-200 dark:border-neutral-800 shadow-xl">
-        {store.bannerImage ? (
-          <img src={store.bannerImage} alt={store.storeName} className="w-full h-full object-cover opacity-60" />
-        ) : (
-          <div className="absolute inset-0 flex items-center justify-center bg-neutral-800"><StoreIcon className="w-20 h-20 text-neutral-600" /></div>
-        )}
+        <StoreImage
+          src={store.bannerImage}
+          alt={store.storeName}
+          storeName={store.storeName}
+          kind="cover"
+          className="h-full w-full object-cover opacity-60"
+        />
+        <StoreImage
+          src={store.logoImage}
+          alt={`${store.storeName} logo`}
+          storeName={store.storeName}
+          kind="logo"
+          className="absolute right-5 top-5 z-10 h-16 w-16 rounded-2xl border-2 border-white bg-white object-cover shadow-xl sm:h-20 sm:w-20"
+        />
         <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/40 to-transparent flex flex-col justify-end p-6 sm:p-10 space-y-2 text-white">
           <div className="flex items-center gap-2">
             <span className="px-3 py-1 bg-lime-400 text-neutral-950 text-xs font-black rounded-full uppercase">{store.category}</span>

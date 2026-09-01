@@ -119,17 +119,33 @@ def _row_variants(row: sqlite3.Row) -> list[dict[str, Any]]:
     except (TypeError, json.JSONDecodeError):
         variants = []
     clean: list[dict[str, Any]] = []
+    seen_ids: set[str] = set()
     if isinstance(variants, list):
-        for item in variants:
+        for index, item in enumerate(variants):
             if not isinstance(item, dict):
                 continue
             size = item.get("size")
             inventory = item.get("inventory")
-            if isinstance(size, str) and size.strip() and isinstance(inventory, int) and not isinstance(inventory, bool):
-                clean.append({"size": size.strip(), "inventory": max(0, inventory)})
+            if not (isinstance(size, str) and size.strip() and isinstance(inventory, int) and not isinstance(inventory, bool)):
+                continue
+            variant_id = item.get("id")
+            if not isinstance(variant_id, str) or not variant_id.strip() or len(variant_id) > 128 or variant_id in seen_ids:
+                variant_id = f"{row['id']}-var-{index + 1}"
+            seen_ids.add(variant_id)
+            clean.append({
+                "id": variant_id,
+                "size": size.strip(),
+                "inventory": max(0, inventory),
+                "active": item.get("active") is not False,
+            })
     if clean:
         return clean
-    return [{"size": row["size"], "inventory": row["inventory"]}]
+    return [{
+        "id": f"{row['id']}-var-1",
+        "size": row["size"],
+        "inventory": row["inventory"],
+        "active": True,
+    }]
 
 
 class ShopWorkflow:
@@ -169,6 +185,10 @@ class ShopWorkflow:
             self._migrate_products(db)
             self._migrate_product_change_requests(db)
             self._migrate_product_variants(db)
+            self._migrate_store_branding(db)
+            integrity = [row[0] for row in db.execute("PRAGMA integrity_check").fetchall()]
+            if integrity != ["ok"]:
+                raise RuntimeError("Shop migration failed SQLite integrity validation")
             check = db.execute("PRAGMA foreign_key_check").fetchall()
             if check:
                 raise RuntimeError("Shop migration failed foreign key validation")
@@ -193,6 +213,8 @@ class ShopWorkflow:
               state TEXT NOT NULL,
               pincode TEXT NOT NULL,
               business_information TEXT,
+              banner_image_url TEXT,
+              logo_image_url TEXT,
               status TEXT NOT NULL DEFAULT 'DRAFT' CHECK(status IN ({statuses})),
               rejection_reason TEXT,
               suspension_reason TEXT,
@@ -433,6 +455,31 @@ class ShopWorkflow:
             raise
 
     @staticmethod
+    def _migrate_store_branding(db: sqlite3.Connection) -> None:
+        now = iso(utc_now())
+        db.execute("BEGIN IMMEDIATE")
+        try:
+            marker_exists = db.execute(
+                "SELECT 1 FROM shop_schema_migrations WHERE version=5"
+            ).fetchone() is not None
+            columns = {row["name"] for row in db.execute(
+                "PRAGMA table_info(vendor_applications)"
+            ).fetchall()}
+            if "banner_image_url" not in columns:
+                db.execute("ALTER TABLE vendor_applications ADD COLUMN banner_image_url TEXT")
+            if "logo_image_url" not in columns:
+                db.execute("ALTER TABLE vendor_applications ADD COLUMN logo_image_url TEXT")
+            if not marker_exists:
+                db.execute(
+                    "INSERT INTO shop_schema_migrations(version,applied_at) VALUES(5,?)",
+                    (now,),
+                )
+            db.commit()
+        except Exception:
+            db.rollback()
+            raise
+
+    @staticmethod
     def _application_payload(
         payload: dict[str, Any],
         current: sqlite3.Row | None = None,
@@ -527,6 +574,8 @@ class ShopWorkflow:
             "state": row["state"],
             "pincode": row["pincode"],
             "businessInformation": row["business_information"],
+            "bannerImage": row["banner_image_url"],
+            "logoImage": row["logo_image_url"],
             "rejectionReason": row["rejection_reason"] if row["status"] == "REJECTED" else None,
             "createdAt": row["created_at"],
             "updatedAt": row["updated_at"],
@@ -550,6 +599,39 @@ class ShopWorkflow:
         with self.connect() as db:
             row = self._customer_application(db, user_id)
         return self._serialize_application(row) if row is not None else None
+
+    def update_store_branding(self, user_id: str, payload: dict[str, Any]) -> dict[str, Any]:
+        allowed = {"bannerImage", "logoImage"}
+        if not isinstance(payload, dict) or not payload or set(payload) - allowed:
+            raise SecurityError(400, "Invalid store branding update.", "invalid_store_branding")
+
+        def clean_image(value: Any, label: str) -> str | None:
+            if value is None or value == "":
+                return None
+            if not isinstance(value, str) or not PRODUCT_MEDIA_PATH_PATTERN.fullmatch(value):
+                raise SecurityError(400, f"Upload a valid {label} image.", "invalid_store_branding")
+            return value
+
+        now = iso(utc_now())
+        with self.connect() as db:
+            db.execute("BEGIN IMMEDIATE")
+            current = self._customer_application(db, user_id)
+            if current is None:
+                db.rollback()
+                raise SecurityError(404, "Shop application not found.", "vendor_application_not_found")
+            if current["status"] not in {"APPROVED", "ACTIVE"}:
+                db.rollback()
+                raise SecurityError(409, "Store branding can be changed after shop approval.", "approved_shop_required")
+            banner = clean_image(payload.get("bannerImage", current["banner_image_url"]), "store cover")
+            logo = clean_image(payload.get("logoImage", current["logo_image_url"]), "store logo")
+            db.execute(
+                "UPDATE vendor_applications SET banner_image_url=?,logo_image_url=?,updated_at=? "
+                "WHERE id=? AND submitted_by_user_id=?",
+                (banner, logo, now, current["id"], user_id),
+            )
+            db.commit()
+            row = db.execute("SELECT * FROM vendor_applications WHERE id=?", (current["id"],)).fetchone()
+        return self._serialize_application(row)
 
     def create_draft(self, user_id: str, payload: dict[str, Any]) -> dict[str, Any]:
         values = self._application_payload(payload)
@@ -814,6 +896,7 @@ class ShopWorkflow:
         current: sqlite3.Row | None = None,
         *,
         allow_legacy_current_images: bool = False,
+        trusted_variant_metadata: bool = False,
     ) -> dict[str, Any]:
         if not isinstance(payload, dict) or set(payload) - PRODUCT_PAYLOAD_FIELDS:
             raise SecurityError(400, "Unsupported product field.", "invalid_product")
@@ -844,39 +927,65 @@ class ShopWorkflow:
 
         variants_value = payload.get("variants") if "variants" in payload else None
         current_variants = _row_variants(current) if current is not None else []
+        variants_from_current = variants_value is None and current is not None
         legacy_variant_change = "inventory" in payload or (
-            "size" in payload and (len(current_variants) <= 1 or payload.get("size") != current["size"])
+            "size" in payload and (len([item for item in current_variants if item.get("active", True)]) <= 1 or payload.get("size") != current["size"])
         )
         if variants_value is not None and legacy_variant_change:
             raise SecurityError(400, "Use either variants or legacy size/inventory fields.", "invalid_product")
         if variants_value is None and current is not None and not legacy_variant_change:
-            variants_value = _row_variants(current)
+            variants_value = current_variants
         elif variants_value is None:
             variants_value = [{
                 "size": supplied("size", "size"),
                 "inventory": supplied("inventory", "inventory"),
             }]
-        if not isinstance(variants_value, list) or not 1 <= len(variants_value) <= 20:
-            raise SecurityError(400, "Add between 1 and 20 size variants.", "invalid_product")
+        max_rows = 60 if trusted_variant_metadata or variants_from_current else 20
+        if not isinstance(variants_value, list) or not 1 <= len(variants_value) <= max_rows:
+            raise SecurityError(400, "Add between 1 and 20 active size variants.", "invalid_product")
         clean_variants: list[dict[str, Any]] = []
         seen_sizes: set[str] = set()
+        seen_ids: set[str] = set()
         total_inventory = 0
+        active_count = 0
+        metadata_allowed = trusted_variant_metadata or variants_from_current
         for item in variants_value:
-            if not isinstance(item, dict) or set(item) - {"size", "inventory"}:
+            allowed_fields = {"size", "inventory", "id", "active"} if metadata_allowed else {"size", "inventory"}
+            if not isinstance(item, dict) or set(item) - allowed_fields:
                 raise SecurityError(400, "Enter valid size inventory rows.", "invalid_product")
             size = clean_text(item.get("size"), "size", 1, 40)
-            key = size.casefold()
-            if key in seen_sizes:
-                raise SecurityError(400, "Each size can appear only once.", "invalid_product")
-            seen_sizes.add(key)
             inventory = item.get("inventory")
             if isinstance(inventory, bool) or not isinstance(inventory, int) or not 0 <= inventory <= 100_000:
                 raise SecurityError(400, "Enter valid product inventory.", "invalid_product")
-            total_inventory += inventory
-            clean_variants.append({"size": size, "inventory": inventory})
+            active = item.get("active", True) if metadata_allowed else True
+            if not isinstance(active, bool):
+                raise SecurityError(400, "Enter valid size inventory rows.", "invalid_product")
+            variant_id = item.get("id") if metadata_allowed else None
+            if metadata_allowed:
+                if variant_id is not None and (
+                    not isinstance(variant_id, str) or not variant_id.strip() or len(variant_id) > 128
+                ):
+                    raise SecurityError(400, "Enter valid size inventory rows.", "invalid_product")
+                variant_id = variant_id.strip() if isinstance(variant_id, str) else "shopvar_" + secrets.token_hex(12)
+                if variant_id in seen_ids:
+                    raise SecurityError(400, "Duplicate product variant identity.", "invalid_product")
+                seen_ids.add(variant_id)
+            if active:
+                key = size.casefold()
+                if key in seen_sizes:
+                    raise SecurityError(400, "Each active size can appear only once.", "invalid_product")
+                seen_sizes.add(key)
+                active_count += 1
+                total_inventory += inventory
+            clean = {"size": size, "inventory": inventory}
+            if metadata_allowed:
+                clean.update({"id": variant_id, "active": active})
+            clean_variants.append(clean)
+        if not 1 <= active_count <= 20:
+            raise SecurityError(400, "Add between 1 and 20 active size variants.", "invalid_product")
         if total_inventory > 100_000:
-            raise SecurityError(400, "Total product inventory cannot exceed 100000.", "invalid_product")
-        size_summary = ", ".join(item["size"] for item in clean_variants)
+            raise SecurityError(400, "Total active product inventory cannot exceed 100000.", "invalid_product")
+        size_summary = ", ".join(item["size"] for item in clean_variants if item.get("active", True))
 
         raw_colour_hex = supplied("colourHex", "colour_hex")
         colour_hex = _optional_text(raw_colour_hex, "colour", 7)
@@ -978,8 +1087,8 @@ class ShopWorkflow:
     @staticmethod
     def _serialize_product(row: sqlite3.Row, *, admin: bool = False) -> dict[str, Any]:
         variants = [
-            {"id": f"{row['id']}-var-{index + 1}", "size": item["size"], "inventory": item["inventory"]}
-            for index, item in enumerate(_row_variants(row))
+            {"id": item["id"], "size": item["size"], "inventory": item["inventory"]}
+            for item in _row_variants(row) if item.get("active", True)
         ]
         result = {
             "id": row["id"],
@@ -1312,6 +1421,9 @@ class ShopWorkflow:
             if current is None:
                 db.rollback()
                 raise SecurityError(404, "Product submission not found.", "product_not_found")
+            if not isinstance(payload, dict):
+                db.rollback()
+                raise SecurityError(400, "Unsupported product field.", "invalid_product")
             if current["status"] == "PUBLISHED" and ({"variants", "inventory", "size"} & set(payload)):
                 db.rollback()
                 raise SecurityError(
@@ -1319,7 +1431,92 @@ class ShopWorkflow:
                     "Unpublish this product before changing its size structure. Live stock can be edited from Inventory.",
                     "live_variant_change_blocked",
                 )
-            values = self._product_payload(payload, current)
+            variant_fields = {"variants", "inventory", "size"} & set(payload)
+            trusted_variant_metadata = False
+            candidate = dict(payload)
+            if variant_fields:
+                if "variants" in payload and ({"inventory", "size"} & set(payload)):
+                    db.rollback()
+                    raise SecurityError(
+                        400,
+                        "Use either variants or legacy size/inventory fields.",
+                        "invalid_product",
+                    )
+                current_variants = _row_variants(current)
+                active_current = [
+                    item for item in current_variants if item.get("active", True)
+                ]
+                if "variants" in payload:
+                    proposed_variants = payload["variants"]
+                else:
+                    if len(active_current) != 1:
+                        db.rollback()
+                        raise SecurityError(
+                            400,
+                            "Use size variants when editing a multi-size product.",
+                            "invalid_product",
+                        )
+                    proposed_variants = [{
+                        "size": payload.get("size", active_current[0]["size"]),
+                        "inventory": payload.get(
+                            "inventory", active_current[0]["inventory"]
+                        ),
+                    }]
+                if not isinstance(proposed_variants, list):
+                    db.rollback()
+                    raise SecurityError(
+                        400,
+                        "Enter valid size inventory rows.",
+                        "invalid_product",
+                    )
+                active_by_size = {
+                    item["size"].casefold(): item for item in active_current
+                }
+                retained_ids: set[str] = set()
+                normalized_variants: list[dict[str, Any]] = []
+                for item in proposed_variants:
+                    if not isinstance(item, dict) or set(item) - {"size", "inventory"}:
+                        db.rollback()
+                        raise SecurityError(
+                            400,
+                            "Enter valid size inventory rows.",
+                            "invalid_product",
+                        )
+                    size = clean_text(item.get("size"), "size", 1, 40)
+                    existing = active_by_size.get(size.casefold())
+                    if existing is not None and existing["id"] not in retained_ids:
+                        variant_id = existing["id"]
+                    else:
+                        variant_id = "shopvar_" + secrets.token_hex(12)
+                    retained_ids.add(variant_id)
+                    normalized_variants.append({
+                        "id": variant_id,
+                        "size": size,
+                        "inventory": item.get("inventory"),
+                        "active": True,
+                    })
+                normalized_variants.extend(
+                    {
+                        "id": item["id"],
+                        "size": item["size"],
+                        "inventory": item["inventory"],
+                        "active": False,
+                    }
+                    for item in current_variants
+                    if item["id"] not in retained_ids
+                )
+                candidate = {
+                    key: value
+                    for key, value in payload.items()
+                    if key not in {"variants", "inventory", "size"}
+                }
+                candidate["variants"] = normalized_variants
+                trusted_variant_metadata = True
+            values = self._product_payload(
+                candidate,
+                current,
+                trusted_variant_metadata=trusted_variant_metadata,
+            )
             now = iso(utc_now())
             db.execute(
                 """
@@ -1436,6 +1633,24 @@ class ShopWorkflow:
             row = self._seller_published_product(db, user_id, product_id)
         return self._serialize_product(row)
 
+    def require_seller_stock_update_allowed(
+        self, user_id: str, product_id: str
+    ) -> dict[str, Any]:
+        with self.connect() as db:
+            row = self._seller_published_product(db, user_id, product_id)
+            pending = db.execute(
+                "SELECT 1 FROM shop_product_change_requests "
+                "WHERE product_id=? AND status IN ('SUBMITTED','UNDER_REVIEW')",
+                (product_id,),
+            ).fetchone()
+            if pending is not None:
+                raise SecurityError(
+                    409,
+                    "Finish the pending product change review before updating stock.",
+                    "product_change_pending",
+                )
+        return self._serialize_product(row)
+
     def list_product_change_requests(self, user_id: str) -> list[dict[str, Any]]:
         with self.connect() as db:
             rows = db.execute(
@@ -1456,6 +1671,7 @@ class ShopWorkflow:
         product_id: str,
         action: str,
         payload: dict[str, Any] | None = None,
+        live_inventory: dict[str, int] | None = None,
     ) -> dict[str, Any]:
         now = iso(utc_now())
         request_id = "shopchg_" + secrets.token_hex(12)
@@ -1490,24 +1706,55 @@ class ShopWorkflow:
                 if "variants" in candidate:
                     proposed_variants = candidate["variants"]
                     current_variants = _row_variants(current)
-                    if not isinstance(proposed_variants, list) or len(proposed_variants) < len(current_variants):
+                    current_by_id = {item["id"]: item for item in current_variants}
+                    active_current = [item for item in current_variants if item.get("active", True)]
+                    if not isinstance(proposed_variants, list):
                         db.rollback()
-                        raise SecurityError(
-                            409,
-                            "Existing published sizes cannot be removed. Set stock to 0 instead; you can rename sizes or add new sizes.",
-                            "published_variant_removal_blocked",
-                        )
-                    normalized_variants: list[dict[str, Any]] = []
-                    for index, item in enumerate(proposed_variants):
-                        if not isinstance(item, dict):
+                        raise SecurityError(400, "Enter valid size inventory rows.", "invalid_product_change")
+                    normalized_active: list[dict[str, Any]] = []
+                    retained_ids: set[str] = set()
+                    for item in proposed_variants:
+                        if not isinstance(item, dict) or set(item) - {"id", "size", "inventory"}:
                             db.rollback()
                             raise SecurityError(400, "Enter valid size inventory rows.", "invalid_product_change")
-                        normalized = dict(item)
-                        if index < len(current_variants):
-                            normalized["inventory"] = current_variants[index]["inventory"]
-                        normalized_variants.append(normalized)
-                    candidate["variants"] = normalized_variants
-                values = self._product_payload(candidate, current)
+                        variant_id = item.get("id")
+                        if variant_id is None:
+                            normalized_active.append({"size": item.get("size"), "inventory": item.get("inventory")})
+                            continue
+                        existing = current_by_id.get(variant_id) if isinstance(variant_id, str) else None
+                        if existing is None or not existing.get("active", True) or variant_id in retained_ids:
+                            db.rollback()
+                            raise SecurityError(400, "Invalid published size selection.", "invalid_product_change")
+                        requested_size = clean_text(item.get("size"), "size", 1, 40)
+                        if requested_size != existing["size"]:
+                            db.rollback()
+                            raise SecurityError(
+                                409,
+                                "Published size labels cannot be renamed in place. Set its stock to 0, remove that size, then add the corrected size.",
+                                "published_variant_rename_blocked",
+                            )
+                        retained_ids.add(variant_id)
+                        stock = (live_inventory or {}).get(variant_id, existing["inventory"])
+                        normalized_active.append({"id": variant_id, "size": existing["size"], "inventory": stock, "active": True})
+                    retired: list[dict[str, Any]] = []
+                    for existing in active_current:
+                        if existing["id"] in retained_ids:
+                            continue
+                        stock = (live_inventory or {}).get(existing["id"], existing["inventory"])
+                        if stock != 0:
+                            db.rollback()
+                            raise SecurityError(
+                                409,
+                                f"Set stock for size {existing['size']} to 0 before removing it.",
+                                "published_variant_has_stock",
+                            )
+                        retired.append({"id": existing["id"], "size": existing["size"], "inventory": 0, "active": False})
+                    retired.extend(
+                        {"id": item["id"], "size": item["size"], "inventory": 0, "active": False}
+                        for item in current_variants if not item.get("active", True)
+                    )
+                    candidate["variants"] = normalized_active + retired
+                values = self._product_payload(candidate, current, trusted_variant_metadata="variants" in candidate)
                 if not json.loads(values["image_urls_json"]):
                     db.rollback()
                     raise SecurityError(
@@ -1516,8 +1763,24 @@ class ShopWorkflow:
                         "product_image_required",
                     )
                 proposed = self._product_values_to_change_payload(values)
+                compare_payload: dict[str, Any] = {}
+                if "variants" in candidate:
+                    compare_payload["variants"] = [
+                        {
+                            "id": item["id"],
+                            "size": item["size"],
+                            "inventory": (live_inventory or {}).get(item["id"], item["inventory"]) if item.get("active", True) else 0,
+                            "active": item.get("active", True),
+                        }
+                        for item in _row_variants(current)
+                    ]
                 current_values = self._product_values_to_change_payload(
-                    self._product_payload({}, current, allow_legacy_current_images=True)
+                    self._product_payload(
+                        compare_payload,
+                        current,
+                        allow_legacy_current_images=True,
+                        trusted_variant_metadata=bool(compare_payload),
+                    )
                 )
                 if proposed == current_values:
                     db.rollback()
@@ -1574,10 +1837,14 @@ class ShopWorkflow:
         return self._serialize_change_request(row)
 
     def create_product_edit_request(
-        self, user_id: str, product_id: str, payload: dict[str, Any]
+        self,
+        user_id: str,
+        product_id: str,
+        payload: dict[str, Any],
+        live_inventory: dict[str, int] | None = None,
     ) -> dict[str, Any]:
         return self._create_product_change_request(
-            user_id, product_id, "EDIT", payload
+            user_id, product_id, "EDIT", payload, live_inventory
         )
 
     def create_product_unpublish_request(
@@ -1616,6 +1883,7 @@ class ShopWorkflow:
         request_id: str,
         target_status: Any,
         reason: Any = None,
+        live_inventory: dict[str, int] | None = None,
     ) -> dict[str, Any]:
         if not isinstance(target_status, str):
             raise SecurityError(
@@ -1666,7 +1934,44 @@ class ShopWorkflow:
                 if request["action"] == "EDIT":
                     proposed = json.loads(request["payload_json"] or "{}")
                     candidate = dict(proposed)
-                    values = self._product_payload(candidate, current)
+                    if "variants" in candidate:
+                        current_variants = _row_variants(current)
+                        proposed_by_id = {
+                            item.get("id"): item
+                            for item in candidate["variants"]
+                            if isinstance(item, dict)
+                            and isinstance(item.get("id"), str)
+                        }
+                        retiring = [
+                            item
+                            for item in current_variants
+                            if item.get("active", True)
+                            and (
+                                item["id"] not in proposed_by_id
+                                or proposed_by_id[item["id"]].get("active") is False
+                            )
+                        ]
+                        if retiring and (
+                            live_inventory is None
+                            or any(item["id"] not in live_inventory for item in retiring)
+                        ):
+                            db.rollback()
+                            raise SecurityError(
+                                409,
+                                "Current inventory must be revalidated before retiring a size.",
+                                "inventory_revalidation_required",
+                            )
+                        for item in retiring:
+                            if live_inventory[item["id"]] != 0:
+                                db.rollback()
+                                raise SecurityError(
+                                    409,
+                                    f"Set stock for size {item['size']} to 0 before removing it.",
+                                    "published_variant_has_stock",
+                                )
+                    values = self._product_payload(
+                        candidate, current, trusted_variant_metadata="variants" in candidate
+                    )
                     if not json.loads(values["image_urls_json"]):
                         db.rollback()
                         raise SecurityError(
@@ -1763,7 +2068,7 @@ class ShopWorkflow:
             rows = db.execute(
                 """
                 SELECT a.id,a.shop_name,a.category,a.description,a.address,a.city,a.pincode,
-                       a.created_at,a.updated_at,
+                       a.banner_image_url,a.logo_image_url,a.created_at,a.updated_at,
                        (SELECT p.image_urls_json FROM shop_product_submissions p
                          WHERE p.application_id=a.id AND p.status='PUBLISHED'
                          ORDER BY p.published_at DESC LIMIT 1) AS image_urls_json
@@ -1783,7 +2088,9 @@ class ShopWorkflow:
                 "storeName": row["shop_name"], "category": row["category"],
                 "description": row["description"], "address": row["address"],
                 "city": row["city"], "pincode": row["pincode"],
-                "deliveryMinutes": 60, "bannerImage": image, "logoImage": image,
+                "deliveryMinutes": 60,
+                "bannerImage": row["banner_image_url"] or image,
+                "logoImage": row["logo_image_url"] or image,
                 "active": True, "approved": True, "createdAt": row["created_at"],
             })
         return stores
@@ -1817,9 +2124,9 @@ class ShopWorkflow:
         )
         store_slug = _store_slug(row['application_id'])
         variants = []
-        for index, item in enumerate(_row_variants(row)):
+        for index, item in enumerate(item for item in _row_variants(row) if item.get("active", True)):
             variant = {
-                "id": f"{row['id']}-var-{index + 1}",
+                "id": item["id"],
                 "sku": f"SD-SHOP-{row['id'][-12:].upper()}" if index == 0 else f"SD-SHOP-{row['id'][-12:].upper()}-{index + 1}",
                 "size": item["size"],
                 "colourName": row["colour_name"],
@@ -1901,12 +2208,13 @@ class ShopWorkflow:
                     "price": price,
                     "variants": [
                         {
-                            "id": f"{row['id']}-var-{index + 1}",
+                            "id": item["id"],
                             "sku": f"SD-SHOP-{row['id'][-12:].upper()}" if index == 0 else f"SD-SHOP-{row['id'][-12:].upper()}-{index + 1}",
                             "size": item["size"],
                             "colourName": row["colour_name"],
                             "stock": item["inventory"],
                             "price": price,
+                            "active": item.get("active", True),
                         }
                         for index, item in enumerate(_row_variants(row))
                     ],
