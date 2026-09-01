@@ -1421,6 +1421,9 @@ class ShopWorkflow:
             if current is None:
                 db.rollback()
                 raise SecurityError(404, "Product submission not found.", "product_not_found")
+            if not isinstance(payload, dict):
+                db.rollback()
+                raise SecurityError(400, "Unsupported product field.", "invalid_product")
             if current["status"] == "PUBLISHED" and ({"variants", "inventory", "size"} & set(payload)):
                 db.rollback()
                 raise SecurityError(
@@ -1428,7 +1431,92 @@ class ShopWorkflow:
                     "Unpublish this product before changing its size structure. Live stock can be edited from Inventory.",
                     "live_variant_change_blocked",
                 )
-            values = self._product_payload(payload, current)
+            variant_fields = {"variants", "inventory", "size"} & set(payload)
+            trusted_variant_metadata = False
+            candidate = dict(payload)
+            if variant_fields:
+                if "variants" in payload and ({"inventory", "size"} & set(payload)):
+                    db.rollback()
+                    raise SecurityError(
+                        400,
+                        "Use either variants or legacy size/inventory fields.",
+                        "invalid_product",
+                    )
+                current_variants = _row_variants(current)
+                active_current = [
+                    item for item in current_variants if item.get("active", True)
+                ]
+                if "variants" in payload:
+                    proposed_variants = payload["variants"]
+                else:
+                    if len(active_current) != 1:
+                        db.rollback()
+                        raise SecurityError(
+                            400,
+                            "Use size variants when editing a multi-size product.",
+                            "invalid_product",
+                        )
+                    proposed_variants = [{
+                        "size": payload.get("size", active_current[0]["size"]),
+                        "inventory": payload.get(
+                            "inventory", active_current[0]["inventory"]
+                        ),
+                    }]
+                if not isinstance(proposed_variants, list):
+                    db.rollback()
+                    raise SecurityError(
+                        400,
+                        "Enter valid size inventory rows.",
+                        "invalid_product",
+                    )
+                active_by_size = {
+                    item["size"].casefold(): item for item in active_current
+                }
+                retained_ids: set[str] = set()
+                normalized_variants: list[dict[str, Any]] = []
+                for item in proposed_variants:
+                    if not isinstance(item, dict) or set(item) - {"size", "inventory"}:
+                        db.rollback()
+                        raise SecurityError(
+                            400,
+                            "Enter valid size inventory rows.",
+                            "invalid_product",
+                        )
+                    size = clean_text(item.get("size"), "size", 1, 40)
+                    existing = active_by_size.get(size.casefold())
+                    if existing is not None and existing["id"] not in retained_ids:
+                        variant_id = existing["id"]
+                    else:
+                        variant_id = "shopvar_" + secrets.token_hex(12)
+                    retained_ids.add(variant_id)
+                    normalized_variants.append({
+                        "id": variant_id,
+                        "size": size,
+                        "inventory": item.get("inventory"),
+                        "active": True,
+                    })
+                normalized_variants.extend(
+                    {
+                        "id": item["id"],
+                        "size": item["size"],
+                        "inventory": item["inventory"],
+                        "active": False,
+                    }
+                    for item in current_variants
+                    if item["id"] not in retained_ids
+                )
+                candidate = {
+                    key: value
+                    for key, value in payload.items()
+                    if key not in {"variants", "inventory", "size"}
+                }
+                candidate["variants"] = normalized_variants
+                trusted_variant_metadata = True
+            values = self._product_payload(
+                candidate,
+                current,
+                trusted_variant_metadata=trusted_variant_metadata,
+            )
             now = iso(utc_now())
             db.execute(
                 """
@@ -1795,6 +1883,7 @@ class ShopWorkflow:
         request_id: str,
         target_status: Any,
         reason: Any = None,
+        live_inventory: dict[str, int] | None = None,
     ) -> dict[str, Any]:
         if not isinstance(target_status, str):
             raise SecurityError(
@@ -1845,6 +1934,41 @@ class ShopWorkflow:
                 if request["action"] == "EDIT":
                     proposed = json.loads(request["payload_json"] or "{}")
                     candidate = dict(proposed)
+                    if "variants" in candidate:
+                        current_variants = _row_variants(current)
+                        proposed_by_id = {
+                            item.get("id"): item
+                            for item in candidate["variants"]
+                            if isinstance(item, dict)
+                            and isinstance(item.get("id"), str)
+                        }
+                        retiring = [
+                            item
+                            for item in current_variants
+                            if item.get("active", True)
+                            and (
+                                item["id"] not in proposed_by_id
+                                or proposed_by_id[item["id"]].get("active") is False
+                            )
+                        ]
+                        if retiring and (
+                            live_inventory is None
+                            or any(item["id"] not in live_inventory for item in retiring)
+                        ):
+                            db.rollback()
+                            raise SecurityError(
+                                409,
+                                "Current inventory must be revalidated before retiring a size.",
+                                "inventory_revalidation_required",
+                            )
+                        for item in retiring:
+                            if live_inventory[item["id"]] != 0:
+                                db.rollback()
+                                raise SecurityError(
+                                    409,
+                                    f"Set stock for size {item['size']} to 0 before removing it.",
+                                    "published_variant_has_stock",
+                                )
                     values = self._product_payload(
                         candidate, current, trusted_variant_metadata="variants" in candidate
                     )

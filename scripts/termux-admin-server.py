@@ -351,32 +351,61 @@ class AdminApplication:
             and request is not None
             and request.get("action") == "EDIT"
         )
-        if approving_edit:
-            self.payments.refresh_shop_products()
+        if not approving_edit:
+            return self.shops.admin_transition_product_change_request(
+                admin_id, request_id, target_status, reason
+            )
+
+        self.payments.refresh_shop_products()
+        # Inventory adjustment, checkout finalization, and order release all
+        # use this same lock. Keep it from the authoritative revalidation
+        # through catalogue/state synchronization so a retirement cannot race
+        # with stock being restored after the snapshot.
+        with self.payments.store.lock:
             product = self.payments.product_snapshot().get(request["productId"])
+            live_inventory: dict[str, int] = {}
             if product:
-                before_variants = {item["id"]: dict(item) for item in product.get("variants", [])}
-        result = self.shops.admin_transition_product_change_request(
-            admin_id, request_id, target_status, reason
-        )
-        if approving_edit and result.get("status") == "APPROVED":
+                before_variants = {
+                    item["id"]: dict(item) for item in product.get("variants", [])
+                }
+                live_inventory = {
+                    item["id"]: self.payments._inventory(
+                        self.payments.store.state, item
+                    )
+                    for item in product.get("variants", [])
+                }
+            result = self.shops.admin_transition_product_change_request(
+                admin_id,
+                request_id,
+                target_status,
+                reason,
+                live_inventory=live_inventory,
+            )
+            if result.get("status") != "APPROVED":
+                return result
+
             self.payments.refresh_shop_products()
             product = self.payments.product_snapshot().get(result["productId"])
             changed = False
             if product:
-                with self.payments.store.lock:
-                    inventory = self.payments.store.state["inventory"]
-                    for variant in product.get("variants", []):
-                        old = before_variants.get(variant["id"])
-                        if old is None and variant.get("active") is not False:
-                            inventory[variant["id"]] = int(variant.get("stock", 0))
-                            changed = True
-                        elif old is not None and old.get("active") is not False and variant.get("active") is False:
-                            inventory[variant["id"]] = 0
-                            changed = True
-                    if changed:
-                        self.payments.store.save()
-        return result
+                inventory = self.payments.store.state["inventory"]
+                for variant in product.get("variants", []):
+                    old = before_variants.get(variant["id"])
+                    if old is None and variant.get("active") is not False:
+                        inventory[variant["id"]] = int(variant.get("stock", 0))
+                        changed = True
+                    elif (
+                        old is not None
+                        and old.get("active") is not False
+                        and variant.get("active") is False
+                    ):
+                        # The workflow revalidated this value as zero while the
+                        # inventory lock was held, so this cannot erase stock.
+                        inventory[variant["id"]] = 0
+                        changed = True
+                if changed:
+                    self.payments.store.save()
+            return result
 
     def inventory(self, query: str = "", low_only: bool = False) -> list[dict[str, Any]]:
         self.payments.refresh_shop_products()

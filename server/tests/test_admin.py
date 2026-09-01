@@ -190,6 +190,60 @@ class AdminStoreTests(unittest.TestCase):
         actions = {row["action"] for row in app.identity.audit()}
         self.assertTrue({"customer_created","shop_admin_created","shop_product_admin_created","shop_product_admin_updated","customer_password_reset"}.issubset(actions))
 
+    def test_private_admin_size_replacement_does_not_inherit_retired_stock(self):
+        app = ADMIN_SERVER.AdminApplication(
+            self.database, self.key, ROOT / "server/payment-data/catalog.json",
+            ROOT / "server/payment-data/settings.json", self.root / "data-admin-size-replacement",
+        )
+        owner = app.identity.create_customer_account(self.admin["id"], {
+            "name": "Admin Size Owner", "email": "admin-size-owner@example.test",
+            "phone": "9876543212", "password": "TempPass8!",
+        })
+        shop = app.shops.admin_create_application(self.admin["id"], owner["id"], {
+            "shopName": "Admin Size Replacement", "ownerName": "Admin Size Owner",
+            "category": "Clothing & Fashion", "description": "A store testing immutable private admin variant identities.",
+            "address": "12 Main Market Road", "city": "Neemuch",
+            "state": "Madhya Pradesh", "pincode": "458441",
+        })
+        product = app.shops.admin_create_product(self.admin["id"], shop["id"], {
+            "name": "Admin Replacement Tee", "description": "Published tee used to verify private admin size replacement safety.",
+            "brand": "Local", "department": "unisex", "category": "Clothing & Fashion",
+            "pricePaise": 79900, "originalPricePaise": 99900,
+            "variants": [{"size": "M", "inventory": 2}], "colourName": "Black",
+            "colourHex": "#000000", "imageUrls": ["https://images.example.test/admin-size-tee.jpg"], "attributes": {},
+        })
+        app.payments.refresh_shop_products()
+        old_id = product["variants"][0]["id"]
+        app.payments.set_shop_inventory(product["id"], 7, old_id)
+
+        app.shops.admin_transition_product(self.admin["id"], product["id"], "APPROVED")
+        replaced = app.shops.admin_update_product(
+            self.admin["id"], product["id"],
+            {"variants": [{"size": "XL", "inventory": 4}]},
+        )
+        active = replaced["variants"][0]
+        replacement_catalog = next(
+            item
+            for item in app.shops.payment_catalog_products()
+            if item["id"] == product["id"]
+        )["variants"]
+        retired = next(item for item in replacement_catalog if item["id"] == old_id)
+        self.assertFalse(retired["active"])
+        self.assertNotEqual(active["id"], old_id)
+
+        app.shops.admin_transition_product(self.admin["id"], product["id"], "PUBLISHED")
+        app.payments.refresh_shop_products()
+        variants = app.payments.product_snapshot()[product["id"]]["variants"]
+        live_active = next(item for item in variants if item.get("active") is not False)
+        live_retired = next(item for item in variants if item["id"] == old_id)
+        self.assertEqual((live_active["id"], live_active["size"]), (active["id"], "XL"))
+        self.assertFalse(live_retired["active"])
+        with app.payments.store.lock:
+            self.assertEqual(
+                app.payments._inventory(app.payments.store.state, live_active), 4
+            )
+            self.assertEqual(app.payments.store.state["inventory"].get(old_id), 7)
+
     def test_approved_size_change_syncs_new_and_retired_inventory(self):
         app = ADMIN_SERVER.AdminApplication(
             self.database, self.key, ROOT / "server/payment-data/catalog.json",
@@ -220,7 +274,75 @@ class AdminStoreTests(unittest.TestCase):
             owner["id"], product["id"], {"variants": [{"size": "XL", "inventory": 4}]}, live,
         )
         app.transition_shop_product_request(self.admin["id"], request["id"], "UNDER_REVIEW")
-        approved = app.transition_shop_product_request(self.admin["id"], request["id"], "APPROVED")
+        app.adjust_inventory(self.admin["id"], old_id, 5)
+        with self.assertRaises(ADMIN_SERVER.SecurityError) as caught:
+            app.transition_shop_product_request(
+                self.admin["id"], request["id"], "APPROVED"
+            )
+        self.assertEqual(caught.exception.code, "published_variant_has_stock")
+        pending = next(
+            item
+            for item in app.shops.admin_list_product_change_requests(self.admin["id"])
+            if item["id"] == request["id"]
+        )
+        self.assertEqual(pending["status"], "UNDER_REVIEW")
+        with app.payments.store.lock:
+            self.assertEqual(app.payments.store.state["inventory"].get(old_id), 5)
+        app.adjust_inventory(self.admin["id"], old_id, -5)
+
+        with app.payments.store.lock:
+            app.payments.store.state["orders"]["ORDER-SIZE-RELEASE-RACE"] = {
+                "id": "ORDER-SIZE-RELEASE-RACE",
+                "paymentMethod": "cod",
+                "inventoryCommitted": True,
+                "items": [{
+                    "productId": product["id"],
+                    "variantId": old_id,
+                    "quantity": 1,
+                }],
+            }
+            app.payments.store.save()
+
+        approval_entered = threading.Event()
+        release_attempted = threading.Event()
+        release_results = []
+        release_errors = []
+        original_transition = app.shops.admin_transition_product_change_request
+
+        def synchronized_transition(*args, **kwargs):
+            approval_entered.set()
+            self.assertTrue(release_attempted.wait(2))
+            return original_transition(*args, **kwargs)
+
+        def release_order():
+            try:
+                self.assertTrue(approval_entered.wait(2))
+                release_attempted.set()
+                with app.payments.store.lock:
+                    order = app.payments.store.state["orders"]["ORDER-SIZE-RELEASE-RACE"]
+                    release_results.append(
+                        app.payments._release_inventory(
+                            app.payments.store.state, order
+                        )
+                    )
+                    app.payments.store.save()
+            except BaseException as error:
+                release_errors.append(error)
+
+        release_thread = threading.Thread(target=release_order)
+        with patch.object(
+            app.shops,
+            "admin_transition_product_change_request",
+            side_effect=synchronized_transition,
+        ):
+            release_thread.start()
+            approved = app.transition_shop_product_request(
+                self.admin["id"], request["id"], "APPROVED"
+            )
+        release_thread.join(3)
+        self.assertFalse(release_thread.is_alive())
+        self.assertEqual(release_errors, [])
+        self.assertEqual(release_results, [True])
         self.assertEqual(approved["status"], "APPROVED")
         app.payments.refresh_shop_products()
         variants = app.payments.product_snapshot()[product["id"]]["variants"]
@@ -229,7 +351,7 @@ class AdminStoreTests(unittest.TestCase):
         self.assertFalse(retired["active"])
         self.assertTrue(added["active"])
         with app.payments.store.lock:
-            self.assertEqual(app.payments.store.state["inventory"].get(old_id), 0)
+            self.assertEqual(app.payments.store.state["inventory"].get(old_id), 1)
             self.assertEqual(app.payments.store.state["inventory"].get(added["id"]), 4)
 
     def test_order_cancellation_sends_owner_notification(self):

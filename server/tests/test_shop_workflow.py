@@ -530,6 +530,58 @@ class ShopWorkflowTests(unittest.TestCase):
             {image_less["id"], product["id"]},
         )
 
+    def test_private_admin_size_replacement_never_reuses_retired_variant_identity(self) -> None:
+        self.create_active_shop("user-a", "Immutable Variant Shop")
+        product = self.store.create_product_draft(
+            "user-a", self.complete_product("Immutable Variant Kurta")
+        )
+        self.store.submit_product("user-a", product["id"])
+        for target in ("UNDER_REVIEW", "APPROVED", "PUBLISHED"):
+            product = self.store.admin_transition_product(
+                "admin-a", product["id"], target
+            )
+
+        original_id = product["variants"][0]["id"]
+        self.store.admin_transition_product("admin-a", product["id"], "APPROVED")
+        replaced = self.store.admin_update_product(
+            "admin-a",
+            product["id"],
+            {"variants": [{"size": "XL", "inventory": 4}]},
+        )
+        active = replaced["variants"][0]
+        replacement_catalog = next(
+            item
+            for item in self.store.payment_catalog_products()
+            if item["id"] == product["id"]
+        )["variants"]
+        retired = next(
+            item for item in replacement_catalog if item["id"] == original_id
+        )
+        self.assertEqual((active["size"], active["inventory"]), ("XL", 4))
+        self.assertTrue(active["id"].startswith("shopvar_"))
+        self.assertNotEqual(active["id"], original_id)
+        self.assertEqual(
+            (
+                retired["id"],
+                retired["size"],
+                retired["colourName"],
+                retired["stock"],
+                retired["active"],
+            ),
+            (original_id, "M", "Blue", 8, False),
+        )
+
+        self.store.admin_transition_product("admin-a", product["id"], "PUBLISHED")
+        public_variant = self.store.list_published_products()[0]["variants"][0]
+        self.assertEqual(
+            (public_variant["id"], public_variant["size"], public_variant["stock"]),
+            (active["id"], "XL", 4),
+        )
+        catalog = self.store.payment_catalog_products()[0]["variants"]
+        self.assertFalse(
+            next(item for item in catalog if item["id"] == original_id)["active"]
+        )
+
     def test_published_product_change_requests_preserve_live_version_until_approval(self) -> None:
         self.create_active_shop("user-a", "Managed Publishing Shop")
         self.create_active_shop("user-b", "Other Seller Shop")
@@ -621,7 +673,10 @@ class ShopWorkflowTests(unittest.TestCase):
             "admin-a", variant_change["id"], "UNDER_REVIEW"
         )
         self.store.admin_transition_product_change_request(
-            "admin-a", variant_change["id"], "APPROVED"
+            "admin-a",
+            variant_change["id"],
+            "APPROVED",
+            live_inventory={original_variant_id: 0},
         )
         resized_public = self.store.list_published_products()[0]
         self.assertEqual(
