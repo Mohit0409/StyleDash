@@ -347,6 +347,10 @@ class DeploymentAndTaxTests(unittest.TestCase):
             text,
         )
         self.assertIn(
+            'install -m 600 "$STAGE/scripts/styledash_reviews.py" "$HOME/admin/styledash_reviews.py"',
+            text,
+        )
+        self.assertIn(
             'install -m 600 "$STAGE/scripts/audit_identity_duplicates.py" "$HOME/server/audit_identity_duplicates.py"',
             text,
         )
