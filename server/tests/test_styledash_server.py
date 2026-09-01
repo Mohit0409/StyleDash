@@ -3483,5 +3483,69 @@ class HttpApiTests(unittest.TestCase):
             delivery_queue.close()
 
 
+    def test_verified_customer_review_http_contract(self) -> None:
+        status, registered, headers = self.post_json("/api/auth/register", {
+            "name": "Review HTTP Customer",
+            "email": "review-http@example.test",
+            "password": "very secure review password 123",
+            "phone": "9888888888",
+        })
+        self.assertEqual(status, 201)
+        session_headers = {
+            "Cookie": headers["Set-Cookie"].split(";", 1)[0],
+            "X-CSRF-Token": registered["csrfToken"],
+            "Origin": "https://styledash.test",
+        }
+        user_id = registered["user"]["id"]
+
+        status, empty, _headers = self.get_json("/api/reviews?productId=sd-prod-001")
+        self.assertEqual((status, empty["reviewCount"], empty["rating"]), (200, 0, 0))
+        status, ineligible, _headers = self.get_json(
+            "/api/reviews/eligibility?productId=sd-prod-001", {"Cookie": session_headers["Cookie"]}
+        )
+        self.assertEqual((status, ineligible["eligible"]), (200, False))
+
+        with self.service.store.lock:
+            self.service.store.state["orders"]["review-http-order"] = {
+                "id": "review-http-order", "userId": user_id, "status": "delivered",
+                "createdAt": "2026-09-01T01:00:00+00:00", "updatedAt": "2026-09-01T02:00:00+00:00",
+                "fulfillmentRequired": True,
+                "items": [{"productId": "sd-prod-001", "productName": "Review Product"}],
+            }
+            self.service.store.save()
+
+        status, eligible, _headers = self.get_json(
+            "/api/reviews/eligibility?productId=sd-prod-001", {"Cookie": session_headers["Cookie"]}
+        )
+        self.assertEqual((status, eligible["eligible"], eligible["orderId"]), (200, True, "review-http-order"))
+
+        status, created, _headers = self.post_json("/api/reviews", {
+            "productId": "sd-prod-001", "rating": 5,
+            "title": "Loved it", "comment": "Delivered product matched the listing.",
+        }, session_headers)
+        self.assertEqual(status, 201)
+        review_id = created["review"]["id"]
+        self.assertTrue(created["review"]["verifiedPurchase"])
+
+        status, public, _headers = self.get_json("/api/reviews?productId=sd-prod-001&sort=highest")
+        self.assertEqual((status, public["rating"], public["reviewCount"]), (200, 5.0, 1))
+        self.assertEqual(public["reviews"][0]["id"], review_id)
+
+        status, duplicate, _headers = self.post_json("/api/reviews", {
+            "productId": "sd-prod-001", "rating": 4, "comment": "Duplicate attempt",
+        }, session_headers)
+        self.assertEqual((status, duplicate["code"]), (409, "review_exists"))
+
+        status, updated, _headers = self.post_json(f"/api/reviews/{review_id}/edit", {
+            "rating": 4, "title": "Updated", "comment": "Updated after a few days of use.",
+        }, session_headers)
+        self.assertEqual((status, updated["review"]["rating"]), (200, 4))
+
+        status, deleted, _headers = self.post_json(f"/api/reviews/{review_id}/delete", {}, session_headers)
+        self.assertEqual((status, deleted), (200, {"success": True}))
+        status, empty_again, _headers = self.get_json("/api/reviews?productId=sd-prod-001")
+        self.assertEqual((status, empty_again["reviewCount"]), (200, 0))
+
+
 if __name__ == "__main__":
     unittest.main()

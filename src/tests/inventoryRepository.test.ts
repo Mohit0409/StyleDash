@@ -12,6 +12,11 @@ const productsResponse = (products: unknown[] = []) => new Response(JSON.stringi
   headers: { 'Content-Type': 'application/json' },
 });
 
+const reviewResponse = (summaries: Record<string, unknown> = {}) => new Response(JSON.stringify({ success: true, summaries }), {
+  status: 200,
+  headers: { 'Content-Type': 'application/json' },
+});
+
 afterEach(() => {
   vi.unstubAllGlobals();
   vi.restoreAllMocks();
@@ -55,6 +60,28 @@ describe('authoritative inventory repository', () => {
 
     expect(fetcher.mock.calls.filter(([input]) => String(input) === '/api/shop-products/published')).toHaveLength(1);
     expect(fetcher.mock.calls.filter(([input]) => String(input) === '/api/inventory/availability')).toHaveLength(1);
+  });
+
+  it('batches review summaries so every catalogue product is covered without exceeding 64 ids', async () => {
+    const fetcher = vi.fn<typeof fetch>(async input => {
+      const url = String(input);
+      if (url === '/api/shop-products/published') return productsResponse();
+      if (url.startsWith('/api/reviews/summaries?')) return reviewResponse();
+      return response([]);
+    });
+    vi.stubGlobal('fetch', fetcher);
+
+    const products = await productRepository.getAllProducts();
+    const reviewCalls = fetcher.mock.calls.filter(([input]) => String(input).startsWith('/api/reviews/summaries?'));
+    expect(products.length).toBeGreaterThan(64);
+    expect(reviewCalls.length).toBeGreaterThan(1);
+    const requestedIds = reviewCalls.flatMap(([input]) =>
+      new URL(String(input), 'https://styledash.test').searchParams.getAll('productId'));
+    for (const [input] of reviewCalls) {
+      const ids = new URL(String(input), 'https://styledash.test').searchParams.getAll('productId');
+      expect(ids.length).toBeLessThanOrEqual(64);
+    }
+    expect(new Set(requestedIds)).toEqual(new Set(products.map(product => product.id)));
   });
 
   it('refreshes displayed availability when server stock changes', async () => {

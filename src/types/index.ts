@@ -18,9 +18,10 @@ export interface Review {
   id: string;
   userName: string;
   rating: number;
-  title?: string;
+  title?: string | null;
   comment: string;
   createdAt: string;
+  updatedAt?: string;
   verifiedPurchase: boolean;
 }
 

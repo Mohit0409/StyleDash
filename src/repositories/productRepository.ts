@@ -1,6 +1,7 @@
 import { Product } from '../types';
 import { inventoryRepository } from './inventoryRepository';
 import { shopProductApi } from '../services/businessApi';
+import { reviewApi, ReviewSummary } from '../services/reviewApi';
 
 const PUBLISHED_SHOP_CACHE_MS = 15_000;
 let publishedShopCache: { expiresAt: number; products: Product[] } | null = null;
@@ -81,6 +82,33 @@ const getCatalogue = async (): Promise<Product[]> => mergeCatalogue(
 );
 
 
+const REVIEW_SUMMARY_BATCH_SIZE = 64;
+
+const getReviewSummaries = async (products: Product[]): Promise<Record<string, ReviewSummary>> => {
+  if (!products.length) return {};
+  const productIds = products.map(product => product.id);
+  const batches: string[][] = [];
+  for (let offset = 0; offset < productIds.length; offset += REVIEW_SUMMARY_BATCH_SIZE) {
+    batches.push(productIds.slice(offset, offset + REVIEW_SUMMARY_BATCH_SIZE));
+  }
+  const results = await Promise.all(batches.map(async batch => {
+    try {
+      const summaries = await reviewApi.summaries(batch);
+      return summaries && typeof summaries === 'object' ? summaries : {};
+    } catch {
+      return {};
+    }
+  }));
+  return Object.assign({}, ...results);
+};
+
+const applyReviewSummaries = (products: Product[], summaries: Record<string, ReviewSummary>): Product[] =>
+  products.map(product => ({
+    ...product,
+    rating: summaries[product.id]?.rating ?? product.rating,
+    reviewCount: summaries[product.id]?.reviewCount ?? product.reviewCount,
+  }));
+
 const selectHomepageProducts = (products: Product[]): Product[] => {
   const selectedIds = new Set<string>();
   const sections = [
@@ -108,13 +136,22 @@ const withHomepageAvailability = async (products: Product[]): Promise<Product[]>
 export const productRepository = {
   async getHomepageProducts(): Promise<Product[]> {
     const products = selectHomepageProducts(await getCatalogue());
-    return withHomepageAvailability(products);
+    const [availableProducts, summaries] = await Promise.all([
+      withHomepageAvailability(products),
+      getReviewSummaries(products),
+    ]);
+    return applyReviewSummaries(availableProducts, summaries);
   },
 
   async getAllProducts(): Promise<Product[]> {
-    // Start both public requests together; availability remains fail-closed.
+    // Start availability while catalogue data loads; review summaries are independent and fail open to zero.
     if (!availabilityRequest) availabilityRequest = inventoryRepository.getAvailability();
-    return withServerAvailability(await getCatalogue());
+    const products = await getCatalogue();
+    const [availableProducts, summaries] = await Promise.all([
+      withServerAvailability(products),
+      getReviewSummaries(products),
+    ]);
+    return applyReviewSummaries(availableProducts, summaries);
   },
 
   async getProductBySlug(slug: string): Promise<Product | null> {
