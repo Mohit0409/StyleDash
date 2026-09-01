@@ -4,6 +4,17 @@ import { shopProductApi } from '../services/businessApi';
 import { reviewApi, ReviewSummary } from '../services/reviewApi';
 
 const PUBLISHED_SHOP_CACHE_MS = 15_000;
+const PRODUCT_IMAGE_FALLBACK = '/product-placeholder.svg';
+
+const isObviouslyPageUrl = (value: string): boolean => {
+  try {
+    const pathname = new URL(value, 'https://vibe4you.invalid').pathname.toLowerCase();
+    return /\.x?html?$/.test(pathname);
+  } catch {
+    return false;
+  }
+};
+
 let publishedShopCache: { expiresAt: number; products: Product[] } | null = null;
 let publishedShopRequest: Promise<Product[]> | null = null;
 let availabilityRequest: ReturnType<typeof inventoryRepository.getAvailability> | null = null;
@@ -14,12 +25,27 @@ const launchStore = {
   storeSlug: 'urban-style-store',
 };
 
-const normalizeStoreMetadata = (product: Product): Product => ({
-  ...product,
-  vendorId: product.vendorId || launchStore.vendorId,
-  storeName: product.storeName || launchStore.storeName,
-  storeSlug: product.storeSlug || launchStore.storeSlug,
-});
+const normalizeStoreMetadata = (product: Product): Product => {
+  const safeImages = product.images.filter(image => !isObviouslyPageUrl(image));
+  const safeThumbnail = product.thumbnail && !isObviouslyPageUrl(product.thumbnail)
+    ? product.thumbnail
+    : null;
+  const thumbnail = safeThumbnail || safeImages[0] || PRODUCT_IMAGE_FALLBACK;
+  const images = safeImages.length > 0 ? safeImages : [thumbnail];
+  return {
+    ...product,
+    images,
+    thumbnail,
+    variants: product.variants.map(variant => {
+      if (!variant.images) return variant;
+      const safeVariantImages = variant.images.filter(image => !isObviouslyPageUrl(image));
+      return { ...variant, images: safeVariantImages.length > 0 ? safeVariantImages : undefined };
+    }),
+    vendorId: product.vendorId || launchStore.vendorId,
+    storeName: product.storeName || launchStore.storeName,
+    storeSlug: product.storeSlug || launchStore.storeSlug,
+  };
+};
 
 const withServerAvailability = async (products: Product[]): Promise<Product[]> => {
   try {
@@ -50,7 +76,7 @@ const getPublishedShopProducts = async (): Promise<Product[]> => {
   if (publishedShopRequest) return publishedShopRequest;
 
   publishedShopRequest = shopProductApi.published()
-    .then(products => products.filter(product => product.active === true))
+    .then(products => products.filter(product => product.active === true).map(normalizeStoreMetadata))
     .then(products => {
       publishedShopCache = { expiresAt: Date.now() + PUBLISHED_SHOP_CACHE_MS, products };
       return products;
