@@ -106,8 +106,8 @@ describe('authoritative inventory repository', () => {
       id: 'shopprod_1', slug: 'active-local-shop-product', name: 'Local Shop Product', brand: 'Test Shop',
       department: 'women', category: 'Fashion', shortDescription: 'Local product', description: 'Local product',
       material: 'Cotton', careInstructions: [], price: 500, originalPrice: 500, discount: 0,
-      images: ['https://example.test/product.jpg'], thumbnail: 'https://example.test/product.jpg', rating: 0, reviewCount: 0,
-      variants: [{ id: 'shopprod_1-var-1', sku: 'SHOP-1', size: 'M', colourName: 'Black', stock: 1, available: false }],
+      images: ['https://example.test/product.html'], thumbnail: 'https://example.test/product.html', rating: 0, reviewCount: 0,
+      variants: [{ id: 'shopprod_1-var-1', sku: 'SHOP-1', size: 'M', colourName: 'Black', stock: 1, available: false, images: ['https://example.test/product.html'] }],
       tags: ['local-shop'], badge: 'Local Shop', active: true, returnWindowDays: 0, exchangeAvailable: false,
       vendorId: 'shop-1', storeName: 'Test Shop', storeSlug: 'test-shop',
     };
@@ -119,6 +119,9 @@ describe('authoritative inventory repository', () => {
     const product = await productRepository.getProductBySlug('active-local-shop-product');
 
     expect(product?.id).toBe('shopprod_1');
+    expect(product?.images).toEqual(['/product-placeholder.svg']);
+    expect(product?.thumbnail).toBe('/product-placeholder.svg');
+    expect(product?.variants[0].images).toBeUndefined();
     expect(product?.variants[0].available).toBe(true);
     expect(fetcher).toHaveBeenCalledWith('/api/shop-products/published', expect.objectContaining({ credentials: 'include' }));
   });

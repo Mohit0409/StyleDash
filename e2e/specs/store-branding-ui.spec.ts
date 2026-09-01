@@ -273,3 +273,34 @@ test('public stores, storefront, product search, and royals search use safe bran
   await expect(page.getByRole('heading', { name: /Search results for "shirt"/ })).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Textured Linen Spread Collar Shirt' })).toBeVisible();
 });
+
+
+test('obvious product page URLs fall back before the browser requests them', async ({ page }) => {
+  const badUrl = 'https://pngtree.com/freepng/stacked-jeans_3160982.html';
+  const product = {
+    id: 'shopprod-bad-page-url', slug: 'legacy-page-image-product', name: 'Legacy Page Image Product', brand: 'Royals',
+    department: 'unisex', category: 'Clothing & Fashion', shortDescription: 'Legacy image data', description: 'Legacy image data',
+    material: 'Cotton', careInstructions: [], price: 30, originalPrice: 50, discount: 40,
+    images: [badUrl], thumbnail: badUrl, rating: 0, reviewCount: 0,
+    variants: [{ id: 'shopprod-bad-page-url-var-1', sku: 'BAD-PAGE-1', size: 'M', colourName: 'Blue', stock: 20, available: true, images: [badUrl] }],
+    tags: ['local-shop'], badge: 'Local Shop', active: true, returnWindowDays: 0, exchangeAvailable: false,
+    vendorId: 'store-royals', storeName: 'royals', storeSlug: 'royals',
+  };
+  let badRequests = 0;
+  page.on('request', request => { if (request.url() === badUrl) badRequests += 1; });
+  await page.route('**/api/shop-products/published', route => route.fulfill({
+    status: 200, contentType: 'application/json', body: JSON.stringify({ success: true, products: [product] }),
+  }));
+
+  await page.goto('/products?search=Legacy%20Page%20Image%20Product');
+  await expect(page.getByRole('heading', { name: 'Legacy Page Image Product', exact: true })).toBeVisible();
+  const cardImage = page.getByAltText('Legacy Page Image Product', { exact: true });
+  await expect(cardImage).toHaveAttribute('src', '/product-placeholder.svg');
+  expect(badRequests).toBe(0);
+
+  await page.goto('/product/legacy-page-image-product');
+  await expect(page.getByRole('heading', { name: 'Legacy Page Image Product', exact: true })).toBeVisible();
+  await expect(page.getByAltText('Legacy Page Image Product', { exact: true })).toHaveAttribute('src', '/product-placeholder.svg');
+  await expect(page.getByRole('heading', { name: 'Customer Reviews' })).toBeVisible();
+  expect(badRequests).toBe(0);
+});
