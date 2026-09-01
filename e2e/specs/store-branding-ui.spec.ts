@@ -293,13 +293,13 @@ test('obvious product page URLs fall back before the browser requests them', asy
   }));
 
   await page.goto('/products?search=Legacy%20Page%20Image%20Product');
-  await expect(page.getByRole('heading', { name: 'Legacy Page Image Product' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Legacy Page Image Product', exact: true })).toBeVisible();
   const cardImage = page.getByAltText('Legacy Page Image Product', { exact: true });
   await expect(cardImage).toHaveAttribute('src', '/product-placeholder.svg');
   expect(badRequests).toBe(0);
 
   await page.goto('/product/legacy-page-image-product');
-  await expect(page.getByRole('heading', { name: 'Legacy Page Image Product' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Legacy Page Image Product', exact: true })).toBeVisible();
   await expect(page.getByAltText('Legacy Page Image Product', { exact: true })).toHaveAttribute('src', '/product-placeholder.svg');
   await expect(page.getByRole('heading', { name: 'Customer Reviews' })).toBeVisible();
   expect(badRequests).toBe(0);
