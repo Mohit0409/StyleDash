@@ -126,6 +126,33 @@ describe('authoritative inventory repository', () => {
     expect(fetcher).toHaveBeenCalledWith('/api/shop-products/published', expect.objectContaining({ credentials: 'include' }));
   });
 
+  it('excludes the demo catalogue on the real Vibe4You hostname', async () => {
+    const now = Date.now();
+    vi.spyOn(Date, 'now').mockReturnValue(now + 40_000);
+    vi.stubGlobal('window', { location: { hostname: 'vibe4you.in' } });
+    const publishedProduct = {
+      id: 'shopprod_live', slug: 'goutam-live-shoe', name: 'Goutam Live Shoe', brand: 'Goutam Shoes',
+      department: 'footwear', category: 'Sneakers', shortDescription: 'Live seller product', description: 'Live seller product',
+      material: 'Not specified', careInstructions: [], price: 999, originalPrice: 999, discount: 0,
+      images: ['/media/product-images/0123456789abcdef0123456789abcdef.jpg'], thumbnail: '/media/product-images/0123456789abcdef0123456789abcdef.jpg', rating: 0, reviewCount: 0,
+      variants: [{ id: 'shopprod_live-var-1', sku: 'SHOP-LIVE', size: '6', colourName: 'As shown', stock: 0, available: false }],
+      tags: ['local-shop'], badge: 'Local Shop', active: true, returnWindowDays: 0, exchangeAvailable: false,
+      vendorId: 'vendor_goutam', storeName: 'Goutam Shoes', storeSlug: 'goutam-shoes',
+    };
+    const fetcher = vi.fn<typeof fetch>(async input => {
+      const url = String(input);
+      if (url === '/api/shop-products/published') return productsResponse([publishedProduct]);
+      if (url.startsWith('/api/reviews/summaries?')) return reviewResponse();
+      return response([]);
+    });
+    vi.stubGlobal('fetch', fetcher);
+
+    const products = await productRepository.getAllProducts();
+
+    expect(products.map(product => product.id)).toEqual(['shopprod_live']);
+    expect(products.some(product => product.id.startsWith('sd-prod-'))).toBe(false);
+  });
+
   it('fails closed when the availability server cannot be reached', async () => {
     vi.stubGlobal('fetch', vi.fn<typeof fetch>().mockRejectedValue(new TypeError('offline')));
     const product = await productRepository.getProductBySlug('sd-prod-001');
