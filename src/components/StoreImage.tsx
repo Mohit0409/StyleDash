@@ -1,6 +1,15 @@
 import React, { useEffect, useState } from 'react';
 import { Store } from 'lucide-react';
 
+const isObviouslyPageUrl = (value: string): boolean => {
+  try {
+    const pathname = new URL(value, 'https://vibe4you.invalid').pathname.toLowerCase();
+    return /\.x?html?$/.test(pathname);
+  } catch {
+    return false;
+  }
+};
+
 interface StoreImageProps {
   src?: string | null;
   alt: string;
@@ -27,7 +36,7 @@ export const StoreImage: React.FC<StoreImageProps> = ({
     setFailed(false);
   }, [src]);
 
-  if (src && !failed) {
+  if (src && !failed && !isObviouslyPageUrl(src)) {
     return (
       <img
         src={src}

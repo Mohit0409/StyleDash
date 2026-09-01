@@ -227,8 +227,8 @@ export const Products: React.FC = () => {
             </div>
           ) : (
             <div className="grid grid-cols-2 md:grid-cols-3 gap-4 sm:gap-6">
-              {sortedProducts.map(p => (
-                <ProductCard key={p.id} product={p} />
+              {sortedProducts.map((p, index) => (
+                <ProductCard key={p.id} product={p} priority={index === 0} />
               ))}
             </div>
           )}

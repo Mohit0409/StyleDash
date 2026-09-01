@@ -12,10 +12,12 @@ export const Stores: React.FC = () => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    vendorRepository.getAllStores().then(s => {
-      setStores(s.filter(item => item.approved && item.active));
-      setLoading(false);
-    });
+    let active = true;
+    vendorRepository.getAllStores()
+      .then(s => { if (active) setStores(s.filter(item => item.approved && item.active)); })
+      .catch(() => { if (active) setStores([]); })
+      .finally(() => { if (active) setLoading(false); });
+    return () => { active = false; };
   }, []);
 
   return (
@@ -43,7 +45,22 @@ export const Stores: React.FC = () => {
 
       {/* Stores Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {stores.map(store => (
+        {loading ? [0, 1, 2].map(index => (
+          <div
+            key={`store-skeleton-${index}`}
+            data-testid="stores-loading-skeleton"
+            aria-hidden="true"
+            className="min-h-[360px] animate-pulse overflow-hidden rounded-3xl border border-neutral-200 bg-white shadow-sm dark:border-neutral-800 dark:bg-neutral-900"
+          >
+            <div className="aspect-[16/9] bg-neutral-200 dark:bg-neutral-800" />
+            <div className="space-y-4 p-6">
+              <div className="h-5 w-2/3 rounded bg-neutral-200 dark:bg-neutral-800" />
+              <div className="h-3 w-full rounded bg-neutral-200 dark:bg-neutral-800" />
+              <div className="h-3 w-4/5 rounded bg-neutral-200 dark:bg-neutral-800" />
+              <div className="h-9 w-full rounded-xl bg-neutral-200 dark:bg-neutral-800" />
+            </div>
+          </div>
+        )) : stores.map(store => (
           <div key={store.id} className="group bg-white dark:bg-neutral-900 rounded-3xl border border-neutral-200 dark:border-neutral-800 overflow-hidden shadow-sm hover:shadow-xl transition-all duration-300 flex flex-col">
             <div className="relative aspect-[16/9] bg-neutral-100 dark:bg-neutral-800 overflow-hidden">
               <StoreImage

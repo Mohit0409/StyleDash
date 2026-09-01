@@ -6,9 +6,10 @@ import { useWishlist } from '../context/WishlistContext';
 
 const PRODUCT_IMAGE_FALLBACK = '/product-placeholder.svg';
 
-export const ProductCard: React.FC<{ product: Product; onQuickView?: (p: Product) => void }> = ({
+export const ProductCard: React.FC<{ product: Product; onQuickView?: (p: Product) => void; priority?: boolean }> = ({
   product,
-  onQuickView
+  onQuickView,
+  priority = false,
 }) => {
   const { isInWishlist, toggleWishlist } = useWishlist();
   const [hoveredImage, setHoveredImage] = useState(false);
@@ -70,7 +71,8 @@ export const ProductCard: React.FC<{ product: Product; onQuickView?: (p: Product
           src={imageFailed ? PRODUCT_IMAGE_FALLBACK : (hoveredImage ? secondaryImage : primaryImage)}
           alt={product.name}
           className="w-full h-full object-cover object-center group-hover:scale-105 transition-transform duration-500"
-          loading="lazy"
+          loading={priority ? 'eager' : 'lazy'}
+          fetchPriority={priority ? 'high' : 'auto'}
           decoding="async"
           onError={() => {
             if (!imageFailed) setFailedProductId(product.id);

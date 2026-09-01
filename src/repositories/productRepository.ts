@@ -76,10 +76,13 @@ const getStaticProducts = async (): Promise<Product[]> => {
   return PRODUCTS.map(normalizeStoreMetadata);
 };
 
-const getCatalogue = async (): Promise<Product[]> => mergeCatalogue(
-  await getStaticProducts(),
-  await getPublishedShopProducts(),
-);
+const getCatalogue = async (): Promise<Product[]> => {
+  const [staticProducts, shopProducts] = await Promise.all([
+    getStaticProducts(),
+    getPublishedShopProducts(),
+  ]);
+  return mergeCatalogue(staticProducts, shopProducts);
+};
 
 
 const REVIEW_SUMMARY_BATCH_SIZE = 64;
