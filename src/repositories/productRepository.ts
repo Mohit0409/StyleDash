@@ -97,7 +97,16 @@ const mergeCatalogue = (staticProducts: Product[], shopProducts: Product[]): Pro
   }));
 };
 
+const shouldLoadDemoCatalogue = (): boolean => {
+  if (typeof window === 'undefined') return true;
+  const hostname = window.location.hostname.toLowerCase();
+  return hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '::1';
+};
+
 const getStaticProducts = async (): Promise<Product[]> => {
+  // The generated StyleDash catalogue is retained only as a deterministic local/E2E fixture.
+  // Real Vibe4You domains render DB-backed seller products exclusively.
+  if (!shouldLoadDemoCatalogue()) return [];
   const { PRODUCTS } = await import('../data/products');
   return PRODUCTS.map(normalizeStoreMetadata);
 };

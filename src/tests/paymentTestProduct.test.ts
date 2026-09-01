@@ -96,3 +96,17 @@ describe('controlled payment test route isolation', () => {
     expect(page).toContain('TEST — NO FULFILLMENT REQUIRED');
   });
 });
+
+
+describe('production catalogue isolation', () => {
+  it('keeps generated demo inventory out of the live payment runtime', () => {
+    const productionCatalogue = JSON.parse(source('server/payment-data/production-catalog.json'));
+    expect(productionCatalogue).toEqual([]);
+
+    const deploy = source('scripts/termux/deploy-payment-release');
+    expect(deploy).toContain('$STAGE/server/payment-data/production-catalog.json');
+    expect(deploy).not.toContain(
+      'install -m 644 "$STAGE/server/payment-data/catalog.json" "$HOME/.local/share/styledash/catalog.json"',
+    );
+  });
+});

@@ -3,6 +3,7 @@ import { dirname, resolve } from 'node:path';
 
 const sourcePath = resolve('src/data/products.ts');
 const outputPath = resolve('server/payment-data/catalog.json');
+const productionOutputPath = resolve('server/payment-data/production-catalog.json');
 const source = await readFile(sourcePath, 'utf8');
 const marker = 'export const PRODUCTS: Product[] =';
 const markerIndex = source.indexOf(marker);
@@ -36,4 +37,5 @@ const catalog = products.map((product) => ({
 
 await mkdir(dirname(outputPath), { recursive: true });
 await writeFile(outputPath, `${JSON.stringify(catalog, null, 2)}\n`, 'utf8');
-console.log(`Generated secure payment catalog with ${catalog.length} products.`);
+await writeFile(productionOutputPath, '[]\n', 'utf8');
+console.log(`Generated secure test catalogue with ${catalog.length} products; production catalogue is seller-only.`);

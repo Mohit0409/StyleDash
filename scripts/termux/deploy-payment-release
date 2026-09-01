@@ -12,6 +12,10 @@ DATA_ROOT="$HOME/.local/share/styledash"
 LIVE_DB="$DATA_ROOT/styledash.db"
 LIVE_STATE="$DATA_ROOT/runtime/orders.json"
 BACKUP_SCRIPT="$STAGE/scripts/termux/backup-styledash-data"
+if [ ! -f "$STAGE/server/payment-data/production-catalog.json" ]; then
+  echo "release is missing production-catalog.json; deployment aborted" >&2
+  exit 1
+fi
 for required_ops_script in styledash-health styledash-notify rollback-payment-release backup-styledash-recovery start-styledash-cloudflare; do
   if [ ! -f "$STAGE/scripts/termux/$required_ops_script" ]; then
     echo "release is missing $required_ops_script; deployment aborted" >&2
@@ -209,7 +213,7 @@ done
 
 mkdir -p "$HOME/.local/share/styledash/runtime"
 chmod 700 "$HOME/.local/share/styledash" "$HOME/.local/share/styledash/runtime"
-install -m 644 "$STAGE/server/payment-data/catalog.json" "$HOME/.local/share/styledash/catalog.json"
+install -m 644 "$STAGE/server/payment-data/production-catalog.json" "$HOME/.local/share/styledash/catalog.json"
 install -m 644 "$STAGE/server/payment-data/settings.json" "$HOME/.local/share/styledash/settings.json"
 
 install -m 755 "$STAGE/scripts/termux/start-styledash" "$HOME/bin/start-styledash"
