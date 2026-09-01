@@ -188,6 +188,7 @@ install -m 600 "$STAGE/scripts/styledash_notify.py" "$HOME/server/styledash_noti
 mkdir -p "$HOME/admin/admin" "$HOME/admin/tools"
 install -m 600 "$STAGE/scripts/styledash_mail.py" "$HOME/admin/styledash_mail.py"
 install -m 600 "$STAGE/scripts/styledash_notify.py" "$HOME/admin/styledash_notify.py"
+install -m 600 "$STAGE/scripts/styledash_reviews.py" "$HOME/admin/styledash_reviews.py"
 chmod 700 "$HOME/admin" "$HOME/admin/admin" "$HOME/admin/tools"
 install -m 600 "$STAGE/scripts/termux-admin-server.py" "$HOME/admin/serve.py"
 install -m 600 "$STAGE/scripts/styledash_admin.py" "$HOME/admin/styledash_admin.py"
@@ -199,16 +200,12 @@ install -m 600 "$STAGE/server/admin/admin.js" "$HOME/admin/admin/admin.js"
 install -m 700 "$STAGE/server/tools/create_admin.py" "$HOME/admin/tools/create_admin.py"
 rm -f -- "$HOME/server/tools/set_admin.py" "$HOME/server/tools/setup_admin_totp.py"
 
-for runtime_module in styledash_security.py styledash_mail.py styledash_notify.py styledash_shops.py; do
+for runtime_module in styledash_security.py styledash_mail.py styledash_notify.py styledash_shops.py styledash_reviews.py; do
   if [ ! -f "$HOME/server/$runtime_module" ] || [ ! -f "$HOME/admin/$runtime_module" ]; then
     echo "deployed runtime is missing $runtime_module; deployment aborted" >&2
     exit 1
   fi
 done
-if [ ! -f "$HOME/server/styledash_reviews.py" ]; then
-  echo "deployed runtime is missing styledash_reviews.py; deployment aborted" >&2
-  exit 1
-fi
 
 mkdir -p "$HOME/.local/share/styledash/runtime"
 chmod 700 "$HOME/.local/share/styledash" "$HOME/.local/share/styledash/runtime"
