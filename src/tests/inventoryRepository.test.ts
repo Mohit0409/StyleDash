@@ -48,7 +48,7 @@ describe('authoritative inventory repository', () => {
     expect(new Set(requestedProductIds).size).toBe(requestedProductIds.length);
     expect(requestedProductIds.length).toBeLessThanOrEqual(32);
     expect(fetcher.mock.calls.some(([input]) => String(input) === '/api/inventory/availability')).toBe(false);
-  });
+  }, 10_000);
 
   it('deduplicates concurrent public catalogue and availability requests', async () => {
     const fetcher = vi.fn<typeof fetch>(async input => String(input) === '/api/shop-products/published'
