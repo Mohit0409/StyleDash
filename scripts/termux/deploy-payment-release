@@ -26,8 +26,9 @@ if [ ! -f "$STAGE/scripts/styledash_firebase.py" ]; then
   exit 1
 fi
 if [ ! -f "$STAGE/scripts/styledash_shops.py" ] || \
+   [ ! -f "$STAGE/scripts/styledash_reviews.py" ] || \
    [ ! -f "$STAGE/scripts/audit_identity_duplicates.py" ]; then
-  echo "release is missing shop or identity-migration safety modules; deployment aborted" >&2
+  echo "release is missing shop, review, or identity-migration safety modules; deployment aborted" >&2
   exit 1
 fi
 firebase_assets=("$STAGE"/dist/assets/*.js)
@@ -90,6 +91,7 @@ if [ ! -f "$FIREBASE_CREDENTIALS_REAL" ] || \
 fi
 export STYLEDASH_FIREBASE_CREDENTIALS="$FIREBASE_CREDENTIALS_REAL"
 PYTHONPATH="$STAGE/scripts${PYTHONPATH:+:$PYTHONPATH}" python3 -c 'from styledash_firebase import _initialize_app; _initialize_app(); print("firebase_admin_preflight=ok")'
+PYTHONPATH="$STAGE/scripts${PYTHONPATH:+:$PYTHONPATH}" python3 -c 'import styledash_reviews; print("reviews_module_preflight=ok")'
 
 if [ -f "$LIVE_DB" ]; then
   python3 - "$LIVE_DB" <<'PY'
@@ -179,6 +181,7 @@ install -m 755 "$STAGE/scripts/termux-spa-server.py" "$HOME/server/serve.py"
 install -m 600 "$STAGE/scripts/styledash_security.py" "$HOME/server/styledash_security.py"
 install -m 600 "$STAGE/scripts/styledash_firebase.py" "$HOME/server/styledash_firebase.py"
 install -m 600 "$STAGE/scripts/styledash_shops.py" "$HOME/server/styledash_shops.py"
+install -m 600 "$STAGE/scripts/styledash_reviews.py" "$HOME/server/styledash_reviews.py"
 install -m 600 "$STAGE/scripts/audit_identity_duplicates.py" "$HOME/server/audit_identity_duplicates.py"
 install -m 600 "$STAGE/scripts/styledash_mail.py" "$HOME/server/styledash_mail.py"
 install -m 600 "$STAGE/scripts/styledash_notify.py" "$HOME/server/styledash_notify.py"
@@ -202,6 +205,10 @@ for runtime_module in styledash_security.py styledash_mail.py styledash_notify.p
     exit 1
   fi
 done
+if [ ! -f "$HOME/server/styledash_reviews.py" ]; then
+  echo "deployed runtime is missing styledash_reviews.py; deployment aborted" >&2
+  exit 1
+fi
 
 mkdir -p "$HOME/.local/share/styledash/runtime"
 chmod 700 "$HOME/.local/share/styledash" "$HOME/.local/share/styledash/runtime"
@@ -256,18 +263,22 @@ connection = sqlite3.connect(sys.argv[1])
 try:
     identity_versions = {row[0] for row in connection.execute("SELECT version FROM schema_migrations")}
     shop_versions = {row[0] for row in connection.execute("SELECT version FROM shop_schema_migrations")}
+    review_versions = {row[0] for row in connection.execute("SELECT version FROM review_schema_migrations")}
     shop_product_columns = {row[1] for row in connection.execute("PRAGMA table_info(shop_product_submissions)")}
+    review_columns = {row[1] for row in connection.execute("PRAGMA table_info(product_reviews)")}
     shop_application_columns = {row[1] for row in connection.execute("PRAGMA table_info(vendor_applications)")}
     integrity = connection.execute("PRAGMA integrity_check").fetchone()[0]
     foreign_keys = connection.execute("PRAGMA foreign_key_check").fetchall()
 finally:
     connection.close()
-if 6 not in identity_versions or not {1, 2, 3, 4, 5}.issubset(shop_versions):
+if 6 not in identity_versions or not {1, 2, 3, 4, 5}.issubset(shop_versions) or 1 not in review_versions:
     raise SystemExit("Vibe4You schema migrations are incomplete")
 if "variants_json" not in shop_product_columns:
     raise SystemExit("Vibe4You product variant schema is incomplete")
 if not {"banner_image_url", "logo_image_url"}.issubset(shop_application_columns):
     raise SystemExit("Vibe4You store branding schema is incomplete")
+if not {"product_id", "user_id", "order_id", "rating", "comment", "status"}.issubset(review_columns):
+    raise SystemExit("Vibe4You verified review schema is incomplete")
 if integrity != "ok" or foreign_keys:
     raise SystemExit("Vibe4You post-migration database validation failed")
 print("styledash_migrations=ok")

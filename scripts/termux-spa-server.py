@@ -43,6 +43,11 @@ except ModuleNotFoundError:  # Repository test import path.
     from scripts.styledash_shops import ShopWorkflow
 
 try:
+    from styledash_reviews import ReviewWorkflow
+except ModuleNotFoundError:  # Repository test import path.
+    from scripts.styledash_reviews import ReviewWorkflow
+
+try:
     from styledash_mail import PasswordResetDeliveryQueue, SmtpPasswordResetSender
 except ModuleNotFoundError:  # Repository test import path.
     from scripts.styledash_mail import PasswordResetDeliveryQueue, SmtpPasswordResetSender
@@ -1909,6 +1914,7 @@ class PaymentService:
 class StyleDashRequestHandler(SimpleHTTPRequestHandler):
     payment_service: PaymentService
     product_image_directory: Path
+    review_workflow: ReviewWorkflow | None
     rate_limiter = RateLimiter()
 
     def guess_type(self, path: str) -> str:
@@ -2137,6 +2143,11 @@ class StyleDashRequestHandler(SimpleHTTPRequestHandler):
             )
         return self.payment_service.shops
 
+    def _reviews(self) -> ReviewWorkflow:
+        if self.review_workflow is None:
+            raise SecurityError(HTTPStatus.SERVICE_UNAVAILABLE, "Reviews are unavailable.", "review_service_unavailable")
+        return self.review_workflow
+
     def _session_token(self) -> str | None:
         cookie = SimpleCookie()
         try:
@@ -2294,6 +2305,33 @@ class StyleDashRequestHandler(SimpleHTTPRequestHandler):
                 self._rate_limit(path, 30)
                 user = self._payment_test_user()
                 self._json_response(HTTPStatus.OK, self.payment_service.payment_test_product(user))
+                return
+            if path == "/api/reviews":
+                self._rate_limit("reviews:list", 120)
+                query = parse_qs(parsed.query, keep_blank_values=True)
+                product_values = query.get("productId", [])
+                sort_values = query.get("sort", ["newest"])
+                if len(product_values) != 1 or len(sort_values) != 1:
+                    raise SecurityError(400, "Invalid review request.", "invalid_review_request")
+                result = self._reviews().list_product(product_values[0], sort_values[0])
+                self._json_response(HTTPStatus.OK, {"success": True, **result})
+                return
+            if path == "/api/reviews/summaries":
+                self._rate_limit("reviews:summaries", 240)
+                query = parse_qs(parsed.query, keep_blank_values=True)
+                product_values = query.get("productId", [])
+                result = self._reviews().summaries(product_values)
+                self._json_response(HTTPStatus.OK, {"success": True, "summaries": result})
+                return
+            if path == "/api/reviews/eligibility":
+                self._rate_limit("reviews:eligibility", 60)
+                user, _session = self._current_user()
+                query = parse_qs(parsed.query, keep_blank_values=True)
+                product_values = query.get("productId", [])
+                if len(product_values) != 1:
+                    raise SecurityError(400, "Invalid product.", "invalid_product")
+                result = self._reviews().eligibility(self.payment_service.store, user["id"], product_values[0])
+                self._json_response(HTTPStatus.OK, {"success": True, **result})
                 return
             if path == "/api/auth/me":
                 raw = self._session_token()
@@ -2475,6 +2513,33 @@ class StyleDashRequestHandler(SimpleHTTPRequestHandler):
                     )
 
                 self._json_response(HTTPStatus.CREATED, result)
+                return
+            if path == "/api/reviews":
+                self._rate_limit("reviews:create", 10)
+                user, _session = self._current_user()
+                self._csrf()
+                review = self._reviews().create(self.payment_service.store, user["id"], self._read_json())
+                self._json_response(HTTPStatus.CREATED, {"success": True, "review": review})
+                return
+            if path.startswith("/api/reviews/") and path.endswith("/edit"):
+                self._rate_limit("reviews:edit", 10)
+                user, _session = self._current_user()
+                self._csrf()
+                review_id = unquote(path.removeprefix("/api/reviews/").removesuffix("/edit"))
+                if not review_id or "/" in review_id:
+                    raise SecurityError(404, "Review not found.", "review_not_found")
+                review = self._reviews().edit(user["id"], review_id, self._read_json())
+                self._json_response(HTTPStatus.OK, {"success": True, "review": review})
+                return
+            if path.startswith("/api/reviews/") and path.endswith("/delete"):
+                self._rate_limit("reviews:delete", 10)
+                user, _session = self._current_user()
+                self._csrf()
+                review_id = unquote(path.removeprefix("/api/reviews/").removesuffix("/delete"))
+                if not review_id or "/" in review_id:
+                    raise SecurityError(404, "Review not found.", "review_not_found")
+                self._reviews().delete(user["id"], review_id)
+                self._json_response(HTTPStatus.OK, {"success": True})
                 return
             if path == "/api/auth/register":
                 self._rate_limit(path, 5)
@@ -2898,6 +2963,9 @@ def create_server(
         pass
     BoundStyleDashRequestHandler.payment_service = payment_service
     BoundStyleDashRequestHandler.product_image_directory = product_image_directory
+    BoundStyleDashRequestHandler.review_workflow = (
+        ReviewWorkflow(payment_service.security.path) if payment_service.security is not None else None
+    )
     BoundStyleDashRequestHandler.rate_limiter = RateLimiter()
     handler = partial(BoundStyleDashRequestHandler, directory=str(directory))
     server = ThreadingHTTPServer((bind, port), handler)

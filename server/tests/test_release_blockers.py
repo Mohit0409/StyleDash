@@ -343,11 +343,18 @@ class DeploymentAndTaxTests(unittest.TestCase):
             text,
         )
         self.assertIn(
+            'install -m 600 "$STAGE/scripts/styledash_reviews.py" "$HOME/server/styledash_reviews.py"',
+            text,
+        )
+        self.assertIn(
             'install -m 600 "$STAGE/scripts/audit_identity_duplicates.py" "$HOME/server/audit_identity_duplicates.py"',
             text,
         )
         self.assertIn("styledash_migrations=ok", text)
         self.assertIn("{1, 2, 3, 4, 5}.issubset(shop_versions)", text)
+        self.assertIn("1 not in review_versions", text)
+        self.assertIn('SELECT version FROM review_schema_migrations', text)
+        self.assertIn('PRAGMA table_info(product_reviews)', text)
         self.assertIn('PRAGMA table_info(shop_product_submissions)', text)
         self.assertIn('"variants_json" not in shop_product_columns', text)
         self.assertIn('PRAGMA table_info(vendor_applications)', text)

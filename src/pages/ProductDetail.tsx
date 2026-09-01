@@ -1,10 +1,11 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { Star, Zap, Heart, ShieldCheck, RefreshCw, ShoppingBag, CheckCircle, ArrowRight } from 'lucide-react';
 import { SEO } from '../components/SEO';
 import { VariantSelector } from '../components/VariantSelector';
 import { SizeGuideModal } from '../components/SizeGuideModal';
 import { ProductCard } from '../components/ProductCard';
+import { ProductReviews } from '../components/ProductReviews';
 import { Product, ProductVariant } from '../types';
 import { productRepository } from '../repositories/productRepository';
 import { useCart } from '../context/CartContext';
@@ -27,6 +28,10 @@ export const ProductDetail: React.FC = () => {
   const [quantity, setQuantity] = useState(1);
   const [sizeGuideOpen, setSizeGuideOpen] = useState(false);
   const [relatedProducts, setRelatedProducts] = useState<Product[]>([]);
+
+  const handleReviewSummaryChange = useCallback((rating: number, reviewCount: number) => {
+    setProduct(current => current ? { ...current, rating, reviewCount } : current);
+  }, []);
 
   useEffect(() => {
     if (!slug) return;
@@ -112,6 +117,11 @@ export const ProductDetail: React.FC = () => {
               ? 'https://schema.org/InStock'
               : 'https://schema.org/OutOfStock',
           },
+          aggregateRating: product.reviewCount > 0 ? {
+            '@type': 'AggregateRating',
+            ratingValue: product.rating,
+            reviewCount: product.reviewCount,
+          } : undefined,
         }}
       />
 
@@ -270,6 +280,8 @@ export const ProductDetail: React.FC = () => {
         onClose={() => setSizeGuideOpen(false)}
         department={product.department}
       />
+
+      <ProductReviews productId={product.id} onSummaryChange={handleReviewSummaryChange} />
 
       {/* Similar Products */}
       <section className="pt-12 border-t border-neutral-200 dark:border-neutral-800 space-y-6">
