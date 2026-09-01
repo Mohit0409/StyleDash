@@ -11,7 +11,22 @@ echo "$(date -Iseconds) boot startup requested"
 
 termux-wake-lock || true
 source "$PREFIX/etc/profile.d/start-services.sh"
-sv up sshd || true
+
+# start-services.sh launches runsvdir asynchronously. Wait for it before
+# asking runit to bring sshd up, otherwise early boot races with runsv.
+SSHD_READY=0
+for _ in $(seq 1 20); do
+  if sv status sshd >/dev/null 2>&1; then
+    SSHD_READY=1
+    break
+  fi
+  sleep 1
+done
+if [ "$SSHD_READY" -eq 1 ] && sv up sshd; then
+  echo "$(date -Iseconds) sshd service ready"
+else
+  echo "$(date -Iseconds) sshd service failed to become ready" >&2
+fi
 
 for _ in $(seq 1 30); do
   curl -fsS --max-time 3 http://127.0.0.1:8080/api/health >/dev/null && break
