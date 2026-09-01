@@ -1826,7 +1826,10 @@ class HttpApiTests(unittest.TestCase):
             self.assertNotIn("paymentMode", payload)
             self.assertEqual(response.headers["X-Content-Type-Options"], "nosniff")
             self.assertEqual(response.headers["Referrer-Policy"], "strict-origin-when-cross-origin")
-            self.assertIn("checkout.razorpay.com", response.headers["Content-Security-Policy"])
+            policy = response.headers["Content-Security-Policy"]
+            self.assertIn("checkout.razorpay.com", policy)
+            self.assertIn("https://static.cloudflareinsights.com", policy)
+            self.assertIn("https://cloudflareinsights.com", policy)
 
     def test_static_utf8_assets_declare_charset(self) -> None:
         with urllib.request.urlopen(f"{self.base_url}/utf8.js") as response:
