@@ -63,6 +63,7 @@ function formDialog(title, fields, submitLabel='Continue') {
       control.name=field.name; control.required=field.required===true;
       if(field.type==='select'){for(const option of field.options||[]){const node=document.createElement('option');node.value=option.value;node.textContent=option.label;control.appendChild(node);}}
       else if(field.type&&field.type!=='textarea')control.type=field.type;
+      if(field.accept)control.accept=field.accept; if(field.multiple)control.multiple=true;
       control.value=field.value??'';
       if(field.placeholder)control.placeholder=field.placeholder;
       if(field.minLength)control.minLength=field.minLength;
@@ -74,13 +75,24 @@ function formDialog(title, fields, submitLabel='Continue') {
     }
     let settled=false;
     const finish=value=>{if(settled)return;settled=true;form.onsubmit=null;byId('admin-dialog-cancel').onclick=null;dialog.oncancel=null;if(dialog.open)dialog.close();resolve(value);};
-    form.onsubmit=event=>{event.preventDefault();if(!form.reportValidity())return;finish(Object.fromEntries(new FormData(form).entries()));};
+    form.onsubmit=event=>{event.preventDefault();if(!form.reportValidity())return;const values=Object.fromEntries(new FormData(form).entries());for(const field of fields){if(field.type==='file'&&field.multiple)values[field.name]=Array.from(form.elements[field.name]?.files||[]);}finish(values);};
     byId('admin-dialog-cancel').onclick=()=>finish(null);
     dialog.oncancel=event=>{event.preventDefault();finish(null);};
     dialog.showModal();
     fieldsRoot.querySelector('input,textarea,select')?.focus();
   });
 }
+
+async function prepareAdminProductImage(file){
+  const allowed=new Set(['image/jpeg','image/png','image/webp']); if(!allowed.has(file.type))throw new Error('Choose JPEG, PNG or WebP images.'); if(file.size<=0||file.size>12*1024*1024)throw new Error('Choose images smaller than 12 MB.');
+  const bitmap=await createImageBitmap(file,{imageOrientation:'from-image'});
+  try{const fit=max=>{const scale=Math.min(1,max/Math.max(bitmap.width,bitmap.height));return {width:Math.max(1,Math.round(bitmap.width*scale)),height:Math.max(1,Math.round(bitmap.height*scale))};};let size=fit(1600);let canvas=document.createElement('canvas');canvas.width=size.width;canvas.height=size.height;canvas.getContext('2d').drawImage(bitmap,0,0,size.width,size.height);
+    const make=q=>new Promise((resolve,reject)=>canvas.toBlob(blob=>blob?resolve(blob):reject(new Error('Image compression failed.')),'image/webp',q)); let blob=await make(.82);for(const q of [.72,.62,.52]){if(blob.size<=350*1024)break;blob=await make(q);}if(blob.size>500*1024){size=fit(1200);canvas=document.createElement('canvas');canvas.width=size.width;canvas.height=size.height;canvas.getContext('2d').drawImage(bitmap,0,0,size.width,size.height);blob=await new Promise((resolve,reject)=>canvas.toBlob(b=>b?resolve(b):reject(new Error('Image compression failed.')),'image/webp',.62));}if(blob.size>500*1024)throw new Error('Image is still too large after compression.');return blob;
+  }finally{bitmap.close();}
+}
+async function blobBase64(blob){const bytes=new Uint8Array(await blob.arrayBuffer());let binary='';for(let i=0;i<bytes.length;i+=0x8000)binary+=String.fromCharCode(...bytes.subarray(i,i+0x8000));return btoa(binary);}
+async function uploadAdminProductImages(files){const urls=[];for(const [index,file] of (files||[]).entries()){status(`Uploading image ${index+1} of ${files.length}…`);const blob=await prepareAdminProductImage(file);const result=await api('/api/admin/product-images',{method:'POST',body:JSON.stringify({fileName:`${file.name.replace(/\.[^.]+$/,'').slice(0,80)||'product'}.webp`,contentType:'image/webp',dataBase64:await blobBase64(blob)})});urls.push(result.image.url);}return urls;}
+
 function parseVariants(raw) {
   const rows=String(raw||'').split(',').map(value=>value.trim()).filter(Boolean).map(value=>{
     const split=value.lastIndexOf(':');
@@ -201,10 +213,11 @@ async function editStoreProduct(button){
     {name:'variants',label:'Sizes and stock (S:5, M:8, L:3)',required:true,value:(item.variants||[]).map(v=>`${v.size}:${v.inventory}`).join(', ')},
     {name:'colourName',label:'Colour name',required:true,value:item.colourName||'Multi',maxLength:80},
     {name:'colourHex',label:'Colour hex (optional)',value:item.colourHex||'',placeholder:'#000000'},
-    {name:'images',label:'HTTPS image URLs separated by commas',type:'textarea',required:true,value:(item.imageUrls||[]).join(', ')},
+    {name:'images',label:'Existing / HTTPS image URLs separated by commas',type:'textarea',required:true,value:(item.imageUrls||[]).join(', ')},
+    {name:'uploads',label:'Upload product images from this PC (optional)',type:'file',accept:'image/jpeg,image/png,image/webp',multiple:true},
   ],'Save all changes'); if(!values)return;
   const price=Number(values.price), original=Number(values.original); if(!Number.isFinite(price)||price<1||!Number.isFinite(original)||original<price)throw new Error('Enter valid selling and original prices.');
-  const variants=parseVariants(values.variants); const imageUrls=values.images.split(',').map(value=>value.trim()).filter(Boolean);
+  const variants=parseVariants(values.variants); const uploadedUrls=await uploadAdminProductImages(values.uploads||[]); const imageUrls=[...values.images.split(',').map(value=>value.trim()).filter(Boolean),...uploadedUrls];
   if(!imageUrls.length)throw new Error('Add at least one product image.');
   const payload={name:values.name,description:values.description,brand:values.brand||undefined,department:values.department,category:values.category,pricePaise:Math.round(price*100),originalPricePaise:Math.round(original*100),variants,colourName:values.colourName,colourHex:values.colourHex||undefined,imageUrls};
   const wasPublished=item.status==='PUBLISHED'; let unpublished=false;

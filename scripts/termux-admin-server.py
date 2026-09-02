@@ -4,10 +4,14 @@
 from __future__ import annotations
 
 import argparse
+import base64
+import binascii
+import hashlib
 import importlib.util
 import json
 import os
 import sqlite3
+import secrets
 from http import HTTPStatus
 from http.cookies import SimpleCookie
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -35,6 +39,8 @@ except ModuleNotFoundError:
 
 
 MAX_BODY_BYTES = 64 * 1024
+PRODUCT_IMAGE_MAX_BYTES = 500 * 1024
+PRODUCT_IMAGE_REQUEST_MAX_BYTES = 700 * 1024
 ALLOWED_HOSTS = {"127.0.0.1:8081", "localhost:8081"}
 ALLOWED_ORIGINS = {"http://127.0.0.1:8081", "http://localhost:8081"}
 SECURITY_POLICY = (
@@ -125,11 +131,43 @@ class AdminApplication:
         finally:
             probe.close()
         self.shops = ShopWorkflow(database) if has_customers else None
+        self.product_image_directory = database.parent / "product-images"
         self.payments = public.PaymentService(
             catalog, settings, data_dir, key_id="", key_secret="", webhook_secret="",
             mode=os.environ.get("RAZORPAY_MODE", "test"), gateway=None,
             shop_workflow=self.shops,
         )
+
+    def store_product_image(self, payload: dict[str, Any]) -> dict[str, Any]:
+        if set(payload) != {"fileName", "contentType", "dataBase64"}:
+            raise SecurityError(400, "Invalid image upload.", "invalid_product_image")
+        file_name = payload.get("fileName")
+        content_type = payload.get("contentType")
+        encoded = payload.get("dataBase64")
+        if not isinstance(file_name, str) or not 1 <= len(file_name) <= 120 or "/" in file_name or "\\" in file_name:
+            raise SecurityError(400, "Invalid image filename.", "invalid_product_image")
+        extensions = {"image/webp": "webp", "image/jpeg": "jpg", "image/png": "png"}
+        extension = extensions.get(content_type)
+        if extension is None or not isinstance(encoded, str) or not encoded:
+            raise SecurityError(400, "Upload a JPEG, PNG or WebP image.", "invalid_product_image")
+        try:
+            content = base64.b64decode(encoded, validate=True)
+        except (binascii.Error, ValueError):
+            raise SecurityError(400, "Invalid image data.", "invalid_product_image") from None
+        if not 32 <= len(content) <= PRODUCT_IMAGE_MAX_BYTES:
+            raise SecurityError(413, "The optimized image must be 500 KB or smaller.", "product_image_too_large")
+        magic_ok = ((content_type == "image/jpeg" and content.startswith(b"\xff\xd8\xff")) or (content_type == "image/png" and content.startswith(b"\x89PNG\r\n\x1a\n")) or (content_type == "image/webp" and len(content) >= 12 and content[:4] == b"RIFF" and content[8:12] == b"WEBP"))
+        if not magic_ok:
+            raise SecurityError(400, "The uploaded file does not match its image type.", "invalid_product_image")
+        digest = hashlib.sha256(content).hexdigest()[:32]
+        self.product_image_directory.mkdir(parents=True, exist_ok=True)
+        target = self.product_image_directory / f"{digest}.{extension}"
+        if not target.exists():
+            temporary = self.product_image_directory / f".{digest}.{secrets.token_hex(6)}.tmp"
+            temporary.write_bytes(content)
+            os.chmod(temporary, 0o644)
+            os.replace(temporary, target)
+        return {"url": f"/media/product-images/{target.name}", "bytes": len(content), "contentType": content_type}
 
     def list_orders(self, query: str = "") -> list[dict[str, Any]]:
         needle = query.strip().casefold()[:100]
@@ -600,7 +638,7 @@ class AdminHandler(BaseHTTPRequestHandler):
             raise SecurityError(403, "Administrator request origin is not allowed.", "admin_invalid_origin")
         self.application.identity.verify_csrf(self._cookie(ADMIN_COOKIE), self.headers.get("X-CSRF-Token"))
 
-    def _body(self) -> dict[str, Any]:
+    def _body(self, max_bytes: int = MAX_BODY_BYTES) -> dict[str, Any]:
         content_type = self.headers.get("Content-Type", "").split(";", 1)[0].strip().casefold()
         if content_type != "application/json":
             raise SecurityError(415, "Content-Type must be application/json.", "invalid_content_type")
@@ -608,7 +646,7 @@ class AdminHandler(BaseHTTPRequestHandler):
             length = int(self.headers.get("Content-Length", ""))
         except ValueError:
             raise SecurityError(400, "Invalid request body.", "malformed_request") from None
-        if length <= 0 or length > MAX_BODY_BYTES:
+        if length <= 0 or length > max_bytes:
             raise SecurityError(413, "Request body is too large.", "body_too_large")
         try:
             payload = json.loads(self.rfile.read(length))
@@ -703,6 +741,10 @@ class AdminHandler(BaseHTTPRequestHandler):
                     raise SecurityError(400, "Choose a store-owner account.", "invalid_customer")
                 result = self._shops().admin_create_application(admin["id"], owner_user_id, payload)
                 self._json(201, {"success": True, "application": result}); return
+            if path == "/api/admin/product-images":
+                self._admin(); self._csrf()
+                result = self.application.store_product_image(self._body(PRODUCT_IMAGE_REQUEST_MAX_BYTES))
+                self._json(201, {"success": True, "image": result}); return
             if path == "/api/admin/shop-products/bulk":
                 admin, _session = self._admin(); self._csrf(); payload = self._body()
                 application_id = payload.get("applicationId")
