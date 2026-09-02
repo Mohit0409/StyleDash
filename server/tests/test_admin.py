@@ -911,6 +911,22 @@ class AdminHttpTests(unittest.TestCase):
         self.assertEqual((status, body["created"], body["products"][0]["status"]), (201, 1, "PUBLISHED"))
         self.assertEqual(shops.list_published_products()[0]["name"], "Bulk HTTP Tee")
 
+    def test_admin_product_image_upload_is_content_addressed(self):
+        import base64
+        self.request("/api/admin/login", {"username": "local-owner", "password": "long administrator password 123"}, method="POST")
+        status, body, _headers = self.request("/api/admin/totp", {"code": pyotp.TOTP(self.secret).now()}, method="POST")
+        self.assertEqual(status, 200)
+        png = base64.b64decode("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=")
+        status, body, _headers = self.request(
+            "/api/admin/product-images",
+            {"fileName": "admin-upload.png", "contentType": "image/png", "dataBase64": base64.b64encode(png).decode("ascii")},
+            headers={"X-CSRF-Token": body["csrfToken"]}, method="POST",
+        )
+        self.assertEqual(status, 201)
+        self.assertRegex(body["image"]["url"], r"^/media/product-images/[0-9a-f]{32}\.png$")
+        stored = self.database.parent / "product-images" / Path(body["image"]["url"]).name
+        self.assertEqual(stored.read_bytes(), png)
+
     def test_non_loopback_bind_refused(self):
         with self.assertRaises(RuntimeError):
             ADMIN_SERVER.create_admin_server("0.0.0.0", 0, self.database, self.key, ROOT / "server/payment-data/catalog.json", ROOT / "server/payment-data/settings.json", self.root / "data2", ROOT / "server/admin", self.root / "backups")
