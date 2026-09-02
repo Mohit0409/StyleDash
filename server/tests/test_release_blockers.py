@@ -406,3 +406,18 @@ class DeploymentAndTaxTests(unittest.TestCase):
         self.assertNotIn("Inclusive of all GST taxes", product)
 
 if __name__ == "__main__": unittest.main()
+
+
+class AdminFullProductEditTests(unittest.TestCase):
+    def test_admin_full_product_edit_exposes_catalog_fields_and_safe_live_stock_sync(self):
+        source = (ROOT / "server" / "admin" / "admin.js").read_text(encoding="utf-8")
+        for label in (
+            "Brand (optional)", "Department", "Category", "Sizes and stock",
+            "Colour name", "Colour hex (optional)", "HTTPS image URLs separated by commas",
+        ):
+            self.assertIn(label, source)
+        self.assertIn("const wasPublished=item.status==='PUBLISHED'", source)
+        self.assertIn("JSON.stringify({status:'APPROVED'})", source)
+        self.assertIn("JSON.stringify({status:'PUBLISHED'})", source)
+        self.assertIn("/api/admin/inventory?low=0&q=", source)
+        self.assertIn("All product details, images, sizes and stock updated.", source)
