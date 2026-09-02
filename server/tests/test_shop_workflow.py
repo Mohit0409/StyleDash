@@ -733,5 +733,28 @@ class ShopWorkflowTests(unittest.TestCase):
         self.assertEqual([item["stock"] for item in public["variants"]], [3, 7, 2, 1])
         self.assertEqual([item["id"] for item in public["variants"]], [f"{product['id']}-var-{index}" for index in range(1, 5)])
 
+    def test_admin_bulk_create_products_is_atomic_and_publishes_all_rows(self) -> None:
+        application = self.create_active_shop("user-a", "Bulk Upload Shop")
+        first = self.complete_product("Bulk Kurta One")
+        second = self.complete_product("Bulk Kurta Two")
+        second["pricePaise"] = 129900
+        second["originalPricePaise"] = 149900
+        created = self.store.admin_bulk_create_products("admin-a", application["id"], [first, second])
+        self.assertEqual([item["status"] for item in created], ["PUBLISHED", "PUBLISHED"])
+        self.assertEqual(set(item["name"] for item in self.store.list_published_products()), {"Bulk Kurta One", "Bulk Kurta Two"})
+
+        duplicate_a = self.complete_product("Duplicate Name")
+        duplicate_b = self.complete_product("duplicate name")
+        self.assert_error("invalid_bulk_products", lambda: self.store.admin_bulk_create_products("admin-a", application["id"], [duplicate_a, duplicate_b]))
+        self.assertNotIn("Duplicate Name", [item["name"] for item in self.store.list_published_products()])
+
+    def test_admin_bulk_create_products_rejects_existing_name_without_partial_insert(self) -> None:
+        application = self.create_active_shop("user-a", "Existing Product Shop")
+        self.store.admin_create_product("admin-a", application["id"], self.complete_product("Existing Kurta"))
+        fresh = self.complete_product("Fresh Kurta")
+        duplicate = self.complete_product("existing kurta")
+        self.assert_error("duplicate_product", lambda: self.store.admin_bulk_create_products("admin-a", application["id"], [fresh, duplicate]))
+        self.assertEqual([item["name"] for item in self.store.list_published_products()], ["Existing Kurta"])
+
 if __name__ == "__main__":
     unittest.main()

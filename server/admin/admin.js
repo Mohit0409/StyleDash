@@ -51,9 +51,11 @@ function formDialog(title, fields, submitLabel='Continue') {
     fieldsRoot.replaceChildren();
     for(const field of fields){
       const label=document.createElement('label'); label.textContent=field.label;
-      const control=field.type==='textarea'?document.createElement('textarea'):document.createElement('input');
-      control.name=field.name; control.value=field.value??''; control.required=field.required===true;
-      if(field.type&&field.type!=='textarea')control.type=field.type;
+      const control=field.type==='textarea'?document.createElement('textarea'):field.type==='select'?document.createElement('select'):document.createElement('input');
+      control.name=field.name; control.required=field.required===true;
+      if(field.type==='select'){for(const option of field.options||[]){const node=document.createElement('option');node.value=option.value;node.textContent=option.label;control.appendChild(node);}}
+      else if(field.type&&field.type!=='textarea')control.type=field.type;
+      control.value=field.value??'';
       if(field.placeholder)control.placeholder=field.placeholder;
       if(field.minLength)control.minLength=field.minLength;
       if(field.maxLength)control.maxLength=field.maxLength;
@@ -68,7 +70,7 @@ function formDialog(title, fields, submitLabel='Continue') {
     byId('admin-dialog-cancel').onclick=()=>finish(null);
     dialog.oncancel=event=>{event.preventDefault();finish(null);};
     dialog.showModal();
-    fieldsRoot.querySelector('input,textarea')?.focus();
+    fieldsRoot.querySelector('input,textarea,select')?.focus();
   });
 }
 function parseVariants(raw) {
@@ -112,6 +114,48 @@ async function createLocalStore(){
   ],'Create and activate store'); if(!values)return;
   await api('/api/admin/vendors',{method:'POST',body:JSON.stringify(values)});
   status(`${values.shopName} created and activated.`);
+}
+function downloadProductCsvTemplate(){
+  const header=['name','description','brand','department','category','price','originalPrice','variants','colourName','colourHex','imageUrls'];
+  const sample=['Classic T-Shirt','Premium cotton T-shirt','Example Brand','men','Clothing & Fashion','799','999','S:5, M:8, L:5','Black','#000000','https://example.com/front.jpg|https://example.com/back.jpg'];
+  const quote=value=>`"${String(value).replaceAll('"','""')}"`;
+  const blob=new Blob([[header,sample].map(row=>row.map(quote).join(',')).join('\r\n')],{type:'text/csv;charset=utf-8'});
+  const link=document.createElement('a'); link.href=URL.createObjectURL(blob); link.download='vibe4you-product-import-template.csv'; link.click(); URL.revokeObjectURL(link.href);
+}
+function parseCsv(text){
+  const rows=[]; let row=[]; let field=''; let quoted=false;
+  for(let i=0;i<text.length;i++){
+    const ch=text[i];
+    if(quoted){if(ch==='"'&&text[i+1]==='"'){field+='"';i++;}else if(ch==='"')quoted=false;else field+=ch;continue;}
+    if(ch==='"'){quoted=true;continue;} if(ch===','){row.push(field);field='';continue;}
+    if(ch==='\n'){row.push(field.replace(/\r$/,''));rows.push(row);row=[];field='';continue;} field+=ch;
+  }
+  if(field||row.length){row.push(field.replace(/\r$/,''));rows.push(row);} return rows.filter(r=>r.some(v=>v.trim()));
+}
+function csvProducts(text){
+  const rows=parseCsv(text); if(rows.length<2)throw new Error('CSV needs a header row and at least one product.');
+  const headers=rows[0].map(value=>value.trim()); const required=['name','description','department','category','price','variants','colourName','imageUrls'];
+  for(const key of required)if(!headers.includes(key))throw new Error(`CSV is missing required column: ${key}`);
+  return rows.slice(1).map((row,index)=>{
+    const values=Object.fromEntries(headers.map((key,i)=>[key,(row[i]??'').trim()]));
+    const price=Number(values.price); const original=Number(values.originalPrice||values.price);
+    if(!values.name)throw new Error(`Row ${index+2}: product name is required.`);
+    if(!Number.isFinite(price)||price<1||!Number.isFinite(original)||original<price)throw new Error(`Row ${index+2}: invalid price.`);
+    return {name:values.name,description:values.description,brand:values.brand||undefined,department:values.department,category:values.category,pricePaise:Math.round(price*100),originalPricePaise:Math.round(original*100),variants:parseVariants(values.variants),colourName:values.colourName,colourHex:values.colourHex||undefined,imageUrls:values.imageUrls.split('|').map(v=>v.trim()).filter(Boolean),attributes:{}};
+  });
+}
+async function bulkUploadStoreProducts(){
+  const applications=(await api('/api/admin/vendors')).applications.filter(item=>item.status==='ACTIVE');
+  if(!applications.length)throw new Error('There are no active shops available for product import.');
+  const values=await formDialog('Bulk upload products',[{name:'applicationId',label:'Publish products for',type:'select',required:true,options:applications.map(item=>({value:item.id,label:`${item.shopName} — ${item.ownerName}`}))}],'Choose CSV'); if(!values)return;
+  const input=document.createElement('input'); input.type='file'; input.accept='.csv,text/csv';
+  const file=await new Promise(resolve=>{input.onchange=()=>resolve(input.files?.[0]||null);input.click();}); if(!file)return;
+  if(file.size>1024*1024)throw new Error('CSV must be 1 MB or smaller.');
+  const products=csvProducts(await file.text()); if(products.length>100)throw new Error('Upload a maximum of 100 products at a time.');
+  const selectedShop=applications.find(item=>item.id===values.applicationId);
+  const approval=await formDialog(`Publish ${products.length} products to ${selectedShop?.shopName||'selected shop'}?`,[],`Publish ${products.length} products`); if(!approval)return;
+  const result=await api('/api/admin/shop-products/bulk',{method:'POST',body:JSON.stringify({applicationId:values.applicationId,products})});
+  status(`${result.created} products published successfully.`);
 }
 async function createStoreProduct(){
   const values=await formDialog('Add product for local store',[
@@ -161,6 +205,8 @@ byId('content').addEventListener('click', async event => {
     if(action==='reset-customer-password') await resetCustomerPassword(button.dataset.id);
     if(action==='create-store') await createLocalStore();
     if(action==='create-shop-product') await createStoreProduct();
+    if(action==='bulk-shop-products') await bulkUploadStoreProducts();
+    if(action==='download-product-template') downloadProductCsvTemplate();
     if(action==='edit-shop-product') await editStoreProduct(button);
     if(action==='order-status') await api(`/api/admin/orders/${encodeURIComponent(button.dataset.id)}/status`,{method:'PATCH',body:JSON.stringify({status:button.dataset.value})});
     if(action==='vendor') { const nextStatus=button.dataset.value; let reason=null; if(['REJECTED','SUSPENDED'].includes(nextStatus)){reason=await reasonFor(`Enter the ${nextStatus.toLowerCase()} reason`);if(!reason)return;} await api(`/api/admin/vendors/${encodeURIComponent(button.dataset.id)}`,{method:'PATCH',body:JSON.stringify({status:nextStatus,reason})}); status('Shop application status updated.'); }
@@ -219,7 +265,7 @@ function applicationTransitions(status){return {SUBMITTED:['UNDER_REVIEW'],UNDER
 function productTransitions(status){return {SUBMITTED:['UNDER_REVIEW'],UNDER_REVIEW:['APPROVED','REJECTED'],APPROVED:['PUBLISHED'],PUBLISHED:['APPROVED']}[status]||[];}
 function productRequestTransitions(status){return {SUBMITTED:['UNDER_REVIEW'],UNDER_REVIEW:['APPROVED','REJECTED']}[status]||[];}
 function renderVendors(items){byId('content').innerHTML=`<h2>Shop applications</h2><div class="actions"><button class="success" data-action="create-store">Create Local Store</button></div><div class="grid">${items.map(item=>`<article class="card"><h3>${escapeText(item.shopName)}</h3><small>${escapeText(item.id)}</small><p>${escapeText(item.ownerName)} · ${escapeText(item.registeredEmail)} · ${escapeText(item.registeredMobile)}</p><p class="muted">${escapeText(item.address)}, ${escapeText(item.city)} ${escapeText(item.pincode)} — ${escapeText(item.description)}</p>${item.rejectionReason?`<p class="error">${escapeText(item.rejectionReason)}</p>`:''}<strong>${escapeText(item.status)}</strong><div class="actions">${applicationTransitions(item.status).map(status=>`<button class="${['REJECTED','SUSPENDED'].includes(status)?'danger':'success'}" data-action="vendor" data-id="${escapeText(item.id)}" data-value="${status}">${escapeText(status.replaceAll('_',' '))}</button>`).join('')}</div></article>`).join('')||'<p>No applications.</p>'}</div>`;}
-function renderShopProducts(items){byId('content').innerHTML=`<h2>Shop product submissions</h2><div class="actions"><button class="success" data-action="create-shop-product">Add Product for Local Store</button></div><div class="grid">${items.map(item=>`<article class="card"><h3>${escapeText(item.name)}</h3><small>${escapeText(item.id)} · store ${escapeText(item.applicationId)}</small><p>${escapeText(item.category)} · ₹${escapeText((item.pricePaise/100).toFixed(2))} · total stock ${escapeText(item.inventory)}</p><p>${(item.variants||[]).map(variant=>`${escapeText(variant.size)}: <strong>${escapeText(variant.inventory)}</strong>`).join(' · ')}</p><p class="muted">${escapeText(item.description)}</p>${item.rejectionReason?`<p class="error">${escapeText(item.rejectionReason)}</p>`:''}<strong>${escapeText(item.status)}</strong><div class="actions"><button data-action="edit-shop-product" data-id="${escapeText(item.id)}" data-name="${escapeText(item.name)}" data-description="${escapeText(item.description)}" data-price="${escapeText((item.pricePaise/100).toFixed(2))}" data-original="${escapeText((item.originalPricePaise/100).toFixed(2))}">Edit Details</button>${productTransitions(item.status).map(status=>`<button class="${status==='REJECTED'?'danger':'success'}" data-action="shop-product" data-id="${escapeText(item.id)}" data-value="${status}">${escapeText(status==='APPROVED'&&item.status==='PUBLISHED'?'UNPUBLISH':status.replaceAll('_',' '))}</button>`).join('')}</div></article>`).join('')||'<p>No shop product submissions.</p>'}</div>`;}
+function renderShopProducts(items){byId('content').innerHTML=`<h2>Shop product submissions</h2><div class="actions"><button class="success" data-action="create-shop-product">Add Product for Local Store</button><button class="success" data-action="bulk-shop-products">Bulk Upload CSV</button><button class="secondary" data-action="download-product-template">Download CSV Template</button></div><div class="grid">${items.map(item=>`<article class="card"><h3>${escapeText(item.name)}</h3><small>${escapeText(item.id)} · store ${escapeText(item.applicationId)}</small><p>${escapeText(item.category)} · ₹${escapeText((item.pricePaise/100).toFixed(2))} · total stock ${escapeText(item.inventory)}</p><p>${(item.variants||[]).map(variant=>`${escapeText(variant.size)}: <strong>${escapeText(variant.inventory)}</strong>`).join(' · ')}</p><p class="muted">${escapeText(item.description)}</p>${item.rejectionReason?`<p class="error">${escapeText(item.rejectionReason)}</p>`:''}<strong>${escapeText(item.status)}</strong><div class="actions"><button data-action="edit-shop-product" data-id="${escapeText(item.id)}" data-name="${escapeText(item.name)}" data-description="${escapeText(item.description)}" data-price="${escapeText((item.pricePaise/100).toFixed(2))}" data-original="${escapeText((item.originalPricePaise/100).toFixed(2))}">Edit Details</button>${productTransitions(item.status).map(status=>`<button class="${status==='REJECTED'?'danger':'success'}" data-action="shop-product" data-id="${escapeText(item.id)}" data-value="${status}">${escapeText(status==='APPROVED'&&item.status==='PUBLISHED'?'UNPUBLISH':status.replaceAll('_',' '))}</button>`).join('')}</div></article>`).join('')||'<p>No shop product submissions.</p>'}</div>`;}
 function renderShopProductRequests(items){byId('content').innerHTML=`<h2>Product change requests</h2><div class="grid">${items.map(item=>{const proposed=item.proposedProduct?JSON.stringify(item.proposedProduct,null,2):'';return `<article class="card"><h3>${escapeText(item.productName||item.productId)}</h3><p>${escapeText(item.shopName||item.applicationId)} / ${escapeText(item.action)}</p>${proposed?`<pre>${escapeText(proposed)}</pre>`:'<p class="muted">Seller requested this product be unpublished.</p>'}${item.rejectionReason?`<p class="error">${escapeText(item.rejectionReason)}</p>`:''}<strong>${escapeText(item.status)}</strong><div class="actions">${productRequestTransitions(item.status).map(status=>`<button class="${status==='REJECTED'?'danger':'success'}" data-action="shop-product-request" data-id="${escapeText(item.id)}" data-value="${status}">${escapeText(status.replaceAll('_',' '))}</button>`).join('')}</div></article>`;}).join('')||'<p>No product change requests.</p>'}</div>`;}
 function renderInventory(items){byId('content').innerHTML=`<h2>Low stock inventory</h2><p class="muted">Showing variants with 5 or fewer units.</p><table><thead><tr><th>Product</th><th>Variant</th><th>Stock</th><th>Action</th></tr></thead><tbody>${items.map(item=>`<tr><td>${escapeText(item.productName)}</td><td>${escapeText(item.size)} / ${escapeText(item.colour)}<br><small>${escapeText(item.variantId)}</small></td><td><strong>${escapeText(item.stock)}</strong></td><td><button data-action="inventory" data-id="${escapeText(item.variantId)}">Adjust</button></td></tr>`).join('')}</tbody></table>`;}
 function renderCustomers(items){byId('content').innerHTML=`<h2>Customers</h2><div class="actions"><button class="success" data-action="create-owner">Create Store Owner Account</button></div><table><thead><tr><th>Customer</th><th>Contact</th><th>Status</th><th>Action</th></tr></thead><tbody>${items.map(item=>`<tr><td>${escapeText(item.name)}<br><small>${escapeText(item.id)}</small></td><td>${escapeText(item.email)}<br>${escapeText(item.phone)}</td><td>${item.is_active?'Active':'Disabled'}</td><td><div class="actions"><button data-action="reset-customer-password" data-id="${escapeText(item.id)}">Reset Password</button><button class="${item.is_active?'danger':'success'}" data-action="customer" data-id="${escapeText(item.id)}" data-value="${item.is_active?'false':'true'}">${item.is_active?'Disable':'Enable'}</button></div></td></tr>`).join('')}</tbody></table>`;}
