@@ -1409,6 +1409,76 @@ class ShopWorkflow:
             ).fetchone()
         return self._serialize_product(row, admin=True)
 
+    def admin_bulk_create_products(
+        self, admin_id: str, application_id: str, products: Any
+    ) -> list[dict[str, Any]]:
+        if not isinstance(products, list) or not 1 <= len(products) <= 100:
+            raise SecurityError(400, "Upload between 1 and 100 products at a time.", "invalid_bulk_products")
+        validated: list[tuple[int, dict[str, Any]]] = []
+        seen_keys: set[tuple[str, str]] = set()
+        errors: list[str] = []
+        for index, payload in enumerate(products, start=1):
+            try:
+                values = self._product_payload(payload)
+                if not json.loads(values["image_urls_json"]):
+                    raise SecurityError(400, "Add at least one product image.", "product_image_required")
+                key = (values["name"].strip().casefold(), values["colour_name"].strip().casefold())
+                if key in seen_keys:
+                    raise SecurityError(409, "Duplicate product name and colour in this upload.", "duplicate_product")
+                seen_keys.add(key)
+                validated.append((index, values))
+            except SecurityError as error:
+                errors.append(f"Row {index}: {error.message}")
+        if errors:
+            raise SecurityError(400, "Fix these rows: " + " | ".join(errors[:20]), "invalid_bulk_products")
+
+        now = iso(utc_now())
+        created_ids: list[str] = []
+        with self.connect() as db:
+            db.execute("BEGIN IMMEDIATE")
+            self._require_admin(db, admin_id)
+            application = db.execute(
+                "SELECT * FROM vendor_applications WHERE id=?", (application_id,)
+            ).fetchone()
+            if application is None:
+                db.rollback()
+                raise SecurityError(404, "Shop application not found.", "vendor_application_not_found")
+            if application["status"] != "ACTIVE":
+                db.rollback()
+                raise SecurityError(409, "Activate the shop before publishing products.", "active_shop_required")
+            existing = {
+                (row["name"].strip().casefold(), row["colour_name"].strip().casefold())
+                for row in db.execute(
+                    "SELECT name,colour_name FROM shop_product_submissions WHERE application_id=? AND status!='REJECTED'",
+                    (application_id,),
+                ).fetchall()
+            }
+            duplicates = [
+                f"Row {index}: A product named '{values['name']}' in colour '{values['colour_name']}' already exists for this shop."
+                for index, values in validated
+                if (values["name"].strip().casefold(), values["colour_name"].strip().casefold()) in existing
+            ]
+            if duplicates:
+                db.rollback()
+                raise SecurityError(409, "Fix these rows: " + " | ".join(duplicates[:20]), "duplicate_product")
+            for _index, values in validated:
+                product_id = "shopprod_" + secrets.token_hex(12)
+                slug = self._product_slug(values["name"], product_id)
+                db.execute(
+                    """INSERT INTO shop_product_submissions(
+                      id,slug,application_id,submitted_by_user_id,name,description,brand,department,category,price_paise,original_price_paise,inventory,size,variants_json,colour_name,colour_hex,image_urls_json,attributes_json,status,reviewed_by,created_at,updated_at,submitted_at,reviewed_at,published_at
+                    ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,'PUBLISHED',?,?,?,?,?,?)""",
+                    (product_id,slug,application_id,application["submitted_by_user_id"],values["name"],values["description"],values["brand"],values["department"],values["category"],values["price_paise"],values["original_price_paise"],values["inventory"],values["size"],values["variants_json"],values["colour_name"],values["colour_hex"],values["image_urls_json"],values["attributes_json"],admin_id,now,now,now,now,now),
+                )
+                created_ids.append(product_id)
+                self._audit_if_available(db,admin_id,"shop_product_admin_bulk_created","shop_product",product_id,{"applicationId":application_id,"status":"PUBLISHED"})
+            db.commit()
+            rows = db.execute(
+                f"SELECT * FROM shop_product_submissions WHERE id IN ({','.join('?' for _ in created_ids)})", created_ids
+            ).fetchall()
+        by_id = {row["id"]: self._serialize_product(row, admin=True) for row in rows}
+        return [by_id[product_id] for product_id in created_ids]
+
     def admin_update_product(
         self, admin_id: str, product_id: str, payload: dict[str, Any]
     ) -> dict[str, Any]:

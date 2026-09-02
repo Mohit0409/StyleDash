@@ -703,6 +703,13 @@ class AdminHandler(BaseHTTPRequestHandler):
                     raise SecurityError(400, "Choose a store-owner account.", "invalid_customer")
                 result = self._shops().admin_create_application(admin["id"], owner_user_id, payload)
                 self._json(201, {"success": True, "application": result}); return
+            if path == "/api/admin/shop-products/bulk":
+                admin, _session = self._admin(); self._csrf(); payload = self._body()
+                application_id = payload.get("applicationId")
+                if not isinstance(application_id, str) or not application_id:
+                    raise SecurityError(400, "Choose a local store.", "vendor_application_not_found")
+                result = self._shops().admin_bulk_create_products(admin["id"], application_id, payload.get("products"))
+                self._json(201, {"success": True, "products": result, "created": len(result)}); return
             if path == "/api/admin/shop-products":
                 admin, _session = self._admin(); self._csrf(); payload = self._body()
                 application_id = payload.pop("applicationId", None)

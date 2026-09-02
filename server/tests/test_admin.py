@@ -877,6 +877,36 @@ class AdminHttpTests(unittest.TestCase):
         updated = next(item for item in shops.admin_list_products(body["request"]["reviewedBy"]) if item["id"] == product["id"] )
         self.assertEqual(updated["name"], "Transition Tee Updated")
 
+    def test_admin_bulk_product_endpoint_publishes_valid_rows_atomically(self):
+        customers = SECURITY.SecurityStore(self.database, self.key)
+        user, _raw, _csrf = customers.register({
+            "name": "Bulk Seller", "email": "bulk-seller@example.test",
+            "password": "long seller password 123", "phone": "9999999988",
+        })
+        shops = ADMIN_SERVER.ShopWorkflow(self.database)
+        self.request("/api/admin/login", {"username": "local-owner", "password": "long administrator password 123"}, method="POST")
+        status, body, _headers = self.request("/api/admin/totp", {"code": pyotp.TOTP(self.secret).now()}, method="POST")
+        self.assertEqual(status, 200); csrf = body["csrfToken"]; admin_id = body["admin"]["id"]
+        application = shops.admin_create_application(admin_id, user["id"], {
+            "shopName": "Bulk HTTP Shop", "ownerName": "Bulk Seller",
+            "category": "Clothing & Fashion", "description": "Bulk import endpoint shop.",
+            "address": "10 Main Market", "city": "Neemuch", "state": "Madhya Pradesh",
+            "pincode": "458441",
+        })
+        product = {
+            "name": "Bulk HTTP Tee", "description": "Imported through the admin bulk endpoint.",
+            "brand": "Local", "department": "men", "category": "Clothing & Fashion",
+            "pricePaise": 79900, "originalPricePaise": 99900,
+            "variants": [{"size": "M", "inventory": 5}], "colourName": "Black",
+            "colourHex": "#000000", "imageUrls": ["https://example.test/bulk-http.jpg"], "attributes": {},
+        }
+        status, body, _headers = self.request(
+            "/api/admin/shop-products/bulk", {"applicationId": application["id"], "products": [product]},
+            headers={"X-CSRF-Token": csrf}, method="POST",
+        )
+        self.assertEqual((status, body["created"], body["products"][0]["status"]), (201, 1, "PUBLISHED"))
+        self.assertEqual(shops.list_published_products()[0]["name"], "Bulk HTTP Tee")
+
     def test_non_loopback_bind_refused(self):
         with self.assertRaises(RuntimeError):
             ADMIN_SERVER.create_admin_server("0.0.0.0", 0, self.database, self.key, ROOT / "server/payment-data/catalog.json", ROOT / "server/payment-data/settings.json", self.root / "data2", ROOT / "server/admin", self.root / "backups")

@@ -62,3 +62,11 @@ complete SMTP configuration is present in the private runtime file
 `~/.config/styledash/secrets.env`. This source tree does not confirm deployed
 configuration or successful provider delivery. Do not return reset tokens to
 browsers; delivery links carry the raw token only in the URL fragment.
+## Bulk product import
+
+The private admin **Shop Products** tab supports CSV bulk import for active local stores. Use **Download CSV Template**, fill one product per row, then choose **Bulk Upload CSV** and select the shop by name.
+
+Required columns: `name`, `description`, `department`, `category`, `price`, `variants`, `colourName`, `imageUrls`. Optional columns: `brand`, `originalPrice`, `colourHex`. Use `S:5, M:8` for size/stock variants and separate multiple HTTPS image URLs with `|`.
+
+Imports are all-or-nothing, limited to 100 products / 1 MB per upload, revalidated on the server, audited per product, and reject duplicate product-name + colour combinations for the same shop.
+
