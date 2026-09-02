@@ -189,17 +189,38 @@ async function createStoreProduct(){
   status(`${values.name} published for the selected local store.`);
 }
 async function editStoreProduct(button){
+  const item=currentShopProducts.find(product=>product.id===button.dataset.id); if(!item)throw new Error('Product details are no longer available. Refresh and try again.');
   const values=await formDialog('Edit product details',[
-    {name:'name',label:'Product name',required:true,value:button.dataset.name||'',maxLength:140},
-    {name:'description',label:'Description',type:'textarea',required:true,value:button.dataset.description||'',maxLength:2000},
-    {name:'price',label:'Selling price in rupees',type:'number',required:true,value:button.dataset.price||'',min:1,step:'0.01'},
-    {name:'original',label:'Original/MRP price in rupees',type:'number',required:true,value:button.dataset.original||button.dataset.price||'',min:1,step:'0.01'},
-  ],'Save details'); if(!values)return;
-  const price=Number(values.price); const original=Number(values.original);
-  if(!Number.isFinite(price)||price<1||!Number.isFinite(original)||original<price)throw new Error('Enter valid selling and original prices.');
-  const payload={name:values.name,description:values.description,pricePaise:Math.round(price*100),originalPricePaise:Math.round(original*100)};
-  await api(`/api/admin/shop-products/${encodeURIComponent(button.dataset.id)}/details`,{method:'PATCH',body:JSON.stringify(payload)});
-  status('Product details updated.');
+    {name:'name',label:'Product name',required:true,value:item.name||'',maxLength:140},
+    {name:'description',label:'Description',type:'textarea',required:true,value:item.description||'',maxLength:2000},
+    {name:'brand',label:'Brand (optional)',value:item.brand||'',maxLength:100},
+    {name:'department',label:'Department',required:true,value:item.department||'footwear',placeholder:'men, women, kids, unisex, footwear, accessories'},
+    {name:'category',label:'Category',required:true,value:item.category||'Footwear',maxLength:100},
+    {name:'price',label:'Selling price in rupees',type:'number',required:true,value:(item.pricePaise/100).toFixed(2),min:1,step:'0.01'},
+    {name:'original',label:'Original/MRP price in rupees',type:'number',required:true,value:(item.originalPricePaise/100).toFixed(2),min:1,step:'0.01'},
+    {name:'variants',label:'Sizes and stock (S:5, M:8, L:3)',required:true,value:(item.variants||[]).map(v=>`${v.size}:${v.inventory}`).join(', ')},
+    {name:'colourName',label:'Colour name',required:true,value:item.colourName||'Multi',maxLength:80},
+    {name:'colourHex',label:'Colour hex (optional)',value:item.colourHex||'',placeholder:'#000000'},
+    {name:'images',label:'HTTPS image URLs separated by commas',type:'textarea',required:true,value:(item.imageUrls||[]).join(', ')},
+  ],'Save all changes'); if(!values)return;
+  const price=Number(values.price), original=Number(values.original); if(!Number.isFinite(price)||price<1||!Number.isFinite(original)||original<price)throw new Error('Enter valid selling and original prices.');
+  const variants=parseVariants(values.variants); const imageUrls=values.images.split(',').map(value=>value.trim()).filter(Boolean);
+  if(!imageUrls.length)throw new Error('Add at least one product image.');
+  const payload={name:values.name,description:values.description,brand:values.brand||undefined,department:values.department,category:values.category,pricePaise:Math.round(price*100),originalPricePaise:Math.round(original*100),variants,colourName:values.colourName,colourHex:values.colourHex||undefined,imageUrls};
+  const wasPublished=item.status==='PUBLISHED'; let unpublished=false;
+  try {
+    if(wasPublished){await api(`/api/admin/shop-products/${encodeURIComponent(item.id)}`,{method:'PATCH',body:JSON.stringify({status:'APPROVED'})});unpublished=true;}
+    await api(`/api/admin/shop-products/${encodeURIComponent(item.id)}/details`,{method:'PATCH',body:JSON.stringify(payload)});
+    if(wasPublished){await api(`/api/admin/shop-products/${encodeURIComponent(item.id)}`,{method:'PATCH',body:JSON.stringify({status:'PUBLISHED'})});unpublished=false;}
+  } catch(cause) {
+    if(unpublished){try{await api(`/api/admin/shop-products/${encodeURIComponent(item.id)}`,{method:'PATCH',body:JSON.stringify({status:'PUBLISHED'})});}catch{}}
+    throw cause;
+  }
+  if(wasPublished){
+    const live=(await api(`/api/admin/inventory?low=0&q=${encodeURIComponent(item.id)}`)).inventory||[];
+    for(let index=0;index<variants.length;index+=1){const variantId=`${item.id}-var-${index+1}`;const record=live.find(row=>row.variantId===variantId);const before=Number(record?.stock??variants[index].inventory);const delta=variants[index].inventory-before;if(delta)await api(`/api/admin/inventory/${encodeURIComponent(variantId)}`,{method:'PATCH',body:JSON.stringify({delta})});}
+  }
+  status('All product details, images, sizes and stock updated.');
 }
 async function reasonFor(title){const values=await formDialog(title,[{name:'reason',label:'Reason',type:'textarea',required:true,maxLength:1000}],'Continue');return values?.reason||null;}
 async function inventoryAdjustment(){const values=await formDialog('Adjust inventory',[{name:'delta',label:'Stock adjustment (for example 5 or -2)',type:'number',required:true,step:'1'}],'Apply adjustment');if(!values)return null;const delta=Number(values.delta);if(!Number.isSafeInteger(delta))throw new Error('Enter a whole-number stock adjustment.');return delta;}
