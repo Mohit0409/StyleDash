@@ -77,6 +77,7 @@ export const Footer: React.FC = () => {
               <li><Link to="/products?dept=kids" className="hover:text-lime-400">Kids Wear</Link></li>
               <li><Link to="/products?category=Footwear" className="hover:text-lime-400">Footwear Spotlight</Link></li>
               <li><Link to="/products?category=Accessories" className="hover:text-lime-400">Accessories &amp; Bags</Link></li>
+              <li><Link to="/products?category=Beauty%20%26%20Personal%20Care" className="hover:text-lime-400">Beauty &amp; Personal Care</Link></li>
             </ul>
           </div>
 

@@ -101,8 +101,8 @@ export const LocationSelector: React.FC<{ isOpen: boolean; onClose: () => void }
               <p className="mt-0.5">
                 {isSuccess
                   ? result?.expressAvailable && result?.estimatedDeliveryMinutes
-                    ? `Normal delivery is available within a day. Weekend express is also available within ${result.estimatedDeliveryMinutes} minutes.`
-                    : 'Normal delivery is available within a day. Express delivery is disabled Monday–Friday.'
+                    ? `Local delivery is available. Express Local Delivery is also available within ${result.estimatedDeliveryMinutes} minutes.`
+                    : 'Local delivery is available. Express Local Delivery is unavailable Monday–Friday.'
                   : null}
                 {isProblem && checkState === 'unserviceable' ? 'We are not delivering to this pincode yet.' : null}
                 {isProblem && checkState === 'invalid' ? 'Pincodes must contain exactly six numbers.' : null}

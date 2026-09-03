@@ -30,7 +30,7 @@ export const Stores: React.FC = () => {
           <span className="text-xs font-black text-lime-400 uppercase tracking-widest">Multi-Store Quick-Commerce Marketplace</span>
           <h1 className="text-2xl sm:text-3xl font-black">Local Boutiques & Partner Stores in {CONFIG.SERVICE_CITY}</h1>
           <p className="text-xs text-neutral-400">
-            Shop directly from verified neighbourhood clothing, ethnic wear, and footwear stores with reliable within-a-day local delivery.
+            Shop directly from verified neighbourhood clothing, ethnic wear, and footwear stores with reliable local delivery.
           </p>
         </div>
 
@@ -100,7 +100,7 @@ export const Stores: React.FC = () => {
                 <div className="pt-2 text-xs text-neutral-500 space-y-1">
                   <p className="flex items-center gap-1"><MapPin className="w-3.5 h-3.5 text-lime-600" /> {store.address}</p>
                   <p className="flex items-center gap-1 font-bold text-emerald-600 dark:text-emerald-400">
-                    <Zap className="w-3.5 h-3.5 fill-emerald-400" /> Within-a-Day Local Delivery
+                    <Zap className="w-3.5 h-3.5 fill-emerald-400" /> Local Delivery
                   </p>
                 </div>
               </div>

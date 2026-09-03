@@ -193,7 +193,7 @@ export const Products: React.FC = () => {
             {searchQuery ? (
               <>Found <strong>{matchingStores.length}</strong> local store{matchingStores.length === 1 ? '' : 's'} and <strong>{sortedProducts.length}</strong> available product{sortedProducts.length === 1 ? '' : 's'} in Neemuch</>
             ) : (
-              <>Showing <strong>{sortedProducts.length}</strong> available items for within-a-day delivery in Neemuch</>
+              <>Showing <strong>{sortedProducts.length}</strong> available items from local Neemuch stores. Express Local Delivery appears where eligible.</>
             )}
           </p>
         </div>
@@ -229,7 +229,7 @@ export const Products: React.FC = () => {
                   <h3 className="font-extrabold text-neutral-900 dark:text-white truncate group-hover:text-lime-600">{store.storeName}</h3>
                   <p className="text-xs text-neutral-500 truncate">{store.category}</p>
                   <p className="mt-1 flex items-center gap-1 text-xs text-neutral-500 truncate"><MapPin className="w-3 h-3 shrink-0" /> {store.address}</p>
-                  <p className="mt-1 flex items-center gap-1 text-[11px] font-bold text-emerald-600 dark:text-emerald-400"><Zap className="w-3 h-3" /> Within-a-Day Local Delivery</p>
+                  <p className="mt-1 flex items-center gap-1 text-[11px] font-bold text-emerald-600 dark:text-emerald-400"><Zap className="w-3 h-3" /> Express Local Delivery</p>
                 </div>
               </Link>
             ))}
@@ -242,7 +242,7 @@ export const Products: React.FC = () => {
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <p className="font-black">Weekend Express is available Saturday and Sunday.</p>
-              <p className="mt-1 text-xs opacity-80">Today we are showing the normal within-a-day catalogue instead, so you can keep shopping.</p>
+              <p className="mt-1 text-xs opacity-80">Today we are showing the regular local catalogue instead, so you can keep shopping.</p>
             </div>
             <button
               type="button"
@@ -292,7 +292,7 @@ export const Products: React.FC = () => {
                 {expressFilterActive ? 'No Weekend Express products are available right now' : 'No matching products found'}
               </h3>
               <p className="text-xs text-neutral-500 mb-6">
-                {expressFilterActive ? 'Normal within-a-day delivery is still available from local Neemuch stores.' : 'Try relaxing your search terms or clearing filters to view more items.'}
+                {expressFilterActive ? 'Regular local delivery is still available from local Neemuch stores.' : 'Try relaxing your search terms or clearing filters to view more items.'}
               </p>
               <button
                 onClick={expressFilterActive ? () => updateParam('filter', 'all') : handleClearAll}

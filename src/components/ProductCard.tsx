@@ -139,7 +139,7 @@ export const ProductCard: React.FC<{ product: Product; onQuickView?: (p: Product
               )}
             </div>
             <div className="flex items-center gap-1 text-[10px] font-bold text-emerald-600 dark:text-emerald-400">
-              <Zap className="w-3 h-3 fill-emerald-400" /> Within-a-day delivery
+              <Zap className="w-3 h-3 fill-emerald-400" /> Local Delivery
             </div>
           </div>
 

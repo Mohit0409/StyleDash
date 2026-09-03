@@ -65,7 +65,7 @@ export const CartDrawer: React.FC<{ isOpen: boolean; onClose: () => void }> = ({
                 <Tag className="w-10 h-10" />
               </div>
               <h4 className="font-bold text-lg text-neutral-900 dark:text-white mb-1">Your cart is empty</h4>
-              <p className="text-xs text-neutral-500 mb-6">Delivery is available in {CONFIG.SERVICE_CITY} ({CONFIG.DEFAULT_PINCODE}), with normal delivery within a day.</p>
+              <p className="text-xs text-neutral-500 mb-6">Local delivery is available in {CONFIG.SERVICE_CITY} ({CONFIG.DEFAULT_PINCODE}). Express Local Delivery is shown when an item is eligible.</p>
               <button
                 onClick={() => { onClose(); navigate('/products'); }}
                 className="px-6 py-2.5 bg-neutral-950 dark:bg-lime-400 text-white dark:text-neutral-950 font-bold text-xs rounded-xl"
@@ -161,7 +161,7 @@ export const CartDrawer: React.FC<{ isOpen: boolean; onClose: () => void }> = ({
                       : 'text-neutral-500'
                   }`}
                 >
-                  Normal (within a day)
+                  Normal Delivery
                 </button>
               </div>
             </div>

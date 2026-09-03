@@ -27,7 +27,7 @@ const removeMeta = (attribute: 'name' | 'property', key: string) => {
 
 export const SEO: React.FC<SEOProps> = ({
   title = 'Vibe4You - Your City. Your Shops. Your Style.',
-  description = 'Fashion essentials, trending streetwear, ethnic wear, and footwear delivered from nearby stores in Neemuch within a day, with weekend express where available.',
+  description = 'Fashion essentials, trending streetwear, ethnic wear, and footwear from nearby Neemuch stores, with Express Local Delivery on eligible items.',
   image,
   type = 'website',
   jsonLd,
