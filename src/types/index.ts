@@ -33,6 +33,7 @@ export interface Product {
   department: Department;
   category: string;
   subcategory?: string;
+  deliveryType?: 'normal' | 'express' | 'both';
   collection?: string;
 
   shortDescription: string;
