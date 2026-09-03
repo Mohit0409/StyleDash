@@ -123,6 +123,9 @@ class ProductionReliabilityTests(unittest.TestCase):
         self.assertIn("razorpay-global-preload-unexpected", script)
         self.assertIn("razorpay-lazy-load-ok", script)
         self.assertIn("https://checkout.razorpay.com/v1/checkout.js", script)
+        self.assertIn('install -m 600 "$STAGE/scripts/catalog_normalization.py" "$HOME/server/catalog_normalization.py"', script)
+        self.assertIn('install -m 600 "$STAGE/scripts/catalog_normalization.py" "$HOME/admin/catalog_normalization.py"', script)
+        self.assertIn("catalog_normalization.py styledash_mail.py", script)
         self.assertNotIn("razorpay-script-missing", script)
 
     def test_repository_production_branch_is_main(self) -> None:
