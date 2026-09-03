@@ -155,6 +155,71 @@ test('weekend Weekend Express request applies express product filtering', async 
   await expect(page.getByRole('heading', { name: 'Pure Cotton Oversized Graphic Tee' })).toBeVisible();
 });
 
+test('brand and size facets come only from eligible catalogue products', async ({ page }) => {
+  const product = (id: string, department: 'men' | 'women', brand: string, variants: Array<{ id: string; size: string; stock: number }>) => ({
+    id,
+    slug: id,
+    name: `${id} facet-scope`,
+    brand,
+    department,
+    category: 'Footwear',
+    subcategory: 'Sneakers',
+    shortDescription: 'Facet scope product',
+    description: 'Facet scope product for deterministic filter testing.',
+    material: 'Synthetic',
+    careInstructions: [],
+    price: 799,
+    originalPrice: 799,
+    discount: 0,
+    images: ['/product-placeholder.svg'],
+    thumbnail: '/product-placeholder.svg',
+    rating: 0,
+    reviewCount: 0,
+    variants: variants.map(item => ({ ...item, sku: item.id, colourName: 'Black', available: false, price: 799, images: ['/product-placeholder.svg'] })),
+    tags: ['local-shop', 'facet-scope'],
+    newArrival: true,
+    trending: false,
+    featured: false,
+    expressDelivery: false,
+    returnWindowDays: 0,
+    exchangeAvailable: false,
+    vendorId: 'facet-vendor',
+    storeName: 'Facet Test Store',
+    storeSlug: 'facet-test-store',
+    active: true,
+  });
+
+  const men = product('facet-men', 'men', 'Facet Men Brand', [
+    { id: 'facet-men-available', size: 'Facet Available Size', stock: 2 },
+    { id: 'facet-men-sold-out', size: 'Facet Sold Out Size', stock: 0 },
+  ]);
+  const women = product('facet-women', 'women', 'Facet Women Brand', [
+    { id: 'facet-women-available', size: 'Facet Women Size', stock: 3 },
+  ]);
+
+  await page.route('**/api/shop-products/published', route => route.fulfill({
+    status: 200,
+    contentType: 'application/json',
+    body: JSON.stringify({ success: true, products: [men, women] }),
+  }));
+  await page.route('**/api/inventory/availability**', route => route.fulfill({
+    status: 200,
+    contentType: 'application/json',
+    body: JSON.stringify({ success: true, availability: [
+      { productId: men.id, variantId: 'facet-men-available', available: true },
+      { productId: men.id, variantId: 'facet-men-sold-out', available: false },
+      { productId: women.id, variantId: 'facet-women-available', available: true },
+    ] }),
+  }));
+
+  await page.goto('/products?dept=men&search=facet-scope');
+  await expect(page.getByRole('radio', { name: 'Facet Men Brand', exact: true })).toBeVisible();
+  await expect(page.getByRole('radio', { name: 'Facet Women Brand', exact: true })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Facet Available Size', exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Facet Sold Out Size', exact: true })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Facet Women Size', exact: true })).toHaveCount(0);
+});
+
 test('global search returns matching local stores', async ({ page }) => {
   await page.route('**/api/stores/active', route => route.fulfill({
     status: 200,
