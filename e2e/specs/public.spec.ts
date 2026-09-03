@@ -213,6 +213,10 @@ test('brand and size facets come only from eligible catalogue products', async (
   }));
 
   await page.goto('/products?dept=men&search=facet-scope');
+  if ((page.viewportSize()?.width ?? 1280) < 1024) {
+    await page.getByRole('button', { name: 'Filter & Sort', exact: true }).click();
+    await expect(page.getByRole('dialog', { name: 'Filter & Sort' })).toBeVisible();
+  }
   await expect(page.getByRole('radio', { name: 'Facet Men Brand', exact: true })).toBeVisible();
   await expect(page.getByRole('radio', { name: 'Facet Women Brand', exact: true })).toHaveCount(0);
   await expect(page.getByRole('button', { name: 'Facet Available Size', exact: true })).toBeVisible();
