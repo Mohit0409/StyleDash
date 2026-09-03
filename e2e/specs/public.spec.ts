@@ -133,6 +133,28 @@ test('category subcategory links apply the selected filters', async ({ page }) =
   await expect(page.getByRole('heading', { name: 'Textured Linen Spread Collar Shirt' })).toHaveCount(0);
 });
 
+test('header uses category queries for Footwear and Accessories', async ({ page }) => {
+  await page.goto('/');
+  const header = page.locator('header');
+  await expect(header.getByRole('link', { name: 'FOOTWEAR', exact: true })).toHaveAttribute('href', '/products?category=Footwear');
+  await expect(header.getByRole('link', { name: 'ACCESSORIES', exact: true })).toHaveAttribute('href', '/products?category=Accessories');
+});
+
+test('weekday Weekend Express request keeps normal catalogue visible', async ({ page }) => {
+  await page.clock.setFixedTime(new Date('2026-08-31T06:00:00Z'));
+  await page.goto('/products?filter=express');
+  await expect(page.getByText('Weekend Express is available Saturday and Sunday.')).toBeVisible();
+  await expect(page.getByText('No matching products found')).toHaveCount(0);
+  await expect(page.locator('main').getByRole('heading', { level: 3 }).first()).toBeVisible();
+});
+
+test('weekend Weekend Express request applies express product filtering', async ({ page }) => {
+  await page.clock.setFixedTime(new Date('2026-08-29T06:00:00Z'));
+  await page.goto('/products?filter=express');
+  await expect(page.getByText('Weekend Express is available Saturday and Sunday.')).toHaveCount(0);
+  await expect(page.getByRole('heading', { name: 'Pure Cotton Oversized Graphic Tee' })).toBeVisible();
+});
+
 test('global search returns matching local stores', async ({ page }) => {
   await page.route('**/api/stores/active', route => route.fulfill({
     status: 200,

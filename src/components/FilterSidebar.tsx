@@ -6,10 +6,13 @@ interface FilterSidebarProps {
   setDepartment: (dept: string) => void;
   category: string;
   setCategory: (cat: string) => void;
+  categories: string[];
   brand: string;
   setBrand: (b: string) => void;
+  brands: string[];
   size: string;
   setSize: (s: string) => void;
+  sizes: string[];
   maxPrice: number;
   setMaxPrice: (p: number) => void;
   sortBy: string;
@@ -24,10 +27,13 @@ export const FilterSidebar: React.FC<FilterSidebarProps> = ({
   setDepartment,
   category,
   setCategory,
+  categories,
   brand,
   setBrand,
+  brands,
   size,
   setSize,
+  sizes,
   maxPrice,
   setMaxPrice,
   sortBy,
@@ -82,7 +88,7 @@ export const FilterSidebar: React.FC<FilterSidebarProps> = ({
       <div>
         <label className="block text-xs font-bold uppercase tracking-wider text-neutral-500 mb-2">Department</label>
         <div className="flex flex-wrap gap-2">
-          {['all', 'men', 'women', 'kids', 'footwear', 'accessories'].map(d => (
+          {['all', 'men', 'women', 'kids', 'unisex'].map(d => (
             <button
               key={d}
               onClick={() => setDepartment(d)}
@@ -98,11 +104,33 @@ export const FilterSidebar: React.FC<FilterSidebarProps> = ({
         </div>
       </div>
 
+      {/* Category Filter */}
+      {categories.length > 0 && (
+        <div>
+          <label className="block text-xs font-bold uppercase tracking-wider text-neutral-500 mb-2">Category</label>
+          <div className="flex flex-wrap gap-2">
+            {['all', ...categories].map(c => (
+              <button
+                key={c}
+                onClick={() => setCategory(c)}
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold border transition-all ${
+                  category === c
+                    ? 'bg-neutral-950 dark:bg-lime-400 text-white dark:text-neutral-950 border-neutral-950 dark:border-lime-400'
+                    : 'bg-neutral-100 dark:bg-neutral-800 text-neutral-700 dark:text-neutral-300 border-transparent hover:border-neutral-300'
+                }`}
+              >
+                {c === 'all' ? 'All Categories' : c}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Size Filter */}
       <div>
         <label className="block text-xs font-bold uppercase tracking-wider text-neutral-500 mb-2">Size</label>
         <div className="flex flex-wrap gap-1.5">
-          {['all', 'S', 'M', 'L', 'XL', 'XXL', 'UK 6', 'UK 7', 'UK 8', 'UK 9'].map(s => (
+          {['all', ...sizes].map(s => (
             <button
               key={s}
               onClick={() => setSize(s)}
@@ -144,7 +172,7 @@ export const FilterSidebar: React.FC<FilterSidebarProps> = ({
       <div>
         <label className="block text-xs font-bold uppercase tracking-wider text-neutral-500 mb-2">Brand</label>
         <div className="space-y-1 max-h-40 overflow-y-auto pr-2 no-scrollbar">
-          {['all', 'Roadster', 'HRX', 'Vibe4You Studio', 'Anouk', 'Mast & Harbour', 'Highlander', 'Snitch'].map(b => (
+          {['all', ...brands].map(b => (
             <label key={b} className="flex items-center gap-2 text-xs font-medium cursor-pointer py-1">
               <input
                 type="radio"
