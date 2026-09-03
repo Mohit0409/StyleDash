@@ -810,6 +810,45 @@ class ShopWorkflow:
             ).fetchone()
         return self._serialize_application(row, admin=True)
 
+    def admin_update_application(
+        self, admin_id: str, application_id: str, payload: dict[str, Any]
+    ) -> dict[str, Any]:
+        allowed = APPLICATION_PAYLOAD_FIELDS | {"bannerImage", "logoImage"}
+        if not isinstance(payload, dict) or not payload or set(payload) - allowed:
+            raise SecurityError(400, "Unsupported shop edit field.", "invalid_vendor_application")
+
+        def clean_image(value: Any, label: str) -> str | None:
+            if value is None or value == "":
+                return None
+            if not isinstance(value, str) or not PRODUCT_MEDIA_PATH_PATTERN.fullmatch(value):
+                raise SecurityError(400, f"Upload a valid {label} image.", "invalid_store_branding")
+            return value
+
+        metadata = {key: value for key, value in payload.items() if key in APPLICATION_PAYLOAD_FIELDS}
+        now = iso(utc_now())
+        with self.connect() as db:
+            db.execute("BEGIN IMMEDIATE")
+            self._require_admin(db, admin_id)
+            current = db.execute("SELECT * FROM vendor_applications WHERE id=?", (application_id,)).fetchone()
+            if current is None:
+                db.rollback()
+                raise SecurityError(404, "Shop application not found.", "vendor_application_not_found")
+            values = self._application_payload(metadata, current, require_complete=True)
+            banner = clean_image(payload.get("bannerImage", current["banner_image_url"]), "store cover")
+            logo = clean_image(payload.get("logoImage", current["logo_image_url"]), "store logo")
+            db.execute(
+                "UPDATE vendor_applications SET shop_name=?,owner_name=?,category=?,description=?,"
+                "address=?,city=?,state=?,pincode=?,business_information=?,banner_image_url=?,"
+                "logo_image_url=?,updated_at=? WHERE id=?",
+                (values["shop_name"], values["owner_name"], values["category"], values["description"],
+                 values["address"], values["city"], values["state"], values["pincode"],
+                 values["business_information"], banner, logo, now, application_id),
+            )
+            self._audit_if_available(db, admin_id, "shop_admin_updated", "shop_application", application_id, {"fields": sorted(payload)})
+            db.commit()
+            row = db.execute("SELECT * FROM vendor_applications WHERE id=?", (application_id,)).fetchone()
+        return self._serialize_application(row, admin=True)
+
     def admin_list_applications(self, admin_id: str) -> list[dict[str, Any]]:
         with self.connect() as db:
             self._require_admin(db, admin_id)
