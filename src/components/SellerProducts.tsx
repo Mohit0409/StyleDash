@@ -10,8 +10,8 @@ import {
   shopProductApi,
 } from '../services/businessApi';
 
-const CATEGORIES = ['Clothing & Fashion', 'Footwear', 'Electronics', 'Home & Living', 'General Store'];
-const DEPARTMENTS = ['men', 'women', 'kids', 'unisex', 'footwear', 'accessories'] as const;
+const CATEGORIES = ['Clothing & Fashion', 'Footwear', 'Accessories', 'Beauty & Personal Care', 'Electronics', 'Home & Living', 'General Store'];
+const DEPARTMENTS = ['men', 'women', 'kids', 'unisex'] as const;
 const INTERNAL_PRODUCT_IMAGE = /^\/media\/product-images\/[0-9a-f]{32}\.(?:webp|jpg|png)$/;
 
 const validExternalImageLink = (value: string) => {

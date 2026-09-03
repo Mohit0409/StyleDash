@@ -8,8 +8,8 @@ export const isExpressDeliveryAvailable = (date = new Date()): boolean => {
 
 export const deliveryAvailabilityMessage = (date = new Date()): string =>
   isExpressDeliveryAvailable(date)
-    ? 'Normal within-a-day delivery is selected. Weekend express delivery is also available.'
-    : 'Normal within-a-day delivery is selected. Express delivery is disabled Monday–Friday.';
+    ? 'Local delivery is selected. Express Local Delivery is also available this weekend.'
+    : 'Local delivery is selected. Express Local Delivery is unavailable Monday–Friday.';
 
 export interface ExpressCatalogueState {
   requested: boolean;

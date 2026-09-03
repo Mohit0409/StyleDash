@@ -77,7 +77,7 @@ export const StoreDetail: React.FC = () => {
 
           <div className="flex flex-wrap gap-4 text-xs text-neutral-300 pt-2">
             <span className="flex items-center gap-1"><MapPin className="w-4 h-4 text-lime-400" /> {store.address}</span>
-            <span className="flex items-center gap-1 text-lime-400 font-bold"><Zap className="w-4 h-4 fill-lime-400" /> Normal Delivery Within a Day</span>
+            <span className="flex items-center gap-1 text-lime-400 font-bold"><Zap className="w-4 h-4 fill-lime-400" /> Local Delivery</span>
           </div>
         </div>
       </div>

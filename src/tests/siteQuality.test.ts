@@ -11,8 +11,8 @@ describe('site quality guardrails', () => {
     const monday = new Date('2026-08-31T06:00:00Z');
     expect(isExpressDeliveryAvailable(saturday)).toBe(true);
     expect(isExpressDeliveryAvailable(monday)).toBe(false);
-    expect(deliveryAvailabilityMessage(saturday)).toContain('Weekend express');
-    expect(deliveryAvailabilityMessage(monday)).toContain('disabled Monday–Friday');
+    expect(deliveryAvailabilityMessage(saturday)).toContain('Express Local Delivery');
+    expect(deliveryAvailabilityMessage(monday)).toContain('unavailable Monday');
   });
 
 
@@ -28,7 +28,7 @@ describe('site quality guardrails', () => {
     expect(BANNERS.some(banner => banner.targetUrl === '/express')).toBe(false);
     expect(BANNERS[0].title).not.toContain(' ? ');
     const manifest = JSON.parse(readText('../../public/manifest.json')) as { description: string };
-    expect(manifest.description).toContain('within a day');
+    expect(manifest.description).toContain('Express Local Delivery');
     expect(manifest.description).not.toMatch(/stores in minutes/i);
   });
 

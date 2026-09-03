@@ -72,19 +72,24 @@ const products: Product[] = [
     id: 'nakoda-women', brand: 'Nakoda Imitation Jewellery', department: 'women', category: 'Accessories',
     variants: [{ id: 'n1', sku: 'n1', size: 'One Size', colourName: 'Gold', stock: 5, available: true }],
   }),
+  makeProduct({
+    id: 'beauty-perfume', brand: 'Aura', department: 'women', category: 'Beauty & Personal Care',
+    variants: [{ id: 'b1', sku: 'b1', size: 'One Size', colourName: 'Rose', stock: 4, available: true }],
+  }),
 ];
 
 describe('catalogue dynamic facets', () => {
   it('keeps audience departments separate from merchandise categories', () => {
-    expect(availableCategoryOptions(products, baseFilters())).toEqual(['Accessories', 'Footwear']);
+    expect(availableCategoryOptions(products, baseFilters())).toEqual(['Accessories', 'Beauty & Personal Care', 'Footwear']);
     expect(availableCategoryOptions(products, baseFilters({ department: 'men' }))).toEqual(['Footwear']);
+    expect(products.filter(product => matchesCatalogueProduct(product, baseFilters({ category: 'Beauty & Personal Care' }))).map(product => product.id)).toEqual(['beauty-perfume']);
     expect(products.filter(product => matchesCatalogueProduct(product, baseFilters({ department: 'women', category: 'Accessories' }))).map(product => product.id)).toEqual(['nakoda-women']);
     expect(products.filter(product => matchesCatalogueProduct(product, baseFilters({ department: 'men', category: 'Footwear' }))).map(product => product.id)).toEqual(['goutam-men', 'campus-men']);
   });
 
   it('derives brands from products in the active catalogue scope', () => {
     expect(availableBrandOptions(products, baseFilters())).toEqual([
-      'Campus', 'Goutam Shoes', 'Nakoda Imitation Jewellery',
+      'Aura', 'Campus', 'Goutam Shoes', 'Nakoda Imitation Jewellery',
     ]);
     expect(availableBrandOptions(products, baseFilters({ department: 'men' }))).toEqual([
       'Campus', 'Goutam Shoes',
@@ -101,7 +106,7 @@ describe('catalogue dynamic facets', () => {
 
   it('does not apply the express product filter when weekday availability disables it', () => {
     const weekday = baseFilters({ filterBadge: 'express', expressFilterActive: false });
-    expect(products.filter(product => matchesCatalogueProduct(product, weekday))).toHaveLength(3);
+    expect(products.filter(product => matchesCatalogueProduct(product, weekday))).toHaveLength(4);
     const weekend = baseFilters({ filterBadge: 'express', expressFilterActive: true });
     expect(products.filter(product => matchesCatalogueProduct(product, weekend)).map(product => product.id)).toEqual(['campus-men']);
   });
