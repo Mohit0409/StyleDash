@@ -5,6 +5,7 @@ let orderFilters = {status:'all', payment:'all', fulfillment:'all'};
 let currentShopProducts = [];
 let shopProductStores = [];
 let shopProductFilter = 'all';
+let currentVendors = [];
 
 const byId = id => document.getElementById(id);
 const escapeText = value => String(value ?? '').replace(/[&<>"']/g, character => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[character]));
@@ -135,6 +136,29 @@ async function createLocalStore(){
   await api('/api/admin/vendors',{method:'POST',body:JSON.stringify(values)});
   status(`${values.shopName} created and activated.`);
 }
+async function editStore(button){
+  const item=currentVendors.find(store=>store.id===button.dataset.id); if(!item)throw new Error('Store details are no longer available. Refresh and try again.');
+  const categories=['Clothing & Fashion','Footwear','Electronics','Home & Living','General Store'];
+  const values=await formDialog(`Edit ${item.shopName}`,[
+    {name:'shopName',label:'Store name',required:true,value:item.shopName||'',maxLength:100},
+    {name:'ownerName',label:'Owner / contact name',required:true,value:item.ownerName||'',maxLength:80},
+    {name:'category',label:'Category',type:'select',required:true,value:item.category||categories[0],options:categories.map(value=>({value,label:value}))},
+    {name:'description',label:'Store description',type:'textarea',required:true,value:item.description||'',maxLength:1000},
+    {name:'address',label:'Store address',type:'textarea',required:true,value:item.address||'',maxLength:250},
+    {name:'city',label:'City',required:true,value:item.city||'Neemuch',maxLength:80},
+    {name:'state',label:'State',required:true,value:item.state||'Madhya Pradesh',maxLength:80},
+    {name:'pincode',label:'Pincode',required:true,value:item.pincode||'458441',maxLength:6},
+    {name:'businessInformation',label:'Business information (optional)',type:'textarea',value:item.businessInformation||'',maxLength:1000},
+    {name:'bannerUpload',label:'Replace store cover (optional)',type:'file',accept:'image/jpeg,image/png,image/webp'},
+    {name:'logoUpload',label:'Replace store logo (optional)',type:'file',accept:'image/jpeg,image/png,image/webp'},
+  ],'Save Store Changes'); if(!values)return;
+  const payload={shopName:values.shopName,ownerName:values.ownerName,category:values.category,description:values.description,address:values.address,city:values.city,state:values.state,pincode:values.pincode,businessInformation:values.businessInformation||undefined};
+  if(values.bannerUpload instanceof File&&values.bannerUpload.size){payload.bannerImage=(await uploadAdminProductImages([values.bannerUpload]))[0];}
+  if(values.logoUpload instanceof File&&values.logoUpload.size){payload.logoImage=(await uploadAdminProductImages([values.logoUpload]))[0];}
+  await api(`/api/admin/vendors/${encodeURIComponent(item.id)}/details`,{method:'PATCH',body:JSON.stringify(payload)});
+  status(`${values.shopName} store details updated.`);
+}
+
 function downloadProductCsvTemplate(){
   const header=['name','description','brand','department','category','price','originalPrice','variants','colourName','colourHex','imageUrls'];
   const sample=['Classic T-Shirt','Premium cotton T-shirt','Example Brand','men','Clothing & Fashion','799','999','S:5, M:8, L:5','Black','#000000','https://example.com/front.jpg|https://example.com/back.jpg'];
@@ -246,6 +270,7 @@ byId('content').addEventListener('click', async event => {
     if(action==='create-owner') await createOwnerAccount();
     if(action==='reset-customer-password') await resetCustomerPassword(button.dataset.id);
     if(action==='create-store') await createLocalStore();
+    if(action==='edit-store') await editStore(button);
     if(action==='create-shop-product') await createStoreProduct();
     if(action==='bulk-shop-products') await bulkUploadStoreProducts();
     if(action==='download-product-template') downloadProductCsvTemplate();
@@ -310,7 +335,7 @@ function renderOrdersView(){
 function applicationTransitions(status){return {SUBMITTED:['UNDER_REVIEW'],UNDER_REVIEW:['APPROVED','REJECTED'],APPROVED:['ACTIVE'],ACTIVE:['SUSPENDED'],SUSPENDED:['ACTIVE']}[status]||[];}
 function productTransitions(status){return {SUBMITTED:['UNDER_REVIEW'],UNDER_REVIEW:['APPROVED','REJECTED'],APPROVED:['PUBLISHED'],PUBLISHED:['APPROVED']}[status]||[];}
 function productRequestTransitions(status){return {SUBMITTED:['UNDER_REVIEW'],UNDER_REVIEW:['APPROVED','REJECTED']}[status]||[];}
-function renderVendors(items){byId('content').innerHTML=`<h2>Shop applications</h2><div class="actions"><button class="success" data-action="create-store">Create Local Store</button></div><div class="grid">${items.map(item=>`<article class="card"><h3>${escapeText(item.shopName)}</h3><small>${escapeText(item.id)}</small><p>${escapeText(item.ownerName)} · ${escapeText(item.registeredEmail)} · ${escapeText(item.registeredMobile)}</p><p class="muted">${escapeText(item.address)}, ${escapeText(item.city)} ${escapeText(item.pincode)} — ${escapeText(item.description)}</p>${item.rejectionReason?`<p class="error">${escapeText(item.rejectionReason)}</p>`:''}<strong>${escapeText(item.status)}</strong><div class="actions">${applicationTransitions(item.status).map(status=>`<button class="${['REJECTED','SUSPENDED'].includes(status)?'danger':'success'}" data-action="vendor" data-id="${escapeText(item.id)}" data-value="${status}">${escapeText(status.replaceAll('_',' '))}</button>`).join('')}</div></article>`).join('')||'<p>No applications.</p>'}</div>`;}
+function renderVendors(items){currentVendors=Array.isArray(items)?items:[];byId('content').innerHTML=`<h2>Shop applications</h2><div class="actions"><button class="success" data-action="create-store">Create Local Store</button></div><div class="grid">${currentVendors.map(item=>`<article class="card"><h3>${escapeText(item.shopName)}</h3><small>${escapeText(item.id)}</small><p>${escapeText(item.ownerName)} · ${escapeText(item.registeredEmail)} · ${escapeText(item.registeredMobile)}</p><p class="muted">${escapeText(item.address)}, ${escapeText(item.city)} ${escapeText(item.pincode)} — ${escapeText(item.description)}</p>${item.rejectionReason?`<p class="error">${escapeText(item.rejectionReason)}</p>`:''}<strong>${escapeText(item.status)}</strong><div class="actions"><button data-action="edit-store" data-id="${escapeText(item.id)}">Edit Store</button>${applicationTransitions(item.status).map(status=>`<button class="${['REJECTED','SUSPENDED'].includes(status)?'danger':'success'}" data-action="vendor" data-id="${escapeText(item.id)}" data-value="${status}">${escapeText(status.replaceAll('_',' '))}</button>`).join('')}</div></article>`).join('')||'<p>No applications.</p>'}</div>`;}
 function renderShopProducts(items,applications=shopProductStores){
   const storeMap=new Map(applications.map(item=>[item.id,item.shopName||item.id]));
   const storeIds=[...new Set(items.map(item=>item.applicationId))];

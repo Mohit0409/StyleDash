@@ -707,6 +707,11 @@ class AdminStoreTests(unittest.TestCase):
         self.assertIn("paymentTest?", admin_ui)
         self.assertIn("Mobile number (required; used for OTP login)", admin_ui)
         self.assertIn("Store owner email (optional)", admin_ui)
+        self.assertIn("async function editStore(button)", admin_ui)
+        self.assertIn('data-action="edit-store"', admin_ui)
+        self.assertIn("Replace store cover (optional)", admin_ui)
+        self.assertIn("Replace store logo (optional)", admin_ui)
+        self.assertIn("/details`,{method:'PATCH'", admin_ui)
         self.assertIn('data-order-filter="status"', admin_ui)
         self.assertIn('data-order-filter="payment"', admin_ui)
         self.assertIn('data-order-filter="fulfillment"', admin_ui)
@@ -880,6 +885,42 @@ class AdminHttpTests(unittest.TestCase):
             self.assertEqual((status, body["request"]["status"]), (200, target))
         updated = next(item for item in shops.admin_list_products(body["request"]["reviewedBy"]) if item["id"] == product["id"] )
         self.assertEqual(updated["name"], "Transition Tee Updated")
+
+    def test_admin_can_edit_store_details_without_changing_identity_or_status(self):
+        import base64
+        customers = SECURITY.SecurityStore(self.database, self.key)
+        user, _raw, _csrf = customers.register({
+            "name": "Editable Seller", "email": "editable-seller@example.test",
+            "password": "long seller password 123", "phone": "9999999977",
+        })
+        self.request("/api/admin/login", {"username": "local-owner", "password": "long administrator password 123"}, method="POST")
+        status, body, _headers = self.request("/api/admin/totp", {"code": pyotp.TOTP(self.secret).now()}, method="POST")
+        self.assertEqual(status, 200); csrf = body["csrfToken"]; admin_id = body["admin"]["id"]
+        shops = ADMIN_SERVER.ShopWorkflow(self.database)
+        application = shops.admin_create_application(admin_id, user["id"], {
+            "shopName": "Editable Shop", "ownerName": "Editable Seller", "category": "Clothing & Fashion",
+            "description": "A local shop that can be edited safely by the administrator.",
+            "address": "1 Main Market", "city": "Neemuch", "state": "Madhya Pradesh", "pincode": "458441",
+        })
+        png = base64.b64decode("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=")
+        status, uploaded, _headers = self.request("/api/admin/product-images", {
+            "fileName": "cover.png", "contentType": "image/png", "dataBase64": base64.b64encode(png).decode("ascii"),
+        }, headers={"X-CSRF-Token": csrf}, method="POST")
+        self.assertEqual(status, 201); cover = uploaded["image"]["url"]
+        status, body, _headers = self.request(f"/api/admin/vendors/{application['id']}/details", {
+            "shopName": "Edited Local Shop", "description": "Updated local shop description for the public storefront.",
+            "address": "22 Veer Park Road", "businessInformation": "Updated by private admin.", "bannerImage": cover,
+        }, headers={"X-CSRF-Token": csrf}, method="PATCH")
+        self.assertEqual(status, 200); edited = body["application"]
+        self.assertEqual((edited["shopName"], edited["status"]), ("Edited Local Shop", "ACTIVE"))
+        self.assertEqual((edited["registeredEmail"], edited["registeredMobile"]), (user["email"], user["phone"]))
+        self.assertEqual((edited["submittedByUserId"], edited["bannerImage"]), (user["id"], cover))
+        status, bad, _headers = self.request(f"/api/admin/vendors/{application['id']}/details", {"registeredMobile": "+919999999999"}, headers={"X-CSRF-Token": csrf}, method="PATCH")
+        self.assertEqual((status, bad["code"]), (400, "invalid_vendor_application"))
+        status, bad, _headers = self.request(f"/api/admin/vendors/{application['id']}/details", {"bannerImage": "/media/product-images/" + "a" * 32 + ".png"}, headers={"X-CSRF-Token": csrf}, method="PATCH")
+        self.assertEqual((status, bad["code"]), (400, "invalid_store_branding"))
+        status, audit, _headers = self.request("/api/admin/audit")
+        self.assertEqual(status, 200); self.assertTrue(any(row["action"] == "shop_admin_updated" and row["target_id"] == application["id"] for row in audit["audit"]))
 
     def test_admin_bulk_product_endpoint_publishes_valid_rows_atomically(self):
         customers = SECURITY.SecurityStore(self.database, self.key)

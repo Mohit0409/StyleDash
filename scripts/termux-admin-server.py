@@ -28,9 +28,9 @@ except ModuleNotFoundError:
     from scripts.styledash_security import SecurityError, iso, utc_now
 
 try:
-    from styledash_shops import ShopWorkflow
+    from styledash_shops import PRODUCT_MEDIA_PATH_PATTERN, ShopWorkflow
 except ModuleNotFoundError:
-    from scripts.styledash_shops import ShopWorkflow
+    from scripts.styledash_shops import PRODUCT_MEDIA_PATH_PATTERN, ShopWorkflow
 
 try:
     from styledash_notify import owner_notifier
@@ -775,6 +775,18 @@ class AdminHandler(BaseHTTPRequestHandler):
                 order_id = unquote(path.removeprefix("/api/admin/orders/").removesuffix("/status"))
                 result = self.application.update_order_status(admin["id"], order_id, payload.get("status"))
                 self._json(200, {"success": True, "order": result}); return
+            if path.startswith("/api/admin/vendors/") and path.endswith("/details"):
+                application_id = unquote(path.removeprefix("/api/admin/vendors/").removesuffix("/details"))
+                for field, label in (("bannerImage", "store cover"), ("logoImage", "store logo")):
+                    value = payload.get(field)
+                    if value in (None, ""):
+                        continue
+                    if not isinstance(value, str) or not PRODUCT_MEDIA_PATH_PATTERN.fullmatch(value):
+                        raise SecurityError(400, f"Upload a valid {label} image.", "invalid_store_branding")
+                    if not (self.application.product_image_directory / Path(value).name).is_file():
+                        raise SecurityError(400, f"Upload a valid {label} image.", "invalid_store_branding")
+                result = self._shops().admin_update_application(admin["id"], application_id, payload)
+                self._json(200, {"success": True, "application": result}); return
             if path.startswith("/api/admin/vendors/"):
                 application_id = unquote(path.removeprefix("/api/admin/vendors/"))
                 result = self._shops().admin_transition_application(
