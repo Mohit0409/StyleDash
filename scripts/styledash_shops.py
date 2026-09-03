@@ -22,6 +22,18 @@ except ModuleNotFoundError:  # Repository test import path.
     from scripts.styledash_security import ClosingConnection, SecurityError, clean_text, iso, utc_now
 
 
+try:
+    from catalog_normalization import (
+        CANONICAL_DEPARTMENTS, PRODUCT_CATEGORIES, normalize_brand, normalize_delivery_type,
+        normalize_department, normalize_product_category, normalize_size_label, normalize_subcategory,
+    )
+except ModuleNotFoundError:
+    from scripts.catalog_normalization import (
+        CANONICAL_DEPARTMENTS, PRODUCT_CATEGORIES, normalize_brand, normalize_delivery_type,
+        normalize_department, normalize_product_category, normalize_size_label, normalize_subcategory,
+    )
+
+
 APPLICATION_STATUSES = (
     "DRAFT",
     "SUBMITTED",
@@ -88,13 +100,15 @@ PRODUCT_PAYLOAD_FIELDS = {
     "inventory",
     "imageUrls",
     "attributes",
+    "subcategory",
+    "deliveryType",
     "size",
     "colourName",
     "colourHex",
     "variants",
 }
 PRODUCT_CHANGE_PAYLOAD_FIELDS = PRODUCT_PAYLOAD_FIELDS - {"inventory", "size"}
-DEPARTMENTS = {"men", "women", "kids", "unisex", "footwear", "accessories"}
+DEPARTMENTS = CANONICAL_DEPARTMENTS
 COLOUR_HEX_PATTERN = re.compile(r"^#[0-9A-Fa-f]{6}$")
 PRODUCT_MEDIA_PATH_PATTERN = re.compile(r"^/media/product-images/[0-9a-f]{32}\.(?:webp|jpg|png)$")
 
@@ -945,12 +959,21 @@ class ShopWorkflow:
                 return payload[key]
             return current[column] if current is not None else None
 
-        category = supplied("category", "category")
-        if category not in ALLOWED_CATEGORIES:
-            raise SecurityError(400, "Invalid product category.", "invalid_product")
-        department = supplied("department", "department")
-        if department not in DEPARTMENTS:
-            raise SecurityError(400, "Invalid product department.", "invalid_product")
+        name = clean_text(supplied("name", "name"), "product name", 2, 140)
+        description = clean_text(
+            supplied("description", "description"), "product description", 10, 2000
+        )
+        raw_department = supplied("department", "department")
+        category = normalize_product_category(
+            supplied("category", "category"), name=name, description=description,
+            legacy_department=raw_department,
+        )
+        allow_legacy_department = current is not None and "department" not in payload
+        department = normalize_department(
+            raw_department, name=name, description=description, category=category,
+            allow_legacy=allow_legacy_department,
+        )
+        brand = normalize_brand(supplied("brand", "brand"), name=name)
         price = supplied("pricePaise", "price_paise")
         original_price = supplied("originalPricePaise", "original_price_paise")
         if original_price is None:
@@ -992,7 +1015,7 @@ class ShopWorkflow:
             allowed_fields = {"size", "inventory", "id", "active"} if metadata_allowed else {"size", "inventory"}
             if not isinstance(item, dict) or set(item) - allowed_fields:
                 raise SecurityError(400, "Enter valid size inventory rows.", "invalid_product")
-            size = clean_text(item.get("size"), "size", 1, 40)
+            size = normalize_size_label(item.get("size"), category)
             inventory = item.get("inventory")
             if isinstance(inventory, bool) or not isinstance(inventory, int) or not 0 <= inventory <= 100_000:
                 raise SecurityError(400, "Enter valid product inventory.", "invalid_product")
@@ -1089,12 +1112,19 @@ class ShopWorkflow:
                 value, "attribute value", 1, 200
             )
 
+        subcategory_value = payload.get("subcategory", clean_attributes.get("subcategory"))
+        subcategory = normalize_subcategory(subcategory_value, name=name, category=category)
+        if subcategory:
+            clean_attributes["subcategory"] = subcategory
+        else:
+            clean_attributes.pop("subcategory", None)
+        delivery_value = payload.get("deliveryType", clean_attributes.get("deliveryType", "normal"))
+        clean_attributes["deliveryType"] = normalize_delivery_type(delivery_value)
+
         return {
-            "name": clean_text(supplied("name", "name"), "product name", 2, 140),
-            "description": clean_text(
-                supplied("description", "description"), "product description", 10, 2000
-            ),
-            "brand": _optional_text(supplied("brand", "brand"), "brand", 100),
+            "name": name,
+            "description": description,
+            "brand": brand,
             "department": department,
             "category": category,
             "price_paise": price,
@@ -1125,6 +1155,7 @@ class ShopWorkflow:
 
     @staticmethod
     def _serialize_product(row: sqlite3.Row, *, admin: bool = False) -> dict[str, Any]:
+        attributes = json.loads(row["attributes_json"])
         variants = [
             {"id": item["id"], "size": item["size"], "inventory": item["inventory"]}
             for item in _row_variants(row) if item.get("active", True)
@@ -1138,6 +1169,8 @@ class ShopWorkflow:
             "brand": row["brand"],
             "department": row["department"],
             "category": row["category"],
+            "subcategory": attributes.get("subcategory"),
+            "deliveryType": attributes.get("deliveryType", "normal"),
             "pricePaise": row["price_paise"],
             "originalPricePaise": row["original_price_paise"],
             "inventory": sum(item["inventory"] for item in variants),
@@ -1146,7 +1179,7 @@ class ShopWorkflow:
             "colourName": row["colour_name"],
             "colourHex": row["colour_hex"],
             "imageUrls": json.loads(row["image_urls_json"]),
-            "attributes": json.loads(row["attributes_json"]),
+            "attributes": attributes,
             "status": row["status"],
             "rejectionReason": row["rejection_reason"] if row["status"] == "REJECTED" else None,
             "createdAt": row["created_at"],
@@ -1166,19 +1199,22 @@ class ShopWorkflow:
 
     @staticmethod
     def _product_values_to_change_payload(values: dict[str, Any]) -> dict[str, Any]:
+        attributes = json.loads(values["attributes_json"])
         return {
             "name": values["name"],
             "description": values["description"],
             "brand": values["brand"],
             "department": values["department"],
             "category": values["category"],
+            "subcategory": attributes.get("subcategory"),
+            "deliveryType": attributes.get("deliveryType", "normal"),
             "pricePaise": values["price_paise"],
             "originalPricePaise": values["original_price_paise"],
             "variants": json.loads(values["variants_json"]),
             "colourName": values["colour_name"],
             "colourHex": values["colour_hex"],
             "imageUrls": json.loads(values["image_urls_json"]),
-            "attributes": json.loads(values["attributes_json"]),
+            "attributes": attributes,
         }
 
     @staticmethod
@@ -2254,6 +2290,8 @@ class ShopWorkflow:
             "brand": row["brand"] or row["shop_name"],
             "department": row["department"],
             "category": row["category"],
+            "subcategory": attributes.get("subcategory"),
+            "deliveryType": attributes.get("deliveryType", "normal"),
             "shortDescription": row["description"][:180],
             "description": row["description"],
             "material": attributes.get("material", "Not specified"),
@@ -2271,7 +2309,7 @@ class ShopWorkflow:
             "newArrival": True,
             "trending": False,
             "featured": False,
-            "expressDelivery": False,
+            "expressDelivery": attributes.get("deliveryType", "normal") in {"express", "both"},
             "returnWindowDays": 0,
             "exchangeAvailable": False,
             "vendorId": row["application_id"],

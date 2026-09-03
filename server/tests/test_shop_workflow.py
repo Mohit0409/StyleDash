@@ -756,5 +756,46 @@ class ShopWorkflowTests(unittest.TestCase):
         self.assert_error("duplicate_product", lambda: self.store.admin_bulk_create_products("admin-a", application["id"], [fresh, duplicate]))
         self.assertEqual([item["name"] for item in self.store.list_published_products()], ["Existing Kurta"])
 
+    def test_catalog_normalization_applies_to_seller_create_and_public_dto(self) -> None:
+        self.create_active_shop("user-a", "Normalized Seller Shop")
+        payload = self.complete_product("Puma Slider for Men")
+        payload.update({
+            "brand": None,
+            "department": "Mens",
+            "category": "Clothing & Fashion",
+            "variants": [{"size": "8", "inventory": 5}, {"size": "uk-9", "inventory": 4}],
+            "deliveryType": "Weekend Express",
+        })
+        payload.pop("inventory", None)
+        payload.pop("size", None)
+        product = self.store.create_product_draft("user-a", payload)
+        self.assertEqual((product["brand"], product["department"], product["category"]), ("Puma", "men", "Footwear"))
+        self.assertEqual([item["size"] for item in product["variants"]], ["UK 8", "UK 9"])
+        self.assertEqual((product["subcategory"], product["deliveryType"]), ("Sliders", "express"))
+        self.store.submit_product("user-a", product["id"])
+        for target in ("UNDER_REVIEW", "APPROVED", "PUBLISHED"):
+            self.store.admin_transition_product("admin-a", product["id"], target)
+        public = self.store.list_published_products()[0]
+        self.assertEqual((public["subcategory"], public["deliveryType"], public["expressDelivery"]), ("Sliders", "express", True))
+
+    def test_catalog_normalization_applies_to_admin_bulk_and_edit(self) -> None:
+        application = self.create_active_shop("user-a", "Normalized Admin Shop")
+        payload = self.complete_product("Skechers Slider for Men")
+        payload.update({"brand": "skechers", "department": "male", "category": "Footwear", "variants": [{"size": "10", "inventory": 5}]})
+        payload.pop("inventory", None)
+        payload.pop("size", None)
+        created = self.store.admin_bulk_create_products("admin-a", application["id"], [payload])[0]
+        self.assertEqual((created["brand"], created["department"], created["category"], created["subcategory"]), ("Skechers", "men", "Footwear", "Sliders"))
+        self.assertEqual(created["variants"][0]["size"], "UK 10")
+        self.store.admin_transition_product("admin-a", created["id"], "APPROVED")
+        edited = self.store.admin_update_product("admin-a", created["id"], {"department": "gents", "deliveryType": "both"})
+        self.assertEqual((edited["department"], edited["deliveryType"]), ("men", "both"))
+
+    def test_new_products_reject_legacy_merchandise_class_as_department_when_ambiguous(self) -> None:
+        self.create_active_shop("user-a", "Ambiguous Shop")
+        payload = self.complete_product("Premium Everyday Sneakers")
+        payload.update({"department": "footwear", "category": "Footwear"})
+        self.assert_error("invalid_product", lambda: self.store.create_product_draft("user-a", payload))
+
 if __name__ == "__main__":
     unittest.main()
