@@ -386,9 +386,11 @@ class AdminStoreTests(unittest.TestCase):
                 self.admin["id"],
                 "ORDER-CANCEL-NOTIFY",
                 "cancelled",
+                "Customer requested cancellation before dispatch",
             )
 
             self.assertEqual(result["status"], "cancelled")
+            self.assertEqual(result["cancellationReason"], "Customer requested cancellation before dispatch")
             self.assertEqual(notifier.send.call_count, 1)
 
             notification = notifier.send.call_args.kwargs
@@ -464,9 +466,11 @@ class AdminStoreTests(unittest.TestCase):
                 self.admin["id"],
                 "ORDER-CANCEL-FAILURE",
                 "cancelled",
+                "Item unavailable after order review",
             )
 
         self.assertEqual(result["status"], "cancelled")
+        self.assertEqual(result["cancellationReason"], "Item unavailable after order review")
 
         persisted = app.get_order("ORDER-CANCEL-FAILURE")
 
@@ -722,6 +726,11 @@ class AdminStoreTests(unittest.TestCase):
         self.assertIn("payment_pending:'amber'", admin_ui)
         self.assertIn("delivered:'green'", admin_ui)
         self.assertIn("cancelled:'red'", admin_ui)
+        self.assertIn("async function cancellationReasonFor()", admin_ui)
+        self.assertIn("Customer requested cancellation", admin_ui)
+        self.assertIn("Other", admin_ui)
+        self.assertIn("Cancellation reason", admin_ui)
+        self.assertIn("orderItemMarkup", admin_ui)
         self.assertNotIn("prompt(", admin_ui)
         self.assertNotIn("alert(", admin_ui)
         self.assertNotIn("confirm(", admin_ui)

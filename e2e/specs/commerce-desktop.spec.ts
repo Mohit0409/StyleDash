@@ -249,6 +249,12 @@ test('isolated COD order succeeds and another account cannot read it', async ({
 
   expect(orderId.length).toBeGreaterThan(0);
 
+  await page.getByRole('link', { name: 'Track order' }).click();
+  await expect(page).toHaveURL(/\/orders\/[^/?#]+\/track$/);
+  await expect(page.getByRole('heading', { name: orderId })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Order items' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Download receipt' })).toHaveCount(0);
+
   await page.goto('/profile');
 
   await page.getByRole('button', { name: 'Logout' }).click();

@@ -3,6 +3,7 @@ import { expect, test } from '@playwright/test';
 const protectedRoutes = [
   '/checkout',
   '/orders',
+  '/orders/SD-E2E-PROTECTED/track',
   '/profile',
   '/partner',
 ];

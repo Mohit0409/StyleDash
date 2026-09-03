@@ -33,6 +33,10 @@ export interface TrustedOrderItem {
   quantity: number;
   unitPrice: number;
   lineTotal: number;
+  storeId?: string;
+  storeName?: string;
+  storeSlug?: string;
+  imageUrl?: string;
 }
 
 export interface ServerOrder {
@@ -66,6 +70,8 @@ export interface ServerOrder {
   refundAmount?: number;
   refundCurrency?: string;
   refundProcessedAt?: string;
+  cancellationReason?: string;
+  cancelledAt?: string;
 }
 
 export interface CreatePaymentOrderResponse {

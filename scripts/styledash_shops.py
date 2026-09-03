@@ -2334,7 +2334,7 @@ class ShopWorkflow:
         with self.connect() as db:
             rows = db.execute(
                 """
-                SELECT p.*,a.status AS shop_status
+                SELECT p.*,a.status AS shop_status,a.shop_name
                   FROM shop_product_submissions p
                   JOIN vendor_applications a ON a.id=p.application_id
                  ORDER BY p.created_at
@@ -2345,12 +2345,18 @@ class ShopWorkflow:
         products = []
         for row in rows:
             price = row["price_paise"] / 100
+            images = json.loads(row["image_urls_json"]) if row["image_urls_json"] else []
+            store_slug = _store_slug(row["application_id"])
             products.append(
                 {
                     "id": row["id"],
                     "name": row["name"],
                     "slug": row["slug"],
                     "vendorId": row["application_id"],
+                    "storeName": row["shop_name"],
+                    "storeSlug": store_slug,
+                    "images": images,
+                    "thumbnail": images[0] if images else None,
                     "active": row["status"] == "PUBLISHED" and row["shop_status"] == "ACTIVE",
                     "price": price,
                     "variants": [
@@ -2361,6 +2367,7 @@ class ShopWorkflow:
                             "colourName": row["colour_name"],
                             "stock": item["inventory"],
                             "price": price,
+                            "images": images,
                             "active": item.get("active", True),
                         }
                         for index, item in enumerate(_row_variants(row))

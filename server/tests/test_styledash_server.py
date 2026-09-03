@@ -3395,6 +3395,62 @@ class HttpApiTests(unittest.TestCase):
         self.assertEqual(historical["order"]["adminLabels"], ["TEST", "NO FULFILLMENT REQUIRED"])
         self.assertEqual(historical["order"]["paymentStatus"], "paid")
 
+    def test_delivered_receipt_is_owner_only_and_unavailable_before_delivery(self) -> None:
+        status, owner, owner_headers = self.post_json('/api/auth/register', {
+            'name': 'Receipt Owner', 'email': 'receipt-owner@example.test',
+            'password': 'long receipt owner password 123', 'phone': '9888800001',
+        })
+        self.assertEqual(status, 201)
+        status, other, other_headers = self.post_json('/api/auth/register', {
+            'name': 'Receipt Other', 'email': 'receipt-other@example.test',
+            'password': 'long receipt other password 123', 'phone': '9888800002',
+        })
+        self.assertEqual(status, 201)
+        now = '2026-09-03T12:00:00+00:00'
+        base = {
+            'userId': owner['user']['id'], 'paymentMethod': 'cod', 'paymentStatus': 'pending',
+            'subtotal': 100, 'discount': 0, 'walletAmount': 0, 'deliveryFee': 0, 'taxes': 0, 'grandTotal': 100,
+            'deliveryMethod': 'standard', 'estimatedDelivery': 'Local Delivery',
+            'address': {'id': 'addr', 'name': 'Receipt Owner', 'phone': '9888800001', 'street': '1 Test Road', 'city': 'Neemuch', 'state': 'Madhya Pradesh', 'pincode': '458441'},
+            'items': [{'productId': 'sd-prod-001', 'productName': 'Receipt Product', 'productSlug': 'receipt-product', 'variantId': 'sd-prod-001-var-2', 'sku': 'TEST', 'size': 'M', 'colourName': 'Black', 'quantity': 1, 'unitPrice': 100, 'lineTotal': 100}],
+            'statusHistory': [{'status': 'placed', 'timestamp': now}], 'createdAt': now, 'updatedAt': now,
+        }
+        with self.service.store.lock:
+            self.service.store.state['orders']['receipt-ready'] = {**base, 'id': 'receipt-ready', 'status': 'delivered'}
+            self.service.store.state['orders']['receipt-not-ready'] = {**base, 'id': 'receipt-not-ready', 'status': 'placed'}
+            self.service.store.save()
+        owner_cookie = owner_headers['Set-Cookie'].split(';', 1)[0]
+        other_cookie = other_headers['Set-Cookie'].split(';', 1)[0]
+        request = urllib.request.Request(
+            f'{self.base_url}/api/orders/receipt-ready/receipt', headers={'Cookie': owner_cookie}
+        )
+        with urllib.request.urlopen(request) as response:
+            body = response.read()
+            self.assertEqual(response.status, 200)
+            self.assertEqual(response.headers.get_content_type(), 'application/pdf')
+            self.assertIn('vibe4you-receipt-receipt-ready.pdf', response.headers['Content-Disposition'])
+            self.assertTrue(body.startswith(b'%PDF-1.4'))
+            self.assertIn(b'receipt-ready', body)
+            self.assertIn(b'Total: INR 100', body)
+
+        request = urllib.request.Request(
+            f'{self.base_url}/api/orders/receipt-not-ready/receipt', headers={'Cookie': owner_cookie}
+        )
+        with self.assertRaises(urllib.error.HTTPError) as caught:
+            urllib.request.urlopen(request)
+        self.assertEqual(caught.exception.code, 409)
+        self.assertEqual(json.loads(caught.exception.read())['code'], 'receipt_not_ready')
+        caught.exception.close()
+
+        request = urllib.request.Request(
+            f'{self.base_url}/api/orders/receipt-ready/receipt', headers={'Cookie': other_cookie}
+        )
+        with self.assertRaises(urllib.error.HTTPError) as caught:
+            urllib.request.urlopen(request)
+        self.assertEqual(caught.exception.code, 404)
+        self.assertEqual(json.loads(caught.exception.read())['code'], 'order_not_found')
+        caught.exception.close()
+
     def test_password_reset_http_is_generic_rate_limited_and_never_returns_tokens(self) -> None:
         registered_payload = {
             "name": "Recovery Customer", "email": "recovery@example.test",

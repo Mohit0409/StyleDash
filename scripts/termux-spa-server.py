@@ -388,6 +388,55 @@ def _rounded_rupees(value: Decimal) -> int:
     return int(value.quantize(Decimal("1"), rounding=ROUND_HALF_UP))
 
 
+def _pdf_escape(value: Any) -> str:
+    text = str(value or "").encode("latin-1", "replace").decode("latin-1")
+    text = "".join(character if ord(character) >= 32 else " " for character in text)
+    return text.replace("\\", "\\\\").replace("(", "\\(").replace(")", "\\)")
+
+
+def _simple_pdf(lines: list[str]) -> bytes:
+    wrapped: list[str] = []
+    for line in lines:
+        text = str(line or "")
+        if not text:
+            wrapped.append("")
+            continue
+        while len(text) > 88:
+            split = text.rfind(" ", 0, 89)
+            split = split if split > 20 else 88
+            wrapped.append(text[:split].rstrip())
+            text = text[split:].lstrip()
+        wrapped.append(text)
+    pages = [wrapped[index:index + 38] for index in range(0, len(wrapped), 38)] or [[""]]
+    font_number = 3 + (2 * len(pages))
+    kids = " ".join(f"{3 + (2 * index)} 0 R" for index in range(len(pages)))
+    objects: list[bytes] = [
+        b"<< /Type /Catalog /Pages 2 0 R >>",
+        f"<< /Type /Pages /Kids [{kids}] /Count {len(pages)} >>".encode(),
+    ]
+    for index, page_lines in enumerate(pages):
+        page_number = 3 + (2 * index)
+        content_number = page_number + 1
+        commands = ["BT", "/F1 11 Tf", "48 760 Td"]
+        for line_index, line in enumerate(page_lines):
+            if line_index:
+                commands.append("0 -17 Td")
+            commands.append(f"({_pdf_escape(line)}) Tj")
+        commands.append("ET")
+        stream = "\n".join(commands).encode("latin-1", "replace")
+        objects.append(f"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 {font_number} 0 R >> >> /Contents {content_number} 0 R >>".encode())
+        objects.append(b"<< /Length %d >>\nstream\n" % len(stream) + stream + b"\nendstream")
+    objects.append(b"<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>")
+    pdf = bytearray(b"%PDF-1.4\n")
+    offsets = [0]
+    for number, obj in enumerate(objects, 1):
+        offsets.append(len(pdf)); pdf.extend(f"{number} 0 obj\n".encode()); pdf.extend(obj); pdf.extend(b"\nendobj\n")
+    xref = len(pdf); pdf.extend(f"xref\n0 {len(objects)+1}\n0000000000 65535 f \n".encode())
+    for offset in offsets[1:]: pdf.extend(f"{offset:010d} 00000 n \n".encode())
+    pdf.extend(f"trailer\n<< /Size {len(objects)+1} /Root 1 0 R >>\nstartxref\n{xref}\n%%EOF\n".encode())
+    return bytes(pdf)
+
+
 def _clean_string(value: Any, field: str, minimum: int, maximum: int) -> str:
     if not isinstance(value, str):
         raise ApiError(HTTPStatus.UNPROCESSABLE_ENTITY, f"Invalid {field}.", "invalid_customer")
@@ -494,6 +543,59 @@ class PaymentService:
     def product_snapshot(self) -> dict[str, dict[str, Any]]:
         with self._products_lock:
             return self.products
+
+    def order_for_display(self, order: dict[str, Any]) -> dict[str, Any]:
+        """Enrich safe order-item snapshots with current display-only metadata."""
+        self.refresh_shop_products()
+        products = self.product_snapshot()
+        result = dict(order)
+        if "items" not in order:
+            return result
+        display_items: list[dict[str, Any]] = []
+        for source in order.get("items", []) or []:
+            item = dict(source)
+            product = products.get(item.get("productId"))
+            if product is not None:
+                for key, product_key in (
+                    ("storeId", "vendorId"), ("storeName", "storeName"),
+                    ("storeSlug", "storeSlug"),
+                ):
+                    value = product.get(product_key)
+                    if value and not item.get(key):
+                        item[key] = value
+                variant = next((candidate for candidate in product.get("variants", [])
+                                if candidate.get("id") == item.get("variantId")), None)
+                images = (variant or {}).get("images") or product.get("images") or []
+                image_url = item.get("imageUrl") or product.get("thumbnail") or (images[0] if images else None)
+                if image_url:
+                    item["imageUrl"] = image_url
+            display_items.append(item)
+        result["items"] = display_items
+        return result
+
+    def receipt_pdf(self, order: dict[str, Any]) -> bytes:
+        display = self.order_for_display(order)
+        if display.get("status") != "delivered":
+            raise SecurityError(409, "Receipt is available after delivery.", "receipt_not_ready")
+        address = display.get("address") or {}
+        lines = [
+            "Vibe4You Receipt",
+            f"Order: {display.get('id', '-')}",
+            f"Order date: {display.get('createdAt', '-')}",
+            f"Delivered: {display.get('updatedAt', '-')}",
+            f"Payment: {str(display.get('paymentMethod') or '-').upper()} / {display.get('paymentStatus', '-')}",
+            "",
+            f"Customer: {address.get('name', '-')}",
+            f"Phone: {address.get('phone', '-')}",
+            f"Address: {address.get('street', '-')}, {address.get('city', '-')} {address.get('pincode', '-')}",
+            "",
+            "Items:",
+        ]
+        for item in display.get("items", []) or []:
+            store = item.get("storeName") or "Vibe4You"
+            lines.append(f"{store} | {item.get('productName', '-')} | Size {item.get('size', '-')} | Color {item.get('colourName', '-')} | Qty {item.get('quantity', 0)} | INR {item.get('lineTotal', 0)}")
+        lines.extend(["", f"Subtotal: INR {display.get('subtotal', 0)}", f"Discount: INR {display.get('discount', 0)}", f"Delivery: INR {display.get('deliveryFee', 0)}", f"Taxes: INR {display.get('taxes', 0)}", f"Total: INR {display.get('grandTotal', 0)}", "", "Thank you for shopping local with Vibe4You."])
+        return _simple_pdf(lines)
 
     @staticmethod
     def express_delivery_available(now: datetime | None = None) -> bool:
@@ -752,8 +854,7 @@ class PaymentService:
                 unit_price = _money(variant.get("price", product["price"]), "price")
                 line_total = unit_price * quantity
                 subtotal += line_total
-                trusted_items.append(
-                    {
+                trusted_item = {
                         "productId": product_id,
                         "productName": product["name"],
                         "productSlug": product["slug"],
@@ -765,7 +866,18 @@ class PaymentService:
                         "unitPrice": _rounded_rupees(unit_price),
                         "lineTotal": _rounded_rupees(line_total),
                     }
-                )
+                for key, value in (
+                    ("storeId", product.get("vendorId")),
+                    ("storeName", product.get("storeName")),
+                    ("storeSlug", product.get("storeSlug")),
+                ):
+                    if value:
+                        trusted_item[key] = value
+                images = variant.get("images") or product.get("images") or []
+                image_url = product.get("thumbnail") or (images[0] if images else None)
+                if image_url:
+                    trusted_item["imageUrl"] = image_url
+                trusted_items.append(trusted_item)
 
         coupon_code = payload.get("couponCode")
         coupon_discount = Decimal("0")
@@ -829,6 +941,7 @@ class PaymentService:
         return value
 
     def _public_order(self, order: dict[str, Any]) -> dict[str, Any]:
+        display_order = self.order_for_display(order)
         allowed = (
             "id", "userId", "items", "address", "paymentMethod", "paymentStatus",
             "subtotal", "discount", "walletAmount", "deliveryFee", "taxes", "grandTotal",
@@ -836,8 +949,9 @@ class PaymentService:
             "updatedAt", "razorpayOrderId", "razorpayPaymentId", "paymentVerifiedAt",
             "isPaymentTestOrder", "fulfillmentRequired", "adminLabels", "inventoryCommitted",
             "inventoryReleasedAt", "refundId", "refundAmount", "refundCurrency", "refundProcessedAt",
+            "cancellationReason", "cancelledAt",
         )
-        return {key: order[key] for key in allowed if key in order}
+        return {key: display_order[key] for key in allowed if key in display_order}
 
     def _create_response(self, order: dict[str, Any]) -> dict[str, Any]:
         return {
@@ -1958,6 +2072,14 @@ class StyleDashRequestHandler(SimpleHTTPRequestHandler):
         if not head_only:
             self.wfile.write(encoded)
 
+    def _binary_response(self, status: int, body: bytes, content_type: str, headers: dict[str, str] | None = None) -> None:
+        self.send_response(status)
+        self.send_header("Content-Type", content_type)
+        self.send_header("Content-Length", str(len(body)))
+        self.send_header("Cache-Control", "no-store")
+        for name, value in (headers or {}).items(): self.send_header(name, value)
+        self.end_headers(); self.wfile.write(body)
+
     def _text_response(
         self, status: int, body: str, content_type: str, *, head_only: bool = False,
     ) -> None:
@@ -2343,7 +2465,8 @@ class StyleDashRequestHandler(SimpleHTTPRequestHandler):
             if path == "/api/orders":
                 user, _session = self._current_user()
                 orders = self._security().list_orders(self.payment_service.store, user["id"])
-                self._json_response(HTTPStatus.OK, {"success": True, "orders": orders})
+                display_orders = [self.payment_service.order_for_display(order) for order in orders]
+                self._json_response(HTTPStatus.OK, {"success": True, "orders": display_orders})
                 return
             if path == "/api/profile":
                 user, _session = self._current_user()
@@ -2384,10 +2507,19 @@ class StyleDashRequestHandler(SimpleHTTPRequestHandler):
                     },
                 )
                 return
+            if path.startswith("/api/orders/") and path.endswith("/receipt"):
+                user, _session = self._current_user()
+                order_id = unquote(path.removeprefix("/api/orders/").removesuffix("/receipt"))
+                order = self._security().get_order(self.payment_service.store, order_id, user["id"])
+                pdf = self.payment_service.receipt_pdf(order)
+                safe_id = re.sub(r"[^A-Za-z0-9_-]+", "-", order_id)[:80] or "order"
+                self._binary_response(HTTPStatus.OK, pdf, "application/pdf", {"Content-Disposition": f'attachment; filename="vibe4you-receipt-{safe_id}.pdf"'})
+                return
             if path.startswith("/api/orders/"):
                 user, _session = self._current_user()
-                order = self._security().get_order(self.payment_service.store, path.removeprefix("/api/orders/"), user["id"])
-                self._json_response(HTTPStatus.OK, {"success": True, "order": order})
+                order_id = unquote(path.removeprefix("/api/orders/"))
+                order = self._security().get_order(self.payment_service.store, order_id, user["id"])
+                self._json_response(HTTPStatus.OK, {"success": True, "order": self.payment_service.order_for_display(order)})
                 return
             if path.startswith(API_PREFIX):
                 self._json_response(HTTPStatus.NOT_FOUND, {"success": False, "error": "API endpoint not found.", "code": "not_found"})

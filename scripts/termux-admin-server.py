@@ -175,7 +175,8 @@ class AdminApplication:
             orders = list(self.payments.store.state["orders"].values())
             if needle:
                 orders = [order for order in orders if needle in str(order.get("id", "")).casefold()]
-            return [dict(order) for order in sorted(orders, key=lambda item: item.get("createdAt", ""), reverse=True)[:250]]
+            selected = [dict(order) for order in sorted(orders, key=lambda item: item.get("createdAt", ""), reverse=True)[:250]]
+        return [self.payments.order_for_display(order) for order in selected]
 
     def payment_alerts(self) -> list[dict[str, Any]]:
         with self.payments.store.lock:
@@ -190,7 +191,8 @@ class AdminApplication:
             order = self.payments.store.state["orders"].get(order_id)
             if order is None:
                 raise SecurityError(404, "Order not found.", "order_not_found")
-            return dict(order)
+            selected = dict(order)
+        return self.payments.order_for_display(selected)
 
     def _resolve_order_alerts(
         self,
@@ -216,7 +218,9 @@ class AdminApplication:
             for alert in state.get("operationalAlerts", {}).values()
         )
 
-    def update_order_status(self, admin_id: str, order_id: str, requested: Any) -> dict[str, Any]:
+    def update_order_status(
+        self, admin_id: str, order_id: str, requested: Any, reason: Any = None
+    ) -> dict[str, Any]:
         transitions = {
             "payment_pending": {"cancelled"},
             "payment_review_required": {"placed", "cancelled"},
@@ -247,6 +251,15 @@ class AdminApplication:
             current = order.get("status", "placed")
             if requested not in transitions.get(current, set()):
                 raise SecurityError(409, "Invalid order status transition.", "invalid_transition")
+            cancellation_reason = None
+            if requested == "cancelled":
+                if not isinstance(reason, str) or not 3 <= len(reason.strip()) <= 500:
+                    raise SecurityError(
+                        400,
+                        "A cancellation reason is required.",
+                        "cancellation_reason_required",
+                    )
+                cancellation_reason = " ".join(reason.strip().split())
             now = iso(utc_now())
             inventory_released = False
 
@@ -296,10 +309,13 @@ class AdminApplication:
                     raise
                 order["status"] = "cancelled"
                 order["updatedAt"] = now
+                order["cancelledAt"] = now
+                order["cancellationReason"] = cancellation_reason
+                base_note = "Cancelled after verified Razorpay refund" if online else "Cash on Delivery order cancelled"
                 order.setdefault("statusHistory", []).append({
                     "status": "cancelled",
                     "timestamp": now,
-                    "note": "Cancelled after verified Razorpay refund" if online else "Cash on Delivery order cancelled",
+                    "note": f"{base_note}. Reason: {cancellation_reason}",
                 })
                 self._resolve_order_alerts(
                     state,
@@ -328,6 +344,7 @@ class AdminApplication:
                 "from": current,
                 "to": requested,
                 "inventoryReleased": inventory_released,
+                "cancellationReason": cancellation_reason,
             },
         )
 
@@ -355,7 +372,8 @@ class AdminApplication:
                         f"Order: {order_id}\n"
                         f"Amount: {amount_text}\n"
                         f"Payment: {payment_method}\n"
-                        f"Status: Cancelled"
+                        f"Status: Cancelled\n"
+                        f"Reason: {result.get('cancellationReason') or '-'}"
                     ),
                     priority=5,
                     tags=["no_entry_sign"],
@@ -773,7 +791,9 @@ class AdminHandler(BaseHTTPRequestHandler):
             admin, _session = self._admin(); self._csrf(); payload = self._body()
             if path.startswith("/api/admin/orders/") and path.endswith("/status"):
                 order_id = unquote(path.removeprefix("/api/admin/orders/").removesuffix("/status"))
-                result = self.application.update_order_status(admin["id"], order_id, payload.get("status"))
+                result = self.application.update_order_status(
+                    admin["id"], order_id, payload.get("status"), payload.get("reason")
+                )
                 self._json(200, {"success": True, "order": result}); return
             if path.startswith("/api/admin/vendors/") and path.endswith("/details"):
                 application_id = unquote(path.removeprefix("/api/admin/vendors/").removesuffix("/details"))

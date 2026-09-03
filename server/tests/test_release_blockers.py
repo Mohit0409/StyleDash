@@ -203,21 +203,29 @@ class AdminCancellationTests(unittest.TestCase):
     def test_cod_cancel_releases_inventory_once(self):
         o = self.order("SD-COD", "cod", "pending", "placed", None)
         self.seed(o)
-        result = self.app.update_order_status("adm_test", o["id"], "cancelled")
+        result = self.app.update_order_status("adm_test", o["id"], "cancelled", "Customer requested cancellation")
         self.assertEqual(result["status"], "cancelled")
         self.assertEqual(self.app.payments.store.state["inventory"]["sd-prod-001-var-2"], 15)
-        with self.assertRaises(ADMIN.SecurityError): self.app.update_order_status("adm_test", o["id"], "cancelled")
+        with self.assertRaises(ADMIN.SecurityError): self.app.update_order_status("adm_test", o["id"], "cancelled", "Refund completed; order cancelled")
         self.assertEqual(self.app.payments.store.state["inventory"]["sd-prod-001-var-2"], 15)
+
+    def test_cancel_requires_customer_visible_reason(self):
+        o = self.order("SD-CANCEL-REASON", "cod", "pending", "placed", None)
+        self.seed(o)
+        with self.assertRaises(ADMIN.SecurityError) as caught:
+            self.app.update_order_status("adm_test", o["id"], "cancelled")
+        self.assertEqual(caught.exception.code, "cancellation_reason_required")
+        self.assertEqual(self.app.payments.store.state["orders"][o["id"]]["status"], "placed")
 
     def test_paid_online_requires_refund_before_cancel(self):
         o = self.order("SD-ONLINE", "upi", "paid", "placed")
         self.seed(o)
-        with self.assertRaises(ADMIN.SecurityError) as caught: self.app.update_order_status("adm_test", o["id"], "cancelled")
+        with self.assertRaises(ADMIN.SecurityError) as caught: self.app.update_order_status("adm_test", o["id"], "cancelled", "Admin cancellation after refund review")
         self.assertEqual(caught.exception.code, "refund_required")
         with self.app.payments.store.lock:
             self.app.payments.store.state["orders"][o["id"]]["paymentStatus"] = "refunded"
             self.app.payments.store.save()
-        self.app.update_order_status("adm_test", o["id"], "cancelled")
+        self.app.update_order_status("adm_test", o["id"], "cancelled", "Refund completed; order cancelled")
         self.assertEqual(self.app.payments.store.state["inventory"]["sd-prod-001-var-2"], 15)
 
     def test_refunded_payment_pending_order_closes_without_restock(self):
@@ -233,6 +241,7 @@ class AdminCancellationTests(unittest.TestCase):
             "adm_test",
             o["id"],
             "cancelled",
+            "Refund completed before fulfillment",
         )
         self.assertEqual(cancelled["status"], "cancelled")
         self.assertFalse(cancelled.get("inventoryCommitted", False))
@@ -256,6 +265,7 @@ class AdminCancellationTests(unittest.TestCase):
             "adm_test",
             o["id"],
             "cancelled",
+            "Refund completed before dispatch",
         )
         self.assertEqual(cancelled["status"], "cancelled")
         self.assertEqual(
