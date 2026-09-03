@@ -159,9 +159,13 @@ async function editStore(button){
   status(`${values.shopName} store details updated.`);
 }
 
+const PRODUCT_DEPARTMENTS=['men','women','kids','unisex'];
+const PRODUCT_CATEGORIES=['Clothing & Fashion','Footwear','Accessories','Electronics','Home & Living','General Store'];
+const DELIVERY_OPTIONS=[{value:'normal',label:'Normal delivery'},{value:'express',label:'Weekend Express only'},{value:'both',label:'Normal + Weekend Express'}];
+
 function downloadProductCsvTemplate(){
-  const header=['name','description','brand','department','category','price','originalPrice','variants','colourName','colourHex','imageUrls'];
-  const sample=['Classic T-Shirt','Premium cotton T-shirt','Example Brand','men','Clothing & Fashion','799','999','S:5, M:8, L:5','Black','#000000','https://example.com/front.jpg|https://example.com/back.jpg'];
+  const header=['name','description','brand','department','category','subcategory','deliveryType','price','originalPrice','variants','colourName','colourHex','imageUrls'];
+  const sample=['Classic T-Shirt','Premium cotton T-shirt','Example Brand','men','Clothing & Fashion','','normal','799','999','S:5, M:8, L:5','Black','#000000','https://example.com/front.jpg|https://example.com/back.jpg'];
   const quote=value=>`"${String(value).replaceAll('"','""')}"`;
   const blob=new Blob([[header,sample].map(row=>row.map(quote).join(',')).join('\r\n')],{type:'text/csv;charset=utf-8'});
   const link=document.createElement('a'); link.href=URL.createObjectURL(blob); link.download='vibe4you-product-import-template.csv'; link.click(); URL.revokeObjectURL(link.href);
@@ -185,7 +189,7 @@ function csvProducts(text){
     const price=Number(values.price); const original=Number(values.originalPrice||values.price);
     if(!values.name)throw new Error(`Row ${index+2}: product name is required.`);
     if(!Number.isFinite(price)||price<1||!Number.isFinite(original)||original<price)throw new Error(`Row ${index+2}: invalid price.`);
-    return {name:values.name,description:values.description,brand:values.brand||undefined,department:values.department,category:values.category,pricePaise:Math.round(price*100),originalPricePaise:Math.round(original*100),variants:parseVariants(values.variants),colourName:values.colourName,colourHex:values.colourHex||undefined,imageUrls:values.imageUrls.split('|').map(v=>v.trim()).filter(Boolean),attributes:{}};
+    return {name:values.name,description:values.description,brand:values.brand||undefined,department:values.department,category:values.category,subcategory:values.subcategory||undefined,deliveryType:values.deliveryType||'normal',pricePaise:Math.round(price*100),originalPricePaise:Math.round(original*100),variants:parseVariants(values.variants),colourName:values.colourName,colourHex:values.colourHex||undefined,imageUrls:values.imageUrls.split('|').map(v=>v.trim()).filter(Boolean),attributes:{}};
   });
 }
 async function bulkUploadStoreProducts(){
@@ -207,8 +211,10 @@ async function createStoreProduct(){
     {name:'name',label:'Product name',required:true,maxLength:140},
     {name:'description',label:'Product description',type:'textarea',required:true,maxLength:2000},
     {name:'brand',label:'Brand (optional)',maxLength:100},
-    {name:'department',label:'Department',required:true,value:'unisex',placeholder:'men, women, kids, unisex, footwear, accessories'},
-    {name:'category',label:'Category',required:true,value:'Clothing & Fashion'},
+    {name:'department',label:'Department',type:'select',required:true,value:'unisex',options:PRODUCT_DEPARTMENTS.map(value=>({value,label:value}))},
+    {name:'category',label:'Category',type:'select',required:true,value:'Clothing & Fashion',options:PRODUCT_CATEGORIES.map(value=>({value,label:value}))},
+    {name:'subcategory',label:'Subcategory (optional; inferred when clear)',maxLength:100},
+    {name:'deliveryType',label:'Delivery eligibility',type:'select',required:true,value:'normal',options:DELIVERY_OPTIONS},
     {name:'price',label:'Selling price in rupees',type:'number',required:true,min:1,step:'0.01'},
     {name:'originalPrice',label:'Original/MRP price in rupees',type:'number',min:1,step:'0.01'},
     {name:'variants',label:'Sizes and stock (S:5, M:8, L:3)',required:true,placeholder:'S:5, M:8, L:3'},
@@ -220,7 +226,7 @@ async function createStoreProduct(){
   if(!Number.isFinite(price)||price<1||!Number.isFinite(originalPrice)||originalPrice<price)throw new Error('Enter valid selling and original prices.');
   const variants=parseVariants(values.variants);
   const imageUrls=values.images.split(',').map(value=>value.trim()).filter(Boolean);
-  const payload={applicationId:values.applicationId,name:values.name,description:values.description,brand:values.brand||undefined,department:values.department,category:values.category,pricePaise:Math.round(price*100),originalPricePaise:Math.round(originalPrice*100),variants,colourName:values.colourName,colourHex:values.colourHex||undefined,imageUrls,attributes:{}};
+  const payload={applicationId:values.applicationId,name:values.name,description:values.description,brand:values.brand||undefined,department:values.department,category:values.category,subcategory:values.subcategory||undefined,deliveryType:values.deliveryType,pricePaise:Math.round(price*100),originalPricePaise:Math.round(originalPrice*100),variants,colourName:values.colourName,colourHex:values.colourHex||undefined,imageUrls,attributes:{}};
   await api('/api/admin/shop-products',{method:'POST',body:JSON.stringify(payload)});
   status(`${values.name} published for the selected local store.`);
 }
@@ -230,8 +236,10 @@ async function editStoreProduct(button){
     {name:'name',label:'Product name',required:true,value:item.name||'',maxLength:140},
     {name:'description',label:'Description',type:'textarea',required:true,value:item.description||'',maxLength:2000},
     {name:'brand',label:'Brand (optional)',value:item.brand||'',maxLength:100},
-    {name:'department',label:'Department',required:true,value:item.department||'footwear',placeholder:'men, women, kids, unisex, footwear, accessories'},
-    {name:'category',label:'Category',required:true,value:item.category||'Footwear',maxLength:100},
+    {name:'department',label:'Department',type:'select',required:true,value:PRODUCT_DEPARTMENTS.includes(item.department)?item.department:'unisex',options:PRODUCT_DEPARTMENTS.map(value=>({value,label:value}))},
+    {name:'category',label:'Category',type:'select',required:true,value:PRODUCT_CATEGORIES.includes(item.category)?item.category:'Clothing & Fashion',options:PRODUCT_CATEGORIES.map(value=>({value,label:value}))},
+    {name:'subcategory',label:'Subcategory (optional; inferred when clear)',value:item.subcategory||item.attributes?.subcategory||'',maxLength:100},
+    {name:'deliveryType',label:'Delivery eligibility',type:'select',required:true,value:item.deliveryType||item.attributes?.deliveryType||'normal',options:DELIVERY_OPTIONS},
     {name:'price',label:'Selling price in rupees',type:'number',required:true,value:(item.pricePaise/100).toFixed(2),min:1,step:'0.01'},
     {name:'original',label:'Original/MRP price in rupees',type:'number',required:true,value:(item.originalPricePaise/100).toFixed(2),min:1,step:'0.01'},
     {name:'variants',label:'Sizes and stock (S:5, M:8, L:3)',required:true,value:(item.variants||[]).map(v=>`${v.size}:${v.inventory}`).join(', ')},
@@ -243,7 +251,7 @@ async function editStoreProduct(button){
   const price=Number(values.price), original=Number(values.original); if(!Number.isFinite(price)||price<1||!Number.isFinite(original)||original<price)throw new Error('Enter valid selling and original prices.');
   const variants=parseVariants(values.variants); const uploadedUrls=await uploadAdminProductImages(values.uploads||[]); const imageUrls=[...values.images.split(',').map(value=>value.trim()).filter(Boolean),...uploadedUrls];
   if(!imageUrls.length)throw new Error('Add at least one product image.');
-  const payload={name:values.name,description:values.description,brand:values.brand||undefined,department:values.department,category:values.category,pricePaise:Math.round(price*100),originalPricePaise:Math.round(original*100),variants,colourName:values.colourName,colourHex:values.colourHex||undefined,imageUrls};
+  const payload={name:values.name,description:values.description,brand:values.brand||undefined,department:values.department,category:values.category,subcategory:values.subcategory||undefined,deliveryType:values.deliveryType,pricePaise:Math.round(price*100),originalPricePaise:Math.round(original*100),variants,colourName:values.colourName,colourHex:values.colourHex||undefined,imageUrls};
   const wasPublished=item.status==='PUBLISHED'; let unpublished=false;
   try {
     if(wasPublished){await api(`/api/admin/shop-products/${encodeURIComponent(item.id)}`,{method:'PATCH',body:JSON.stringify({status:'APPROVED'})});unpublished=true;}

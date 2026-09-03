@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { BANNERS } from '../data/banners';
-import { deliveryAvailabilityMessage, isExpressDeliveryAvailable } from '../utils/delivery';
+import { deliveryAvailabilityMessage, expressCatalogueState, isExpressDeliveryAvailable } from '../utils/delivery';
 
 const readText = (relativePath: string) => readFileSync(new URL(relativePath, import.meta.url), 'utf8');
 
@@ -13,6 +13,15 @@ describe('site quality guardrails', () => {
     expect(isExpressDeliveryAvailable(monday)).toBe(false);
     expect(deliveryAvailabilityMessage(saturday)).toContain('Weekend express');
     expect(deliveryAvailabilityMessage(monday)).toContain('disabled Monday–Friday');
+  });
+
+
+  it('keeps catalogue brand and size facets data-driven', () => {
+    const sidebar = readText('../components/FilterSidebar.tsx');
+    expect(sidebar).toContain("['all', ...brands]");
+    expect(sidebar).toContain("['all', ...sizes]");
+    expect(sidebar).not.toContain("'Roadster', 'HRX'");
+    expect(sidebar).not.toContain("'UK 6', 'UK 7', 'UK 8', 'UK 9'");
   });
 
   it('does not advertise a nonexistent express route or generic minute delivery in install metadata', () => {

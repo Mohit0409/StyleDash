@@ -133,8 +133,8 @@ export const Header: React.FC<{ onOpenCart: () => void }> = ({ onOpenCart }) => 
           <Link to="/products?dept=men" className="hover:text-lime-600 transition-colors whitespace-nowrap">MEN</Link>
           <Link to="/products?dept=women" className="hover:text-lime-600 transition-colors whitespace-nowrap">WOMEN</Link>
           <Link to="/products?dept=kids" className="hover:text-lime-600 transition-colors whitespace-nowrap">KIDS</Link>
-          <Link to="/products?dept=footwear" className="hover:text-lime-600 transition-colors whitespace-nowrap">FOOTWEAR</Link>
-          <Link to="/products?dept=accessories" className="hover:text-lime-600 transition-colors whitespace-nowrap">ACCESSORIES</Link>
+          <Link to="/products?category=Footwear" className="hover:text-lime-600 transition-colors whitespace-nowrap">FOOTWEAR</Link>
+          <Link to="/products?category=Accessories" className="hover:text-lime-600 transition-colors whitespace-nowrap">ACCESSORIES</Link>
           <span className="text-neutral-300 dark:text-neutral-700">|</span>
           <Link to="/partner" className="text-emerald-600 dark:text-emerald-400 font-extrabold hover:underline whitespace-nowrap flex items-center gap-1">
             <PlusCircle className="w-3.5 h-3.5" /> LIST YOUR SHOP

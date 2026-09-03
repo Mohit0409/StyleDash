@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { MapPin, SlidersHorizontal, Store, Zap } from 'lucide-react';
 import { SEO } from '../components/SEO';
@@ -8,6 +8,8 @@ import { FilterSidebar } from '../components/FilterSidebar';
 import { Product, VendorStore } from '../types';
 import { productRepository } from '../repositories/productRepository';
 import { vendorRepository } from '../repositories/vendorRepository';
+import { expressCatalogueState } from '../utils/delivery';
+import { availableBrandOptions, availableCategoryOptions, availableSizeOptions, matchesCatalogueProduct } from '../utils/catalogFilters';
 
 export const Products: React.FC = () => {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -27,6 +29,20 @@ export const Products: React.FC = () => {
   const sortBy = searchParams.get('sort') || 'recommended';
   const searchQuery = searchParams.get('search') || '';
   const filterBadge = searchParams.get('filter') || '';
+  const { requested: expressRequested, available: expressAvailable, active: expressFilterActive } = expressCatalogueState(filterBadge);
+
+  // Backward compatibility for older links that treated merchandise classes
+  // as departments. Canonical seller data now keeps audience (men/women/kids/
+  // unisex) separate from category (for example Footwear or Accessories).
+  useEffect(() => {
+    if (department !== 'footwear' && department !== 'accessories') return;
+    const nextParams = new URLSearchParams(searchParams);
+    if (!nextParams.has('category')) {
+      nextParams.set('category', department === 'footwear' ? 'Footwear' : 'Accessories');
+    }
+    nextParams.delete('dept');
+    setSearchParams(nextParams, { replace: true });
+  }, [department, searchParams, setSearchParams]);
 
   useEffect(() => {
     productRepository.getAllProducts().then(data => {
@@ -84,31 +100,66 @@ export const Products: React.FC = () => {
     setSearchParams(new URLSearchParams());
   };
 
-  // Filter products logic
-  const filteredProducts = products.filter(p => {
-    if (department !== 'all' && p.department !== department) return false;
-    if (category !== 'all' && p.category !== category) return false;
-    if (subcategory !== 'all' && p.subcategory !== subcategory) return false;
-    if (brand !== 'all' && p.brand !== brand) return false;
-    if (size !== 'all' && !p.variants.some(v => v.size === size && v.available === true)) return false;
-    if (p.price > maxPrice) return false;
+  const updateCategory = (value: string) => {
+    const nextParams = new URLSearchParams(searchParams);
+    if (value && value !== 'all') nextParams.set('category', value);
+    else nextParams.delete('category');
+    nextParams.delete('subcategory');
+    setSearchParams(nextParams);
+  };
 
-    if (searchQuery) {
-      const q = searchQuery.toLowerCase();
-      const matchName = p.name.toLowerCase().includes(q);
-      const matchBrand = p.brand.toLowerCase().includes(q);
-      const matchCategory = p.category.toLowerCase().includes(q);
-      const matchTag = p.tags.some(t => t.toLowerCase().includes(q));
-      const matchStore = p.storeName?.toLowerCase().includes(q) ?? false;
-      if (!matchName && !matchBrand && !matchCategory && !matchTag && !matchStore) return false;
+  const catalogueFilters = useMemo(() => ({
+    department,
+    category,
+    subcategory,
+    brand,
+    size,
+    maxPrice,
+    searchQuery,
+    filterBadge,
+    expressFilterActive,
+  }), [department, category, subcategory, brand, size, maxPrice, searchQuery, filterBadge, expressFilterActive]);
+
+  // Facets are derived from the same published catalogue being displayed. Each
+  // facet ignores only itself so changing department/category/brand/size never
+  // offers an option that is guaranteed to return zero products.
+  const categoryOptions = useMemo(
+    () => availableCategoryOptions(products, catalogueFilters),
+    [products, catalogueFilters],
+  );
+  const brandOptions = useMemo(
+    () => availableBrandOptions(products, catalogueFilters),
+    [products, catalogueFilters],
+  );
+  const sizeOptions = useMemo(
+    () => availableSizeOptions(products, catalogueFilters),
+    [products, catalogueFilters],
+  );
+
+  // Drop stale facet query values when another filter changes the available
+  // inventory scope. This prevents an invisible old brand/size from trapping
+  // customers on a zero-result page.
+  useEffect(() => {
+    if (loading) return;
+    const nextParams = new URLSearchParams(searchParams);
+    let changed = false;
+    if (category !== 'all' && !categoryOptions.includes(category)) {
+      nextParams.delete('category');
+      nextParams.delete('subcategory');
+      changed = true;
     }
+    if (brand !== 'all' && !brandOptions.includes(brand)) {
+      nextParams.delete('brand');
+      changed = true;
+    }
+    if (size !== 'all' && !sizeOptions.includes(size)) {
+      nextParams.delete('size');
+      changed = true;
+    }
+    if (changed) setSearchParams(nextParams, { replace: true });
+  }, [brand, brandOptions, category, categoryOptions, loading, searchParams, setSearchParams, size, sizeOptions]);
 
-    if (filterBadge === 'express' && !p.expressDelivery) return false;
-    if (filterBadge === 'new' && !p.newArrival) return false;
-    if (filterBadge === 'sale' && p.discount === 0) return false;
-
-    return true;
-  });
+  const filteredProducts = products.filter(product => matchesCatalogueProduct(product, catalogueFilters));
 
   const matchingStores = searchQuery
     ? stores.filter(store => {
@@ -136,7 +187,7 @@ export const Products: React.FC = () => {
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-6 border-b border-neutral-200 dark:border-neutral-800">
         <div>
           <h1 className="text-2xl sm:text-3xl font-black text-neutral-900 dark:text-white capitalize">
-            {searchQuery ? `Search results for "${searchQuery}"` : `${department} Fashion Catalogue`}
+            {searchQuery ? `Search results for "${searchQuery}"` : category !== 'all' ? `${category} Catalogue` : `${department} Fashion Catalogue`}
           </h1>
           <p className="text-xs text-neutral-500 mt-1">
             {searchQuery ? (
@@ -186,17 +237,38 @@ export const Products: React.FC = () => {
         </section>
       )}
 
+      {expressRequested && !expressAvailable && (
+        <div role="status" className="rounded-2xl border border-amber-200 bg-amber-50 px-5 py-4 text-sm text-amber-950 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-100">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <p className="font-black">Weekend Express is available Saturday and Sunday.</p>
+              <p className="mt-1 text-xs opacity-80">Today we are showing the normal within-a-day catalogue instead, so you can keep shopping.</p>
+            </div>
+            <button
+              type="button"
+              onClick={() => updateParam('filter', 'all')}
+              className="shrink-0 rounded-xl bg-neutral-950 px-4 py-2 text-xs font-bold text-white dark:bg-lime-400 dark:text-neutral-950"
+            >
+              Browse Normal Delivery
+            </button>
+          </div>
+        </div>
+      )}
+
       <div className="flex gap-8 items-start">
         {/* Filter Sidebar */}
         <FilterSidebar
           department={department}
           setDepartment={(d) => updateParam('dept', d)}
           category={category}
-          setCategory={(c) => updateParam('category', c)}
+          setCategory={updateCategory}
+          categories={categoryOptions}
           brand={brand}
           setBrand={(b) => updateParam('brand', b)}
+          brands={brandOptions}
           size={size}
           setSize={(s) => updateParam('size', s)}
+          sizes={sizeOptions}
           maxPrice={maxPrice}
           setMaxPrice={(p) => updateParam('maxPrice', p.toString())}
           sortBy={sortBy}
@@ -216,13 +288,17 @@ export const Products: React.FC = () => {
             </div>
           ) : sortedProducts.length === 0 && matchingStores.length === 0 && !storesLoading ? (
             <div className="text-center py-20 bg-white dark:bg-neutral-900 rounded-3xl border border-neutral-200 dark:border-neutral-800 p-8">
-              <h3 className="font-extrabold text-lg text-neutral-900 dark:text-white mb-2">No matching products found</h3>
-              <p className="text-xs text-neutral-500 mb-6">Try relaxing your search terms or clearing filters to view more items.</p>
+              <h3 className="font-extrabold text-lg text-neutral-900 dark:text-white mb-2">
+                {expressFilterActive ? 'No Weekend Express products are available right now' : 'No matching products found'}
+              </h3>
+              <p className="text-xs text-neutral-500 mb-6">
+                {expressFilterActive ? 'Normal within-a-day delivery is still available from local Neemuch stores.' : 'Try relaxing your search terms or clearing filters to view more items.'}
+              </p>
               <button
-                onClick={handleClearAll}
+                onClick={expressFilterActive ? () => updateParam('filter', 'all') : handleClearAll}
                 className="px-6 py-2.5 bg-neutral-950 dark:bg-lime-400 text-white dark:text-neutral-950 font-bold text-xs rounded-xl"
               >
-                Clear All Filters
+                {expressFilterActive ? 'Browse Normal Delivery' : 'Clear All Filters'}
               </button>
             </div>
           ) : (

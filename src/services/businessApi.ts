@@ -134,8 +134,10 @@ export interface SellerProductDraft {
   name: string;
   description: string;
   brand?: string;
-  department: Product['department'];
+  department: 'men' | 'women' | 'kids' | 'unisex';
   category: string;
+  subcategory?: string;
+  deliveryType?: 'normal' | 'express' | 'both';
   pricePaise: number;
   originalPricePaise: number;
   variants?: SellerProductVariantDraft[];
