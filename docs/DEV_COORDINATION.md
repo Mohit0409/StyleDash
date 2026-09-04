@@ -130,3 +130,11 @@ DEV2 may use these fields for receipt/tracking display only. DEV2 must not infer
 - **RESULT:** Developer PASS for Issue 5 implementation and local regression scope only; this is not production approval.
 - **KNOWN RISKS:** successful image uploads can remain unreferenced if a later image/import step fails; they do not cause product publication and remain content-addressed media only.
 - **NEXT ROLE:** independent Tester, then Security (admin/CSRF/network-boundary change), then Manager release decision before deployment/production verification.
+
+### DEV1 Issue 5 publication - 2026-09-05
+- **WORKING/TESTED IMPLEMENTATION COMMIT:** `4fa0f793533d55a79704e42cba872e0a80bbb37b` (`feat: add secure admin product image imports`).
+- **PUSH:** SUCCESS; `origin/agent/dev1-admin-product-image-upload` matched the implementation commit at publication time.
+- **TESTS:** final `verify:fast` PASS (88/88 frontend, 219 backend PASS + 1 host-specific skip); full Playwright 130/130 PASS; focused final tests 4/4 PASS.
+- **RESULT:** Developer PASS only. No production deployment or Goutam Shoes product publication performed.
+- **MANUAL ACTION REQUIRED:** independent Tester must test exact implementation commit; Security must review admin auth/CSRF/media/network-boundary behavior; Manager decides release only after both PASS.
+- **NEXT ROLE:** Tester.
