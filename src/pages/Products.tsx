@@ -136,18 +136,13 @@ export const Products: React.FC = () => {
     [products, catalogueFilters],
   );
 
-  // Drop stale facet query values when another filter changes the available
-  // inventory scope. This prevents an invisible old brand/size from trapping
-  // customers on a zero-result page.
+  // Drop stale brand/size facet values when another filter changes the available
+  // inventory scope. Preserve an explicitly selected category even when it has
+  // zero products so customers never fall through into an unrelated catalogue.
   useEffect(() => {
     if (loading) return;
     const nextParams = new URLSearchParams(searchParams);
     let changed = false;
-    if (category !== 'all' && !categoryOptions.includes(category)) {
-      nextParams.delete('category');
-      nextParams.delete('subcategory');
-      changed = true;
-    }
     if (brand !== 'all' && !brandOptions.includes(brand)) {
       nextParams.delete('brand');
       changed = true;
@@ -157,7 +152,7 @@ export const Products: React.FC = () => {
       changed = true;
     }
     if (changed) setSearchParams(nextParams, { replace: true });
-  }, [brand, brandOptions, category, categoryOptions, loading, searchParams, setSearchParams, size, sizeOptions]);
+  }, [brand, brandOptions, loading, searchParams, setSearchParams, size, sizeOptions]);
 
   const filteredProducts = products.filter(product => matchesCatalogueProduct(product, catalogueFilters));
 

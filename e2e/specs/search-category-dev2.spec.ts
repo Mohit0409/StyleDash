@@ -13,7 +13,9 @@ test('homepage category cards use canonical catalogue queries', async ({ page })
   await expect(departmentSection.getByRole('link', { name: /Women's Fashion/ })).toHaveAttribute('href', '/products?dept=women');
   await expect(departmentSection.getByRole('link', { name: /Kids Wear/ })).toHaveAttribute('href', '/products?dept=kids');
   await expect(departmentSection.getByRole('link', { name: /Footwear/ })).toHaveAttribute('href', '/products?category=Footwear');
-  await expect(departmentSection.getByRole('link', { name: /Accessories/ })).toHaveAttribute('href', '/products?category=Accessories');
+  const accessoriesCard = departmentSection.getByRole('link', { name: /Accessories/ });
+  await expect(accessoriesCard).toHaveAttribute('href', '/products?category=Accessories');
+  await expect(accessoriesCard.locator('img')).toHaveAttribute('src', /photo-1515562141207-7a88fb7ce338/);
   await expect(departmentSection.getByRole('link', { name: /Beauty & Personal Care/ })).toHaveAttribute(
     'href',
     '/products?category=Beauty%20%26%20Personal%20Care',
@@ -59,4 +61,12 @@ test('search keeps the normal full-results fallback when suggestions miss', asyn
   await search.press('Enter');
   await expect(page).toHaveURL(/\/products\?search=zzzzzzq$/);
   await expect(page.locator('main')).toBeVisible();
+});
+
+test('empty Beauty category stays selected instead of falling back to unrelated products', async ({ page }) => {
+  await page.goto('/products?category=Beauty%20%26%20Personal%20Care');
+
+  await expect(page.getByRole('heading', { name: 'Beauty & Personal Care Catalogue' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'No matching products found' })).toBeVisible();
+  expect(new URL(page.url()).searchParams.get('category')).toBe('Beauty & Personal Care');
 });
