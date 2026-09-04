@@ -72,7 +72,10 @@ function formDialog(title, fields, submitLabel='Continue') {
       if(field.min!==undefined)control.min=String(field.min);
       if(field.max!==undefined)control.max=String(field.max);
       if(field.step!==undefined)control.step=String(field.step);
-      label.appendChild(control); fieldsRoot.appendChild(label);
+      label.appendChild(control);
+      if(field.help){const help=document.createElement('small');help.className='field-help';help.textContent=field.help;label.appendChild(help);}
+      if(field.type==='file'&&field.previewImages){const preview=document.createElement('div');preview.className='image-preview-grid';label.appendChild(preview);attachImagePreview(control,preview);}
+      fieldsRoot.appendChild(label);
     }
     let settled=false;
     const finish=value=>{if(settled)return;settled=true;form.onsubmit=null;byId('admin-dialog-cancel').onclick=null;dialog.oncancel=null;if(dialog.open)dialog.close();resolve(value);};
@@ -84,15 +87,26 @@ function formDialog(title, fields, submitLabel='Continue') {
   });
 }
 
+const ADMIN_IMAGE_TYPES=new Set(['image/jpeg','image/png','image/webp']);
+function validateAdminImageFile(file,prefix=''){
+  if(!(file instanceof File)||file.size<=0)throw new Error(`${prefix}Invalid image file.`);
+  if(!ADMIN_IMAGE_TYPES.has(file.type))throw new Error(`${prefix}Unsupported image type. Choose JPG, PNG or WebP.`);
+  if(file.size>12*1024*1024)throw new Error(`${prefix}Image exceeds maximum allowed size of 12 MB before optimization.`);
+}
+function attachImagePreview(control,root){
+  const render=()=>{root.replaceChildren();for(const [index,file] of Array.from(control.files||[]).entries()){
+    const card=document.createElement('div');card.className='image-preview-card';const image=document.createElement('img');const url=URL.createObjectURL(file);image.src=url;image.alt=`Preview ${file.name}`;image.onload=image.onerror=()=>URL.revokeObjectURL(url);
+    const meta=document.createElement('span');meta.className='image-preview-meta';meta.textContent=`${file.name} - ${Math.max(1,Math.round(file.size/1024))} KB`;const remove=document.createElement('button');remove.type='button';remove.className='image-preview-remove';remove.textContent='Remove';remove.onclick=event=>{event.preventDefault();event.stopPropagation();const transfer=new DataTransfer();Array.from(control.files||[]).forEach((candidate,candidateIndex)=>{if(candidateIndex!==index)transfer.items.add(candidate);});control.files=transfer.files;render();};card.append(image,meta,remove);root.appendChild(card);
+  }};control.addEventListener('change',render);render();
+}
 async function prepareAdminProductImage(file){
-  const allowed=new Set(['image/jpeg','image/png','image/webp']); if(!allowed.has(file.type))throw new Error('Choose JPEG, PNG or WebP images.'); if(file.size<=0||file.size>12*1024*1024)throw new Error('Choose images smaller than 12 MB.');
-  const bitmap=await createImageBitmap(file,{imageOrientation:'from-image'});
+  validateAdminImageFile(file);let bitmap;try{bitmap=await createImageBitmap(file,{imageOrientation:'from-image'});}catch{throw new Error(`Image ${file.name} could not be decoded.`);}
   try{const fit=max=>{const scale=Math.min(1,max/Math.max(bitmap.width,bitmap.height));return {width:Math.max(1,Math.round(bitmap.width*scale)),height:Math.max(1,Math.round(bitmap.height*scale))};};let size=fit(1600);let canvas=document.createElement('canvas');canvas.width=size.width;canvas.height=size.height;canvas.getContext('2d').drawImage(bitmap,0,0,size.width,size.height);
-    const make=q=>new Promise((resolve,reject)=>canvas.toBlob(blob=>blob?resolve(blob):reject(new Error('Image compression failed.')),'image/webp',q)); let blob=await make(.82);for(const q of [.72,.62,.52]){if(blob.size<=350*1024)break;blob=await make(q);}if(blob.size>500*1024){size=fit(1200);canvas=document.createElement('canvas');canvas.width=size.width;canvas.height=size.height;canvas.getContext('2d').drawImage(bitmap,0,0,size.width,size.height);blob=await new Promise((resolve,reject)=>canvas.toBlob(b=>b?resolve(b):reject(new Error('Image compression failed.')),'image/webp',.62));}if(blob.size>500*1024)throw new Error('Image is still too large after compression.');return blob;
+    const make=q=>new Promise((resolve,reject)=>canvas.toBlob(blob=>blob?resolve(blob):reject(new Error('Image compression failed.')),'image/webp',q));let blob=await make(.82);for(const q of [.72,.62,.52]){if(blob.size<=350*1024)break;blob=await make(q);}if(blob.size>500*1024){size=fit(1200);canvas=document.createElement('canvas');canvas.width=size.width;canvas.height=size.height;canvas.getContext('2d').drawImage(bitmap,0,0,size.width,size.height);blob=await new Promise((resolve,reject)=>canvas.toBlob(b=>b?resolve(b):reject(new Error('Image compression failed.')),'image/webp',.62));}if(blob.size>500*1024)throw new Error('Image is still too large after compression.');return blob;
   }finally{bitmap.close();}
 }
 async function blobBase64(blob){const bytes=new Uint8Array(await blob.arrayBuffer());let binary='';for(let i=0;i<bytes.length;i+=0x8000)binary+=String.fromCharCode(...bytes.subarray(i,i+0x8000));return btoa(binary);}
-async function uploadAdminProductImages(files){const urls=[];for(const [index,file] of (files||[]).entries()){status(`Uploading image ${index+1} of ${files.length}…`);const blob=await prepareAdminProductImage(file);const result=await api('/api/admin/product-images',{method:'POST',body:JSON.stringify({fileName:`${file.name.replace(/\.[^.]+$/,'').slice(0,80)||'product'}.webp`,contentType:'image/webp',dataBase64:await blobBase64(blob)})});urls.push(result.image.url);}return urls;}
+async function uploadAdminProductImages(files){const urls=[];for(const [index,file] of (files||[]).entries()){validateAdminImageFile(file);status(`Uploading ${file.name} (${index+1} of ${files.length})...`);const blob=await prepareAdminProductImage(file);const result=await api('/api/admin/product-images',{method:'POST',body:JSON.stringify({fileName:`${file.name.replace(/\.[^.]+$/,'').slice(0,80)||'product'}.webp`,contentType:'image/webp',dataBase64:await blobBase64(blob)})});urls.push(result.image.url);}return urls;}
 
 function parseVariants(raw) {
   const rows=String(raw||'').split(',').map(value=>value.trim()).filter(Boolean).map(value=>{
@@ -164,71 +178,45 @@ const PRODUCT_CATEGORIES=['Clothing & Fashion','Footwear','Accessories','Beauty 
 const DELIVERY_OPTIONS=[{value:'normal',label:'Normal delivery'},{value:'express',label:'Weekend Express only'},{value:'both',label:'Normal + Weekend Express'}];
 
 function downloadProductCsvTemplate(){
-  const header=['name','description','brand','department','category','subcategory','deliveryType','price','originalPrice','variants','colourName','colourHex','imageUrls'];
-  const sample=['Classic T-Shirt','Premium cotton T-shirt','Example Brand','men','Clothing & Fashion','','normal','799','999','S:5, M:8, L:5','Black','#000000','https://example.com/front.jpg|https://example.com/back.jpg'];
-  const quote=value=>`"${String(value).replaceAll('"','""')}"`;
-  const blob=new Blob([[header,sample].map(row=>row.map(quote).join(',')).join('\r\n')],{type:'text/csv;charset=utf-8'});
-  const link=document.createElement('a'); link.href=URL.createObjectURL(blob); link.download='vibe4you-product-import-template.csv'; link.click(); URL.revokeObjectURL(link.href);
+  const header=['name','description','brand','department','category','subcategory','deliveryType','price','originalPrice','variants','colourName','colourHex','imageFile','imageUrls'];
+  const sample=['Campus Sports Shoes','Sports shoes','Campus','unisex','Footwear','','normal','1720','1720','6:5, 7:5, 8:5, 9:5, 10:5','Multi Color (White/Blue/Green)','','product1.jpg',''];
+  const quote=value=>`"${String(value).replaceAll('"','""')}"`;const blob=new Blob([[header,sample].map(row=>row.map(quote).join(',')).join('\r\n')],{type:'text/csv;charset=utf-8'});const link=document.createElement('a');link.href=URL.createObjectURL(blob);link.download='vibe4you-product-import-template.csv';link.click();URL.revokeObjectURL(link.href);
 }
 function parseCsv(text){
-  const rows=[]; let row=[]; let field=''; let quoted=false;
-  for(let i=0;i<text.length;i++){
-    const ch=text[i];
-    if(quoted){if(ch==='"'&&text[i+1]==='"'){field+='"';i++;}else if(ch==='"')quoted=false;else field+=ch;continue;}
-    if(ch==='"'){quoted=true;continue;} if(ch===','){row.push(field);field='';continue;}
-    if(ch==='\n'){row.push(field.replace(/\r$/,''));rows.push(row);row=[];field='';continue;} field+=ch;
-  }
-  if(field||row.length){row.push(field.replace(/\r$/,''));rows.push(row);} return rows.filter(r=>r.some(v=>v.trim()));
+  const rows=[];let row=[];let field='';let quoted=false;for(let i=0;i<text.length;i++){const ch=text[i];if(quoted){if(ch==='"'&&text[i+1]==='"'){field+='"';i++;}else if(ch==='"')quoted=false;else field+=ch;continue;}if(ch==='"'){quoted=true;continue;}if(ch===','){row.push(field);field='';continue;}if(ch==='\n'){row.push(field.replace(/\r$/,''));rows.push(row);row=[];field='';continue;}field+=ch;}if(quoted)throw new Error('CSV has an unterminated quoted field.');if(field||row.length){row.push(field.replace(/\r$/,''));rows.push(row);}return rows.filter(candidate=>candidate.some(value=>value.trim()));
 }
-function csvProducts(text){
-  const rows=parseCsv(text); if(rows.length<2)throw new Error('CSV needs a header row and at least one product.');
-  const headers=rows[0].map(value=>value.trim()); const required=['name','description','department','category','price','variants','colourName','imageUrls'];
-  for(const key of required)if(!headers.includes(key))throw new Error(`CSV is missing required column: ${key}`);
-  return rows.slice(1).map((row,index)=>{
-    const values=Object.fromEntries(headers.map((key,i)=>[key,(row[i]??'').trim()]));
-    const price=Number(values.price); const original=Number(values.originalPrice||values.price);
-    if(!values.name)throw new Error(`Row ${index+2}: product name is required.`);
-    if(!Number.isFinite(price)||price<1||!Number.isFinite(original)||original<price)throw new Error(`Row ${index+2}: invalid price.`);
-    return {name:values.name,description:values.description,brand:values.brand||undefined,department:values.department,category:values.category,subcategory:values.subcategory||undefined,deliveryType:values.deliveryType||'normal',pricePaise:Math.round(price*100),originalPricePaise:Math.round(original*100),variants:parseVariants(values.variants),colourName:values.colourName,colourHex:values.colourHex||undefined,imageUrls:values.imageUrls.split('|').map(v=>v.trim()).filter(Boolean),attributes:{}};
-  });
+function csvImageRequirements(text){
+  const rows=parseCsv(text);if(rows.length<2)throw new Error('CSV needs a header row and at least one product.');const headers=rows[0].map((value,index)=>(index===0?value.replace(/^\uFEFF/,''):value).trim());if(new Set(headers).size!==headers.length)throw new Error('CSV headers must be unique.');
+  const required=['name','description','department','category','price','variants','colourName'];for(const key of required)if(!headers.includes(key))throw new Error(`CSV is missing required column: ${key}`);if(!headers.includes('imageFile')&&!headers.includes('imageUrls'))throw new Error('CSV requires imageFile or imageUrls.');const requirements=[];let productRows=0;
+  for(const row of rows.slice(1)){if(!row.some(value=>value.trim()))continue;productRows+=1;const values=Object.fromEntries(headers.map((key,index)=>[key,(row[index]??'').trim()]));const imageFile=values.imageFile||'';const direct=(values.imageUrls||'').split('|').map(value=>value.trim()).filter(Boolean);if(imageFile){if(imageFile.includes('/')||imageFile.includes('\\'))throw new Error(`Row ${productRows}: Image file "${imageFile}" is invalid.`);requirements.push({row:productRows,fileName:imageFile});}else if(!direct.length)throw new Error(`Row ${productRows}: At least one product image is required.`);}
+  if(!productRows)throw new Error('CSV needs at least one product row.');if(productRows>100)throw new Error('Upload a maximum of 100 products at a time.');return {productRows,requirements};
 }
+function selectedImageMap(files){const map=new Map();for(const file of files||[]){if(map.has(file.name))throw new Error(`More than one selected image is named "${file.name}".`);map.set(file.name,file);}return map;}
 async function bulkUploadStoreProducts(){
-  const applications=(await api('/api/admin/vendors')).applications.filter(item=>item.status==='ACTIVE');
-  if(!applications.length)throw new Error('There are no active shops available for product import.');
-  const values=await formDialog('Bulk upload products',[{name:'applicationId',label:'Publish products for',type:'select',required:true,options:applications.map(item=>({value:item.id,label:`${item.shopName} — ${item.ownerName}`}))}],'Choose CSV'); if(!values)return;
-  const input=document.createElement('input'); input.type='file'; input.accept='.csv,text/csv';
-  const file=await new Promise(resolve=>{input.onchange=()=>resolve(input.files?.[0]||null);input.click();}); if(!file)return;
-  if(file.size>1024*1024)throw new Error('CSV must be 1 MB or smaller.');
-  const products=csvProducts(await file.text()); if(products.length>100)throw new Error('Upload a maximum of 100 products at a time.');
-  const selectedShop=applications.find(item=>item.id===values.applicationId);
-  const approval=await formDialog(`Publish ${products.length} products to ${selectedShop?.shopName||'selected shop'}?`,[],`Publish ${products.length} products`); if(!approval)return;
-  const result=await api('/api/admin/shop-products/bulk',{method:'POST',body:JSON.stringify({applicationId:values.applicationId,products})});
-  status(`${result.created} products published successfully.`);
+  const applications=(await api('/api/admin/vendors')).applications.filter(item=>item.status==='ACTIVE');if(!applications.length)throw new Error('There are no active shops available for product import.');
+  const values=await formDialog('Bulk upload products',[
+    {name:'applicationId',label:'Publish products for',type:'select',required:true,options:applications.map(item=>({value:item.id,label:`${item.shopName} - ${item.ownerName}`}))},
+    {name:'csv',label:'Product CSV',type:'file',accept:'.csv,text/csv',required:true,help:'Use imageFile values such as product1.jpg. HTTPS imageUrls remain optional.'},
+    {name:'imageFiles',label:'Select the local product images referenced by the CSV',type:'file',accept:'image/jpeg,image/png,image/webp',multiple:true,previewImages:true,help:'Filenames are matched exactly to imageFile. Images upload automatically before products are published.'},
+  ],'Review import');if(!values)return;
+  const csvFile=values.csv;if(!(csvFile instanceof File)||!csvFile.size)throw new Error('Choose a CSV file.');if(csvFile.size>1024*1024)throw new Error('CSV must be 1 MB or smaller.');const csvText=await csvFile.text();const plan=csvImageRequirements(csvText);const selected=selectedImageMap(values.imageFiles||[]);const requiredFiles=new Map();
+  for(const requirement of plan.requirements){const file=selected.get(requirement.fileName);if(!file)throw new Error(`Row ${requirement.row}: Image file "${requirement.fileName}" was not selected.`);validateAdminImageFile(file,`Row ${requirement.row}: `);requiredFiles.set(requirement.fileName,file);}
+  const selectedShop=applications.find(item=>item.id===values.applicationId);const approval=await formDialog(`Publish ${plan.productRows} products to ${selectedShop?.shopName||'selected shop'}?`,[],`Upload images & publish ${plan.productRows}`);if(!approval)return;
+  const images={};let uploaded=0;for(const [fileName,file] of requiredFiles){status(`Uploading ${fileName} (${uploaded+1} of ${requiredFiles.size})...`);images[fileName]=(await uploadAdminProductImages([file]))[0];uploaded+=1;}
+  const result=await api('/api/admin/shop-products/bulk',{method:'POST',body:JSON.stringify({applicationId:values.applicationId,csvText,images})});status(`${result.created} products published successfully with ${requiredFiles.size} local image${requiredFiles.size===1?'':'s'}.`);
 }
 async function createStoreProduct(){
+  const applications=(await api('/api/admin/vendors')).applications.filter(item=>item.status==='ACTIVE');if(!applications.length)throw new Error('There are no active shops available for product creation.');
   const values=await formDialog('Add product for local store',[
-    {name:'applicationId',label:'Store application ID',required:true,maxLength:128},
-    {name:'name',label:'Product name',required:true,maxLength:140},
-    {name:'description',label:'Product description',type:'textarea',required:true,maxLength:2000},
-    {name:'brand',label:'Brand (optional)',maxLength:100},
-    {name:'department',label:'Department',type:'select',required:true,value:'unisex',options:PRODUCT_DEPARTMENTS.map(value=>({value,label:value}))},
-    {name:'category',label:'Category',type:'select',required:true,value:'Clothing & Fashion',options:PRODUCT_CATEGORIES.map(value=>({value,label:value}))},
-    {name:'subcategory',label:'Subcategory (optional; inferred when clear)',maxLength:100},
-    {name:'deliveryType',label:'Delivery eligibility',type:'select',required:true,value:'normal',options:DELIVERY_OPTIONS},
-    {name:'price',label:'Selling price in rupees',type:'number',required:true,min:1,step:'0.01'},
-    {name:'originalPrice',label:'Original/MRP price in rupees',type:'number',min:1,step:'0.01'},
-    {name:'variants',label:'Sizes and stock (S:5, M:8, L:3)',required:true,placeholder:'S:5, M:8, L:3'},
-    {name:'colourName',label:'Colour name',required:true,value:'Multi'},
-    {name:'colourHex',label:'Colour hex (optional)',placeholder:'#000000'},
-    {name:'images',label:'HTTPS image URLs separated by commas',type:'textarea',required:true},
-  ],'Publish product'); if(!values)return;
-  const price=Number(values.price); const originalPrice=Number(values.originalPrice||values.price);
-  if(!Number.isFinite(price)||price<1||!Number.isFinite(originalPrice)||originalPrice<price)throw new Error('Enter valid selling and original prices.');
-  const variants=parseVariants(values.variants);
-  const imageUrls=values.images.split(',').map(value=>value.trim()).filter(Boolean);
-  const payload={applicationId:values.applicationId,name:values.name,description:values.description,brand:values.brand||undefined,department:values.department,category:values.category,subcategory:values.subcategory||undefined,deliveryType:values.deliveryType,pricePaise:Math.round(price*100),originalPricePaise:Math.round(originalPrice*100),variants,colourName:values.colourName,colourHex:values.colourHex||undefined,imageUrls,attributes:{}};
-  await api('/api/admin/shop-products',{method:'POST',body:JSON.stringify(payload)});
-  status(`${values.name} published for the selected local store.`);
+    {name:'applicationId',label:'Store',type:'select',required:true,options:applications.map(item=>({value:item.id,label:item.shopName}))},
+    {name:'name',label:'Product name',required:true,maxLength:140},{name:'description',label:'Product description',type:'textarea',required:true,maxLength:2000},{name:'brand',label:'Brand (optional)',maxLength:100},
+    {name:'department',label:'Department',type:'select',required:true,value:'unisex',options:PRODUCT_DEPARTMENTS.map(value=>({value,label:value}))},{name:'category',label:'Category',type:'select',required:true,value:'Clothing & Fashion',options:PRODUCT_CATEGORIES.map(value=>({value,label:value}))},{name:'subcategory',label:'Subcategory (optional; inferred when clear)',maxLength:100},{name:'deliveryType',label:'Delivery eligibility',type:'select',required:true,value:'normal',options:DELIVERY_OPTIONS},
+    {name:'price',label:'Selling price in rupees',type:'number',required:true,min:1,step:'0.01'},{name:'originalPrice',label:'Original/MRP price in rupees',type:'number',min:1,step:'0.01'},{name:'variants',label:'Sizes and stock (6:5, 7:5, 8:5)',required:true,placeholder:'6:5, 7:5, 8:5'},{name:'colourName',label:'Colour name',required:true,value:'Multi'},{name:'colourHex',label:'Colour hex (optional)',placeholder:'#000000'},
+    {name:'uploads',label:'Choose product images from this PC',type:'file',accept:'image/jpeg,image/png,image/webp',multiple:true,previewImages:true,help:'Recommended. JPG, PNG or WebP. You can remove or reselect images before publishing.'},
+    {name:'images',label:'HTTPS image URLs (optional fallback)',type:'textarea',help:'Optional compatibility input; local upload does not require external hosting.'},
+  ],'Upload images & publish');if(!values)return;
+  const price=Number(values.price);const originalPrice=Number(values.originalPrice||values.price);if(!Number.isFinite(price)||price<1||!Number.isFinite(originalPrice)||originalPrice<price)throw new Error('Enter valid selling and original prices.');const variants=parseVariants(values.variants);const files=values.uploads||[];files.forEach(file=>validateAdminImageFile(file));const uploadedUrls=await uploadAdminProductImages(files);const directUrls=String(values.images||'').split(',').map(value=>value.trim()).filter(Boolean);const imageUrls=[...uploadedUrls,...directUrls];if(!imageUrls.length)throw new Error('Choose at least one local product image or enter an HTTPS image URL.');
+  const payload={applicationId:values.applicationId,name:values.name,description:values.description,brand:values.brand||undefined,department:values.department,category:values.category,subcategory:values.subcategory||undefined,deliveryType:values.deliveryType,pricePaise:Math.round(price*100),originalPricePaise:Math.round(originalPrice*100),variants,colourName:values.colourName,colourHex:values.colourHex||undefined,imageUrls,attributes:{}};await api('/api/admin/shop-products',{method:'POST',body:JSON.stringify(payload)});status(`${values.name} published for the selected local store using ${uploadedUrls.length} uploaded image${uploadedUrls.length===1?'':'s'}.`);
 }
 async function editStoreProduct(button){
   const item=currentShopProducts.find(product=>product.id===button.dataset.id); if(!item)throw new Error('Product details are no longer available. Refresh and try again.');
@@ -246,7 +234,7 @@ async function editStoreProduct(button){
     {name:'colourName',label:'Colour name',required:true,value:item.colourName||'Multi',maxLength:80},
     {name:'colourHex',label:'Colour hex (optional)',value:item.colourHex||'',placeholder:'#000000'},
     {name:'images',label:'Existing / HTTPS image URLs separated by commas',type:'textarea',required:true,value:(item.imageUrls||[]).join(', ')},
-    {name:'uploads',label:'Upload product images from this PC (optional)',type:'file',accept:'image/jpeg,image/png,image/webp',multiple:true},
+    {name:'uploads',label:'Upload product images from this PC (optional)',type:'file',accept:'image/jpeg,image/png,image/webp',multiple:true,previewImages:true},
   ],'Save all changes'); if(!values)return;
   const price=Number(values.price), original=Number(values.original); if(!Number.isFinite(price)||price<1||!Number.isFinite(original)||original<price)throw new Error('Enter valid selling and original prices.');
   const variants=parseVariants(values.variants); const uploadedUrls=await uploadAdminProductImages(values.uploads||[]); const imageUrls=[...values.images.split(',').map(value=>value.trim()).filter(Boolean),...uploadedUrls];

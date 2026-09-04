@@ -13,8 +13,10 @@ import os
 import posixpath
 import re
 import secrets
+import struct
 import threading
 import time
+import zlib
 from http.cookies import SimpleCookie
 from collections import defaultdict, deque
 from datetime import date, datetime, timedelta, timezone
@@ -73,6 +75,143 @@ PRODUCT_IMAGE_MAX_BYTES = 500 * 1024
 PRODUCT_IMAGE_REQUEST_MAX_BYTES = 700 * 1024
 PRODUCT_IMAGE_ROUTE_PATTERN = re.compile(r"^/media/product-images/([0-9a-f]{32}\.(?:webp|jpg|png))$")
 API_PREFIX = "/api/"
+
+
+
+def _validate_png(content: bytes) -> bool:
+    if not content.startswith(b"\x89PNG\r\n\x1a\n"):
+        return False
+    offset = 8
+    seen_ihdr = False
+    seen_iend = False
+    while offset + 12 <= len(content):
+        length = struct.unpack(">I", content[offset : offset + 4])[0]
+        chunk_type = content[offset + 4 : offset + 8]
+        data_start = offset + 8
+        data_end = data_start + length
+        crc_end = data_end + 4
+        if crc_end > len(content):
+            return False
+        expected_crc = struct.unpack(">I", content[data_end:crc_end])[0]
+        actual_crc = zlib.crc32(chunk_type + content[data_start:data_end]) & 0xFFFFFFFF
+        if actual_crc != expected_crc:
+            return False
+        if not seen_ihdr:
+            if chunk_type != b"IHDR" or length != 13:
+                return False
+            width, height = struct.unpack(">II", content[data_start : data_start + 8])
+            if width < 1 or height < 1 or width > 12000 or height > 12000:
+                return False
+            seen_ihdr = True
+        if chunk_type == b"IEND":
+            if length != 0 or crc_end != len(content):
+                return False
+            seen_iend = True
+            break
+        offset = crc_end
+    return seen_ihdr and seen_iend
+
+
+def _validate_webp(content: bytes) -> bool:
+    if len(content) < 20 or content[:4] != b"RIFF" or content[8:12] != b"WEBP":
+        return False
+    if struct.unpack("<I", content[4:8])[0] != len(content) - 8:
+        return False
+    offset = 12
+    image_chunk = False
+    while offset + 8 <= len(content):
+        chunk_type = content[offset : offset + 4]
+        chunk_size = struct.unpack("<I", content[offset + 4 : offset + 8])[0]
+        data_end = offset + 8 + chunk_size
+        padded_end = data_end + (chunk_size & 1)
+        if data_end > len(content) or padded_end > len(content):
+            return False
+        if chunk_type in {b"VP8 ", b"VP8L", b"ANMF"}:
+            image_chunk = True
+        offset = padded_end
+    return image_chunk and offset == len(content)
+
+
+def _validate_jpeg(content: bytes) -> bool:
+    if len(content) < 16 or not content.startswith(b"\xff\xd8") or not content.endswith(b"\xff\xd9"):
+        return False
+    offset = 2
+    saw_frame = False
+    frame_markers = {0xC0, 0xC1, 0xC2, 0xC3, 0xC5, 0xC6, 0xC7, 0xC9, 0xCA, 0xCB, 0xCD, 0xCE, 0xCF}
+    while offset < len(content) - 2:
+        if content[offset] != 0xFF:
+            return False
+        while offset < len(content) and content[offset] == 0xFF:
+            offset += 1
+        if offset >= len(content):
+            return False
+        marker = content[offset]
+        offset += 1
+        if marker == 0xD9:
+            return saw_frame and offset == len(content)
+        if marker == 0xDA:
+            return saw_frame and content.endswith(b"\xff\xd9")
+        if marker == 0x01 or 0xD0 <= marker <= 0xD7:
+            continue
+        if offset + 2 > len(content):
+            return False
+        segment_length = struct.unpack(">H", content[offset : offset + 2])[0]
+        if segment_length < 2 or offset + segment_length > len(content):
+            return False
+        if marker in frame_markers:
+            if segment_length < 8:
+                return False
+            height, width = struct.unpack(">HH", content[offset + 3 : offset + 7])
+            if width < 1 or height < 1 or width > 12000 or height > 12000:
+                return False
+            saw_frame = True
+        offset += segment_length
+    return False
+
+
+def store_product_image_payload(product_image_directory: Path, payload: dict[str, Any]) -> dict[str, Any]:
+    if set(payload) != {"fileName", "contentType", "dataBase64"}:
+        raise SecurityError(400, "Invalid image upload.", "invalid_product_image")
+    file_name = payload.get("fileName")
+    content_type = payload.get("contentType")
+    encoded = payload.get("dataBase64")
+    if (
+        not isinstance(file_name, str)
+        or not 1 <= len(file_name) <= 120
+        or "/" in file_name
+        or "\\" in file_name
+        or any(ord(character) < 32 for character in file_name)
+    ):
+        raise SecurityError(400, "Invalid image filename.", "invalid_product_image")
+    extensions = {"image/webp": "webp", "image/jpeg": "jpg", "image/png": "png"}
+    validators = {"image/webp": _validate_webp, "image/jpeg": _validate_jpeg, "image/png": _validate_png}
+    extension = extensions.get(content_type)
+    if extension is None or not isinstance(encoded, str) or not encoded:
+        raise SecurityError(400, "Upload a JPEG, PNG or WebP image.", "invalid_product_image")
+    try:
+        content = base64.b64decode(encoded, validate=True)
+    except (binascii.Error, ValueError):
+        raise SecurityError(400, "Invalid image data.", "invalid_product_image") from None
+    if not 32 <= len(content) <= PRODUCT_IMAGE_MAX_BYTES:
+        raise SecurityError(413, "The optimized image must be 500 KB or smaller.", "product_image_too_large")
+    if not validators[content_type](content):
+        raise SecurityError(400, "The uploaded file does not match its image type.", "invalid_product_image")
+    product_image_directory.mkdir(parents=True, exist_ok=True)
+    try:
+        os.chmod(product_image_directory, 0o700)
+    except OSError:
+        pass
+    digest = hashlib.sha256(content).hexdigest()[:32]
+    target = product_image_directory / f"{digest}.{extension}"
+    if not target.exists():
+        temporary = product_image_directory / f".{digest}.{secrets.token_hex(6)}.tmp"
+        temporary.write_bytes(content)
+        try:
+            os.chmod(temporary, 0o644)
+        except OSError:
+            pass
+        os.replace(temporary, target)
+    return {"url": f"/media/product-images/{target.name}", "bytes": len(content), "contentType": content_type}
 # Firebase/Google endpoints are added narrowly (never a wildcard) and only to
 # support the Google + Phone-OTP identity flows; Firebase is never granted
 # order/payment/inventory/admin authority.
@@ -2110,52 +2249,7 @@ class StyleDashRequestHandler(SimpleHTTPRequestHandler):
             self.wfile.write(body)
 
     def _store_product_image(self, payload: dict[str, Any]) -> dict[str, Any]:
-        if set(payload) != {"fileName", "contentType", "dataBase64"}:
-            raise SecurityError(400, "Invalid image upload.", "invalid_product_image")
-        file_name = payload.get("fileName")
-        content_type = payload.get("contentType")
-        encoded = payload.get("dataBase64")
-        if (
-            not isinstance(file_name, str)
-            or not 1 <= len(file_name) <= 120
-            or "/" in file_name
-            or "\\" in file_name
-            or any(ord(character) < 32 for character in file_name)
-        ):
-            raise SecurityError(400, "Invalid image filename.", "invalid_product_image")
-        extensions = {"image/webp": "webp", "image/jpeg": "jpg", "image/png": "png"}
-        extension = extensions.get(content_type)
-        if extension is None or not isinstance(encoded, str) or not encoded:
-            raise SecurityError(400, "Upload a JPEG, PNG or WebP image.", "invalid_product_image")
-        try:
-            content = base64.b64decode(encoded, validate=True)
-        except (binascii.Error, ValueError):
-            raise SecurityError(400, "Invalid image data.", "invalid_product_image") from None
-        if not 32 <= len(content) <= PRODUCT_IMAGE_MAX_BYTES:
-            raise SecurityError(413, "The optimized image must be 500 KB or smaller.", "product_image_too_large")
-        magic_ok = (
-            (content_type == "image/jpeg" and content.startswith(b"\xff\xd8\xff"))
-            or (content_type == "image/png" and content.startswith(b"\x89PNG\r\n\x1a\n"))
-            or (content_type == "image/webp" and len(content) >= 12 and content[:4] == b"RIFF" and content[8:12] == b"WEBP")
-        )
-        if not magic_ok:
-            raise SecurityError(400, "The uploaded file does not match its image type.", "invalid_product_image")
-        digest = hashlib.sha256(content).hexdigest()[:32]
-        self.product_image_directory.mkdir(parents=True, exist_ok=True)
-        try:
-            os.chmod(self.product_image_directory, 0o700)
-        except OSError:
-            pass
-        target = self.product_image_directory / f"{digest}.{extension}"
-        if not target.exists():
-            temporary = self.product_image_directory / f".{digest}.{secrets.token_hex(6)}.tmp"
-            temporary.write_bytes(content)
-            try:
-                os.chmod(temporary, 0o644)
-            except OSError:
-                pass
-            os.replace(temporary, target)
-        return {"url": f"/media/product-images/{target.name}", "bytes": len(content), "contentType": content_type}
+        return store_product_image_payload(self.product_image_directory, payload)
 
     def _require_product_image_seller(self) -> dict[str, Any]:
         user, _session = self._current_user()

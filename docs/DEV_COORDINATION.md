@@ -106,3 +106,27 @@ DEV2 may use these fields for receipt/tracking display only. DEV2 must not infer
 - Disposable DEV1+DEV2 merge review: automatic merge PASS with no conflicts; merged typecheck/lint PASS; frontend 88/88 PASS; backend 217 PASS + 1 host-specific symlink skip; production build PASS; full Playwright 130/130 PASS across 17 files.
 - Blockers: no implementation blocker. Release remains blocked on independent Tester + Security + Manager review/approval of the integrated commit.
 - Deployment: NOT PERFORMED by DEV 2.
+
+## DEV1 Issue 5 implementation handoff - 2026-09-05
+- **TASK:** Issue 5 - secure private-admin product image upload for single-product creation and bulk CSV import.
+- **ROLE:** Developer (DEV1). Branch/worktree: `agent/dev1-admin-product-image-upload` / `StyleDash-dev1-admin-image-upload`.
+- **BASE COMMIT:** `22d4825724e24c47129ab9cd7b322947e2b68e7b` (approved integrated Issues 1-4 baseline).
+- **FILES CHANGED:** `scripts/termux-spa-server.py`, `scripts/termux-admin-server.py`, `server/admin/admin.js`, `server/admin/admin.css`, `server/tests/test_admin.py`, `server/tests/test_styledash_server.py`, this coordination file.
+- **Shared media implementation:** seller `/api/shop-product-images` and private admin `/api/admin/product-images` now use the same `store_product_image_payload` storage/validation helper and the existing product-image directory.
+- **Admin upload API:** `POST /api/admin/product-images` keeps `{fileName,contentType,dataBase64}` and returns `{success:true,image:{url,bytes,contentType}}`; canonical URL remains `/media/product-images/<32hex>.(webp|jpg|png)`.
+- **Admin security:** existing administrator session/TOTP, CSRF, loopback host/origin boundary, generated filenames and fixed media directory are preserved. The public customer server still returns 404 for `/api/admin/product-images`.
+- **Validation:** only JPEG/PNG/WebP; strict base64; 500 KB optimized-server limit; structural image checks; dimension bounds; traversal/control-character rejection; client filenames never control stored paths; canonical internal media paths must reference an existing stored file.
+- **Single-product UI:** active-shop selector, local multi-image picker as primary workflow, preview, remove/reselect before publish, automatic WebP optimization/upload, generated media paths inserted automatically; HTTPS URLs remain optional compatibility fallback.
+- **Bulk contract:** CSV supports `imageFile` plus optional `imageUrls`; admin selects CSV and local files together; exact case-sensitive filename matching; duplicate selected filenames are rejected; required images upload first.
+- **Bulk API:** `/api/admin/shop-products/bulk` accepts `{applicationId,csvText,images}` where `images` maps exact CSV filenames to generated canonical media paths; legacy `{applicationId,products}` remains supported.
+- **Bulk safety:** server reparses CSV, validates mapped paths and file existence, max 100 product rows / 1 MB request, and refuses the entire publish if a required row image is missing or invalid.
+- **Row errors:** missing image example is `Row 1: Image file "missing.jpg" was not selected.`; invalid prices/variants also identify the exact product row.
+- **Focused regression:** post-final-change upload/bulk/seller/public-lockdown tests 4/4 PASS; complete admin suite previously 22/22 PASS.
+- **Full verification:** `npm run verify:fast` PASS - typecheck PASS, lint PASS, frontend unit 88/88 PASS, backend 219 PASS + 1 host-specific skip.
+- **Browser regression:** full Playwright 130/130 PASS across desktop/mobile; production build completed as part of the E2E run.
+- **Hygiene:** `git diff --check` PASS; JS syntax PASS; Python compile PASS; changed-diff secret signature scan 0 findings.
+- **Real Goutam Shoes preflight:** laptop `product1.jpg`, `product2.jpg`, `product3.jpg` all pass the shared server validator in isolated storage and map exactly to Campus/JQR/Adidas with sizes 6-10 stock 5 each. No production data was changed.
+- **DEPLOYMENT:** NOT PERFORMED. No new shop or production product was created and no real payment was executed.
+- **RESULT:** Developer PASS for Issue 5 implementation and local regression scope only; this is not production approval.
+- **KNOWN RISKS:** successful image uploads can remain unreferenced if a later image/import step fails; they do not cause product publication and remain content-addressed media only.
+- **NEXT ROLE:** independent Tester, then Security (admin/CSRF/network-boundary change), then Manager release decision before deployment/production verification.

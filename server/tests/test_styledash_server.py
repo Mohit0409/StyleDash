@@ -2162,7 +2162,7 @@ class HttpApiTests(unittest.TestCase):
             self.assertEqual(image_response.headers.get_content_type(), "image/png")
             self.assertIn("immutable", image_response.headers["Cache-Control"])
 
-        branding_bytes = png + b"store-branding"
+        branding_bytes = base64.b64decode("iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAYAAABytg0kAAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAAJcEhZcwAADsMAAA7DAcdvqGQAAAARSURBVBhXYxAyCfsPwgwwBgA0DAZtjW+muAAAAABJRU5ErkJggg==")
         branding_payload = {
             "fileName": "store-cover.png",
             "contentType": "image/png",
@@ -3069,6 +3069,14 @@ class HttpApiTests(unittest.TestCase):
         anonymous_admin = urllib.request.Request(f"{self.base_url}/api/admin/orders")
         with self.assertRaises(urllib.error.HTTPError) as caught:
             urllib.request.urlopen(anonymous_admin)
+        self.assertEqual(caught.exception.code, 404); caught.exception.close()
+
+        public_admin_upload = urllib.request.Request(
+            f"{self.base_url}/api/admin/product-images", data=b"{}",
+            headers={"Content-Type": "application/json"}, method="POST",
+        )
+        with self.assertRaises(urllib.error.HTTPError) as caught:
+            urllib.request.urlopen(public_admin_upload)
         self.assertEqual(caught.exception.code, 404); caught.exception.close()
 
         customer_admin = urllib.request.Request(f"{self.base_url}/api/admin/orders", headers={"Cookie": cookie})
