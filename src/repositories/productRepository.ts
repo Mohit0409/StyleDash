@@ -2,6 +2,7 @@ import { Product } from '../types';
 import { inventoryRepository } from './inventoryRepository';
 import { shopProductApi } from '../services/businessApi';
 import { reviewApi, ReviewSummary } from '../services/reviewApi';
+import { selectHomepageCandidates } from '../utils/homeMerchandising';
 
 const PUBLISHED_SHOP_CACHE_MS = 15_000;
 const PRODUCT_IMAGE_FALLBACK = '/product-placeholder.svg';
@@ -147,17 +148,8 @@ const applyReviewSummaries = (products: Product[], summaries: Record<string, Rev
     reviewCount: summaries[product.id]?.reviewCount ?? product.reviewCount,
   }));
 
-const selectHomepageProducts = (products: Product[]): Product[] => {
-  const selectedIds = new Set<string>();
-  const sections = [
-    products.filter(product => product.newArrival).slice(0, 8),
-    products.filter(product => product.trending).slice(0, 8),
-    products.filter(product => product.expressDelivery).slice(0, 8),
-    products.filter(product => product.price <= 499).slice(0, 8),
-  ];
-  sections.flat().forEach(product => selectedIds.add(product.id));
-  return products.filter(product => selectedIds.has(product.id));
-};
+const selectHomepageProducts = (products: Product[]): Product[] =>
+  selectHomepageCandidates(products, 8);
 
 const withHomepageAvailability = async (products: Product[]): Promise<Product[]> => {
   try {
