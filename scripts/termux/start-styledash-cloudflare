@@ -20,7 +20,7 @@ if [ -s "$PID_FILE" ]; then
   fi
   rm -f "$PID_FILE"
 fi
-nohup cloudflared tunnel run --protocol http2 --token-file "$TOKEN_FILE" >> "$LOG_FILE" 2>&1 &
+nohup cloudflared tunnel run --protocol auto --token-file "$TOKEN_FILE" >> "$LOG_FILE" 2>&1 &
 pid=$!
 printf '%s\n' "$pid" > "$PID_FILE"
 chmod 600 "$PID_FILE"
