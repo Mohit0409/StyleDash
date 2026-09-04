@@ -218,6 +218,34 @@ class AdminApplication:
             for alert in state.get("operationalAlerts", {}).values()
         )
 
+    def mark_cod_paid(self, admin_id: str, order_id: str, collection_method: Any) -> dict[str, Any]:
+        methods = {"cash": "cash", "upi_at_delivery": "upi_at_delivery"}
+        if not isinstance(collection_method, str) or collection_method not in methods:
+            raise SecurityError(400, "Choose Cash or UPI at delivery.", "invalid_cod_collection_method")
+        with self.payments.store.lock:
+            order = self.payments.store.state["orders"].get(order_id)
+            if order is None:
+                raise SecurityError(404, "Order not found.", "order_not_found")
+            if order.get("fulfillmentRequired") is False:
+                raise SecurityError(409, "Payment validation orders cannot be marked manually.", "manual_payment_forbidden")
+            if order.get("paymentMethod") != "cod":
+                raise SecurityError(409, "Razorpay payments cannot be marked paid manually.", "manual_payment_forbidden")
+            if order.get("status") == "cancelled":
+                raise SecurityError(409, "A cancelled order cannot be marked paid.", "cancelled_order")
+            if order.get("paymentStatus") != "pending":
+                raise SecurityError(409, "This COD payment is no longer pending.", "payment_not_pending")
+            now = iso(utc_now())
+            order["paymentStatus"] = "paid"
+            order["paymentCollectionMethod"] = methods[collection_method]
+            order["paymentCollectedAt"] = now
+            order["updatedAt"] = now
+            self.payments.store.save()
+            result = dict(order)
+        self.identity.record_action(admin_id, "cod_payment_marked_paid", "order", order_id, "success", {
+            "collectionMethod": result["paymentCollectionMethod"], "paymentCollectedAt": result["paymentCollectedAt"]
+        })
+        return self.payments.order_for_display(result)
+
     def update_order_status(
         self, admin_id: str, order_id: str, requested: Any, reason: Any = None
     ) -> dict[str, Any]:
@@ -789,6 +817,10 @@ class AdminHandler(BaseHTTPRequestHandler):
         path = urlsplit(self.path).path
         try:
             admin, _session = self._admin(); self._csrf(); payload = self._body()
+            if path.startswith("/api/admin/orders/") and path.endswith("/payment"):
+                order_id = unquote(path.removeprefix("/api/admin/orders/").removesuffix("/payment"))
+                result = self.application.mark_cod_paid(admin["id"], order_id, payload.get("collectionMethod"))
+                self._json(200, {"success": True, "order": result}); return
             if path.startswith("/api/admin/orders/") and path.endswith("/status"):
                 order_id = unquote(path.removeprefix("/api/admin/orders/").removesuffix("/status"))
                 result = self.application.update_order_status(

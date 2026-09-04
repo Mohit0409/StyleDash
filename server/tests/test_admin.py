@@ -115,6 +115,42 @@ class AdminStoreTests(unittest.TestCase):
         actions = {row["action"] for row in self.store.audit()}
         self.assertTrue({"order_status", "inventory_adjustment", "vendor_approved", "customer_disabled"}.issubset(actions))
 
+    def test_cod_payment_collection_is_separate_audited_and_never_spoofs_razorpay(self):
+        app = ADMIN_SERVER.AdminApplication(
+            self.database, self.key, ROOT / "server/payment-data/catalog.json",
+            ROOT / "server/payment-data/settings.json", self.root / "data-cod-payment",
+        )
+        with app.payments.store.lock:
+            app.payments.store.state["orders"]["COD-PENDING"] = {
+                "id": "COD-PENDING", "paymentMethod": "cod", "paymentStatus": "pending",
+                "status": "placed", "fulfillmentRequired": True, "createdAt": "2026-09-04T10:00:00+00:00",
+            }
+            app.payments.store.state["orders"]["COD-CONFIRM-FIRST"] = {
+                "id": "COD-CONFIRM-FIRST", "paymentMethod": "cod", "paymentStatus": "pending",
+                "status": "placed", "fulfillmentRequired": True, "createdAt": "2026-09-04T10:01:00+00:00",
+            }
+            app.payments.store.state["orders"]["RAZORPAY-PENDING"] = {
+                "id": "RAZORPAY-PENDING", "paymentMethod": "upi", "paymentStatus": "pending",
+                "status": "payment_pending", "fulfillmentRequired": True, "razorpayOrderId": "order_secure",
+                "createdAt": "2026-09-04T10:02:00+00:00",
+            }
+            app.payments.store.save()
+        paid = app.mark_cod_paid(self.admin["id"], "COD-PENDING", "cash")
+        self.assertEqual((paid["paymentMethod"], paid["paymentStatus"], paid["status"]), ("cod", "paid", "placed"))
+        self.assertEqual(paid["paymentCollectionMethod"], "cash")
+        self.assertTrue(paid["paymentCollectedAt"].endswith("+00:00"))
+        public = app.payments._public_order(paid)
+        self.assertEqual(public["paymentCollectionMethod"], "cash")
+        self.assertEqual(public["paymentCollectedAt"], paid["paymentCollectedAt"])
+        confirmed = app.update_order_status(self.admin["id"], "COD-CONFIRM-FIRST", "confirmed")
+        self.assertEqual((confirmed["status"], confirmed["paymentStatus"]), ("confirmed", "pending"))
+        self.assert_error("manual_payment_forbidden", lambda: app.mark_cod_paid(self.admin["id"], "RAZORPAY-PENDING", "cash"))
+        self.assert_error("payment_not_pending", lambda: app.mark_cod_paid(self.admin["id"], "COD-PENDING", "upi_at_delivery"))
+        audit = next(row for row in self.store.audit() if row["action"] == "cod_payment_marked_paid")
+        metadata = json.loads(audit["metadata_json"])
+        self.assertEqual(metadata["collectionMethod"], "cash")
+        self.assertEqual(metadata["paymentCollectedAt"], paid["paymentCollectedAt"])
+
     def test_private_admin_owner_mobile_required_email_optional_and_otp_binds(self):
         owner = self.store.create_customer_account(self.admin["id"], {
             "name": "Phone First Owner", "phone": "9876501234", "password": "TempPass8!",
@@ -819,6 +855,36 @@ class AdminHttpTests(unittest.TestCase):
         self.assertEqual((status, body["code"]), (403, "admin_csrf_failed"))
         status, body, _headers = self.request("/api/admin/logout", {}, headers={"X-CSRF-Token": csrf}, method="POST")
         self.assertEqual(status, 200)
+
+    def test_cod_mark_paid_http_is_private_csrf_protected_and_cod_only(self):
+        app = self.server.RequestHandlerClass.application
+        with app.payments.store.lock:
+            app.payments.store.state["orders"]["HTTP-COD"] = {
+                "id": "HTTP-COD", "paymentMethod": "cod", "paymentStatus": "pending",
+                "status": "placed", "fulfillmentRequired": True, "createdAt": "2026-09-04T10:00:00+00:00",
+            }
+            app.payments.store.state["orders"]["HTTP-RAZORPAY"] = {
+                "id": "HTTP-RAZORPAY", "paymentMethod": "card", "paymentStatus": "pending",
+                "status": "payment_pending", "fulfillmentRequired": True, "razorpayOrderId": "order_http_secure",
+                "createdAt": "2026-09-04T10:01:00+00:00",
+            }
+            app.payments.store.save()
+        status, body, _ = self.request('/api/admin/orders/HTTP-COD/payment', {'collectionMethod':'cash'}, method='PATCH')
+        self.assertEqual((status, body['code']), (401, 'admin_authentication_required'))
+        self.request('/api/admin/login', {'username':'local-owner','password':'long administrator password 123'}, method='POST')
+        status, auth, _ = self.request('/api/admin/totp', {'code':pyotp.TOTP(self.secret).now()}, method='POST')
+        self.assertEqual(status, 200)
+        csrf = auth["csrfToken"]
+        status, missing, _ = self.request('/api/admin/orders/HTTP-COD/payment', {'collectionMethod':'cash'}, method='PATCH')
+        self.assertEqual((status, missing['code']), (403, 'admin_csrf_failed'))
+        status, paid, _ = self.request('/api/admin/orders/HTTP-COD/payment', {'collectionMethod':'upi_at_delivery'}, headers={'X-CSRF-Token':csrf}, method='PATCH')
+        self.assertEqual(status, 200)
+        self.assertEqual((paid['order']['paymentStatus'], paid['order']['paymentCollectionMethod'], paid['order']['status']), ('paid','upi_at_delivery','placed'))
+        status, blocked, _ = self.request('/api/admin/orders/HTTP-RAZORPAY/payment', {'collectionMethod':'cash'}, headers={'X-CSRF-Token':csrf}, method='PATCH')
+        self.assertEqual((status, blocked['code']), (409, 'manual_payment_forbidden'))
+        status, audit, _ = self.request('/api/admin/audit')
+        self.assertEqual(status, 200)
+        self.assertTrue(any(row['action']=='cod_payment_marked_paid' for row in audit['audit']))
 
     def test_shop_transition_success_does_not_depend_on_admin_catalog_refresh(self):
         customers = SECURITY.SecurityStore(self.database, self.key)

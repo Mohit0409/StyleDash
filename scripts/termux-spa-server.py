@@ -947,6 +947,7 @@ class PaymentService:
             "subtotal", "discount", "walletAmount", "deliveryFee", "taxes", "grandTotal",
             "deliveryMethod", "estimatedDelivery", "status", "statusHistory", "createdAt",
             "updatedAt", "razorpayOrderId", "razorpayPaymentId", "paymentVerifiedAt",
+            "paymentCollectionMethod", "paymentCollectedAt",
             "isPaymentTestOrder", "fulfillmentRequired", "adminLabels", "inventoryCommitted",
             "inventoryReleasedAt", "refundId", "refundAmount", "refundCurrency", "refundProcessedAt",
             "cancellationReason", "cancelledAt",
@@ -2690,11 +2691,12 @@ class StyleDashRequestHandler(SimpleHTTPRequestHandler):
                     tags=["bust_in_silhouette"],
                 )
 
+                profile = self._security().profile(user["id"])
                 self._json_response(
                     HTTPStatus.CREATED,
                     {
                         "success": True,
-                        "user": user,
+                        "user": profile,
                         "csrfToken": csrf,
                     },
                     headers={
@@ -2705,7 +2707,8 @@ class StyleDashRequestHandler(SimpleHTTPRequestHandler):
             if path == "/api/auth/login":
                 self._rate_limit(path, 12)
                 user, raw, csrf = self._security().login(self._read_json(), self._client_key("login"))
-                self._json_response(HTTPStatus.OK, {"success": True, "user": user, "csrfToken": csrf}, headers={"Set-Cookie": self._security().cookie(raw)})
+                profile = self._security().profile(user["id"])
+                self._json_response(HTTPStatus.OK, {"success": True, "user": profile, "csrfToken": csrf}, headers={"Set-Cookie": self._security().cookie(raw)})
                 return
             if path in ("/api/auth/federated/google", "/api/auth/federated/phone"):
                 self._rate_limit(path, 10)
@@ -2731,13 +2734,15 @@ class StyleDashRequestHandler(SimpleHTTPRequestHandler):
                         tags=["bust_in_silhouette"],
                     )
 
+                needs_profile = bool(user.get("needsProfile"))
+                profile = self._security().profile(user["id"])
                 self._json_response(
                     HTTPStatus.OK if not created else HTTPStatus.CREATED,
                     {
                         "success": True,
-                        "user": user,
+                        "user": profile,
                         "csrfToken": csrf,
-                        "needsProfile": bool(user.get("needsProfile")),
+                        "needsProfile": needs_profile,
                     },
                     headers={"Set-Cookie": self._security().cookie(raw)},
                 )

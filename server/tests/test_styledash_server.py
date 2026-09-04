@@ -1993,6 +1993,70 @@ class HttpApiTests(unittest.TestCase):
         with response:
             return response.status, json.load(response), response.headers
 
+    def test_saved_profile_is_returned_after_logout_and_password_login(self) -> None:
+        user, _raw, _csrf = self.service.security.register({
+            "name": "Persistent Customer", "email": "persistent-http@example.test",
+            "password": "long persistent password 123", "phone": "9876543210",
+        })
+        status, login, headers = self.post_json(
+            "/api/auth/login", {"email": user["email"], "password": "long persistent password 123"}
+        )
+        self.assertEqual(status, 200)
+        session = {"Cookie": headers["Set-Cookie"].split(";", 1)[0], "X-CSRF-Token": login["csrfToken"], "Origin": "https://styledash.test"}
+        address = {"name": "Persistent Customer", "phone": "9876543210", "street": "12 Persistent Market Road",
+                   "city": "Neemuch", "state": "Madhya Pradesh", "pincode": "458441", "type": "home", "isDefault": True}
+        status, saved, _headers = self.patch_json(
+            "/api/profile", {"name": "Persistent Customer", "phone": "9876543210", "addresses": [address]}, session
+        )
+        self.assertEqual((status, len(saved["profile"]["addresses"])), (200, 1))
+        status, _body, _headers = self.post_json("/api/auth/logout", {}, session)
+        self.assertEqual(status, 200)
+        status, relogin, _headers = self.post_json(
+            "/api/auth/login", {"email": user["email"], "password": "long persistent password 123"}
+        )
+        self.assertEqual(status, 200)
+        self.assertEqual(relogin["user"]["uid"], user["id"])
+        self.assertEqual(relogin["user"]["addresses"][0]["street"], address["street"])
+
+    def test_returning_phone_and_google_auth_hydrate_profile_without_duplicate_users(self) -> None:
+        phone_token = "phone-profile-" + "x" * 24
+        self.firebase_claims[phone_token] = {
+            "uid": "phone-profile-uid", "phone_number": "+919876543210",
+            "firebase": {"sign_in_provider": "phone"},
+        }
+        phone_user, _raw, _csrf, created = self.service.security.federated_session("phone", {"idToken": phone_token})
+        self.assertTrue(created)
+        self.service.security.update_profile(phone_user["id"], {
+            "name": "Phone Customer", "phone": "+919876543210",
+            "addresses": [{"name": "Phone Customer", "phone": "+919876543210", "street": "21 OTP Market Road",
+                           "city": "Neemuch", "state": "Madhya Pradesh", "pincode": "458441", "type": "home", "isDefault": True}],
+        })
+        status, phone_login, _headers = self.post_json("/api/auth/federated/phone", {"idToken": phone_token})
+        self.assertEqual(status, 200)
+        self.assertEqual(phone_login["user"]["uid"], phone_user["id"])
+        self.assertEqual(phone_login["user"]["addresses"][0]["street"], "21 OTP Market Road")
+
+        google_token = "google-profile-" + "x" * 24
+        self.firebase_claims[google_token] = {
+            "uid": "google-profile-uid", "email": "google-profile@example.test", "email_verified": True,
+            "name": "Google Customer", "firebase": {"sign_in_provider": "google.com"},
+        }
+        google_user, _raw, _csrf, created = self.service.security.federated_session("google", {"idToken": google_token})
+        self.assertTrue(created)
+        self.service.security.update_profile(google_user["id"], {
+            "name": "Google Customer",
+            "addresses": [{"name": "Google Customer", "phone": "9876500000", "street": "31 Google Market Road",
+                           "city": "Neemuch", "state": "Madhya Pradesh", "pincode": "458441", "type": "home", "isDefault": True}],
+        })
+        status, google_login, _headers = self.post_json("/api/auth/federated/google", {"idToken": google_token})
+        self.assertEqual(status, 200)
+        self.assertEqual(google_login["user"]["uid"], google_user["id"])
+        self.assertEqual(google_login["user"]["addresses"][0]["street"], "31 Google Market Road")
+        with self.service.security.connect() as db:
+            users = db.execute("SELECT COUNT(*) FROM users").fetchone()[0]
+            identities = db.execute("SELECT COUNT(*) FROM customer_auth_identities").fetchone()[0]
+        self.assertEqual((users, identities), (2, 2))
+
     def test_shop_draft_approval_publication_inventory_and_checkout_contract(self) -> None:
         status, registered, headers = self.post_json(
             "/api/auth/register",

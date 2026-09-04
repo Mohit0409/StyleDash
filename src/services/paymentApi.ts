@@ -46,6 +46,8 @@ export interface ServerOrder {
   address: CheckoutAddressInput & { id: string; state: string };
   paymentMethod: 'cod' | 'upi' | 'card';
   paymentStatus: 'pending' | 'paid' | 'failed' | 'refunded';
+  paymentCollectionMethod?: 'cash' | 'upi_at_delivery';
+  paymentCollectedAt?: string;
   subtotal: number;
   discount: number;
   walletAmount: number; // Retained for historical persisted-order compatibility.
