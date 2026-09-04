@@ -58,6 +58,11 @@ except ModuleNotFoundError:  # Repository test import path.
     from scripts.styledash_notify import mask_email, mask_phone, owner_notifier
 
 try:
+    from receipt_pdf import build_receipt_pdf
+except ModuleNotFoundError:  # Repository test import path.
+    from scripts.receipt_pdf import build_receipt_pdf
+
+try:
     import razorpay
 except ImportError:  # The static site and COD can still start without the SDK.
     razorpay = None
@@ -577,25 +582,7 @@ class PaymentService:
         display = self.order_for_display(order)
         if display.get("status") != "delivered":
             raise SecurityError(409, "Receipt is available after delivery.", "receipt_not_ready")
-        address = display.get("address") or {}
-        lines = [
-            "Vibe4You Receipt",
-            f"Order: {display.get('id', '-')}",
-            f"Order date: {display.get('createdAt', '-')}",
-            f"Delivered: {display.get('updatedAt', '-')}",
-            f"Payment: {str(display.get('paymentMethod') or '-').upper()} / {display.get('paymentStatus', '-')}",
-            "",
-            f"Customer: {address.get('name', '-')}",
-            f"Phone: {address.get('phone', '-')}",
-            f"Address: {address.get('street', '-')}, {address.get('city', '-')} {address.get('pincode', '-')}",
-            "",
-            "Items:",
-        ]
-        for item in display.get("items", []) or []:
-            store = item.get("storeName") or "Vibe4You"
-            lines.append(f"{store} | {item.get('productName', '-')} | Size {item.get('size', '-')} | Color {item.get('colourName', '-')} | Qty {item.get('quantity', 0)} | INR {item.get('lineTotal', 0)}")
-        lines.extend(["", f"Subtotal: INR {display.get('subtotal', 0)}", f"Discount: INR {display.get('discount', 0)}", f"Delivery: INR {display.get('deliveryFee', 0)}", f"Taxes: INR {display.get('taxes', 0)}", f"Total: INR {display.get('grandTotal', 0)}", "", "Thank you for shopping local with Vibe4You."])
-        return _simple_pdf(lines)
+        return build_receipt_pdf(display)
 
     @staticmethod
     def express_delivery_available(now: datetime | None = None) -> bool:

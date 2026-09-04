@@ -1,15 +1,14 @@
 import React, { useEffect, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import { ArrowRight, Zap, Sparkles, ChevronRight } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { Zap, ChevronRight } from 'lucide-react';
 import { SEO } from '../components/SEO';
-import { ProductCard } from '../components/ProductCard';
+import { HomepageMerchandising } from '../components/HomepageMerchandising';
 import { Product } from '../types';
 import { productRepository } from '../repositories/productRepository';
 import { BANNERS } from '../data/banners';
 import { CONFIG } from '../config';
 
 export const Home: React.FC = () => {
-  const navigate = useNavigate();
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -19,11 +18,6 @@ export const Home: React.FC = () => {
       setLoading(false);
     });
   }, []);
-
-  const newDrops = products.filter(p => p.newArrival).slice(0, 8);
-  const trending = products.filter(p => p.trending).slice(0, 8);
-  const expressPicks = products.filter(p => p.expressDelivery).slice(0, 8);
-  const under499 = products.filter(p => p.price <= 499).slice(0, 8);
 
   return (
     <div className="space-y-12 pb-16">
@@ -132,72 +126,7 @@ export const Home: React.FC = () => {
           </div>
         </section>
 
-        {/* Express Delivery Picks */}
-        <section className="space-y-6">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <div className="p-2 bg-amber-400 text-neutral-950 rounded-xl">
-                <Zap className="w-5 h-5 fill-neutral-950" />
-              </div>
-              <div>
-                <h2 className="text-2xl font-black text-neutral-900 dark:text-white">Weekend Express Picks</h2>
-                <p className="text-xs text-neutral-500">In stock nearby and ready for immediate dispatch in Neemuch</p>
-              </div>
-            </div>
-            <Link to="/products?filter=express" className="text-xs font-bold text-lime-600 dark:text-lime-400 hover:underline flex items-center gap-1">
-              View All <ArrowRight className="w-3.5 h-3.5" />
-            </Link>
-          </div>
-
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 sm:gap-6">
-            {expressPicks.map(p => (
-              <ProductCard key={p.id} product={p} />
-            ))}
-          </div>
-        </section>
-
-        {/* Styles Under 499 */}
-        <section className="space-y-6 bg-lime-50 dark:bg-lime-950/20 p-6 sm:p-8 rounded-3xl border border-lime-200 dark:border-lime-900">
-          <div className="flex items-center justify-between">
-            <div>
-              <span className="text-xs font-black uppercase text-lime-700 dark:text-lime-400 tracking-wider">Budget Deals</span>
-              <h2 className="text-2xl font-black text-neutral-900 dark:text-white">Styles Under ₹499</h2>
-            </div>
-            <Link to="/products?maxPrice=499" className="text-xs font-bold text-neutral-900 dark:text-white hover:underline flex items-center gap-1">
-              Shop All Deals <ArrowRight className="w-3.5 h-3.5" />
-            </Link>
-          </div>
-
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 sm:gap-6">
-            {under499.map(p => (
-              <ProductCard key={p.id} product={p} />
-            ))}
-          </div>
-        </section>
-
-        {/* New Drops */}
-        <section className="space-y-6">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <div className="p-2 bg-emerald-500 text-white rounded-xl">
-                <Sparkles className="w-5 h-5" />
-              </div>
-              <div>
-                <h2 className="text-2xl font-black text-neutral-900 dark:text-white">New Drops & Arrivals</h2>
-                <p className="text-xs text-neutral-500">Fresh streetwear and seasonal styles added this week</p>
-              </div>
-            </div>
-            <Link to="/products?filter=new" className="text-xs font-bold text-lime-600 dark:text-lime-400 hover:underline flex items-center gap-1">
-              View All <ArrowRight className="w-3.5 h-3.5" />
-            </Link>
-          </div>
-
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 sm:gap-6">
-            {newDrops.map(p => (
-              <ProductCard key={p.id} product={p} />
-            ))}
-          </div>
-        </section>
+        <HomepageMerchandising products={products} loading={loading} />
 
       </div>
     </div>
