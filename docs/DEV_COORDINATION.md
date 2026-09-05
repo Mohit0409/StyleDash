@@ -138,3 +138,25 @@ DEV2 may use these fields for receipt/tracking display only. DEV2 must not infer
 - **RESULT:** Developer PASS only. No production deployment or Goutam Shoes product publication performed.
 - **MANUAL ACTION REQUIRED:** independent Tester must test exact implementation commit; Security must review admin auth/CSRF/media/network-boundary behavior; Manager decides release only after both PASS.
 - **NEXT ROLE:** Tester.
+
+## DEV2 Issue 7 Developer Handoff - 2026-09-05
+TASK: Issue 7 — Local Stores equal-size horizontally scrollable cards.
+ROLE: Developer (DEV2).
+BASE COMMIT: `8eb7f72f7b2cad57bc9dcfc75cf87c360e6e9c09`.
+WORKING/TESTED COMMIT: `300de4326b58ebce42267371a5328c154d2076a4`.
+FILES CHANGED: `src/components/HomepageMerchandising.tsx`, `src/utils/homeMerchandising.ts`, `src/tests/homeMerchandising.test.ts`, `e2e/specs/home-local-stores-issue7.spec.ts`.
+TESTS: typecheck PASS; lint PASS; focused merchandising unit 7/7 PASS; Issue 7 responsive Playwright 1/1 PASS; `verify:fast` PASS (frontend 89/89, backend 219 PASS + 1 host-specific skip); production build PASS; final full Playwright rerun 132 PASS + 2 expected skips / 134 cases; `git diff --check` PASS; changed-file secret scan 4 files / 0 high-confidence findings.
+RESULT: PASS
+KNOWN RISKS: First full Playwright run had one transient unrelated existing COD cart-state failure; the exact COD test passed 1/1 on immediate fresh-server rerun and the entire unchanged suite then passed 132 + 2 expected skips. No Issue 7 files touch cart/checkout/auth/payment/backend.
+MANUAL ACTION REQUIRED: Independent Tester must validate exact implementation commit `300de4326b58ebce42267371a5328c154d2076a4`; no production deployment from DEV2.
+NEXT ROLE: Tester.
+
+### Issue 7 browser acceptance
+- 10 injected active stores append in one horizontal rail; no automatic featured/oversized first store.
+- Equal card geometry at required widths: 390px mobile `280x336`; 1366/1920/2560 widths `288x336`; all cards equal within <=1px.
+- Mobile shows about 1.2 cards and uses natural horizontal swipe; desktop arrows scroll the rail; View All remains present.
+- No page-level horizontal overflow beyond <=1px; only the Local Stores rail scrolls horizontally.
+- Long names/descriptions are clamped and do not change card dimensions; banner images use consistent fixed-height `object-cover` cropping.
+- Screenshots preserved at `C:\movieXsuggestion\MyProject\Vibe4You-acceptance\Issue7\vibe4you-issue7-{390,1366,1920,2560}.png`.
+- Header/navigation, hero, Shop by Department and unrelated product merchandising rows were not changed. No backend/schema/API changes.
+- DEPLOYMENT: NOT PERFORMED.
