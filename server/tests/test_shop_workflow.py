@@ -777,6 +777,8 @@ class ShopWorkflowTests(unittest.TestCase):
             self.store.admin_transition_product("admin-a", product["id"], target)
         public = self.store.list_published_products()[0]
         self.assertEqual((public["subcategory"], public["deliveryType"], public["expressDelivery"]), ("Sliders", "express", True))
+        payment_product = self.store.payment_catalog_products()[0]
+        self.assertEqual((payment_product["deliveryType"], payment_product["expressDelivery"]), ("express", True))
 
     def test_catalog_normalization_applies_to_admin_bulk_and_edit(self) -> None:
         application = self.create_active_shop("user-a", "Normalized Admin Shop")

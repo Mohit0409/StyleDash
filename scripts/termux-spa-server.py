@@ -730,25 +730,37 @@ class PaymentService:
         return india_time.weekday() >= 5
 
     @staticmethod
+    def product_express_eligible(product: dict[str, Any]) -> bool:
+        delivery_type = product.get("deliveryType")
+        if delivery_type in {"express", "both"}:
+            return True
+        if delivery_type == "normal":
+            return False
+        # Legacy static catalogue fixtures predate deliveryType and expose the
+        # already-derived flag instead. DB-backed products always carry deliveryType.
+        return product.get("expressDelivery") is True
+
+    @staticmethod
     def estimated_delivery_label(delivery_method: str) -> str:
         return "60 minutes" if delivery_method == "express" else "within a day"
 
     def is_serviceable_pincode(self, pincode: str) -> bool:
         return _is_six_ascii_digits(pincode) and pincode in self.supported_pincodes
 
-    def check_serviceability(self, pincode: Any) -> dict[str, Any]:
+    def check_serviceability(self, pincode: Any, now: datetime | None = None) -> dict[str, Any]:
         if not _is_six_ascii_digits(pincode):
             raise ApiError(HTTPStatus.BAD_REQUEST, "A valid 6-digit pincode is required.", "invalid_pincode")
         if not self.is_serviceable_pincode(pincode):
             return {"success": True, "pincode": pincode, "serviceable": False}
+        express_available = self.express_delivery_available(now)
         return {
             "success": True,
             "pincode": pincode,
             "serviceable": True,
             "city": "Neemuch",
             "state": "Madhya Pradesh",
-            "expressAvailable": self.express_delivery_available(),
-            "estimatedDeliveryMinutes": 60 if self.express_delivery_available() else None,
+            "expressAvailable": express_available,
+            "estimatedDeliveryMinutes": 60 if express_available else None,
         }
 
     def can_access_payment_test_product(self, user: Any) -> bool:
@@ -916,7 +928,7 @@ class PaymentService:
             "pincode": pincode,
         }
 
-    def calculate_order(self, payload: dict[str, Any]) -> dict[str, Any]:
+    def calculate_order(self, payload: dict[str, Any], now: datetime | None = None) -> dict[str, Any]:
         self.refresh_shop_products()
         products = self.product_snapshot()
         if not isinstance(payload, dict):
@@ -929,8 +941,12 @@ class PaymentService:
         delivery_fees = self.settings["deliveryFees"]
         if delivery_method not in delivery_fees:
             raise ApiError(HTTPStatus.UNPROCESSABLE_ENTITY, "Unsupported delivery method.", "invalid_delivery")
-        if delivery_method == "express" and not self.express_delivery_available():
-            delivery_method = "standard"
+        if delivery_method == "express" and not self.express_delivery_available(now):
+            raise ApiError(
+                HTTPStatus.UNPROCESSABLE_ENTITY,
+                "Express Delivery is available Saturday and Sunday in Neemuch.",
+                "express_delivery_unavailable",
+            )
 
         wallet_amount = payload.get("walletAmount", 0)
         if wallet_amount not in (0, None):
@@ -959,6 +975,12 @@ class PaymentService:
                 product = products[product_id]
                 if not product.get("active"):
                     raise ApiError(HTTPStatus.UNPROCESSABLE_ENTITY, "A product is unavailable.", "invalid_product")
+                if delivery_method == "express" and not self.product_express_eligible(product):
+                    raise ApiError(
+                        HTTPStatus.UNPROCESSABLE_ENTITY,
+                        f"Express Delivery is unavailable because {product['name']} is not Express-eligible.",
+                        "express_delivery_ineligible",
+                    )
                 variant = next(
                     (candidate for candidate in product["variants"] if candidate["id"] == variant_id),
                     None,

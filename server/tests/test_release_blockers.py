@@ -47,7 +47,7 @@ class ReleasePaymentTests(unittest.TestCase):
         return {
             "items":[{"productId":"sd-prod-001","variantId":"sd-prod-001-var-2","quantity":2}],
             "address":{"name":"Release Test","phone":"9999999999","street":"123 Release Street","city":"Neemuch","pincode":"458441"},
-            "deliveryMethod":"express","couponCode":None,"paymentMethod":"upi",
+            "deliveryMethod":"standard","couponCode":None,"paymentMethod":"upi",
         }
     def create(self, key): return self.service.create_razorpay_order(self.payload(), key)
     def captured(self, created, payment_id):

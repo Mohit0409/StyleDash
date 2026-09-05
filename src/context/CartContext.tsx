@@ -3,7 +3,7 @@ import { Product, CartItem, Coupon } from '../types';
 import { trackEvent } from '../services/analytics';
 import { calculateCartTotals } from './cartTotals';
 import { canAddVariantToCart, canIncreaseCartQuantity } from '../repositories/inventoryRepository';
-import { isExpressDeliveryAvailable } from '../utils/delivery';
+import { cartExpressEligibility, isExpressDeliveryAvailable } from '../utils/delivery';
 
 interface CartContextType {
   items: CartItem[];
@@ -40,16 +40,18 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const [appliedCoupon, setAppliedCoupon] = useState<Coupon | null>(null);
   const [deliveryMethod, setDeliveryMethodState] = useState<'express' | 'standard'>('standard');
+  const expressCart = cartExpressEligibility(items.map(item => item.product));
 
   const setDeliveryMethod = (method: 'express' | 'standard') => {
-    setDeliveryMethodState(method === 'express' && !isExpressDeliveryAvailable() ? 'standard' : method);
+    const expressAllowed = isExpressDeliveryAvailable() && expressCart.eligible;
+    setDeliveryMethodState(method === 'express' && !expressAllowed ? 'standard' : method);
   };
 
   useEffect(() => {
-    if (deliveryMethod === 'express' && !isExpressDeliveryAvailable()) {
+    if (deliveryMethod === 'express' && (!isExpressDeliveryAvailable() || !expressCart.eligible)) {
       setDeliveryMethodState('standard');
     }
-  }, [deliveryMethod]);
+  }, [deliveryMethod, expressCart.eligible]);
 
   useEffect(() => {
     localStorage.setItem(LOCAL_CART_KEY, JSON.stringify(items));
@@ -138,6 +140,7 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const clearCart = () => {
     setItems([]);
     setAppliedCoupon(null);
+    setDeliveryMethodState('standard');
     localStorage.removeItem(LOCAL_CART_KEY);
   };
 
