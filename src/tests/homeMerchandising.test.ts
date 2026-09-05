@@ -92,4 +92,15 @@ describe('homepage merchandising', () => {
     expect(selected).toHaveLength(5);
     expect(selected.some(item => item.id === 'inactive' || item.id === 'unapproved')).toBe(false);
   });
+
+  it('keeps every approved active local store when the homepage rail is uncapped', () => {
+    const stores = [
+      ...Array.from({ length: 10 }, (_, index) => store(`active-${index}`, { rating: 5 - (index * 0.1) })),
+      store('inactive', { active: false }),
+      store('unapproved', { approved: false }),
+    ];
+    const selected = selectHomepageStores(stores);
+    expect(selected).toHaveLength(10);
+    expect(selected.some(item => item.id === 'inactive' || item.id === 'unapproved')).toBe(false);
+  });
 });
