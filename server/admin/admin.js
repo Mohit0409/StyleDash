@@ -95,7 +95,7 @@ function validateAdminImageFile(file,prefix=''){
 }
 function attachImagePreview(control,root){
   const render=()=>{root.replaceChildren();for(const [index,file] of Array.from(control.files||[]).entries()){
-    const card=document.createElement('div');card.className='image-preview-card';const image=document.createElement('img');const url=URL.createObjectURL(file);image.src=url;image.alt=`Preview ${file.name}`;image.onload=image.onerror=()=>URL.revokeObjectURL(url);
+    const card=document.createElement('div');card.className='image-preview-card';const image=document.createElement('img');image.alt=`Preview ${file.name}`;const reader=new FileReader();reader.onload=()=>{if(typeof reader.result==='string')image.src=reader.result;};reader.readAsDataURL(file);
     const meta=document.createElement('span');meta.className='image-preview-meta';meta.textContent=`${file.name} - ${Math.max(1,Math.round(file.size/1024))} KB`;const remove=document.createElement('button');remove.type='button';remove.className='image-preview-remove';remove.textContent='Remove';remove.onclick=event=>{event.preventDefault();event.stopPropagation();const transfer=new DataTransfer();Array.from(control.files||[]).forEach((candidate,candidateIndex)=>{if(candidateIndex!==index)transfer.items.add(candidate);});control.files=transfer.files;render();};card.append(image,meta,remove);root.appendChild(card);
   }};control.addEventListener('change',render);render();
 }
