@@ -77,12 +77,13 @@ export const buildHomepageSections = (products: Product[], limit = 5): HomeMerch
   }).filter(section => section.products.length > 0);
 };
 
-export const selectHomepageStores = (stores: VendorStore[], limit = 5): VendorStore[] =>
-  stores
+export const selectHomepageStores = (stores: VendorStore[], limit?: number): VendorStore[] => {
+  const selected = stores
     .filter(store => store.approved === true && store.active === true)
     .sort((a, b) =>
       (b.rating || 0) - (a.rating || 0)
       || (b.reviewCount || 0) - (a.reviewCount || 0)
       || a.storeName.localeCompare(b.storeName),
-    )
-    .slice(0, limit);
+    );
+  return typeof limit === 'number' ? selected.slice(0, Math.max(0, limit)) : selected;
+};

@@ -1,6 +1,6 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowRight, Gem, MapPin, Sparkles, Store, TrendingUp, UserRound, UsersRound, WalletCards, Zap } from 'lucide-react';
+import { ArrowRight, ChevronLeft, ChevronRight, Gem, MapPin, Sparkles, Store, TrendingUp, UserRound, UsersRound, WalletCards, Zap } from 'lucide-react';
 import { ProductCard } from './ProductCard';
 import { StoreImage } from './StoreImage';
 import { vendorRepository } from '../repositories/vendorRepository';
@@ -23,15 +23,24 @@ const iconFor = (id: HomeMerchSectionId) => {
 };
 const rowClass = 'flex snap-x snap-mandatory gap-4 overflow-x-auto pb-2 pr-2 sm:gap-5';
 const cardWrapClass = 'min-w-[72%] snap-start sm:min-w-[44%] md:min-w-[31%] lg:min-w-[23%] xl:min-w-[19%]';
+const storeRailClass = 'flex w-full snap-x snap-mandatory gap-4 overflow-x-auto overscroll-x-contain pb-3 pr-4 scroll-smooth sm:gap-5';
+const storeCardClass = 'group flex h-[21rem] basis-[82%] shrink-0 snap-start flex-col overflow-hidden rounded-2xl border border-neutral-200 bg-white shadow-sm transition hover:-translate-y-0.5 hover:shadow-lg dark:border-neutral-800 dark:bg-neutral-900 sm:basis-[47%] md:basis-[31%] lg:basis-[24%]';
 
 export const HomepageMerchandising: React.FC<HomepageMerchandisingProps> = ({ products, loading }) => {
   const sections = useMemo(() => buildHomepageSections(products, 5), [products]);
   const [stores, setStores] = useState<VendorStore[]>([]);
+  const storesRailRef = useRef<HTMLDivElement>(null);
+
+  const scrollStores = (direction: -1 | 1) => {
+    const rail = storesRailRef.current;
+    if (!rail) return;
+    rail.scrollBy({ left: direction * Math.max(rail.clientWidth * 0.82, 280), behavior: 'smooth' });
+  };
 
   useEffect(() => {
     let active = true;
     vendorRepository.getAllStores()
-      .then(items => { if (active) setStores(selectHomepageStores(items, 5)); })
+      .then(items => { if (active) setStores(selectHomepageStores(items)); })
       .catch(() => { if (active) setStores([]); });
     return () => { active = false; };
   }, []);
@@ -86,19 +95,33 @@ export const HomepageMerchandising: React.FC<HomepageMerchandisingProps> = ({ pr
                 <p className="mt-1 text-xs text-neutral-500 sm:text-sm">Shop directly from verified neighbourhood stores in Neemuch</p>
               </div>
             </div>
-            <Link to="/stores" className="inline-flex shrink-0 items-center gap-1 text-xs font-black text-lime-700 hover:underline dark:text-lime-400 sm:text-sm">
-              View All <ArrowRight className="h-3.5 w-3.5" />
-            </Link>
+            <div className="flex shrink-0 items-center gap-2">
+              <div className="hidden items-center gap-1 md:flex" aria-label="Local Stores carousel controls">
+                <button type="button" onClick={() => scrollStores(-1)} aria-label="Previous local stores" className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-neutral-200 bg-white text-neutral-700 transition hover:border-neutral-400 hover:text-neutral-950 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-200">
+                  <ChevronLeft className="h-4 w-4" />
+                </button>
+                <button type="button" onClick={() => scrollStores(1)} aria-label="Next local stores" className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-neutral-200 bg-white text-neutral-700 transition hover:border-neutral-400 hover:text-neutral-950 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-200">
+                  <ChevronRight className="h-4 w-4" />
+                </button>
+              </div>
+              <Link to="/stores" className="inline-flex shrink-0 items-center gap-1 text-xs font-black text-lime-700 hover:underline dark:text-lime-400 sm:text-sm">
+                View All <ArrowRight className="h-3.5 w-3.5" />
+              </Link>
+            </div>
           </div>
 
-          <div className={rowClass} data-home-section="stores">
+          <div ref={storesRailRef} className={storeRailClass} data-home-section="stores" data-testid="local-stores-rail">
             {stores.map(store => (
-              <Link key={store.id} to={`/store/${store.slug}`} className={`${cardWrapClass} group overflow-hidden rounded-2xl border border-neutral-200 bg-white shadow-sm transition hover:-translate-y-0.5 hover:shadow-lg dark:border-neutral-800 dark:bg-neutral-900`}>
-                <StoreImage src={store.bannerImage} alt={store.storeName} storeName={store.storeName} kind="cover" loading="lazy" decoding="async" className="aspect-[16/9] w-full object-cover" />
-                <div className="space-y-2 p-4">
-                  <h3 className="truncate font-black text-neutral-900 dark:text-white">{store.storeName}</h3>
-                  <p className="line-clamp-2 text-xs text-neutral-500">{store.description}</p>
-                  <p className="flex items-center gap-1 text-xs font-bold text-neutral-500"><MapPin className="h-3.5 w-3.5 text-lime-600" />{store.city}</p>
+              <Link key={store.id} to={`/store/${store.slug}`} className={storeCardClass} data-store-card>
+                <StoreImage src={store.bannerImage} alt={store.storeName} storeName={store.storeName} kind="cover" loading="lazy" decoding="async" className="h-40 w-full shrink-0 object-cover" />
+                <div className="flex min-h-0 flex-1 flex-col gap-2 p-4">
+                  <h3 className="line-clamp-2 min-h-10 text-base font-black leading-5 text-neutral-900 dark:text-white">{store.storeName}</h3>
+                  <div className="flex items-center gap-2 text-[10px] font-bold text-neutral-600 dark:text-neutral-300">
+                    <span className="max-w-[58%] truncate rounded-full bg-neutral-100 px-2 py-1 dark:bg-neutral-800">{store.category}</span>
+                    <span className="shrink-0 rounded-full bg-lime-100 px-2 py-1 text-lime-800 dark:bg-lime-950 dark:text-lime-300">~{store.deliveryMinutes} min delivery</span>
+                  </div>
+                  <p className="line-clamp-2 min-h-8 text-xs leading-4 text-neutral-500">{store.description}</p>
+                  <p className="mt-auto flex min-w-0 items-center gap-1 text-xs font-bold text-neutral-500"><MapPin className="h-3.5 w-3.5 shrink-0 text-lime-600" /><span className="truncate">{store.city}</span></p>
                 </div>
               </Link>
             ))}
