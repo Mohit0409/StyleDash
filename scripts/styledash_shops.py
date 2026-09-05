@@ -2346,6 +2346,10 @@ class ShopWorkflow:
         for row in rows:
             price = row["price_paise"] / 100
             images = json.loads(row["image_urls_json"]) if row["image_urls_json"] else []
+            attributes = json.loads(row["attributes_json"]) if row["attributes_json"] else {}
+            delivery_type = attributes.get("deliveryType", "normal")
+            if delivery_type not in {"normal", "express", "both"}:
+                delivery_type = "normal"
             store_slug = _store_slug(row["application_id"])
             products.append(
                 {
@@ -2355,6 +2359,8 @@ class ShopWorkflow:
                     "vendorId": row["application_id"],
                     "storeName": row["shop_name"],
                     "storeSlug": store_slug,
+                    "deliveryType": delivery_type,
+                    "expressDelivery": delivery_type in {"express", "both"},
                     "images": images,
                     "thumbnail": images[0] if images else None,
                     "active": row["status"] == "PUBLISHED" and row["shop_status"] == "ACTIVE",

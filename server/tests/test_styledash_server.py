@@ -64,22 +64,77 @@ class PaymentServiceTests(unittest.TestCase):
     def tearDown(self) -> None:
         self.temporary.cleanup()
 
-    def test_weekday_express_is_coerced_to_standard_and_weekend_is_available(self):
-        monday = SERVER.datetime(2026, 8, 31, 6, 0, tzinfo=SERVER.timezone.utc)
-        saturday = SERVER.datetime(2026, 8, 29, 6, 0, tzinfo=SERVER.timezone.utc)
-        self.assertFalse(self.service.express_delivery_available(monday))
-        self.assertTrue(self.service.express_delivery_available(saturday))
+    def test_express_delivery_uses_india_weekend_and_rejects_weekday_bypass(self):
+        monday = SERVER.datetime(2026, 9, 7, 6, 30, tzinfo=SERVER.timezone.utc)
+        friday = SERVER.datetime(2026, 9, 4, 6, 30, tzinfo=SERVER.timezone.utc)
+        saturday = SERVER.datetime(2026, 9, 5, 6, 30, tzinfo=SERVER.timezone.utc)
+        sunday = SERVER.datetime(2026, 9, 6, 6, 30, tzinfo=SERVER.timezone.utc)
+
+        for blocked in (monday, friday):
+            self.assertFalse(self.service.express_delivery_available(blocked))
+            self.assertFalse(self.service.check_serviceability("458441", blocked)["expressAvailable"])
+            self.assert_api_error(
+                "express_delivery_unavailable",
+                lambda blocked=blocked: self.service.calculate_order(
+                    self.payload(deliveryMethod="express"), now=blocked
+                ),
+            )
+
+        for weekend in (saturday, sunday):
+            self.assertTrue(self.service.express_delivery_available(weekend))
+            self.assertTrue(self.service.check_serviceability("458441", weekend)["expressAvailable"])
+            with patch.object(SERVER.PaymentService, "product_express_eligible", return_value=True):
+                quote = self.service.calculate_order(self.payload(deliveryMethod="express"), now=weekend)
+            self.assertEqual(quote["deliveryMethod"], "express")
+
         self.assertEqual(self.service.estimated_delivery_label("express"), "60 minutes")
         self.assertEqual(self.service.estimated_delivery_label("standard"), "within a day")
         with patch.object(SERVER.PaymentService, "express_delivery_available", return_value=False):
-            quote = self.service.calculate_order(self.payload(deliveryMethod="express"))
-            cod = self.service.place_cod_order(
-                self.payload(deliveryMethod="express", paymentMethod="cod"),
-                "delivery-standard-test",
+            self.assert_api_error(
+                "express_delivery_unavailable",
+                lambda: self.service.place_cod_order(
+                    self.payload(deliveryMethod="express", paymentMethod="cod"),
+                    "weekday-bypass-test",
+                ),
             )
-        self.assertEqual(quote["deliveryMethod"], "standard")
-        self.assertEqual(cod["order"]["deliveryMethod"], "standard")
-        self.assertEqual(cod["order"]["estimatedDelivery"], "within a day")
+
+    def test_express_delivery_rejects_non_eligible_cart_but_normal_remains_available(self):
+        saturday = SERVER.datetime(2026, 9, 5, 6, 30, tzinfo=SERVER.timezone.utc)
+        product_id = "sd-prod-001"
+        original = self.service._static_products[product_id]
+        self.service._static_products[product_id] = {
+            **original,
+            "deliveryType": "normal",
+            "expressDelivery": False,
+        }
+        try:
+            self.assert_api_error(
+                "express_delivery_ineligible",
+                lambda: self.service.calculate_order(
+                    self.payload(deliveryMethod="express"), now=saturday
+                ),
+            )
+            with patch.object(SERVER.PaymentService, "express_delivery_available", return_value=True):
+                self.assert_api_error(
+                    "express_delivery_ineligible",
+                    lambda: self.service.place_cod_order(
+                        self.payload(deliveryMethod="express", paymentMethod="cod"),
+                        "ineligible-express-cod",
+                    ),
+                )
+                self.assert_api_error(
+                    "express_delivery_ineligible",
+                    lambda: self.service.create_razorpay_order(
+                        self.payload(deliveryMethod="express", paymentMethod="upi"),
+                        "ineligible-express-razorpay",
+                    ),
+                )
+            normal = self.service.calculate_order(
+                self.payload(deliveryMethod="standard"), now=saturday
+            )
+            self.assertEqual(normal["deliveryMethod"], "standard")
+        finally:
+            self.service._static_products[product_id] = original
 
     def payload(self, **overrides):
         payload = {
@@ -92,7 +147,7 @@ class PaymentServiceTests(unittest.TestCase):
                 "pincode": "458441",
             },
             "userId": "test-user",
-            "deliveryMethod": "express",
+            "deliveryMethod": "standard",
             "couponCode": None,
             "paymentMethod": "upi",
         }
@@ -1023,8 +1078,9 @@ class PaymentServiceTests(unittest.TestCase):
 
 
     def test_server_calculates_trusted_amount_in_paise(self) -> None:
-        with patch.object(SERVER.PaymentService, "express_delivery_available", return_value=True):
-            response = self.service.create_razorpay_order(self.payload(), "checkout-test-001")
+        with patch.object(SERVER.PaymentService, "express_delivery_available", return_value=True), \
+             patch.object(SERVER.PaymentService, "product_express_eligible", return_value=True):
+            response = self.service.create_razorpay_order(self.payload(deliveryMethod="express"), "checkout-test-001")
         self.assertEqual(response["trustedTotals"], {
             "subtotal": 946,
             "discount": 0,
@@ -1268,8 +1324,9 @@ class PaymentServiceTests(unittest.TestCase):
         self.assert_api_error("missing_payment_fields", lambda: self.service.verify_payment({}))
 
     def test_cod_is_server_authoritative_and_idempotent(self) -> None:
-        payload = self.payload(paymentMethod="cod")
-        with patch.object(SERVER.PaymentService, "express_delivery_available", return_value=True):
+        payload = self.payload(paymentMethod="cod", deliveryMethod="express")
+        with patch.object(SERVER.PaymentService, "express_delivery_available", return_value=True), \
+             patch.object(SERVER.PaymentService, "product_express_eligible", return_value=True):
             first = self.service.place_cod_order(payload, "checkout-cod-001")
             second = self.service.place_cod_order(payload, "checkout-cod-001")
         self.assertEqual(first["order"]["grandTotal"], 1072)
@@ -2360,7 +2417,7 @@ class HttpApiTests(unittest.TestCase):
                     "city": "Neemuch",
                     "pincode": "458441",
                 },
-                "deliveryMethod": "express",
+                "deliveryMethod": "standard",
                 "paymentMethod": "cod",
             },
             cod_headers,
@@ -2385,7 +2442,7 @@ class HttpApiTests(unittest.TestCase):
                     "city": "Neemuch",
                     "pincode": "458441",
                 },
-                "deliveryMethod": "express",
+                "deliveryMethod": "standard",
                 "paymentMethod": "cod",
             },
             {**session_headers, "Idempotency-Key": "shop-http-cod-002"},
@@ -2667,7 +2724,7 @@ class HttpApiTests(unittest.TestCase):
                 "city": "Neemuch",
                 "pincode": "458441",
             },
-            "deliveryMethod": "express",
+            "deliveryMethod": "standard",
             "paymentMethod": "cod",
             "couponCode": None,
         }
@@ -2797,7 +2854,7 @@ class HttpApiTests(unittest.TestCase):
                 "city": "Neemuch",
                 "pincode": "458441",
             },
-            "deliveryMethod": "express",
+            "deliveryMethod": "standard",
             "paymentMethod": "cod",
             "couponCode": None,
         }
@@ -3087,7 +3144,7 @@ class HttpApiTests(unittest.TestCase):
         payment_payload = {
             "items": [{"productId": "sd-prod-001", "variantId": "sd-prod-001-var-2", "quantity": 1}],
             "address": {"name": "HTTP Customer", "phone": "9999999999", "street": "123 Test Street", "city": "Neemuch", "pincode": "458441"},
-            "deliveryMethod": "express", "paymentMethod": "upi", "userId": "attacker-controlled-user",
+            "deliveryMethod": "standard", "paymentMethod": "upi", "userId": "attacker-controlled-user",
         }
         base_headers = {"Cookie": cookie, "X-CSRF-Token": csrf, "Idempotency-Key": "http-auth-test"}
         status, body, _headers = self.post_json("/api/create-order", payment_payload, {**base_headers, "Origin": "https://evil.test"})
@@ -3409,7 +3466,7 @@ class HttpApiTests(unittest.TestCase):
                 "name": "HTTP Payment Owner", "phone": "9999999999",
                 "street": "123 Test Street", "city": "Neemuch", "pincode": "458441",
             },
-            "deliveryMethod": "express", "paymentMethod": "cod", "couponCode": None,
+            "deliveryMethod": "standard", "paymentMethod": "cod", "couponCode": None,
         }
         status, ordinary_cod, _headers = self.post_json(
             "/api/place-cod-order", ordinary_payload,

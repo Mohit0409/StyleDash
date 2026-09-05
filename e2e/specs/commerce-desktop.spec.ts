@@ -117,6 +117,36 @@ async function prepareCheckout(page: Page, label: string) {
   await expect(page.getByLabel('Pincode')).toHaveAttribute('readonly', '');
 }
 
+test('checkout enables Express and recalculates totals on a simulated Saturday', async ({ page }) => {
+  await page.clock.install({ time: new Date('2026-09-05T06:30:00Z') });
+  await prepareCheckout(page, 'weekend-express-selector');
+
+  const normal = page.getByRole('radio', { name: /Normal Delivery/ });
+  const express = page.getByRole('radio', { name: /Express Delivery/ });
+  const summary = page.getByRole('heading', { name: 'Order Summary' }).locator('..');
+
+  await expect(normal).toBeChecked();
+  await expect(express).toBeEnabled();
+  await expect(summary.getByText('₹49', { exact: true })).toBeVisible();
+
+  await express.check();
+  await expect(express).toBeChecked();
+  await expect(summary.getByText('₹79', { exact: true })).toBeVisible();
+  await expect(summary.getByText('About 60 minutes', { exact: true })).toBeVisible();
+  await expect(page.getByText('Express selected. Delivery charge and estimated total have been recalculated below.')).toBeVisible();
+});
+
+test('checkout disables Express on a simulated Monday and keeps Normal Delivery', async ({ page }) => {
+  await page.clock.install({ time: new Date('2026-09-07T06:30:00Z') });
+  await prepareCheckout(page, 'weekday-normal-selector');
+
+  const normal = page.getByRole('radio', { name: /Normal Delivery/ });
+  const express = page.getByRole('radio', { name: /Express Delivery/ });
+
+  await expect(normal).toBeChecked();
+  await expect(express).toBeDisabled();
+  await expect(page.getByRole('status')).toContainText('Express Delivery is available Saturday and Sunday in Neemuch.');
+});
 test('single-city launch fixes profile and checkout delivery area to Neemuch 458441', async ({ page }) => {
   await loginCustomer(page, USER_A);
 

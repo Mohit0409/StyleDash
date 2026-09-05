@@ -3,7 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { X, Trash2, Plus, Minus, Zap, ArrowRight, Tag, ShieldCheck } from 'lucide-react';
 import { useCart } from '../context/CartContext';
 import { CONFIG } from '../config';
-import { deliveryAvailabilityMessage, isExpressDeliveryAvailable } from '../utils/delivery';
+import { cartExpressEligibility, deliveryAvailabilityMessage, isExpressDeliveryAvailable } from '../utils/delivery';
 
 export const CartDrawer: React.FC<{ isOpen: boolean; onClose: () => void }> = ({ isOpen, onClose }) => {
   const navigate = useNavigate();
@@ -20,6 +20,13 @@ export const CartDrawer: React.FC<{ isOpen: boolean; onClose: () => void }> = ({
     setDeliveryMethod
   } = useCart();
   const expressAvailable = isExpressDeliveryAvailable();
+  const expressCart = cartExpressEligibility(items.map(item => item.product));
+  const expressSelectable = expressAvailable && expressCart.eligible;
+  const expressBlockedReason = !expressAvailable
+    ? 'Express Delivery is available Saturday and Sunday.'
+    : !expressCart.eligible
+      ? `Express Delivery is unavailable because ${expressCart.ineligibleProductNames.slice(0, 2).join(', ')} ${expressCart.ineligibleProductNames.length > 1 ? 'are' : 'is'} not Express-eligible.`
+      : '';
 
   useEffect(() => {
     if (!isOpen) return undefined;
@@ -143,7 +150,7 @@ export const CartDrawer: React.FC<{ isOpen: boolean; onClose: () => void }> = ({
               <span className="text-neutral-600 dark:text-neutral-400">Speed:</span>
               <div className="flex gap-1">
                 <button
-                  disabled={!expressAvailable}
+                  disabled={!expressSelectable}
                   onClick={() => setDeliveryMethod('express')}
                   className={`px-3 py-1 rounded-lg transition-all disabled:cursor-not-allowed disabled:opacity-40 ${
                     deliveryMethod === 'express'
@@ -166,6 +173,7 @@ export const CartDrawer: React.FC<{ isOpen: boolean; onClose: () => void }> = ({
               </div>
             </div>
             <p className="text-[11px] text-neutral-500">{deliveryAvailabilityMessage()} Delivery is available in {CONFIG.SERVICE_CITY} ({CONFIG.DEFAULT_PINCODE}).</p>
+            {expressBlockedReason && <p className="text-[11px] font-semibold text-amber-700 dark:text-amber-300">{expressBlockedReason}</p>}
 
             {/* Price Breakdown */}
             <div className="space-y-1.5 text-xs text-neutral-600 dark:text-neutral-400">

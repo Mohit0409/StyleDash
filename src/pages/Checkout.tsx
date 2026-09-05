@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowRight, ShieldCheck } from 'lucide-react';
+import { ArrowRight, ShieldCheck, Truck, Zap } from 'lucide-react';
 import { SEO } from '../components/SEO';
 import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
@@ -14,6 +14,7 @@ import {
   verifyPayment,
 } from '../services/paymentApi';
 import { CONFIG } from '../config';
+import { cartExpressEligibility, isExpressDeliveryAvailable } from '../utils/delivery';
 
 const makeIdempotencyKey = () =>
   `checkout-${Date.now()}-${globalThis.crypto?.randomUUID?.() || Math.random().toString(36).slice(2)}`;
@@ -28,11 +29,20 @@ export const Checkout: React.FC = () => {
     grandTotal,
     clearCart,
     deliveryMethod,
+    setDeliveryMethod,
     appliedCoupon,
   } = useCart();
   const { user } = useAuth();
   const { showToast } = useToast();
   const savedAddress = user?.addresses?.find((address) => address.isDefault) || user?.addresses?.[0];
+  const expressWeekend = isExpressDeliveryAvailable();
+  const expressCart = cartExpressEligibility(items.map(item => item.product));
+  const expressSelectable = expressWeekend && expressCart.eligible;
+  const expressUnavailableReason = !expressWeekend
+    ? 'Express Delivery is available Saturday and Sunday in Neemuch.'
+    : !expressCart.eligible
+      ? `Express Delivery cannot be selected because ${expressCart.ineligibleProductNames.slice(0, 2).join(', ')} ${expressCart.ineligibleProductNames.length > 1 ? 'are' : 'is'} not Express-eligible.`
+      : '';
 
   const [name, setName] = useState(savedAddress?.name || user?.name || '');
   const [phone, setPhone] = useState(savedAddress?.phone || user?.phone || '');
@@ -159,7 +169,35 @@ export const Checkout: React.FC = () => {
           </div>
 
           <div className="bg-white dark:bg-neutral-900 p-6 rounded-3xl border border-neutral-200 dark:border-neutral-800 space-y-4 shadow-sm">
-            <h3 className="font-extrabold text-base text-neutral-900 dark:text-white">2. Select Payment Method</h3>
+            <h3 className="font-extrabold text-base text-neutral-900 dark:text-white">2. Delivery Method</h3>
+            <div className="grid sm:grid-cols-2 gap-3">
+              <label className={`flex items-start gap-3 p-4 rounded-2xl border cursor-pointer transition-all ${deliveryMethod === 'standard' ? 'border-neutral-950 dark:border-lime-400 bg-neutral-50 dark:bg-neutral-800/80 shadow-md' : 'border-neutral-200 dark:border-neutral-800'}`}>
+                <input type="radio" name="delivery" value="standard" checked={deliveryMethod === 'standard'} onChange={() => setDeliveryMethod('standard')} className="mt-1 accent-lime-500" />
+                <Truck className="mt-0.5 h-4 w-4 shrink-0 text-neutral-500" />
+                <span>
+                  <span className="font-bold text-xs text-neutral-900 dark:text-white block">Normal Delivery</span>
+                  <span className="text-[11px] text-neutral-500">Within a day - always available</span>
+                </span>
+              </label>
+              <label className={`flex items-start gap-3 p-4 rounded-2xl border transition-all ${expressSelectable ? 'cursor-pointer' : 'cursor-not-allowed opacity-60'} ${deliveryMethod === 'express' ? 'border-lime-500 bg-lime-50 dark:border-lime-400 dark:bg-lime-950/20 shadow-md' : 'border-neutral-200 dark:border-neutral-800'}`}>
+                <input type="radio" name="delivery" value="express" checked={deliveryMethod === 'express'} disabled={!expressSelectable} onChange={() => setDeliveryMethod('express')} className="mt-1 accent-lime-500" />
+                <Zap className="mt-0.5 h-4 w-4 shrink-0 text-lime-600" />
+                <span>
+                  <span className="font-bold text-xs text-neutral-900 dark:text-white block">Express Delivery</span>
+                  <span className="text-[11px] text-neutral-500">About 60 minutes - Saturday & Sunday</span>
+                </span>
+              </label>
+            </div>
+            {expressUnavailableReason && (
+              <p role="status" className="rounded-xl bg-amber-50 px-3 py-2 text-[11px] font-semibold text-amber-800 dark:bg-amber-950/30 dark:text-amber-200">{expressUnavailableReason}</p>
+            )}
+            {deliveryMethod === 'express' && (
+              <p className="text-[11px] font-semibold text-emerald-700 dark:text-emerald-300">Express selected. Delivery charge and estimated total have been recalculated below.</p>
+            )}
+          </div>
+
+          <div className="bg-white dark:bg-neutral-900 p-6 rounded-3xl border border-neutral-200 dark:border-neutral-800 space-y-4 shadow-sm">
+            <h3 className="font-extrabold text-base text-neutral-900 dark:text-white">3. Select Payment Method</h3>
             <div className="space-y-3">
               {paymentMethods.map((method) => (
                 <label key={method.id} className={`flex items-start gap-3 p-4 rounded-2xl border cursor-pointer transition-all ${paymentMethod === method.id ? 'border-neutral-950 dark:border-lime-400 bg-neutral-50 dark:bg-neutral-800/80 shadow-md' : 'border-neutral-200 dark:border-neutral-800'}`}>
@@ -192,7 +230,8 @@ export const Checkout: React.FC = () => {
           </div>
           <div className="space-y-2 text-xs text-neutral-600 dark:text-neutral-400">
             <div className="flex justify-between"><span>Subtotal</span><span>₹{subtotal}</span></div>
-            <div className="flex justify-between"><span>Delivery</span><span>{deliveryFee === 0 ? 'FREE' : `₹${deliveryFee}`}</span></div>
+            <div className="flex justify-between"><span>{deliveryMethod === 'express' ? 'Express Delivery' : 'Normal Delivery'}</span><span>{deliveryFee === 0 ? 'FREE' : `\u20B9${deliveryFee}`}</span></div>
+            <div className="flex justify-between"><span>Delivery ETA</span><span>{deliveryMethod === 'express' ? 'About 60 minutes' : 'Within a day'}</span></div>
             <div className="flex justify-between"><span>GST Taxes (5%)</span><span>₹{taxes}</span></div>
             <div className="flex justify-between pt-2 border-t border-neutral-200 dark:border-neutral-800 text-sm font-black text-neutral-900 dark:text-white">
               <span>Estimated Total</span><span className="text-lime-600 dark:text-lime-400">₹{grandTotal}</span>
