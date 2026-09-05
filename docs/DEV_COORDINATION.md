@@ -138,3 +138,16 @@ DEV2 may use these fields for receipt/tracking display only. DEV2 must not infer
 - **RESULT:** Developer PASS only. No production deployment or Goutam Shoes product publication performed.
 - **MANUAL ACTION REQUIRED:** independent Tester must test exact implementation commit; Security must review admin auth/CSRF/media/network-boundary behavior; Manager decides release only after both PASS.
 - **NEXT ROLE:** Tester.
+
+### DEV1 Issue 5 Security blocker remediation - 2026-09-05
+- Security review of implementation `4fa0f793533d55a79704e42cba872e0a80bbb37b` found one real blocker: selected-image previews used `blob:` URLs while the private-admin CSP permits only `img-src 'self' data:`.
+- DEV1 chose the narrower fix: preserve the existing CSP unchanged and replace preview `URL.createObjectURL(...)` usage with `FileReader.readAsDataURL(...)` for product-selection previews.
+- Security boundary remains unchanged: private admin CSP still contains `img-src 'self' data:` and does not add `blob:`.
+- Added real-browser regression `e2e/specs/admin-csp-preview.spec.ts`; it launches the actual private-admin server, verifies its CSP header, selects a PNG, confirms the preview is a visible `data:image/...` URL, and asserts no Chromium CSP console violation.
+- Focused real-CSP Chromium test: 1/1 PASS.
+- `verify:fast`: PASS — typecheck, lint, frontend 88/88, backend 219 PASS + 1 host-specific skip.
+- Full Playwright after remediation: 131 PASS + 1 expected project skip; exit code 0.
+- `git diff --check`: PASS; admin JS syntax: PASS; staged added-line secret signature scan: 0 findings.
+- Immutable remediation commit: `8eb7f72f7b2cad57bc9dcfc75cf87c360e6e9c09` (`fix: make admin image previews CSP compatible`).
+- Deployment: NOT PERFORMED. Manager remains BLOCKED until independent Tester and Security re-review the new commit and Manager approves release.
+- NEXT ROLE: Tester, then Security if Tester PASS.
