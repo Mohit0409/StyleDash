@@ -57,7 +57,7 @@ test('customer policy pages publish launch contacts without pre-live warnings', 
     'before Live Mode',
   ];
 
-  for (const route of ['/help', '/returns', '/privacy', '/terms']) {
+  for (const route of ['/help', '/contact', '/shipping', '/returns', '/privacy', '/terms']) {
     await page.goto(route);
 
     const main = page.locator('main');
@@ -77,7 +77,8 @@ test('customer policy pages publish launch contacts without pre-live warnings', 
   await expect(page.locator('main')).toContainText('INR 50');
 
   await page.goto('/privacy');
-  await expect(page.locator('main')).toContainText('Mohit Jangde');
+  await expect(page.locator('main')).toContainText('Manorama');
+  await expect(page.locator('main')).toContainText('Grievance officer: Mohit Jangde');
 });
 
 test('unknown route renders Vibe4You 404', async ({ page }) => {

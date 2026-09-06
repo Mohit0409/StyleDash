@@ -23,6 +23,8 @@ const Orders = lazy(() => import('./pages/Orders').then(m => ({ default: m.Order
 const Profile = lazy(() => import('./pages/Profile').then(m => ({ default: m.Profile })));
 const NotFound = lazy(() => import('./pages/NotFound').then(m => ({ default: m.NotFound })));
 const Help = lazy(() => import('./pages/Help').then(m => ({ default: m.Help })));
+const Contact = lazy(() => import('./pages/Contact').then(m => ({ default: m.Contact })));
+const Shipping = lazy(() => import('./pages/Shipping').then(m => ({ default: m.Shipping })));
 const Returns = lazy(() => import('./pages/Returns').then(m => ({ default: m.Returns })));
 const Privacy = lazy(() => import('./pages/Privacy').then(m => ({ default: m.Privacy })));
 const Terms = lazy(() => import('./pages/Terms').then(m => ({ default: m.Terms })));
@@ -65,6 +67,8 @@ export const App: React.FC = () => {
                       <Route path="orders" element={<ProtectedRoute><Orders /></ProtectedRoute>} />
                       <Route path="profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
                       <Route path="help" element={<Help />} />
+                      <Route path="contact" element={<Contact />} />
+                      <Route path="shipping" element={<Shipping />} />
                       <Route path="returns" element={<Returns />} />
                       <Route path="privacy" element={<Privacy />} />
                       <Route path="terms" element={<Terms />} />

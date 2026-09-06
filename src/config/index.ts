@@ -13,7 +13,7 @@ export const CONFIG = {
   // Current operating details for the limited-area launch.
   // Keep these centralized so the proprietor/grievance contacts can be changed once.
   LEGAL: {
-    PROPRIETOR_NAME: 'Mohit Jangde',
+    PROPRIETOR_NAME: 'Manorama',
     GRIEVANCE_OFFICER: 'Mohit Jangde',
     ADDRESS: 'Alkaloid Colony, Neemuch, Madhya Pradesh 458441, India',
     SUPPORT_EMAIL: 'styledashsupport@gmail.com',

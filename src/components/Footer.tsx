@@ -85,6 +85,8 @@ export const Footer: React.FC = () => {
             <h5 className="font-bold text-white text-sm mb-3">Customer Service</h5>
             <ul className="space-y-2 text-xs">
               <li><Link to="/help" className="hover:text-lime-400">Help &amp; Support</Link></li>
+              <li><Link to="/contact" className="hover:text-lime-400">Contact Us</Link></li>
+              <li><Link to="/shipping" className="hover:text-lime-400">Shipping &amp; Delivery</Link></li>
               <li><Link to="/returns" className="hover:text-lime-400">Returns &amp; Size Exchange</Link></li>
               <li><Link to="/privacy" className="hover:text-lime-400">Privacy Policy</Link></li>
               <li><Link to="/terms" className="hover:text-lime-400">Terms of Service</Link></li>
