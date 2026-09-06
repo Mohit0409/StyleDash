@@ -40,8 +40,9 @@ except ModuleNotFoundError:
 MAX_BODY_BYTES = 64 * 1024
 PRODUCT_IMAGE_REQUEST_MAX_BYTES = 700 * 1024
 BULK_PRODUCT_REQUEST_MAX_BYTES = 1024 * 1024
+PUBLIC_ADMIN_ORIGIN = "https://admin.vibe4you.in"
 ALLOWED_HOSTS = {"127.0.0.1:8081", "localhost:8081"}
-ALLOWED_ORIGINS = {"http://127.0.0.1:8081", "http://localhost:8081"}
+ALLOWED_ORIGINS = {"http://127.0.0.1:8081", "http://localhost:8081", PUBLIC_ADMIN_ORIGIN}
 SECURITY_POLICY = (
     "default-src 'self'; base-uri 'none'; object-src 'none'; frame-ancestors 'none'; "
     "form-action 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; "

@@ -827,6 +827,25 @@ class AdminHttpTests(unittest.TestCase):
             content = response.read()
             return response.status, json.loads(content) if response.headers.get_content_type() == "application/json" else content.decode(), response.headers
 
+    def test_cloudflare_access_admin_origin_is_allowed_but_other_origins_are_rejected(self):
+        status, body, headers = self.request(
+            "/api/admin/login",
+            {"username": "local-owner", "password": "long administrator password 123"},
+            headers={"Origin": "https://admin.vibe4you.in"},
+            method="POST",
+        )
+        self.assertEqual(status, 200)
+        self.assertTrue(body["requiresTotp"])
+        self.assertIn("styledash_admin_challenge=", headers.get("Set-Cookie", ""))
+
+        status, body, _headers = self.request(
+            "/api/admin/login",
+            {"username": "local-owner", "password": "long administrator password 123"},
+            headers={"Origin": "https://evil.example"},
+            method="POST",
+        )
+        self.assertEqual((status, body["code"]), (403, "admin_request_rejected"))
+
     def test_loopback_host_password_totp_and_separate_cookie(self):
         status, html, _headers = self.request("/", headers={"Origin": ""})
         self.assertEqual(status, 200); self.assertIn("Vibe4You Local Administration", html)
