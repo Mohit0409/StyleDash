@@ -361,6 +361,14 @@ class DeploymentAndTaxTests(unittest.TestCase):
             text,
         )
         self.assertIn(
+            'install -m 600 "$STAGE/scripts/receipt_pdf.py" "$HOME/admin/receipt_pdf.py"',
+            text,
+        )
+        self.assertIn('admin_marker="$HOME/admin/serve.py --bind 127.0.0.1 --port 8081"', text)
+        self.assertIn('pgrep -f "$HOME/admin/serve.py"', text)
+        self.assertIn('rm -f -- "$HOME/run/styledash-admin.pid"', text)
+        self.assertLess(text.index('admin_marker="$HOME/admin/serve.py'), text.index('install -m 600 "$STAGE/server/admin/admin.js"'))
+        self.assertIn(
             'install -m 600 "$STAGE/scripts/audit_identity_duplicates.py" "$HOME/server/audit_identity_duplicates.py"',
             text,
         )
@@ -391,6 +399,13 @@ class DeploymentAndTaxTests(unittest.TestCase):
         backup_text = (ROOT / "scripts/termux/backup-styledash-data").read_text(encoding="utf-8")
         self.assertIn('PRODUCT_IMAGES="$DATA_ROOT/product-images"', backup_text)
         self.assertIn('cp -a "$PRODUCT_IMAGES/." "$target/product-images/"', backup_text)
+
+    def test_admin_start_script_recovers_stale_pid_without_accepting_wrong_process(self):
+        text = (ROOT / "scripts/termux/start-styledash-admin").read_text(encoding="utf-8")
+        self.assertIn('ADMIN_MARKER="$APP_DIR/serve.py --bind 127.0.0.1 --port 8081"', text)
+        self.assertIn('pgrep -f "$APP_DIR/serve.py"', text)
+        self.assertIn("printf '%s\\n' \"$candidate\" > \"$PID_FILE\"", text)
+        self.assertIn('grep -Fq "$ADMIN_MARKER"', text)
 
     def test_boot_uses_only_the_managed_ngrok_stack(self):
         text = (ROOT / "scripts/termux/boot-start-styledash").read_text(encoding="utf-8")

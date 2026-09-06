@@ -766,6 +766,8 @@ class AdminStoreTests(unittest.TestCase):
         self.assertIn("previewImages:true", admin_ui)
         self.assertIn("new DataTransfer()", admin_ui)
         self.assertIn("csvText,images", admin_ui)
+        self.assertIn("progressOffset=0,progressTotal=null", admin_ui)
+        self.assertIn("uploadAdminProductImages([file],uploaded,requiredFiles.size)", admin_ui)
         self.assertIn("payment_pending:'amber'", admin_ui)
         self.assertIn("delivered:'green'", admin_ui)
         self.assertIn("cancelled:'red'", admin_ui)
@@ -1136,6 +1138,20 @@ class AdminHttpTests(unittest.TestCase):
         by_name={product["name"]:product for product in bulk["products"]}
         self.assertEqual(by_name["Mapped Campus"]["imageUrls"][0],image_path)
         self.assertEqual(by_name["Direct URL Shoe"]["imageUrls"],["https://example.test/direct.jpg"])
+
+        fifteen_header = "name,description,brand,department,category,price,originalPrice,variants,colourName,colourHex,imageFile,imageUrls"
+        fifteen_rows = [
+            f'Bulk Shoe {index},Bulk shoe {index},Brand,unisex,Footwear,1099,1099,"6:5, 7:5",Color {index},,product{index}.png,'
+            for index in range(1, 16)
+        ]
+        fifteen_csv = "\n".join([fifteen_header, *fifteen_rows]) + "\n"
+        fifteen_images = {f"product{index}.png": image_path for index in range(1, 16)}
+        status, fifteen_bulk, _ = self.request(
+            "/api/admin/shop-products/bulk",
+            {"applicationId": application["id"], "csvText": fifteen_csv, "images": fifteen_images},
+            headers={"X-CSRF-Token": csrf}, method="POST",
+        )
+        self.assertEqual((status, fifteen_bulk["created"]), (201, 15))
         for product_id, original in before.items():
             after=next(product for product in shops.admin_list_products(admin_id) if product["id"]==product_id)
             self.assertEqual((after["name"],after["imageUrls"]),(original["name"],original["imageUrls"]))

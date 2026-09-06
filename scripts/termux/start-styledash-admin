@@ -31,9 +31,10 @@ export STYLEDASH_DATA_DIR="$DATA_ROOT/runtime"
 export STYLEDASH_DATABASE_PATH="$DATA_ROOT/styledash.db"
 
 healthy() { curl -fsS --max-time 3 -H 'Host: 127.0.0.1:8081' http://127.0.0.1:8081/ >/dev/null; }
+ADMIN_MARKER="$APP_DIR/serve.py --bind 127.0.0.1 --port 8081"
 managed() {
   [ -n "${1:-}" ] && kill -0 "$1" 2>/dev/null &&
-    tr '\0' ' ' < "/proc/$1/cmdline" 2>/dev/null | grep -Fq "$APP_DIR/serve.py"
+    tr '\0' ' ' < "/proc/$1/cmdline" 2>/dev/null | grep -Fq "$ADMIN_MARKER"
 }
 
 pid=''
@@ -41,6 +42,13 @@ if [ -s "$PID_FILE" ]; then pid="$(cat "$PID_FILE")"; fi
 if managed "$pid" && healthy; then exit 0; fi
 if managed "$pid"; then kill "$pid" 2>/dev/null || true; sleep 1; fi
 rm -f "$PID_FILE"
+for candidate in $(pgrep -f "$APP_DIR/serve.py" 2>/dev/null || true); do
+  if managed "$candidate"; then
+    if healthy; then printf '%s\n' "$candidate" > "$PID_FILE"; exit 0; fi
+    kill "$candidate" 2>/dev/null || true
+    sleep 1
+  fi
+done
 
 [ -f "$LOG_FILE" ] && [ "$(wc -l < "$LOG_FILE")" -gt 1500 ] && tail -n 1000 "$LOG_FILE" > "$LOG_FILE.trim" && mv "$LOG_FILE.trim" "$LOG_FILE"
 nohup python3 "$APP_DIR/serve.py" --bind 127.0.0.1 --port 8081 --assets "$APP_DIR/admin" >> "$LOG_FILE" 2>&1 &

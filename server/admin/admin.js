@@ -106,7 +106,7 @@ async function prepareAdminProductImage(file){
   }finally{bitmap.close();}
 }
 async function blobBase64(blob){const bytes=new Uint8Array(await blob.arrayBuffer());let binary='';for(let i=0;i<bytes.length;i+=0x8000)binary+=String.fromCharCode(...bytes.subarray(i,i+0x8000));return btoa(binary);}
-async function uploadAdminProductImages(files){const urls=[];for(const [index,file] of (files||[]).entries()){validateAdminImageFile(file);status(`Uploading ${file.name} (${index+1} of ${files.length})...`);const blob=await prepareAdminProductImage(file);const result=await api('/api/admin/product-images',{method:'POST',body:JSON.stringify({fileName:`${file.name.replace(/\.[^.]+$/,'').slice(0,80)||'product'}.webp`,contentType:'image/webp',dataBase64:await blobBase64(blob)})});urls.push(result.image.url);}return urls;}
+async function uploadAdminProductImages(files,progressOffset=0,progressTotal=null){const urls=[];const total=progressTotal??files.length;for(const [index,file] of (files||[]).entries()){validateAdminImageFile(file);status(`Uploading ${file.name} (${progressOffset+index+1} of ${total})...`);const blob=await prepareAdminProductImage(file);const result=await api('/api/admin/product-images',{method:'POST',body:JSON.stringify({fileName:`${file.name.replace(/\.[^.]+$/,'').slice(0,80)||'product'}.webp`,contentType:'image/webp',dataBase64:await blobBase64(blob)})});urls.push(result.image.url);}return urls;}
 
 function parseVariants(raw) {
   const rows=String(raw||'').split(',').map(value=>value.trim()).filter(Boolean).map(value=>{
@@ -202,7 +202,7 @@ async function bulkUploadStoreProducts(){
   const csvFile=values.csv;if(!(csvFile instanceof File)||!csvFile.size)throw new Error('Choose a CSV file.');if(csvFile.size>1024*1024)throw new Error('CSV must be 1 MB or smaller.');const csvText=await csvFile.text();const plan=csvImageRequirements(csvText);const selected=selectedImageMap(values.imageFiles||[]);const requiredFiles=new Map();
   for(const requirement of plan.requirements){const file=selected.get(requirement.fileName);if(!file)throw new Error(`Row ${requirement.row}: Image file "${requirement.fileName}" was not selected.`);validateAdminImageFile(file,`Row ${requirement.row}: `);requiredFiles.set(requirement.fileName,file);}
   const selectedShop=applications.find(item=>item.id===values.applicationId);const approval=await formDialog(`Publish ${plan.productRows} products to ${selectedShop?.shopName||'selected shop'}?`,[],`Upload images & publish ${plan.productRows}`);if(!approval)return;
-  const images={};let uploaded=0;for(const [fileName,file] of requiredFiles){status(`Uploading ${fileName} (${uploaded+1} of ${requiredFiles.size})...`);images[fileName]=(await uploadAdminProductImages([file]))[0];uploaded+=1;}
+  const images={};let uploaded=0;for(const [fileName,file] of requiredFiles){status(`Uploading ${fileName} (${uploaded+1} of ${requiredFiles.size})...`);images[fileName]=(await uploadAdminProductImages([file],uploaded,requiredFiles.size))[0];uploaded+=1;}
   const result=await api('/api/admin/shop-products/bulk',{method:'POST',body:JSON.stringify({applicationId:values.applicationId,csvText,images})});status(`${result.created} products published successfully with ${requiredFiles.size} local image${requiredFiles.size===1?'':'s'}.`);
 }
 async function createStoreProduct(){
