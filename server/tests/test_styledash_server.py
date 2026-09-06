@@ -83,8 +83,7 @@ class PaymentServiceTests(unittest.TestCase):
         for weekend in (saturday, sunday):
             self.assertTrue(self.service.express_delivery_available(weekend))
             self.assertTrue(self.service.check_serviceability("458441", weekend)["expressAvailable"])
-            with patch.object(SERVER.PaymentService, "product_express_eligible", return_value=True):
-                quote = self.service.calculate_order(self.payload(deliveryMethod="express"), now=weekend)
+            quote = self.service.calculate_order(self.payload(deliveryMethod="express"), now=weekend)
             self.assertEqual(quote["deliveryMethod"], "express")
 
         self.assertEqual(self.service.estimated_delivery_label("express"), "60 minutes")
@@ -98,8 +97,9 @@ class PaymentServiceTests(unittest.TestCase):
                 ),
             )
 
-    def test_express_delivery_rejects_non_eligible_cart_but_normal_remains_available(self):
+    def test_weekend_express_accepts_every_active_product_regardless_stored_delivery_type(self):
         saturday = SERVER.datetime(2026, 9, 5, 6, 30, tzinfo=SERVER.timezone.utc)
+        monday = SERVER.datetime(2026, 9, 7, 6, 30, tzinfo=SERVER.timezone.utc)
         product_id = "sd-prod-001"
         original = self.service._static_products[product_id]
         self.service._static_products[product_id] = {
@@ -108,31 +108,22 @@ class PaymentServiceTests(unittest.TestCase):
             "expressDelivery": False,
         }
         try:
-            self.assert_api_error(
-                "express_delivery_ineligible",
-                lambda: self.service.calculate_order(
-                    self.payload(deliveryMethod="express"), now=saturday
-                ),
+            self.assertTrue(self.service.product_express_eligible(self.service._static_products[product_id]))
+            weekend = self.service.calculate_order(
+                self.payload(deliveryMethod="express"), now=saturday
             )
-            with patch.object(SERVER.PaymentService, "express_delivery_available", return_value=True):
-                self.assert_api_error(
-                    "express_delivery_ineligible",
-                    lambda: self.service.place_cod_order(
-                        self.payload(deliveryMethod="express", paymentMethod="cod"),
-                        "ineligible-express-cod",
-                    ),
-                )
-                self.assert_api_error(
-                    "express_delivery_ineligible",
-                    lambda: self.service.create_razorpay_order(
-                        self.payload(deliveryMethod="express", paymentMethod="upi"),
-                        "ineligible-express-razorpay",
-                    ),
-                )
-            normal = self.service.calculate_order(
-                self.payload(deliveryMethod="standard"), now=saturday
+            self.assertEqual(weekend["deliveryMethod"], "express")
+            self.assertEqual(weekend["deliveryFee"], 79)
+
+            weekday_normal = self.service.calculate_order(
+                self.payload(deliveryMethod="standard"), now=monday
             )
-            self.assertEqual(normal["deliveryMethod"], "standard")
+            self.assertEqual(weekday_normal["deliveryMethod"], "standard")
+            with self.assertRaises(SERVER.ApiError) as caught:
+                self.service.calculate_order(
+                    self.payload(deliveryMethod="express"), now=monday
+                )
+            self.assertEqual(caught.exception.code, "express_delivery_unavailable")
         finally:
             self.service._static_products[product_id] = original
 

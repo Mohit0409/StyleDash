@@ -731,14 +731,11 @@ class PaymentService:
 
     @staticmethod
     def product_express_eligible(product: dict[str, Any]) -> bool:
-        delivery_type = product.get("deliveryType")
-        if delivery_type in {"express", "both"}:
-            return True
-        if delivery_type == "normal":
-            return False
-        # Legacy static catalogue fixtures predate deliveryType and expose the
-        # already-derived flag instead. DB-backed products always carry deliveryType.
-        return product.get("expressDelivery") is True
+        # Express eligibility is site-wide on Saturday/Sunday. Per-product
+        # deliveryType is retained only for backward-compatible catalogue data
+        # and no longer gates checkout. Inactive products are still rejected
+        # separately by calculate_order before this helper is consulted.
+        return product.get("active") is not False
 
     @staticmethod
     def estimated_delivery_label(delivery_method: str) -> str:

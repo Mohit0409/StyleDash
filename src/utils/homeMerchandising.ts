@@ -1,4 +1,5 @@
 import type { Product, VendorStore } from '../types';
+import { isExpressDeliveryAvailable } from './delivery';
 
 export type HomeMerchSectionId =
   | 'express'
@@ -26,7 +27,7 @@ interface SectionDefinition {
   matches: (product: Product) => boolean;
 }
 const SECTIONS: SectionDefinition[] = [
-  { id: 'express', title: 'Weekend Express Picks', subtitle: 'Fast local picks ready for Neemuch weekends', href: '/products?filter=express', matches: p => p.expressDelivery === true },
+  { id: 'express', title: 'Weekend Express Picks', subtitle: 'Every active product supports Normal + Express delivery on Saturday and Sunday', href: '/products?filter=express', matches: () => true },
   { id: 'new', title: 'New Drops', subtitle: 'Freshly added styles without taking over your whole feed', href: '/products?filter=new', matches: p => p.newArrival === true },
   { id: 'trending', title: 'Trending in Neemuch', subtitle: 'Popular local styles customers are checking out now', href: '/products?sort=rating', matches: p => p.trending === true },
   { id: 'under499', title: 'Styles Under ₹499', subtitle: 'Budget-friendly finds from local stores', href: '/products?maxPrice=499', matches: p => p.price <= 499 },
@@ -35,6 +36,9 @@ const SECTIONS: SectionDefinition[] = [
   { id: 'accessories', title: 'Accessories', subtitle: 'Jewellery, bags and finishing touches', href: '/products?category=Accessories', matches: p => p.category === 'Accessories' || p.department === 'accessories' },
   { id: 'beauty', title: 'Beauty & Care', subtitle: 'Beauty and personal-care picks from local sellers', href: '/products?category=Beauty%20%26%20Personal%20Care', matches: p => p.category === 'Beauty & Personal Care' },
 ];
+
+const sectionsForDate = (date: Date): SectionDefinition[] =>
+  SECTIONS.filter(definition => definition.id !== 'express' || isExpressDeliveryAvailable(date));
 
 const merchandisingScore = (product: Product): number =>
   (product.featured ? 50 : 0)
@@ -53,9 +57,9 @@ const sectionCandidates = (products: Product[], definition: SectionDefinition): 
       return merchandisingScore(b) - merchandisingScore(a) || newestFirst(a, b) || a.name.localeCompare(b.name);
     });
 
-export const selectHomepageCandidates = (products: Product[], perSection = 8): Product[] => {
+export const selectHomepageCandidates = (products: Product[], perSection = 8, date = new Date()): Product[] => {
   const selected = new Map<string, Product>();
-  for (const definition of SECTIONS) {
+  for (const definition of sectionsForDate(date)) {
     for (const product of sectionCandidates(products, definition).slice(0, perSection)) {
       selected.set(product.id, product);
     }
@@ -63,9 +67,9 @@ export const selectHomepageCandidates = (products: Product[], perSection = 8): P
   return [...selected.values()];
 };
 
-export const buildHomepageSections = (products: Product[], limit = 5): HomeMerchSection[] => {
+export const buildHomepageSections = (products: Product[], limit = 5, date = new Date()): HomeMerchSection[] => {
   const usage = new Map<string, number>();
-  return SECTIONS.map(definition => {
+  return sectionsForDate(date).map(definition => {
     const candidates = sectionCandidates(products, definition).sort((a, b) =>
       (usage.get(a.id) || 0) - (usage.get(b.id) || 0)
       || merchandisingScore(b) - merchandisingScore(a)

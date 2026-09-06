@@ -145,7 +145,7 @@ test('checkout disables Express on a simulated Monday and keeps Normal Delivery'
 
   await expect(normal).toBeChecked();
   await expect(express).toBeDisabled();
-  await expect(page.getByRole('status')).toContainText('Express Delivery is available Saturday and Sunday in Neemuch.');
+  await expect(page.getByRole('status')).toContainText('Express Delivery is available Saturday and Sunday in Neemuch for every product.');
 });
 test('single-city launch fixes profile and checkout delivery area to Neemuch 458441', async ({ page }) => {
   await loginCustomer(page, USER_A);

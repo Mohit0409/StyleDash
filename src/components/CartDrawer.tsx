@@ -23,10 +23,8 @@ export const CartDrawer: React.FC<{ isOpen: boolean; onClose: () => void }> = ({
   const expressCart = cartExpressEligibility(items.map(item => item.product));
   const expressSelectable = expressAvailable && expressCart.eligible;
   const expressBlockedReason = !expressAvailable
-    ? 'Express Delivery is available Saturday and Sunday.'
-    : !expressCart.eligible
-      ? `Express Delivery is unavailable because ${expressCart.ineligibleProductNames.slice(0, 2).join(', ')} ${expressCart.ineligibleProductNames.length > 1 ? 'are' : 'is'} not Express-eligible.`
-      : '';
+    ? 'Express Delivery is available Saturday and Sunday for every product.'
+    : '';
 
   useEffect(() => {
     if (!isOpen) return undefined;

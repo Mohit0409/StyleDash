@@ -175,7 +175,7 @@ async function editStore(button){
 
 const PRODUCT_DEPARTMENTS=['men','women','kids','unisex'];
 const PRODUCT_CATEGORIES=['Clothing & Fashion','Footwear','Accessories','Beauty & Personal Care','Electronics','Home & Living','General Store'];
-const DELIVERY_OPTIONS=[{value:'normal',label:'Normal delivery'},{value:'express',label:'Weekend Express only'},{value:'both',label:'Normal + Weekend Express'}];
+const DELIVERY_OPTIONS=[{value:'normal',label:'Site-wide: Normal Mon-Fri; Normal + Express Sat-Sun'}];
 
 function downloadProductCsvTemplate(){
   const header=['name','description','brand','department','category','subcategory','deliveryType','price','originalPrice','variants','colourName','colourHex','imageFile','imageUrls'];
@@ -196,7 +196,7 @@ async function bulkUploadStoreProducts(){
   const applications=(await api('/api/admin/vendors')).applications.filter(item=>item.status==='ACTIVE');if(!applications.length)throw new Error('There are no active shops available for product import.');
   const values=await formDialog('Bulk upload products',[
     {name:'applicationId',label:'Publish products for',type:'select',required:true,options:applications.map(item=>({value:item.id,label:`${item.shopName} - ${item.ownerName}`}))},
-    {name:'csv',label:'Product CSV',type:'file',accept:'.csv,text/csv',required:true,help:'Use imageFile values such as product1.jpg. HTTPS imageUrls remain optional.'},
+    {name:'csv',label:'Product CSV',type:'file',accept:'.csv,text/csv',required:true,help:'Use imageFile values such as product1.jpg. Keep deliveryType as normal; the site automatically offers Normal Mon-Fri and Normal + Express Sat-Sun for every product.'},
     {name:'imageFiles',label:'Select the local product images referenced by the CSV',type:'file',accept:'image/jpeg,image/png,image/webp',multiple:true,previewImages:true,help:'Filenames are matched exactly to imageFile. Images upload automatically before products are published.'},
   ],'Review import');if(!values)return;
   const csvFile=values.csv;if(!(csvFile instanceof File)||!csvFile.size)throw new Error('Choose a CSV file.');if(csvFile.size>1024*1024)throw new Error('CSV must be 1 MB or smaller.');const csvText=await csvFile.text();const plan=csvImageRequirements(csvText);const selected=selectedImageMap(values.imageFiles||[]);const requiredFiles=new Map();
@@ -210,7 +210,7 @@ async function createStoreProduct(){
   const values=await formDialog('Add product for local store',[
     {name:'applicationId',label:'Store',type:'select',required:true,options:applications.map(item=>({value:item.id,label:item.shopName}))},
     {name:'name',label:'Product name',required:true,maxLength:140},{name:'description',label:'Product description',type:'textarea',required:true,maxLength:2000},{name:'brand',label:'Brand (optional)',maxLength:100},
-    {name:'department',label:'Department',type:'select',required:true,value:'unisex',options:PRODUCT_DEPARTMENTS.map(value=>({value,label:value}))},{name:'category',label:'Category',type:'select',required:true,value:'Clothing & Fashion',options:PRODUCT_CATEGORIES.map(value=>({value,label:value}))},{name:'subcategory',label:'Subcategory (optional; inferred when clear)',maxLength:100},{name:'deliveryType',label:'Delivery eligibility',type:'select',required:true,value:'normal',options:DELIVERY_OPTIONS},
+    {name:'department',label:'Department',type:'select',required:true,value:'unisex',options:PRODUCT_DEPARTMENTS.map(value=>({value,label:value}))},{name:'category',label:'Category',type:'select',required:true,value:'Clothing & Fashion',options:PRODUCT_CATEGORIES.map(value=>({value,label:value}))},{name:'subcategory',label:'Subcategory (optional; inferred when clear)',maxLength:100},{name:'deliveryType',label:'Delivery schedule',type:'select',required:true,value:'normal',options:DELIVERY_OPTIONS},
     {name:'price',label:'Selling price in rupees',type:'number',required:true,min:1,step:'0.01'},{name:'originalPrice',label:'Original/MRP price in rupees',type:'number',min:1,step:'0.01'},{name:'variants',label:'Sizes and stock (6:5, 7:5, 8:5)',required:true,placeholder:'6:5, 7:5, 8:5'},{name:'colourName',label:'Colour name',required:true,value:'Multi'},{name:'colourHex',label:'Colour hex (optional)',placeholder:'#000000'},
     {name:'uploads',label:'Choose product images from this PC',type:'file',accept:'image/jpeg,image/png,image/webp',multiple:true,previewImages:true,help:'Recommended. JPG, PNG or WebP. You can remove or reselect images before publishing.'},
     {name:'images',label:'HTTPS image URLs (optional fallback)',type:'textarea',help:'Optional compatibility input; local upload does not require external hosting.'},
@@ -227,7 +227,7 @@ async function editStoreProduct(button){
     {name:'department',label:'Department',type:'select',required:true,value:PRODUCT_DEPARTMENTS.includes(item.department)?item.department:'unisex',options:PRODUCT_DEPARTMENTS.map(value=>({value,label:value}))},
     {name:'category',label:'Category',type:'select',required:true,value:PRODUCT_CATEGORIES.includes(item.category)?item.category:'Clothing & Fashion',options:PRODUCT_CATEGORIES.map(value=>({value,label:value}))},
     {name:'subcategory',label:'Subcategory (optional; inferred when clear)',value:item.subcategory||item.attributes?.subcategory||'',maxLength:100},
-    {name:'deliveryType',label:'Delivery eligibility',type:'select',required:true,value:item.deliveryType||item.attributes?.deliveryType||'normal',options:DELIVERY_OPTIONS},
+    {name:'deliveryType',label:'Delivery schedule',type:'select',required:true,value:'normal',options:DELIVERY_OPTIONS},
     {name:'price',label:'Selling price in rupees',type:'number',required:true,value:(item.pricePaise/100).toFixed(2),min:1,step:'0.01'},
     {name:'original',label:'Original/MRP price in rupees',type:'number',required:true,value:(item.originalPricePaise/100).toFixed(2),min:1,step:'0.01'},
     {name:'variants',label:'Sizes and stock (S:5, M:8, L:3)',required:true,value:(item.variants||[]).map(v=>`${v.size}:${v.inventory}`).join(', ')},

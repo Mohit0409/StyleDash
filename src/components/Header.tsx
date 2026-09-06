@@ -11,6 +11,7 @@ import { productRepository } from '../repositories/productRepository';
 import { vendorRepository } from '../repositories/vendorRepository';
 import type { Product, VendorStore } from '../types';
 import { buildSearchSuggestions, highlightSearchMatch, type SearchSuggestion } from '../utils/searchSuggestions';
+import { isExpressDeliveryAvailable } from '../utils/delivery';
 
 const SEARCH_DEBOUNCE_MS = 220;
 const MIN_SUGGESTION_QUERY = 2;
@@ -212,7 +213,7 @@ export const Header: React.FC<{ onOpenCart: () => void }> = ({ onOpenCart }) => 
       {/* Top Banner */}
       <div className="bg-neutral-950 text-white text-xs py-1.5 px-4 text-center flex items-center justify-center gap-2">
         <Zap className="w-3.5 h-3.5 text-lime-400 fill-lime-400" />
-        <span><strong>EXPRESS LOCAL DELIVERY</strong> in {CONFIG.SERVICE_CITY} — Weekend Express options appear when eligible.</span>
+        <span>{isExpressDeliveryAvailable() ? <><strong>NORMAL + EXPRESS LOCAL DELIVERY</strong> in {CONFIG.SERVICE_CITY} ? both options are available for every product this weekend.</> : <><strong>NORMAL LOCAL DELIVERY</strong> in {CONFIG.SERVICE_CITY} ? Express is available Saturday and Sunday for every product.</>}</span>
       </div>
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">

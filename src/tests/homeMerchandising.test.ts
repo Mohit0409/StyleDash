@@ -33,6 +33,9 @@ const store = (id: string, overrides: Partial<VendorStore> = {}): VendorStore =>
   createdAt: '2026-09-04T00:00:00Z', ...overrides,
 });
 
+const monday = new Date('2026-09-07T06:30:00.000Z');
+const saturday = new Date('2026-09-05T06:30:00.000Z');
+
 describe('homepage merchandising', () => {
   it('keeps every product section bounded and preserves category balance after bulk new arrivals', () => {
     const bulkNew = Array.from({ length: 30 }, (_, index) => product(`new-${index}`, { newArrival: true }));
@@ -55,11 +58,18 @@ describe('homepage merchandising', () => {
     const hero = product('hero', { newArrival: true, expressDelivery: true, featured: true });
     const newOnly = product('new-only', { newArrival: true });
     const expressOnly = product('express-only', { expressDelivery: true });
-    const sections = buildHomepageSections([hero, newOnly, expressOnly], 1);
+    const sections = buildHomepageSections([hero, newOnly, expressOnly], 1, saturday);
     const express = sections.find(section => section.id === 'express')?.products[0]?.id;
     const fresh = sections.find(section => section.id === 'new')?.products[0]?.id;
     expect(express).toBe('hero');
     expect(fresh).toBe('new-only');
+  });
+
+
+  it('hides Express merchandising on weekdays and includes every active product on weekends', () => {
+    const normalStored = product('normal-stored', { deliveryType: 'normal', expressDelivery: false });
+    expect(buildHomepageSections([normalStored], 5, monday).some(section => section.id === 'express')).toBe(false);
+    expect(buildHomepageSections([normalStored], 5, saturday).find(section => section.id === 'express')?.products.map(item => item.id)).toEqual(['normal-stored']);
   });
 
   it('keeps the homepage candidate request bounded as catalogue size grows', () => {

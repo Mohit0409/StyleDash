@@ -104,10 +104,12 @@ describe('catalogue dynamic facets', () => {
     expect(availableSizeOptions(products, baseFilters({ department: 'women' }))).toEqual(['One Size']);
   });
 
-  it('does not apply the express product filter when weekday availability disables it', () => {
+  it('shows the full active catalogue for the site-wide weekend Express filter', () => {
     const weekday = baseFilters({ filterBadge: 'express', expressFilterActive: false });
     expect(products.filter(product => matchesCatalogueProduct(product, weekday))).toHaveLength(4);
     const weekend = baseFilters({ filterBadge: 'express', expressFilterActive: true });
-    expect(products.filter(product => matchesCatalogueProduct(product, weekend)).map(product => product.id)).toEqual(['campus-men']);
+    expect(products.filter(product => matchesCatalogueProduct(product, weekend)).map(product => product.id)).toEqual([
+      'goutam-men', 'campus-men', 'nakoda-women', 'beauty-perfume',
+    ]);
   });
 });

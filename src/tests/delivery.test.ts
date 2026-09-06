@@ -25,29 +25,21 @@ describe('Weekend Express delivery rules', () => {
     });
   });
 
-  it('treats product deliveryType as the canonical Express eligibility', () => {
-    expect(isProductExpressEligible({ deliveryType: 'normal' })).toBe(false);
+  it('treats every product as Express-eligible under the site-wide weekend policy', () => {
+    expect(isProductExpressEligible({ deliveryType: 'normal' })).toBe(true);
     expect(isProductExpressEligible({ deliveryType: 'express' })).toBe(true);
     expect(isProductExpressEligible({ deliveryType: 'both' })).toBe(true);
-    expect(isProductExpressEligible({ expressDelivery: true })).toBe(true);
-    expect(isProductExpressEligible({ expressDelivery: false })).toBe(false);
+    expect(isProductExpressEligible({ expressDelivery: false })).toBe(true);
   });
 
-  it('blocks a mixed cart and names the non-Express product', () => {
-    const result = cartExpressEligibility([
-      { name: 'Express Shoes', deliveryType: 'both' },
-      { name: 'Normal Bangles', deliveryType: 'normal' },
-    ]);
-    expect(result).toEqual({
-      eligible: false,
-      ineligibleProductNames: ['Normal Bangles'],
-    });
-  });
-
-  it('allows a non-empty cart when every product is Express-eligible', () => {
+  it('allows a mixed non-empty cart regardless of stored deliveryType', () => {
     expect(cartExpressEligibility([
-      { name: 'Campus Shoes', deliveryType: 'both' },
-      { name: 'JQR Shoes', deliveryType: 'express' },
-    ]).eligible).toBe(true);
+      { name: 'Shoes', deliveryType: 'normal' },
+      { name: 'Bangles', deliveryType: 'both' },
+    ])).toEqual({ eligible: true, ineligibleProductNames: [] });
+  });
+
+  it('keeps an empty cart ineligible until there is something to deliver', () => {
+    expect(cartExpressEligibility([])).toEqual({ eligible: false, ineligibleProductNames: [] });
   });
 });

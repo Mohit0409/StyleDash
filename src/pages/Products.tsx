@@ -188,7 +188,7 @@ export const Products: React.FC = () => {
             {searchQuery ? (
               <>Found <strong>{matchingStores.length}</strong> local store{matchingStores.length === 1 ? '' : 's'} and <strong>{sortedProducts.length}</strong> available product{sortedProducts.length === 1 ? '' : 's'} in Neemuch</>
             ) : (
-              <>Showing <strong>{sortedProducts.length}</strong> available items from local Neemuch stores. Express Local Delivery appears where eligible.</>
+              <>Showing <strong>{sortedProducts.length}</strong> available items from local Neemuch stores. Normal delivery is available every day; all products also support Express on Saturday and Sunday.</>
             )}
           </p>
         </div>

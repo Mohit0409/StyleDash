@@ -39,10 +39,8 @@ export const Checkout: React.FC = () => {
   const expressCart = cartExpressEligibility(items.map(item => item.product));
   const expressSelectable = expressWeekend && expressCart.eligible;
   const expressUnavailableReason = !expressWeekend
-    ? 'Express Delivery is available Saturday and Sunday in Neemuch.'
-    : !expressCart.eligible
-      ? `Express Delivery cannot be selected because ${expressCart.ineligibleProductNames.slice(0, 2).join(', ')} ${expressCart.ineligibleProductNames.length > 1 ? 'are' : 'is'} not Express-eligible.`
-      : '';
+    ? 'Express Delivery is available Saturday and Sunday in Neemuch for every product.'
+    : '';
 
   const [name, setName] = useState(savedAddress?.name || user?.name || '');
   const [phone, setPhone] = useState(savedAddress?.phone || user?.phone || '');
