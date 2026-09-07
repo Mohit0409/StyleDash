@@ -1844,7 +1844,9 @@ class HttpApiTests(unittest.TestCase):
             payment_test_allowed_emails={"http-payment-owner@example.test"},
         )
         self.previous_origin = os.environ.get("STYLEDASH_PUBLIC_ORIGIN")
+        self.previous_trust_loopback_proxy = os.environ.get("STYLEDASH_TRUST_LOOPBACK_PROXY")
         os.environ["STYLEDASH_PUBLIC_ORIGIN"] = "https://styledash.test"
+        os.environ["STYLEDASH_TRUST_LOOPBACK_PROXY"] = "1"
         self.service = service
         self.server = SERVER.create_server(
             "127.0.0.1", 0, web_root,
@@ -1865,6 +1867,10 @@ class HttpApiTests(unittest.TestCase):
             os.environ.pop("STYLEDASH_PUBLIC_ORIGIN", None)
         else:
             os.environ["STYLEDASH_PUBLIC_ORIGIN"] = self.previous_origin
+        if self.previous_trust_loopback_proxy is None:
+            os.environ.pop("STYLEDASH_TRUST_LOOPBACK_PROXY", None)
+        else:
+            os.environ["STYLEDASH_TRUST_LOOPBACK_PROXY"] = self.previous_trust_loopback_proxy
         self.temporary.cleanup()
 
     def test_health_and_security_headers(self) -> None:
@@ -1878,6 +1884,85 @@ class HttpApiTests(unittest.TestCase):
             self.assertIn("checkout.razorpay.com", policy)
             self.assertIn("https://static.cloudflareinsights.com", policy)
             self.assertIn("https://cloudflareinsights.com", policy)
+
+    def test_forwarded_https_canonical_host_adds_hsts(self) -> None:
+        connection = http.client.HTTPConnection("127.0.0.1", self.server.server_address[1])
+        connection.request(
+            "GET",
+            "/api/health",
+            headers={"Host": "styledash.test", "X-Forwarded-Proto": "https"},
+        )
+        response = connection.getresponse()
+        self.assertEqual(response.status, 200)
+        self.assertEqual(response.getheader("Strict-Transport-Security"), "max-age=31536000")
+        response.read()
+        connection.close()
+
+    def test_forwarded_http_canonical_host_redirects_to_https(self) -> None:
+        connection = http.client.HTTPConnection("127.0.0.1", self.server.server_address[1])
+        connection.request(
+            "GET",
+            "/products?dept=men&sort=price-asc",
+            headers={"Host": "styledash.test", "X-Forwarded-Proto": "http"},
+        )
+        response = connection.getresponse()
+        self.assertEqual(response.status, 308)
+        self.assertEqual(
+            response.getheader("Location"),
+            "https://styledash.test/products?dept=men&sort=price-asc",
+        )
+        self.assertEqual(response.getheader("Connection"), "close")
+        response.read()
+        connection.close()
+
+    def test_forwarded_http_post_redirects_before_auth_processing(self) -> None:
+        connection = http.client.HTTPConnection("127.0.0.1", self.server.server_address[1])
+        body = b'{"email":"nobody@example.test","password":"invalid-password"}'
+        connection.request(
+            "POST",
+            "/api/auth/login",
+            body=body,
+            headers={
+                "Host": "styledash.test",
+                "X-Forwarded-Proto": "http",
+                "Content-Type": "application/json",
+                "Content-Length": str(len(body)),
+            },
+        )
+        response = connection.getresponse()
+        self.assertEqual(response.status, 308)
+        self.assertEqual(response.getheader("Location"), "https://styledash.test/api/auth/login")
+        response.read()
+        connection.close()
+
+    def test_cf_visitor_scheme_is_used_when_forwarded_proto_is_missing(self) -> None:
+        connection = http.client.HTTPConnection("127.0.0.1", self.server.server_address[1])
+        connection.request(
+            "GET",
+            "/products",
+            headers={"Host": "styledash.test", "CF-Visitor": '{"scheme":"http"}'},
+        )
+        response = connection.getresponse()
+        self.assertEqual(response.status, 308)
+        self.assertEqual(response.getheader("Location"), "https://styledash.test/products")
+        response.read()
+        connection.close()
+
+    def test_forwarded_proto_is_ignored_when_loopback_proxy_trust_is_disabled(self) -> None:
+        os.environ["STYLEDASH_TRUST_LOOPBACK_PROXY"] = "0"
+        try:
+            connection = http.client.HTTPConnection("127.0.0.1", self.server.server_address[1])
+            connection.request(
+                "GET",
+                "/api/health",
+                headers={"Host": "styledash.test", "X-Forwarded-Proto": "http"},
+            )
+            response = connection.getresponse()
+            self.assertEqual(response.status, 200)
+            response.read()
+            connection.close()
+        finally:
+            os.environ["STYLEDASH_TRUST_LOOPBACK_PROXY"] = "1"
 
     def test_static_utf8_assets_declare_charset(self) -> None:
         with urllib.request.urlopen(f"{self.base_url}/utf8.js") as response:

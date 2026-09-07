@@ -230,6 +230,7 @@ SECURITY_POLICY = (
     "https://accounts.google.com https://*.firebaseapp.com https://www.google.com https://www.recaptcha.net; "
     "form-action 'self' https://api.razorpay.com https://*.razorpay.com"
 )
+HSTS_POLICY = "max-age=31536000"
 ACCESS_LOG_TOKEN_PATTERN = re.compile(r"([?&](?:token|reset_token)=)[^&#\s]*", re.IGNORECASE)
 PAYMENT_TEST_PRODUCT_ID = "styledash-payment-test-item"
 PAYMENT_TEST_PRODUCT_SLUG = "styledash-payment-test-item"
@@ -2196,6 +2197,8 @@ class StyleDashRequestHandler(SimpleHTTPRequestHandler):
         path = urlsplit(self.path).path
         if path.startswith(("/assets/", "/media/product-images/")):
             self.send_header("Cache-Control", "public, max-age=31536000, immutable")
+        if self._is_canonical_public_host():
+            self.send_header("Strict-Transport-Security", HSTS_POLICY)
         self.send_header("X-Content-Type-Options", "nosniff")
         self.send_header("Referrer-Policy", "strict-origin-when-cross-origin")
         self.send_header("X-Frame-Options", "SAMEORIGIN")
@@ -2241,6 +2244,58 @@ class StyleDashRequestHandler(SimpleHTTPRequestHandler):
     @staticmethod
     def _public_origin() -> str:
         return os.environ.get("STYLEDASH_PUBLIC_ORIGIN", "").rstrip("/")
+
+    def _request_hostname(self) -> str | None:
+        return urlsplit(f"//{self.headers.get('Host', '').strip()}").hostname
+
+    def _is_canonical_public_host(self) -> bool:
+        origin = self._public_origin()
+        canonical_host = urlsplit(origin).hostname if origin else None
+        request_host = self._request_hostname()
+        return bool(
+            canonical_host
+            and request_host
+            and request_host.lower() == canonical_host.lower()
+        )
+
+    def _trusted_forwarded_scheme(self) -> str | None:
+        peer = self.client_address[0]
+        trusted_proxy = (
+            os.environ.get("STYLEDASH_TRUST_LOOPBACK_PROXY") == "1"
+            and peer in ("127.0.0.1", "::1")
+        )
+        if not trusted_proxy:
+            return None
+
+        forwarded = self.headers.get("X-Forwarded-Proto", "").split(",", 1)[0].strip().lower()
+        if forwarded in {"http", "https"}:
+            return forwarded
+
+        try:
+            visitor = json.loads(self.headers.get("CF-Visitor", ""))
+        except (TypeError, json.JSONDecodeError):
+            return None
+        scheme = visitor.get("scheme") if isinstance(visitor, dict) else None
+        return scheme.lower() if isinstance(scheme, str) and scheme.lower() in {"http", "https"} else None
+
+    def _redirect_http_to_https(self) -> bool:
+        origin = self._public_origin()
+        if (
+            urlsplit(origin).scheme.lower() != "https"
+            or not self._is_canonical_public_host()
+            or self._trusted_forwarded_scheme() != "http"
+        ):
+            return False
+
+        request_target = self.path if self.path.startswith("/") else f"/{self.path}"
+        self.send_response(HTTPStatus.PERMANENT_REDIRECT)
+        self.send_header("Location", f"{origin}{request_target}")
+        self.send_header("Content-Length", "0")
+        self.send_header("Cache-Control", "no-store")
+        self.send_header("Connection", "close")
+        self.close_connection = True
+        self.end_headers()
+        return True
 
     def _product_image_file(self, request_path: str) -> tuple[Path, str] | None:
         match = PRODUCT_IMAGE_ROUTE_PATTERN.fullmatch(request_path)
@@ -2300,7 +2355,7 @@ class StyleDashRequestHandler(SimpleHTTPRequestHandler):
     def _redirect_to_canonical_host(self) -> bool:
         origin = self._public_origin()
         canonical_host = urlsplit(origin).hostname if origin else None
-        request_host = urlsplit(f"//{self.headers.get('Host', '').strip()}").hostname
+        request_host = self._request_hostname()
         if not canonical_host or not request_host:
             return False
         if request_host.lower() in {canonical_host.lower(), "localhost", "127.0.0.1", "::1"}:
@@ -2460,6 +2515,8 @@ class StyleDashRequestHandler(SimpleHTTPRequestHandler):
         parsed = urlsplit(self.path)
         path = parsed.path
         try:
+            if self._redirect_http_to_https():
+                return
             if self._redirect_to_canonical_host():
                 return
             if self._sensitive_path(path):
@@ -2633,6 +2690,8 @@ class StyleDashRequestHandler(SimpleHTTPRequestHandler):
 
     def do_HEAD(self) -> None:  # noqa: N802 - stdlib override name
         path = urlsplit(self.path).path
+        if self._redirect_http_to_https():
+            return
         if self._redirect_to_canonical_host():
             return
         if self._sensitive_path(path):
@@ -2677,6 +2736,8 @@ class StyleDashRequestHandler(SimpleHTTPRequestHandler):
     def do_POST(self) -> None:  # noqa: N802 - stdlib override name
         path = urlsplit(self.path).path
         try:
+            if self._redirect_http_to_https():
+                return
             if self._sensitive_path(path):
                 self._json_response(HTTPStatus.NOT_FOUND, {"success": False, "error": "Not found.", "code": "not_found"})
                 return
@@ -3028,6 +3089,8 @@ class StyleDashRequestHandler(SimpleHTTPRequestHandler):
             )
 
     def do_PUT(self) -> None:  # noqa: N802 - stdlib override name
+        if self._redirect_http_to_https():
+            return
         if self._sensitive_path(urlsplit(self.path).path):
             self._json_response(HTTPStatus.NOT_FOUND, {"success": False, "error": "Not found.", "code": "not_found"})
             return
@@ -3045,6 +3108,8 @@ class StyleDashRequestHandler(SimpleHTTPRequestHandler):
     def do_PATCH(self) -> None:  # noqa: N802 - stdlib override name
         path = urlsplit(self.path).path
         try:
+            if self._redirect_http_to_https():
+                return
             if self._sensitive_path(path):
                 self._json_response(HTTPStatus.NOT_FOUND, {"success": False, "error": "Not found.", "code": "not_found"})
                 return
