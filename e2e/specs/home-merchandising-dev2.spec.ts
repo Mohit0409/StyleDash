@@ -1,6 +1,7 @@
 import { expect, test } from '@playwright/test';
 
 test('lower homepage uses bounded merchandising rows with View All links', async ({ page }) => {
+  await page.clock.setFixedTime(new Date('2026-08-29T06:00:00Z'));
   await page.goto('/');
   await page.waitForLoadState('networkidle');
 
