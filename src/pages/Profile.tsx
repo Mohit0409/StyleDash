@@ -98,6 +98,9 @@ export const Profile: React.FC = () => {
     {user?.hasPassword ? <form onSubmit={changePassword} className="p-6 bg-white dark:bg-neutral-900 rounded-3xl border dark:border-neutral-800 space-y-4">
       <h2 className="text-xl font-black">Change password</h2>
       <input aria-label="Current password" required type="password" autoComplete="current-password" maxLength={256} value={currentPassword} onChange={event => setCurrentPassword(event.target.value)} placeholder="Current password" className="w-full p-3 rounded-xl border dark:bg-neutral-800" />
+      <div className="text-right">
+        <Link to="/forgot-password" state={{ email: user?.email || '' }} className="text-sm font-bold text-lime-600 hover:underline">Forgot current password?</Link>
+      </div>
       <input aria-label="New password" required type="password" autoComplete="new-password" minLength={8} maxLength={256} value={newPassword} onChange={event => setNewPassword(event.target.value)} placeholder="New password (8+ characters)" className="w-full p-3 rounded-xl border dark:bg-neutral-800" />
       <button disabled={saving} className="px-5 py-3 rounded-xl border font-bold">Change password</button>
     </form> : <div className="p-6 bg-white dark:bg-neutral-900 rounded-3xl border dark:border-neutral-800 space-y-2">

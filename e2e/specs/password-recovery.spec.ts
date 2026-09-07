@@ -40,3 +40,23 @@ test('reset token is removed from visible URL and invalid token fails safely', a
 
   expect(page.url()).not.toContain(fakeToken);
 });
+
+test('profile can start password recovery without the current password', async ({ page }) => {
+  const unique = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  const email = `forgot-current-${unique}@example.test`;
+  const phone = `9${Math.floor(100000000 + Math.random() * 900000000)}`;
+
+  await page.goto('/register');
+  await page.getByPlaceholder('Full name').fill('Forgot Current Password Customer');
+  await page.getByPlaceholder('Phone number').fill(phone);
+  await page.getByPlaceholder('Email').fill(email);
+  await page.getByPlaceholder('Password (8+ characters)').fill('E2E-forgot-current-2026!');
+  await page.getByRole('button', { name: 'Register' }).click();
+  await expect(page).toHaveURL(/\/profile$/);
+
+  await page.getByRole('link', { name: 'Forgot current password?' }).click();
+
+  await expect(page).toHaveURL(/\/forgot-password$/);
+  await expect(page.getByPlaceholder('Email address')).toHaveValue(email);
+  await expect(page.getByPlaceholder('Current password')).toHaveCount(0);
+});
