@@ -44,9 +44,14 @@ export const FilterSidebar: React.FC<FilterSidebarProps> = ({
 }) => {
   useEffect(() => {
     if (!isOpenMobile) return undefined;
+    const previousBodyOverflow = document.body.style.overflow;
     const onKeyDown = (event: KeyboardEvent) => { if (event.key === 'Escape') onCloseMobile?.(); };
+    document.body.style.overflow = 'hidden';
     document.addEventListener('keydown', onKeyDown);
-    return () => document.removeEventListener('keydown', onKeyDown);
+    return () => {
+      document.body.style.overflow = previousBodyOverflow;
+      document.removeEventListener('keydown', onKeyDown);
+    };
   }, [isOpenMobile, onCloseMobile]);
 
   const content = (
@@ -198,8 +203,18 @@ export const FilterSidebar: React.FC<FilterSidebarProps> = ({
 
       {/* Mobile Drawer */}
       {isOpenMobile && (
-        <div className="fixed inset-0 z-50 lg:hidden flex bg-black/60 backdrop-blur-sm animate-fade-in">
-          <div role="dialog" aria-modal="true" aria-labelledby="mobile-filter-heading" className="w-80 bg-white dark:bg-neutral-900 h-full p-6 overflow-y-auto shadow-2xl flex flex-col justify-between">
+        <div
+          className="fixed inset-0 z-50 lg:hidden flex bg-black/60 backdrop-blur-sm animate-fade-in"
+          onClick={onCloseMobile}
+          data-testid="mobile-filter-backdrop"
+        >
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="mobile-filter-heading"
+            className="w-80 bg-white dark:bg-neutral-900 h-full p-6 overflow-y-auto shadow-2xl flex flex-col justify-between"
+            onClick={(event) => event.stopPropagation()}
+          >
             <div>
               <div className="flex items-center justify-between mb-6">
                 <span id="mobile-filter-heading" className="font-extrabold text-lg text-neutral-900 dark:text-white">Filter & Sort</span>
