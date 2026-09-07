@@ -740,7 +740,7 @@ class PaymentService:
 
     @staticmethod
     def estimated_delivery_label(delivery_method: str) -> str:
-        return "60 minutes" if delivery_method == "express" else "within a day"
+        return "60 minutes" if delivery_method == "express" else "same day"
 
     def is_serviceable_pincode(self, pincode: str) -> bool:
         return _is_six_ascii_digits(pincode) and pincode in self.supported_pincodes
@@ -1049,11 +1049,15 @@ class PaymentService:
             coupon_discount = min(coupon_discount, subtotal)
             applied_coupon = normalized
 
-        delivery_fee = Decimal("0")
-        if subtotal < _money(self.settings["freeDeliveryThreshold"], "delivery threshold"):
-            delivery_fee = _money(delivery_fees[delivery_method], "delivery fee")
-        taxes = Decimal(_rounded_rupees((subtotal - coupon_discount) * _money(self.settings["taxRate"], "tax")))
-        grand_total = max(Decimal("0"), subtotal - coupon_discount + delivery_fee + taxes)
+        delivery_fee = _money(delivery_fees[delivery_method], "delivery fee")
+        taxable_merchandise_total = max(Decimal("0"), subtotal - coupon_discount)
+        tax_rate = _money(self.settings["taxRate"], "tax")
+        taxes = Decimal("0") if tax_rate == 0 else Decimal(
+            _rounded_rupees(
+                taxable_merchandise_total * tax_rate / (Decimal("1") + tax_rate)
+            )
+        )
+        grand_total = taxable_merchandise_total + delivery_fee
         amount_paise = _rounded_rupees(grand_total * Decimal("100"))
         if amount_paise < 100:
             raise ApiError(HTTPStatus.UNPROCESSABLE_ENTITY, "Order total is below the minimum amount.", "invalid_amount")

@@ -118,7 +118,7 @@ export const HomepageMerchandising: React.FC<HomepageMerchandisingProps> = ({ pr
                   <h3 className="line-clamp-2 min-h-10 text-base font-black leading-5 text-neutral-900 dark:text-white">{store.storeName}</h3>
                   <div className="flex items-center gap-2 text-[10px] font-bold text-neutral-600 dark:text-neutral-300">
                     <span className="max-w-[58%] truncate rounded-full bg-neutral-100 px-2 py-1 dark:bg-neutral-800">{store.category}</span>
-                    <span className="shrink-0 rounded-full bg-lime-100 px-2 py-1 text-lime-800 dark:bg-lime-950 dark:text-lime-300">~{store.deliveryMinutes} min delivery</span>
+                    <span className="shrink-0 rounded-full bg-lime-100 px-2 py-1 text-lime-800 dark:bg-lime-950 dark:text-lime-300">Same Day Delivery</span>
                   </div>
                   <p className="line-clamp-2 min-h-8 text-xs leading-4 text-neutral-500">{store.description}</p>
                   <p className="mt-auto flex min-w-0 items-center gap-1 text-xs font-bold text-neutral-500"><MapPin className="h-3.5 w-3.5 shrink-0 text-lime-600" /><span className="truncate">{store.city}</span></p>

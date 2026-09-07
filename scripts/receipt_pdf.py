@@ -286,7 +286,7 @@ def _draw_totals_and_payment(doc: PdfDocument, page: list[str], order: dict[str,
         ("Subtotal", money(order.get("subtotal", 0))),
         ("Discount", f"- {money(order.get('discount', 0))}" if Decimal(str(order.get("discount") or 0)) > 0 else money(0)),
         ("Delivery", money(order.get("deliveryFee", 0))),
-        ("Tax", money(order.get("taxes", 0))),
+        ("GST included", money(order.get("taxes", 0))),
     ]
     doc.text(page, right_x, y, "ORDER TOTAL", size=8, bold=True, color=(0.38, 0.38, 0.38))
     y -= 18

@@ -13,7 +13,6 @@ export const CartDrawer: React.FC<{ isOpen: boolean; onClose: () => void }> = ({
     updateQuantity,
     subtotal,
     deliveryFee,
-    taxes,
     grandTotal,
     totalItemsCount,
     deliveryMethod,
@@ -52,14 +51,10 @@ export const CartDrawer: React.FC<{ isOpen: boolean; onClose: () => void }> = ({
           </button>
         </div>
 
-        {/* Free Delivery Bar */}
+        {/* Delivery promise */}
         <div className="bg-lime-100 dark:bg-lime-950/40 p-3 text-xs text-center font-bold text-lime-800 dark:text-lime-300 border-b border-lime-200 dark:border-lime-900 flex items-center justify-center gap-1.5">
           <Zap className="w-4 h-4 fill-lime-500 text-lime-600" />
-          {subtotal >= CONFIG.FREE_DELIVERY_THRESHOLD ? (
-            <span>You've unlocked <strong>FREE NORMAL DELIVERY</strong>!</span>
-          ) : (
-            <span>Add ₹{CONFIG.FREE_DELIVERY_THRESHOLD - subtotal} more for <strong>FREE NORMAL DELIVERY</strong></span>
-          )}
+          <span><strong>FREE SAME DAY DELIVERY</strong> in {CONFIG.SERVICE_CITY}</span>
         </div>
 
         {/* Cart Item List */}
@@ -70,7 +65,7 @@ export const CartDrawer: React.FC<{ isOpen: boolean; onClose: () => void }> = ({
                 <Tag className="w-10 h-10" />
               </div>
               <h4 className="font-bold text-lg text-neutral-900 dark:text-white mb-1">Your cart is empty</h4>
-              <p className="text-xs text-neutral-500 mb-6">Local delivery is available in {CONFIG.SERVICE_CITY} ({CONFIG.DEFAULT_PINCODE}). Express Local Delivery is shown when an item is eligible.</p>
+              <p className="text-xs text-neutral-500 mb-6">Free Same Day Delivery is available in {CONFIG.SERVICE_CITY} ({CONFIG.DEFAULT_PINCODE}). Express Delivery is available on Saturday and Sunday for ₹80.</p>
               <button
                 onClick={() => { onClose(); navigate('/products'); }}
                 className="px-6 py-2.5 bg-neutral-950 dark:bg-lime-400 text-white dark:text-neutral-950 font-bold text-xs rounded-xl"
@@ -156,7 +151,7 @@ export const CartDrawer: React.FC<{ isOpen: boolean; onClose: () => void }> = ({
                       : 'text-neutral-500'
                   }`}
                 >
-                  ⚡ Express (60m)
+                  ⚡ Express ₹80
                 </button>
                 <button
                   onClick={() => setDeliveryMethod('standard')}
@@ -166,7 +161,7 @@ export const CartDrawer: React.FC<{ isOpen: boolean; onClose: () => void }> = ({
                       : 'text-neutral-500'
                   }`}
                 >
-                  Normal Delivery
+                  Same Day Delivery
                 </button>
               </div>
             </div>
@@ -185,10 +180,7 @@ export const CartDrawer: React.FC<{ isOpen: boolean; onClose: () => void }> = ({
                   {deliveryFee === 0 ? <strong className="text-emerald-600">FREE</strong> : `₹${deliveryFee}`}
                 </span>
               </div>
-              <div className="flex justify-between">
-                <span>GST & Taxes (5%)</span>
-                <span className="font-semibold text-neutral-900 dark:text-white">₹{taxes}</span>
-              </div>
+              <p className="text-[10px] text-neutral-500">Product prices include GST.</p>
               <div className="flex justify-between pt-2 border-t border-neutral-200 dark:border-neutral-800 text-sm font-black text-neutral-900 dark:text-white">
                 <span>Grand Total</span>
                 <span className="text-lime-600 dark:text-lime-400">₹{grandTotal}</span>

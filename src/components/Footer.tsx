@@ -15,9 +15,9 @@ export const Footer: React.FC = () => {
             <div className="p-3 bg-neutral-900 rounded-full text-lime-400">
               <Zap className="w-6 h-6 fill-lime-400" />
             </div>
-            <h4 className="font-bold text-white text-sm">Local Delivery</h4>
+            <h4 className="font-bold text-white text-sm">Same Day Delivery</h4>
             <p className="text-xs text-neutral-400">
-              Hyperlocal fashion dispatch in {CONFIG.SERVICE_CITY}
+              FREE across our supported {CONFIG.SERVICE_CITY} service area
             </p>
           </div>
           <div className="flex flex-col items-center gap-2">
@@ -44,9 +44,9 @@ export const Footer: React.FC = () => {
             <div className="p-3 bg-neutral-900 rounded-full text-lime-400">
               <Truck className="w-6 h-6" />
             </div>
-            <h4 className="font-bold text-white text-sm">Free Shipping</h4>
+            <h4 className="font-bold text-white text-sm">Express Delivery</h4>
             <p className="text-xs text-neutral-400">
-              On eligible orders above INR {CONFIG.FREE_DELIVERY_THRESHOLD}
+              ₹80 on Saturday and Sunday
             </p>
           </div>
         </div>

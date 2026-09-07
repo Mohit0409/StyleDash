@@ -199,7 +199,7 @@ export const ProductDetail: React.FC = () => {
                 </span>
               </>
             )}
-            <span className="text-[10px] text-neutral-400 ml-auto">GST calculated at checkout</span>
+            <span className="text-[10px] text-neutral-400 ml-auto">Price includes GST</span>
           </div>
 
           {/* Variant Selector */}
@@ -261,7 +261,7 @@ export const ProductDetail: React.FC = () => {
               <Zap className="w-4 h-4 fill-lime-500" />
               <span>Dispatched from Neemuch Partner Boutique</span>
             </div>
-            <p>Normal delivery within <strong>a day</strong> to pincode 458441. Weekend express is offered at checkout when available.</p>
+            <p>Same Day Delivery is free to pincode 458441. Weekend Express is available at checkout on Saturday and Sunday.</p>
           </div>
 
           {/* Specifications */}

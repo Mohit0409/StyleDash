@@ -87,7 +87,7 @@ class PaymentServiceTests(unittest.TestCase):
             self.assertEqual(quote["deliveryMethod"], "express")
 
         self.assertEqual(self.service.estimated_delivery_label("express"), "60 minutes")
-        self.assertEqual(self.service.estimated_delivery_label("standard"), "within a day")
+        self.assertEqual(self.service.estimated_delivery_label("standard"), "same day")
         with patch.object(SERVER.PaymentService, "express_delivery_available", return_value=False):
             self.assert_api_error(
                 "express_delivery_unavailable",
@@ -113,12 +113,15 @@ class PaymentServiceTests(unittest.TestCase):
                 self.payload(deliveryMethod="express"), now=saturday
             )
             self.assertEqual(weekend["deliveryMethod"], "express")
-            self.assertEqual(weekend["deliveryFee"], 79)
+            self.assertEqual(weekend["deliveryFee"], 80)
 
             weekday_normal = self.service.calculate_order(
                 self.payload(deliveryMethod="standard"), now=monday
             )
             self.assertEqual(weekday_normal["deliveryMethod"], "standard")
+            self.assertEqual(weekday_normal["deliveryFee"], 0)
+            self.assertEqual(weekday_normal["taxes"], 45)
+            self.assertEqual(weekday_normal["grandTotal"], 946)
             with self.assertRaises(SERVER.ApiError) as caught:
                 self.service.calculate_order(
                     self.payload(deliveryMethod="express"), now=monday
@@ -126,6 +129,18 @@ class PaymentServiceTests(unittest.TestCase):
             self.assertEqual(caught.exception.code, "express_delivery_unavailable")
         finally:
             self.service._static_products[product_id] = original
+
+    def test_express_fee_remains_flat_above_legacy_free_delivery_threshold(self):
+        saturday = SERVER.datetime(2026, 9, 5, 6, 30, tzinfo=SERVER.timezone.utc)
+        payload = self.payload(
+            deliveryMethod="express",
+            items=[{"productId": "sd-prod-001", "variantId": "sd-prod-001-var-2", "quantity": 3}],
+        )
+        quote = self.service.calculate_order(payload, now=saturday)
+        self.assertEqual(quote["subtotal"], 1419)
+        self.assertEqual(quote["deliveryFee"], 80)
+        self.assertEqual(quote["taxes"], 68)
+        self.assertEqual(quote["grandTotal"], 1499)
 
     def payload(self, **overrides):
         payload = {
@@ -1075,12 +1090,12 @@ class PaymentServiceTests(unittest.TestCase):
         self.assertEqual(response["trustedTotals"], {
             "subtotal": 946,
             "discount": 0,
-            "deliveryFee": 79,
-            "taxes": 47,
-            "grandTotal": 1072,
+            "deliveryFee": 80,
+            "taxes": 45,
+            "grandTotal": 1026,
         })
-        self.assertEqual(response["amount"], 107200)
-        self.assertEqual(self.gateway.calls[0]["amount"], 107200)
+        self.assertEqual(response["amount"], 102600)
+        self.assertEqual(self.gateway.calls[0]["amount"], 102600)
         self.assertEqual(self.gateway.calls[0]["currency"], "INR")
 
     def test_create_order_is_idempotent(self) -> None:
@@ -1320,7 +1335,7 @@ class PaymentServiceTests(unittest.TestCase):
              patch.object(SERVER.PaymentService, "product_express_eligible", return_value=True):
             first = self.service.place_cod_order(payload, "checkout-cod-001")
             second = self.service.place_cod_order(payload, "checkout-cod-001")
-        self.assertEqual(first["order"]["grandTotal"], 1072)
+        self.assertEqual(first["order"]["grandTotal"], 1026)
         self.assertEqual(first["order"]["paymentStatus"], "pending")
         self.assertTrue(second["idempotent"])
         self.assertEqual(self.service.store.state["inventory"]["sd-prod-001-var-2"], 13)
@@ -3615,7 +3630,7 @@ class HttpApiTests(unittest.TestCase):
         base = {
             'userId': owner['user']['id'], 'paymentMethod': 'cod', 'paymentStatus': 'pending',
             'subtotal': 100, 'discount': 0, 'walletAmount': 0, 'deliveryFee': 0, 'taxes': 0, 'grandTotal': 100,
-            'deliveryMethod': 'standard', 'estimatedDelivery': 'Local Delivery',
+            'deliveryMethod': 'standard', 'estimatedDelivery': 'Same Day Delivery',
             'address': {'id': 'addr', 'name': 'Receipt Owner', 'phone': '9888800001', 'street': '1 Test Road', 'city': 'Neemuch', 'state': 'Madhya Pradesh', 'pincode': '458441'},
             'items': [{'productId': 'sd-prod-001', 'productName': 'Receipt Product', 'productSlug': 'receipt-product', 'variantId': 'sd-prod-001-var-2', 'sku': 'TEST', 'size': 'M', 'colourName': 'Black', 'quantity': 1, 'unitPrice': 100, 'lineTotal': 100}],
             'statusHistory': [{'status': 'placed', 'timestamp': now}], 'createdAt': now, 'updatedAt': now,

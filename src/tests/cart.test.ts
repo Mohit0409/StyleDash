@@ -10,7 +10,7 @@ describe('Vibe4You Cart & Variant Logic', () => {
     expect(lineId).toBe('sd-prod-001:sd-prod-001-var-1');
   });
 
-  it('calculates production totals with GST and delivery', () => {
+  it('keeps GST included while charging Express at a flat ₹80', () => {
     expect(calculateCartTotals({
       subtotal: 1000,
       appliedCoupon: null,
@@ -18,9 +18,9 @@ describe('Vibe4You Cart & Variant Logic', () => {
     })).toEqual({
       couponDiscount: 0,
       discountTotal: 0,
-      deliveryFee: 0,
-      taxes: 50,
-      grandTotal: 1050,
+      deliveryFee: 80,
+      taxes: 48,
+      grandTotal: 1080,
     });
   });
 
@@ -41,9 +41,9 @@ describe('Vibe4You Cart & Variant Logic', () => {
     })).toEqual({
       couponDiscount: 100,
       discountTotal: 100,
-      deliveryFee: 49,
-      taxes: 35,
-      grandTotal: 784,
+      deliveryFee: 0,
+      taxes: 33,
+      grandTotal: 700,
     });
   });
 
@@ -55,6 +55,6 @@ describe('Vibe4You Cart & Variant Logic', () => {
       walletDiscount: 800,
     };
 
-    expect(calculateCartTotals(staleInput).grandTotal).toBe(889);
+    expect(calculateCartTotals(staleInput).grandTotal).toBe(800);
   });
 });

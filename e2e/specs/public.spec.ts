@@ -69,7 +69,7 @@ test('customer policy pages publish launch contacts without pre-live warnings', 
   }
 
   await page.goto('/help');
-  await expect(page.locator('main')).toContainText('+91 8963942394');
+  await expect(page.locator('main')).toContainText('+91 8085810758');
   await expect(page.locator('main')).toContainText('Grievance officer: Mohit Jangde');
 
   await page.goto('/returns');

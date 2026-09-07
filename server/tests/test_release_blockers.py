@@ -423,12 +423,18 @@ class DeploymentAndTaxTests(unittest.TestCase):
     def test_refund_processed_is_documented_for_live_webhook(self):
         readme = (ROOT / "server/README.md").read_text(encoding="utf-8")
         self.assertIn("`refund.processed`", readme)
-    def test_choice_a(self):
+    def test_tax_inclusive_pricing_and_delivery_fee_policy(self):
         settings = json.loads((ROOT / "server/payment-data/settings.json").read_text(encoding="utf-8"))
         self.assertEqual(settings["taxRate"], 0.05)
+        self.assertEqual(settings["deliveryFees"], {"express": 80, "standard": 0})
         product = (ROOT / "src/pages/ProductDetail.tsx").read_text(encoding="utf-8")
-        self.assertIn("GST calculated at checkout", product)
-        self.assertNotIn("Inclusive of all GST taxes", product)
+        checkout = (ROOT / "src/pages/Checkout.tsx").read_text(encoding="utf-8")
+        server = (ROOT / "scripts/termux-spa-server.py").read_text(encoding="utf-8")
+        self.assertIn("Price includes GST", product)
+        self.assertNotIn("GST calculated at checkout", product)
+        self.assertNotIn("GST Taxes (5%)", checkout)
+        self.assertIn("taxable_merchandise_total", server)
+        self.assertIn("grand_total = taxable_merchandise_total + delivery_fee", server)
 
 if __name__ == "__main__": unittest.main()
 

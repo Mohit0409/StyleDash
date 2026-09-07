@@ -28,8 +28,8 @@ export const cartExpressEligibility = (
 
 export const deliveryAvailabilityMessage = (date = new Date()): string =>
   isExpressDeliveryAvailable(date)
-    ? 'Normal Delivery and Express Local Delivery are both available this Saturday and Sunday for every product.'
-    : 'Local delivery is selected. Express Local Delivery is unavailable Monday–Friday.';
+    ? 'Same Day Delivery is FREE. Express Delivery is also available this Saturday and Sunday for every product for ₹80.'
+    : 'FREE Same Day Delivery is selected. Express Delivery is unavailable Monday–Friday.';
 
 export interface ExpressCatalogueState {
   requested: boolean;

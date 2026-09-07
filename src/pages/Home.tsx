@@ -28,7 +28,7 @@ export const Home: React.FC = () => {
         <div className="max-w-7xl mx-auto grid lg:grid-cols-2 gap-12 items-center">
           <div className="space-y-6 z-10">
             <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-lime-400 text-neutral-950 text-xs font-black uppercase tracking-wider">
-              <Zap className="w-3.5 h-3.5 fill-neutral-950" /> Express Local Delivery in {CONFIG.SERVICE_CITY}
+              <Zap className="w-3.5 h-3.5 fill-neutral-950" /> FREE Same Day Delivery in {CONFIG.SERVICE_CITY}
             </div>
 
             <h1 className="text-4xl sm:text-6xl font-black tracking-tight leading-none">
@@ -63,7 +63,7 @@ export const Home: React.FC = () => {
 
             {/* Quick Specs */}
             <div className="pt-6 border-t border-neutral-800 grid grid-cols-3 gap-4 text-xs text-neutral-400">
-              <div><strong className="text-white block text-sm">Express Local</strong> Delivery</div>
+              <div><strong className="text-white block text-sm">Free Same Day</strong> Delivery</div>
               <div><strong className="text-white block text-sm">Local Stores</strong> Curated Marketplace</div>
               <div><strong className="text-white block text-sm">7 Days</strong> Easy Size Exchange</div>
             </div>

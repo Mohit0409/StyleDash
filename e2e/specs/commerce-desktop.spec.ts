@@ -121,29 +121,31 @@ test('checkout enables Express and recalculates totals on a simulated Saturday',
   await page.clock.install({ time: new Date('2026-09-05T06:30:00Z') });
   await prepareCheckout(page, 'weekend-express-selector');
 
-  const normal = page.getByRole('radio', { name: /Normal Delivery/ });
+  const sameDay = page.getByRole('radio', { name: /Same Day Delivery/ });
   const express = page.getByRole('radio', { name: /Express Delivery/ });
   const summary = page.getByRole('heading', { name: 'Order Summary' }).locator('..');
 
-  await expect(normal).toBeChecked();
+  await expect(sameDay).toBeChecked();
   await expect(express).toBeEnabled();
-  await expect(summary.getByText('₹49', { exact: true })).toBeVisible();
+  await expect(summary.getByText('FREE', { exact: true })).toBeVisible();
+  await expect(summary).toContainText('Product prices include GST.');
+  await expect(summary.getByText(/GST Taxes/)).toHaveCount(0);
 
   await express.check();
   await expect(express).toBeChecked();
-  await expect(summary.getByText('₹79', { exact: true })).toBeVisible();
+  await expect(summary.getByText('₹80', { exact: true })).toBeVisible();
   await expect(summary.getByText('About 60 minutes', { exact: true })).toBeVisible();
   await expect(page.getByText('Express selected. Delivery charge and estimated total have been recalculated below.')).toBeVisible();
 });
 
-test('checkout disables Express on a simulated Monday and keeps Normal Delivery', async ({ page }) => {
+test('checkout disables Express on a simulated Monday and keeps free Same Day Delivery', async ({ page }) => {
   await page.clock.install({ time: new Date('2026-09-07T06:30:00Z') });
   await prepareCheckout(page, 'weekday-normal-selector');
 
-  const normal = page.getByRole('radio', { name: /Normal Delivery/ });
+  const sameDay = page.getByRole('radio', { name: /Same Day Delivery/ });
   const express = page.getByRole('radio', { name: /Express Delivery/ });
 
-  await expect(normal).toBeChecked();
+  await expect(sameDay).toBeChecked();
   await expect(express).toBeDisabled();
   await expect(page.getByRole('status')).toContainText('Express Delivery is available Saturday and Sunday in Neemuch for every product.');
 });

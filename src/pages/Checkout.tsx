@@ -25,7 +25,6 @@ export const Checkout: React.FC = () => {
     items,
     subtotal,
     deliveryFee,
-    taxes,
     grandTotal,
     clearCart,
     deliveryMethod,
@@ -173,8 +172,8 @@ export const Checkout: React.FC = () => {
                 <input type="radio" name="delivery" value="standard" checked={deliveryMethod === 'standard'} onChange={() => setDeliveryMethod('standard')} className="mt-1 accent-lime-500" />
                 <Truck className="mt-0.5 h-4 w-4 shrink-0 text-neutral-500" />
                 <span>
-                  <span className="font-bold text-xs text-neutral-900 dark:text-white block">Normal Delivery</span>
-                  <span className="text-[11px] text-neutral-500">Within a day - always available</span>
+                  <span className="font-bold text-xs text-neutral-900 dark:text-white block">Same Day Delivery</span>
+                  <span className="text-[11px] text-neutral-500">FREE - delivered the same day</span>
                 </span>
               </label>
               <label className={`flex items-start gap-3 p-4 rounded-2xl border transition-all ${expressSelectable ? 'cursor-pointer' : 'cursor-not-allowed opacity-60'} ${deliveryMethod === 'express' ? 'border-lime-500 bg-lime-50 dark:border-lime-400 dark:bg-lime-950/20 shadow-md' : 'border-neutral-200 dark:border-neutral-800'}`}>
@@ -182,7 +181,7 @@ export const Checkout: React.FC = () => {
                 <Zap className="mt-0.5 h-4 w-4 shrink-0 text-lime-600" />
                 <span>
                   <span className="font-bold text-xs text-neutral-900 dark:text-white block">Express Delivery</span>
-                  <span className="text-[11px] text-neutral-500">About 60 minutes - Saturday & Sunday</span>
+                  <span className="text-[11px] text-neutral-500">About 60 minutes - ₹80 - Saturday & Sunday</span>
                 </span>
               </label>
             </div>
@@ -228,13 +227,12 @@ export const Checkout: React.FC = () => {
           </div>
           <div className="space-y-2 text-xs text-neutral-600 dark:text-neutral-400">
             <div className="flex justify-between"><span>Subtotal</span><span>₹{subtotal}</span></div>
-            <div className="flex justify-between"><span>{deliveryMethod === 'express' ? 'Express Delivery' : 'Normal Delivery'}</span><span>{deliveryFee === 0 ? 'FREE' : `\u20B9${deliveryFee}`}</span></div>
-            <div className="flex justify-between"><span>Delivery ETA</span><span>{deliveryMethod === 'express' ? 'About 60 minutes' : 'Within a day'}</span></div>
-            <div className="flex justify-between"><span>GST Taxes (5%)</span><span>₹{taxes}</span></div>
+            <div className="flex justify-between"><span>{deliveryMethod === 'express' ? 'Express Delivery' : 'Same Day Delivery'}</span><span>{deliveryFee === 0 ? 'FREE' : `₹${deliveryFee}`}</span></div>
+            <div className="flex justify-between"><span>Delivery ETA</span><span>{deliveryMethod === 'express' ? 'About 60 minutes' : 'Same day'}</span></div>
             <div className="flex justify-between pt-2 border-t border-neutral-200 dark:border-neutral-800 text-sm font-black text-neutral-900 dark:text-white">
               <span>Estimated Total</span><span className="text-lime-600 dark:text-lime-400">₹{grandTotal}</span>
             </div>
-            <p className="text-[10px] leading-relaxed text-neutral-500">Inventory, coupon eligibility and the final payable amount are recalculated securely by the server.</p>
+            <p className="text-[10px] leading-relaxed text-neutral-500">Product prices include GST. Inventory, coupon eligibility and the final payable amount are recalculated securely by the server.</p>
           </div>
           {checkoutError && <p role="alert" className="text-xs font-semibold text-red-600 dark:text-red-400">{checkoutError}</p>}
           <button type="submit" disabled={placing} className="w-full py-4 bg-neutral-950 dark:bg-lime-400 text-white dark:text-neutral-950 font-black text-sm rounded-xl shadow-xl hover:bg-neutral-800 dark:hover:bg-lime-300 transition-all flex items-center justify-center gap-2 disabled:cursor-not-allowed disabled:opacity-60">

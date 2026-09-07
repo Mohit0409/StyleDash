@@ -32,13 +32,14 @@ export const calculateCartTotals = ({
     }
   }
 
-  const isFreeDelivery = subtotal >= CONFIG.FREE_DELIVERY_THRESHOLD;
-  const baseDeliveryFee = deliveryMethod === 'express'
+  const deliveryFee = deliveryMethod === 'express'
     ? CONFIG.EXPRESS_DELIVERY_FEE
     : CONFIG.STANDARD_DELIVERY_FEE;
-  const deliveryFee = isFreeDelivery ? 0 : baseDeliveryFee;
-  const taxes = Math.round((subtotal - couponDiscount) * CONFIG.TAX_RATE);
-  const grandTotal = Math.max(0, subtotal - couponDiscount + deliveryFee + taxes);
+  const taxableMerchandiseTotal = Math.max(0, subtotal - couponDiscount);
+  const taxes = Math.round(
+    (taxableMerchandiseTotal * CONFIG.TAX_RATE) / (1 + CONFIG.TAX_RATE),
+  );
+  const grandTotal = taxableMerchandiseTotal + deliveryFee;
 
   return {
     couponDiscount,
