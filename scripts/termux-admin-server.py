@@ -592,7 +592,7 @@ class AdminApplication:
                     record = {
                         "productId": product["id"], "productName": product["name"],
                         "variantId": variant["id"], "size": variant.get("size"),
-                        "colour": variant.get("colour"), "stock": stock,
+                        "colour": variant.get("colourName") or variant.get("colour"), "stock": stock,
                     }
                     searchable = f"{record['productId']} {record['productName']} {record['variantId']}".casefold()
                     if needle and needle not in searchable:
@@ -814,6 +814,8 @@ class AdminHandler(BaseHTTPRequestHandler):
                 self._serve_asset("index.html", "text/html; charset=utf-8"); return
             if path == "/admin.css":
                 self._serve_asset("admin.css", "text/css; charset=utf-8"); return
+            if path == "/admin-variants.css":
+                self._serve_asset("admin-variants.css", "text/css; charset=utf-8"); return
             if path == "/admin.js":
                 self._serve_asset("admin.js", "text/javascript; charset=utf-8"); return
             if path == "/api/admin/me":
@@ -846,6 +848,18 @@ class AdminHandler(BaseHTTPRequestHandler):
                 self._admin(); self._json(200, {"success": True, "audit": self.application.identity.audit()}); return
             if path == "/api/admin/system":
                 self._admin(); self._json(200, {"success": True, "system": self.application.system_health(self.backup_root)}); return
+            if path.startswith("/media/product-images/"):
+                self._admin()
+                if not PRODUCT_MEDIA_PATH_PATTERN.fullmatch(path):
+                    self._json(404, {"success": False, "error": "Image not found.", "code": "not_found"}); return
+                root = self.application.product_image_directory.resolve()
+                image = (root / Path(path).name).resolve()
+                if image.parent != root or not image.is_file():
+                    self._json(404, {"success": False, "error": "Image not found.", "code": "not_found"}); return
+                content_type = {".webp":"image/webp",".jpg":"image/jpeg",".png":"image/png"}.get(image.suffix.lower())
+                if content_type is None:
+                    self._json(404, {"success": False, "error": "Image not found.", "code": "not_found"}); return
+                body=image.read_bytes(); self._headers(200, content_type, len(body), [("Cache-Control","private, no-store")]); self.wfile.write(body); return
             self._json(404, {"success": False, "error": "Not found.", "code": "not_found"})
         except SecurityError as error:
             self._error(error)

@@ -49,6 +49,23 @@ byId('content').addEventListener('change', event => {
 });
 
 function status(message) { byId('app-status').textContent = message || ''; }
+function newColourCard(source={}) {
+  const key=typeof crypto?.randomUUID==='function'?crypto.randomUUID():`colour-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+  return {cardKey:key,colourName:source.colourName||'',colourHex:source.colourHex||'',imageUrls:Array.isArray(source.imageUrls)?source.imageUrls.filter(value=>typeof value==='string'):[],pendingFiles:[],httpsDraft:'',sizes:Array.isArray(source.sizes)&&source.sizes.length?source.sizes.map(size=>({id:typeof size.id==='string'?size.id:undefined,size:size.size||'',inventory:Number.isInteger(size.inventory)?size.inventory:0})):[{size:'',inventory:0}]};
+}
+function filePreview(file){return new Promise((resolve,reject)=>{const reader=new FileReader();reader.onerror=()=>reject(new Error('The selected image could not be read.'));reader.onload=()=>resolve(String(reader.result||''));reader.readAsDataURL(file);});}
+async function queueColourFiles(colour,files){
+  const selected=Array.from(files||[]); if(!selected.length)return;
+  if(colour.imageUrls.length+colour.pendingFiles.length+selected.length>8)throw new Error('Each colour can have at most 8 images.');
+  for(const file of selected){validateAdminImageFile(file);colour.pendingFiles.push({file,preview:await filePreview(file)});}
+}
+async function uploadColourVariantImages(colours){
+  for(const colour of colours){const httpsUrls=String(colour.httpsDraft||'').split(/\r?\n/).map(value=>value.trim()).filter(Boolean);const count=colour.imageUrls.length+httpsUrls.length+colour.pendingFiles.length;if(count<1||count>8)throw new Error('Each colour needs between 1 and 8 images.');}
+  const total=colours.reduce((sum,colour)=>sum+colour.pendingFiles.length,0); let offset=0;
+  const result=[];
+  for(const colour of colours){const files=colour.pendingFiles.map(entry=>entry.file);const uploaded=files.length?await uploadAdminProductImages(files,offset,total):[];offset+=files.length;const httpsUrls=String(colour.httpsDraft||'').split(/\r?\n/).map(value=>value.trim()).filter(Boolean);result.push({colourName:colour.colourName,colourHex:colour.colourHex||undefined,imageUrls:[...colour.imageUrls,...httpsUrls,...uploaded],sizes:colour.sizes.map(size=>({...size,inventory:Number(size.inventory)}))});}
+  return result;
+}
 function formDialog(title, fields, submitLabel='Continue') {
   return new Promise(resolve => {
     const dialog=byId('admin-dialog');
@@ -58,7 +75,32 @@ function formDialog(title, fields, submitLabel='Continue') {
     byId('admin-dialog-submit').textContent=submitLabel;
     byId('admin-dialog-error').textContent='';
     fieldsRoot.replaceChildren();
+    let colourVariantsGetter=null;
     for(const field of fields){
+      if(field.type==='colourVariants'){
+        const section=document.createElement('section');section.className='variant-editor';
+        const heading=document.createElement('h3');heading.textContent=field.label;section.appendChild(heading);
+        const hint=document.createElement('p');hint.className='muted';hint.textContent='Each colour has its own images, sizes and stock. Local files upload only when you save.';section.appendChild(hint);
+        const cards=document.createElement('div');cards.className='variant-cards';section.appendChild(cards);
+        const addColour=document.createElement('button');addColour.type='button';addColour.className='secondary';addColour.textContent='+ Add another colour';section.appendChild(addColour);
+        const colours=Array.isArray(field.value)&&field.value.length?field.value.map(newColourCard):[newColourCard()];
+        const makeInput=(text,value,type='text')=>{const label=document.createElement('label');label.textContent=text;const control=document.createElement(type==='textarea'?'textarea':'input');control.value=value??'';if(type!=='textarea')control.type=type;label.appendChild(control);return [label,control];};
+        const tile=(source,labelText,onRemove,isLocal=true)=>{const node=document.createElement('div');node.className='image-tile';if(isLocal){const image=document.createElement('img');image.src=source;image.alt=labelText;image.loading='lazy';node.appendChild(image);}else{const text=document.createElement('span');text.textContent=labelText;text.title=source;node.appendChild(text);}const remove=document.createElement('button');remove.type='button';remove.className='danger';remove.textContent='Remove';remove.onclick=onRemove;node.appendChild(remove);return node;};
+        const render=()=>{cards.replaceChildren();colours.forEach((colour,index)=>{
+          const card=document.createElement('article');card.className='variant-card';card.dataset.cardKey=colour.cardKey;const title=document.createElement('h4');title.textContent=`Colour ${index+1}`;card.appendChild(title);
+          const grid=document.createElement('div');grid.className='dialog-fields';const [nameLabel,name]=makeInput('Colour name',colour.colourName);const [hexLabel,hex]=makeInput('Colour hex (optional)',colour.colourHex);name.oninput=()=>colour.colourName=name.value;hex.oninput=()=>colour.colourHex=hex.value;grid.append(nameLabel,hexLabel);card.appendChild(grid);
+          const sizesTitle=document.createElement('strong');sizesTitle.textContent='Sizes & stock';card.appendChild(sizesTitle);const sizes=document.createElement('div');sizes.className='variant-sizes';
+          colour.sizes.forEach((size,sizeIndex)=>{const row=document.createElement('div');row.className='variant-size-row';const [sizeLabel,sizeInput]=makeInput('Size',size.size);const [stockLabel,stockInput]=makeInput('Stock',String(size.inventory),'number');stockInput.min='0';stockInput.step='1';sizeInput.oninput=()=>size.size=sizeInput.value;stockInput.oninput=()=>size.inventory=Number(stockInput.value);row.append(sizeLabel,stockLabel);if(colour.sizes.length>1){const remove=document.createElement('button');remove.type='button';remove.className='danger';remove.textContent='Remove size';remove.onclick=()=>{colour.sizes.splice(sizeIndex,1);render();};row.appendChild(remove);}sizes.appendChild(row);});card.appendChild(sizes);
+          const addSize=document.createElement('button');addSize.type='button';addSize.className='secondary';addSize.textContent='+ Add size';addSize.onclick=()=>{colour.sizes.push({size:'',inventory:0});render();};card.appendChild(addSize);
+          const images=document.createElement('div');images.className='image-tiles';colour.imageUrls.forEach((url,imageIndex)=>images.appendChild(tile(url,`Existing image ${imageIndex+1}`,()=>{colour.imageUrls.splice(imageIndex,1);render();},url.startsWith('/media/product-images/'))));colour.pendingFiles.forEach((entry,imageIndex)=>images.appendChild(tile(entry.preview,`Pending image ${imageIndex+1}`,()=>{colour.pendingFiles.splice(imageIndex,1);render();},true)));card.appendChild(images);
+          const uploadLabel=document.createElement('label');uploadLabel.textContent='Choose product images from this PC';const upload=document.createElement('input');upload.type='file';upload.accept='image/jpeg,image/png,image/webp';upload.multiple=true;upload.onchange=async()=>{try{await queueColourFiles(colour,upload.files);render();}catch(cause){byId('admin-dialog-error').textContent=cause.message;}finally{upload.value='';}};uploadLabel.appendChild(upload);card.appendChild(uploadLabel);
+          const [urlsLabel,urls]=makeInput('HTTPS image URLs (optional fallback)',colour.httpsDraft,'textarea');urls.oninput=()=>colour.httpsDraft=urls.value;card.appendChild(urlsLabel);
+          if(colours.length>1){const removeColour=document.createElement('button');removeColour.type='button';removeColour.className='danger';removeColour.textContent='Remove colour';removeColour.onclick=()=>{colours.splice(index,1);render();};card.appendChild(removeColour);}cards.appendChild(card);
+        });};
+        addColour.onclick=()=>{colours.push(newColourCard());render();};
+        colourVariantsGetter=()=>{const normalized=colours.map(colour=>({cardKey:colour.cardKey,colourName:String(colour.colourName||'').trim(),colourHex:String(colour.colourHex||'').trim()||undefined,imageUrls:colour.imageUrls.map(value=>String(value).trim()).filter(Boolean),httpsDraft:colour.httpsDraft,pendingFiles:[...colour.pendingFiles],sizes:colour.sizes.map(size=>({...(size.id?{id:size.id}:{}),size:String(size.size||'').trim(),inventory:Number(size.inventory)}))}));if(!normalized.length||normalized.some(colour=>!colour.colourName||!colour.sizes.length||colour.sizes.some(size=>!size.size||!Number.isInteger(size.inventory)||size.inventory<0)))throw new Error('Every colour needs a name and valid size/stock rows.');return normalized;};
+        render();fieldsRoot.appendChild(section);continue;
+      }
       const label=document.createElement('label'); label.textContent=field.label;
       const control=field.type==='textarea'?document.createElement('textarea'):field.type==='select'?document.createElement('select'):document.createElement('input');
       control.name=field.name; control.required=field.required===true;
@@ -79,7 +121,7 @@ function formDialog(title, fields, submitLabel='Continue') {
     }
     let settled=false;
     const finish=value=>{if(settled)return;settled=true;form.onsubmit=null;byId('admin-dialog-cancel').onclick=null;dialog.oncancel=null;if(dialog.open)dialog.close();resolve(value);};
-    form.onsubmit=event=>{event.preventDefault();if(!form.reportValidity())return;const values=Object.fromEntries(new FormData(form).entries());for(const field of fields){if(field.type==='file'&&field.multiple)values[field.name]=Array.from(form.elements[field.name]?.files||[]);}finish(values);};
+    form.onsubmit=event=>{event.preventDefault();if(!form.reportValidity())return;try{const values=Object.fromEntries(new FormData(form).entries());for(const field of fields){if(field.type==='file'&&field.multiple)values[field.name]=Array.from(form.elements[field.name]?.files||[]);}if(colourVariantsGetter)values.colourVariants=colourVariantsGetter();finish(values);}catch(cause){byId('admin-dialog-error').textContent=cause.message;}};
     byId('admin-dialog-cancel').onclick=()=>finish(null);
     dialog.oncancel=event=>{event.preventDefault();finish(null);};
     dialog.showModal();
@@ -211,49 +253,31 @@ async function createStoreProduct(){
     {name:'applicationId',label:'Store',type:'select',required:true,options:applications.map(item=>({value:item.id,label:item.shopName}))},
     {name:'name',label:'Product name',required:true,maxLength:140},{name:'description',label:'Product description',type:'textarea',required:true,maxLength:2000},{name:'brand',label:'Brand (optional)',maxLength:100},
     {name:'department',label:'Department',type:'select',required:true,value:'unisex',options:PRODUCT_DEPARTMENTS.map(value=>({value,label:value}))},{name:'category',label:'Category',type:'select',required:true,value:'Clothing & Fashion',options:PRODUCT_CATEGORIES.map(value=>({value,label:value}))},{name:'subcategory',label:'Subcategory (optional; inferred when clear)',maxLength:100},{name:'deliveryType',label:'Delivery schedule',type:'select',required:true,value:'normal',options:DELIVERY_OPTIONS},
-    {name:'price',label:'Selling price in rupees',type:'number',required:true,min:1,step:'0.01'},{name:'originalPrice',label:'Original/MRP price in rupees',type:'number',min:1,step:'0.01'},{name:'variants',label:'Sizes and stock (6:5, 7:5, 8:5)',required:true,placeholder:'6:5, 7:5, 8:5'},{name:'colourName',label:'Colour name',required:true,value:'Multi'},{name:'colourHex',label:'Colour hex (optional)',placeholder:'#000000'},
-    {name:'uploads',label:'Choose product images from this PC',type:'file',accept:'image/jpeg,image/png,image/webp',multiple:true,previewImages:true,help:'Recommended. JPG, PNG or WebP. You can remove or reselect images before publishing.'},
-    {name:'images',label:'HTTPS image URLs (optional fallback)',type:'textarea',help:'Optional compatibility input; local upload does not require external hosting.'},
+    {name:'price',label:'Selling price in rupees',type:'number',required:true,min:1,step:'0.01'},{name:'originalPrice',label:'Original/MRP price in rupees',type:'number',min:1,step:'0.01'},
+    {name:'colourVariants',label:'Colours & Variants',type:'colourVariants'},
   ],'Upload images & publish');if(!values)return;
-  const price=Number(values.price);const originalPrice=Number(values.originalPrice||values.price);if(!Number.isFinite(price)||price<1||!Number.isFinite(originalPrice)||originalPrice<price)throw new Error('Enter valid selling and original prices.');const variants=parseVariants(values.variants);const files=values.uploads||[];files.forEach(file=>validateAdminImageFile(file));const uploadedUrls=await uploadAdminProductImages(files);const directUrls=String(values.images||'').split(',').map(value=>value.trim()).filter(Boolean);const imageUrls=[...uploadedUrls,...directUrls];if(!imageUrls.length)throw new Error('Choose at least one local product image or enter an HTTPS image URL.');
-  const payload={applicationId:values.applicationId,name:values.name,description:values.description,brand:values.brand||undefined,department:values.department,category:values.category,subcategory:values.subcategory||undefined,deliveryType:values.deliveryType,pricePaise:Math.round(price*100),originalPricePaise:Math.round(originalPrice*100),variants,colourName:values.colourName,colourHex:values.colourHex||undefined,imageUrls,attributes:{}};await api('/api/admin/shop-products',{method:'POST',body:JSON.stringify(payload)});status(`${values.name} published for the selected local store using ${uploadedUrls.length} uploaded image${uploadedUrls.length===1?'':'s'}.`);
+  const price=Number(values.price),originalPrice=Number(values.originalPrice||values.price);if(!Number.isFinite(price)||price<1||!Number.isFinite(originalPrice)||originalPrice<price)throw new Error('Enter valid selling and original prices.');
+  const colourVariants=await uploadColourVariantImages(values.colourVariants);
+  const payload={applicationId:values.applicationId,name:values.name,description:values.description,brand:values.brand||undefined,department:values.department,category:values.category,subcategory:values.subcategory||undefined,deliveryType:values.deliveryType,pricePaise:Math.round(price*100),originalPricePaise:Math.round(originalPrice*100),colourVariants,attributes:{}};
+  await api('/api/admin/shop-products',{method:'POST',body:JSON.stringify(payload)});status(`${values.name} published with ${colourVariants.length} colour${colourVariants.length===1?'':'s'}.`);
 }
 async function editStoreProduct(button){
-  const item=currentShopProducts.find(product=>product.id===button.dataset.id); if(!item)throw new Error('Product details are no longer available. Refresh and try again.');
+  const item=currentShopProducts.find(product=>product.id===button.dataset.id);if(!item)throw new Error('Product details are no longer available. Refresh and try again.');
+  const live=(await api(`/api/admin/inventory?low=0&q=${encodeURIComponent(item.id)}`)).inventory||[];const liveById=new Map(live.map(row=>[row.variantId,Number(row.stock)]));
+  const colourSource=(Array.isArray(item.colourVariants)&&item.colourVariants.length?item.colourVariants:[{colourName:item.colourName||'Multi',colourHex:item.colourHex||'',imageUrls:item.imageUrls||[],sizes:item.variants||[]}]).map(colour=>({...colour,sizes:(colour.sizes||[]).map(size=>({...size,inventory:liveById.has(size.id)?liveById.get(size.id):size.inventory}))}));
   const values=await formDialog('Edit product details',[
-    {name:'name',label:'Product name',required:true,value:item.name||'',maxLength:140},
-    {name:'description',label:'Description',type:'textarea',required:true,value:item.description||'',maxLength:2000},
-    {name:'brand',label:'Brand (optional)',value:item.brand||'',maxLength:100},
-    {name:'department',label:'Department',type:'select',required:true,value:PRODUCT_DEPARTMENTS.includes(item.department)?item.department:'unisex',options:PRODUCT_DEPARTMENTS.map(value=>({value,label:value}))},
-    {name:'category',label:'Category',type:'select',required:true,value:PRODUCT_CATEGORIES.includes(item.category)?item.category:'Clothing & Fashion',options:PRODUCT_CATEGORIES.map(value=>({value,label:value}))},
-    {name:'subcategory',label:'Subcategory (optional; inferred when clear)',value:item.subcategory||item.attributes?.subcategory||'',maxLength:100},
-    {name:'deliveryType',label:'Delivery schedule',type:'select',required:true,value:'normal',options:DELIVERY_OPTIONS},
-    {name:'price',label:'Selling price in rupees',type:'number',required:true,value:(item.pricePaise/100).toFixed(2),min:1,step:'0.01'},
-    {name:'original',label:'Original/MRP price in rupees',type:'number',required:true,value:(item.originalPricePaise/100).toFixed(2),min:1,step:'0.01'},
-    {name:'variants',label:'Sizes and stock (S:5, M:8, L:3)',required:true,value:(item.variants||[]).map(v=>`${v.size}:${v.inventory}`).join(', ')},
-    {name:'colourName',label:'Colour name',required:true,value:item.colourName||'Multi',maxLength:80},
-    {name:'colourHex',label:'Colour hex (optional)',value:item.colourHex||'',placeholder:'#000000'},
-    {name:'images',label:'Existing / HTTPS image URLs separated by commas',type:'textarea',required:true,value:(item.imageUrls||[]).join(', ')},
-    {name:'uploads',label:'Upload product images from this PC (optional)',type:'file',accept:'image/jpeg,image/png,image/webp',multiple:true,previewImages:true},
-  ],'Save all changes'); if(!values)return;
-  const price=Number(values.price), original=Number(values.original); if(!Number.isFinite(price)||price<1||!Number.isFinite(original)||original<price)throw new Error('Enter valid selling and original prices.');
-  const variants=parseVariants(values.variants); const uploadedUrls=await uploadAdminProductImages(values.uploads||[]); const imageUrls=[...values.images.split(',').map(value=>value.trim()).filter(Boolean),...uploadedUrls];
-  if(!imageUrls.length)throw new Error('Add at least one product image.');
-  const payload={name:values.name,description:values.description,brand:values.brand||undefined,department:values.department,category:values.category,subcategory:values.subcategory||undefined,deliveryType:values.deliveryType,pricePaise:Math.round(price*100),originalPricePaise:Math.round(original*100),variants,colourName:values.colourName,colourHex:values.colourHex||undefined,imageUrls};
-  const wasPublished=item.status==='PUBLISHED'; let unpublished=false;
-  try {
-    if(wasPublished){await api(`/api/admin/shop-products/${encodeURIComponent(item.id)}`,{method:'PATCH',body:JSON.stringify({status:'APPROVED'})});unpublished=true;}
-    await api(`/api/admin/shop-products/${encodeURIComponent(item.id)}/details`,{method:'PATCH',body:JSON.stringify(payload)});
-    if(wasPublished){await api(`/api/admin/shop-products/${encodeURIComponent(item.id)}`,{method:'PATCH',body:JSON.stringify({status:'PUBLISHED'})});unpublished=false;}
-  } catch(cause) {
-    if(unpublished){try{await api(`/api/admin/shop-products/${encodeURIComponent(item.id)}`,{method:'PATCH',body:JSON.stringify({status:'PUBLISHED'})});}catch{}}
-    throw cause;
-  }
-  if(wasPublished){
-    const live=(await api(`/api/admin/inventory?low=0&q=${encodeURIComponent(item.id)}`)).inventory||[];
-    for(let index=0;index<variants.length;index+=1){const variantId=`${item.id}-var-${index+1}`;const record=live.find(row=>row.variantId===variantId);const before=Number(record?.stock??variants[index].inventory);const delta=variants[index].inventory-before;if(delta)await api(`/api/admin/inventory/${encodeURIComponent(variantId)}`,{method:'PATCH',body:JSON.stringify({delta})});}
-  }
-  status('All product details, images, sizes and stock updated.');
+    {name:'name',label:'Product name',required:true,value:item.name||'',maxLength:140},{name:'description',label:'Description',type:'textarea',required:true,value:item.description||'',maxLength:2000},{name:'brand',label:'Brand (optional)',value:item.brand||'',maxLength:100},
+    {name:'department',label:'Department',type:'select',required:true,value:PRODUCT_DEPARTMENTS.includes(item.department)?item.department:'unisex',options:PRODUCT_DEPARTMENTS.map(value=>({value,label:value}))},{name:'category',label:'Category',type:'select',required:true,value:PRODUCT_CATEGORIES.includes(item.category)?item.category:'Clothing & Fashion',options:PRODUCT_CATEGORIES.map(value=>({value,label:value}))},{name:'subcategory',label:'Subcategory (optional; inferred when clear)',value:item.subcategory||item.attributes?.subcategory||'',maxLength:100},{name:'deliveryType',label:'Delivery schedule',type:'select',required:true,value:'normal',options:DELIVERY_OPTIONS},
+    {name:'price',label:'Selling price in rupees',type:'number',required:true,value:(item.pricePaise/100).toFixed(2),min:1,step:'0.01'},{name:'original',label:'Original/MRP price in rupees',type:'number',required:true,value:(item.originalPricePaise/100).toFixed(2),min:1,step:'0.01'},
+    {name:'colourVariants',label:'Colours & Variants',type:'colourVariants',value:colourSource},
+  ],'Save all changes');if(!values)return;
+  const price=Number(values.price),original=Number(values.original);if(!Number.isFinite(price)||price<1||!Number.isFinite(original)||original<price)throw new Error('Enter valid selling and original prices.');
+  const colourVariants=await uploadColourVariantImages(values.colourVariants);
+  const payload={name:values.name,description:values.description,brand:values.brand||undefined,department:values.department,category:values.category,subcategory:values.subcategory||undefined,deliveryType:values.deliveryType,pricePaise:Math.round(price*100),originalPricePaise:Math.round(original*100),colourVariants,attributes:item.attributes||{}};
+  const wasPublished=item.status==='PUBLISHED';let unpublished=false,updatedProduct=null;
+  try{if(wasPublished){await api(`/api/admin/shop-products/${encodeURIComponent(item.id)}`,{method:'PATCH',body:JSON.stringify({status:'APPROVED'})});unpublished=true;}const result=await api(`/api/admin/shop-products/${encodeURIComponent(item.id)}/details`,{method:'PATCH',body:JSON.stringify(payload)});updatedProduct=result.product;if(wasPublished){await api(`/api/admin/shop-products/${encodeURIComponent(item.id)}`,{method:'PATCH',body:JSON.stringify({status:'PUBLISHED'})});unpublished=false;}}catch(cause){if(unpublished){try{await api(`/api/admin/shop-products/${encodeURIComponent(item.id)}`,{method:'PATCH',body:JSON.stringify({status:'PUBLISHED'})});}catch{}}throw cause;}
+  if(wasPublished&&updatedProduct){const current=(await api(`/api/admin/inventory?low=0&q=${encodeURIComponent(item.id)}`)).inventory||[];for(const variant of updatedProduct.variants||[]){const row=current.find(record=>record.variantId===variant.id);if(!row)throw new Error(`Inventory row ${variant.id} is unavailable after product update.`);const delta=Number(variant.inventory)-Number(row.stock);if(delta)await api(`/api/admin/inventory/${encodeURIComponent(variant.id)}`,{method:'PATCH',body:JSON.stringify({delta})});}}
+  status('All product colours, images, sizes, stock and details updated.');
 }
 async function reasonFor(title){const values=await formDialog(title,[{name:'reason',label:'Reason',type:'textarea',required:true,maxLength:1000}],'Continue');return values?.reason||null;}
 async function codCollectionMethodFor(){

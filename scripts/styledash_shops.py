@@ -106,6 +106,7 @@ PRODUCT_PAYLOAD_FIELDS = {
     "colourName",
     "colourHex",
     "variants",
+    "colourVariants",
 }
 PRODUCT_CHANGE_PAYLOAD_FIELDS = PRODUCT_PAYLOAD_FIELDS - {"inventory", "size"}
 DEPARTMENTS = CANONICAL_DEPARTMENTS
@@ -132,6 +133,12 @@ def _row_variants(row: sqlite3.Row) -> list[dict[str, Any]]:
         variants = json.loads(raw or "[]")
     except (TypeError, json.JSONDecodeError):
         variants = []
+    try:
+        legacy_images = json.loads(row["image_urls_json"] or "[]")
+    except (TypeError, json.JSONDecodeError):
+        legacy_images = []
+    legacy_colour = row["colour_name"]
+    legacy_hex = row["colour_hex"]
     clean: list[dict[str, Any]] = []
     seen_ids: set[str] = set()
     if isinstance(variants, list):
@@ -146,11 +153,20 @@ def _row_variants(row: sqlite3.Row) -> list[dict[str, Any]]:
             if not isinstance(variant_id, str) or not variant_id.strip() or len(variant_id) > 128 or variant_id in seen_ids:
                 variant_id = f"{row['id']}-var-{index + 1}"
             seen_ids.add(variant_id)
+            colour_name = item.get("colourName", legacy_colour)
+            if not isinstance(colour_name, str) or not colour_name.strip():
+                colour_name = legacy_colour
+            images = item.get("imageUrls", legacy_images)
+            if not isinstance(images, list):
+                images = legacy_images
             clean.append({
                 "id": variant_id,
                 "size": size.strip(),
                 "inventory": max(0, inventory),
                 "active": item.get("active") is not False,
+                "colourName": colour_name.strip(),
+                "colourHex": item.get("colourHex", legacy_hex),
+                "imageUrls": images,
             })
     if clean:
         return clean
@@ -159,7 +175,38 @@ def _row_variants(row: sqlite3.Row) -> list[dict[str, Any]]:
         "size": row["size"],
         "inventory": row["inventory"],
         "active": True,
+        "colourName": legacy_colour,
+        "colourHex": legacy_hex,
+        "imageUrls": legacy_images,
     }]
+
+
+def _group_colour_variants(variants: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    groups: list[dict[str, Any]] = []
+    by_colour: dict[str, dict[str, Any]] = {}
+    for variant in variants:
+        if not variant.get("active", True):
+            continue
+        key = variant["colourName"].casefold()
+        group = by_colour.get(key)
+        if group is None:
+            group = {
+                "id": f"colour-{variant['id']}",
+                "colourName": variant["colourName"],
+                "colourHex": variant.get("colourHex"),
+                "imageUrls": list(variant.get("imageUrls") or []),
+                "sizes": [],
+            }
+            by_colour[key] = group
+            groups.append(group)
+        group["sizes"].append({
+            "id": variant["id"],
+            "size": variant["size"],
+            "inventory": variant["inventory"],
+        })
+    return groups
+
+
 
 
 class ShopWorkflow:
@@ -200,6 +247,7 @@ class ShopWorkflow:
             self._migrate_product_change_requests(db)
             self._migrate_product_variants(db)
             self._migrate_store_branding(db)
+            self._migrate_colour_variant_metadata(db)
             integrity = [row[0] for row in db.execute("PRAGMA integrity_check").fetchall()]
             if integrity != ["ok"]:
                 raise RuntimeError("Shop migration failed SQLite integrity validation")
@@ -488,6 +536,56 @@ class ShopWorkflow:
                     "INSERT INTO shop_schema_migrations(version,applied_at) VALUES(5,?)",
                     (now,),
                 )
+            db.commit()
+        except Exception:
+            db.rollback()
+            raise
+
+    @staticmethod
+    def _migrate_colour_variant_metadata(db: sqlite3.Connection) -> None:
+        """Backfill stable IDs and colour metadata after store-branding migration v5."""
+        now = iso(utc_now())
+        db.execute("BEGIN IMMEDIATE")
+        try:
+            rows = db.execute(
+                "SELECT id,size,inventory,colour_name,colour_hex,image_urls_json,variants_json "
+                "FROM shop_product_submissions"
+            ).fetchall()
+            for row in rows:
+                try:
+                    raw = json.loads(row["variants_json"] or "[]")
+                except (TypeError, json.JSONDecodeError):
+                    raw = []
+                if not isinstance(raw, list) or not raw:
+                    raw = [{"size": row["size"], "inventory": row["inventory"], "active": True}]
+                try:
+                    legacy_images = json.loads(row["image_urls_json"] or "[]")
+                except (TypeError, json.JSONDecodeError):
+                    legacy_images = []
+                normalized = []
+                seen_ids: set[str] = set()
+                for index, item in enumerate(raw):
+                    if not isinstance(item, dict):
+                        continue
+                    variant_id = item.get("id")
+                    if not isinstance(variant_id, str) or not variant_id.strip() or len(variant_id) > 128 or variant_id in seen_ids:
+                        variant_id = f"{row['id']}-var-{index + 1}"
+                    seen_ids.add(variant_id)
+                    images = item.get("imageUrls") if isinstance(item.get("imageUrls"), list) else legacy_images
+                    normalized.append({
+                        "id": variant_id,
+                        "size": item.get("size", row["size"]),
+                        "inventory": item.get("inventory", row["inventory"]),
+                        "active": item.get("active") is not False,
+                        "colourName": item.get("colourName") or row["colour_name"],
+                        "colourHex": item.get("colourHex", row["colour_hex"]),
+                        "imageUrls": images,
+                    })
+                encoded = json.dumps(normalized, separators=(",", ":"))
+                if encoded != (row["variants_json"] or ""):
+                    db.execute("UPDATE shop_product_submissions SET variants_json=? WHERE id=?", (encoded, row["id"]))
+            if db.execute("SELECT 1 FROM shop_schema_migrations WHERE version=6").fetchone() is None:
+                db.execute("INSERT INTO shop_schema_migrations(version,applied_at) VALUES(6,?)", (now,))
             db.commit()
         except Exception:
             db.rollback()
@@ -959,6 +1057,52 @@ class ShopWorkflow:
                 return payload[key]
             return current[column] if current is not None else None
 
+        current_variants = _row_variants(current) if current is not None else []
+        current_by_id = {item["id"]: item for item in current_variants}
+        current_image_urls = {
+            image
+            for variant in current_variants
+            for image in variant.get("imageUrls", [])
+            if isinstance(image, str)
+        }
+        if current is not None:
+            try:
+                current_image_urls.update(
+                    image for image in json.loads(current["image_urls_json"] or "[]") if isinstance(image, str)
+                )
+            except (TypeError, json.JSONDecodeError):
+                pass
+
+        def clean_image_urls(value: Any) -> list[str]:
+            if not isinstance(value, list) or len(value) > 8:
+                raise SecurityError(400, "Enter valid product images.", "invalid_product")
+            has_uploaded_image = any(
+                isinstance(image, str) and PRODUCT_MEDIA_PATH_PATTERN.fullmatch(image)
+                for image in value
+            )
+            clean: list[str] = []
+            for image in value:
+                if not isinstance(image, str) or len(image) > 500:
+                    raise SecurityError(400, "Enter valid product images.", "invalid_product")
+                if PRODUCT_MEDIA_PATH_PATTERN.fullmatch(image):
+                    clean.append(image)
+                    continue
+                parsed = urlsplit(image)
+                if parsed.scheme == "https" and parsed.netloc and not re.search(r"\.html?$", parsed.path, re.IGNORECASE):
+                    clean.append(image)
+                    continue
+                if allow_legacy_current_images and image in current_image_urls:
+                    clean.append(image)
+                    continue
+                if has_uploaded_image:
+                    continue
+                raise SecurityError(
+                    400,
+                    "Product image links must point directly to an HTTPS image, not a webpage, or use an uploaded Vibe4You image.",
+                    "invalid_product",
+                )
+            return clean
+
         name = clean_text(supplied("name", "name"), "product name", 2, 140)
         description = clean_text(
             supplied("description", "description"), "product description", 10, 2000
@@ -987,11 +1131,53 @@ class ShopWorkflow:
         ):
             raise SecurityError(400, "Enter a valid original price.", "invalid_product")
 
-        variants_value = payload.get("variants") if "variants" in payload else None
-        current_variants = _row_variants(current) if current is not None else []
+        colour_variants_value = payload.get("colourVariants") if "colourVariants" in payload else None
+        if colour_variants_value is not None and "variants" in payload:
+            raise SecurityError(400, "Use either colourVariants or legacy variants, not both.", "invalid_product")
+        colour_input = colour_variants_value is not None
+        if colour_input:
+            if not isinstance(colour_variants_value, list) or not 1 <= len(colour_variants_value) <= 20:
+                raise SecurityError(400, "Add between 1 and 20 colour variants.", "invalid_product")
+            expanded: list[dict[str, Any]] = []
+            seen_colour_names: set[str] = set()
+            for colour in colour_variants_value:
+                if not isinstance(colour, dict) or set(colour) - {"colourName", "colourHex", "imageUrls", "sizes"}:
+                    raise SecurityError(400, "Enter valid colour variant details.", "invalid_product")
+                colour_name = clean_text(colour.get("colourName"), "colour name", 1, 80)
+                colour_key = colour_name.casefold()
+                if colour_key in seen_colour_names:
+                    raise SecurityError(400, "Each colour can appear only once.", "invalid_product")
+                seen_colour_names.add(colour_key)
+                colour_hex_value = _optional_text(colour.get("colourHex"), "colour", 7)
+                if colour_hex_value is not None and not COLOUR_HEX_PATTERN.fullmatch(colour_hex_value):
+                    raise SecurityError(400, "Enter a valid colour.", "invalid_product")
+                colour_images = clean_image_urls(colour.get("imageUrls"))
+                if not colour_images:
+                    raise SecurityError(400, "Each colour needs at least one product image.", "invalid_product")
+                sizes = colour.get("sizes")
+                if not isinstance(sizes, list) or not sizes:
+                    raise SecurityError(400, "Each colour needs at least one size and stock row.", "invalid_product")
+                for size in sizes:
+                    if not isinstance(size, dict) or set(size) - {"id", "size", "inventory"}:
+                        raise SecurityError(400, "Enter valid size inventory rows.", "invalid_product")
+                    expanded.append({
+                        "id": size.get("id"),
+                        "size": size.get("size"),
+                        "inventory": size.get("inventory"),
+                        "active": True,
+                        "colourName": colour_name,
+                        "colourHex": colour_hex_value,
+                        "imageUrls": colour_images,
+                    })
+            variants_value = expanded
+        else:
+            variants_value = payload.get("variants") if "variants" in payload else None
         variants_from_current = variants_value is None and current is not None
         legacy_variant_change = "inventory" in payload or (
-            "size" in payload and (len([item for item in current_variants if item.get("active", True)]) <= 1 or payload.get("size") != current["size"])
+            "size" in payload and (
+                len([item for item in current_variants if item.get("active", True)]) <= 1
+                or payload.get("size") != current["size"]
+            )
         )
         if variants_value is not None and legacy_variant_change:
             raise SecurityError(400, "Use either variants or legacy size/inventory fields.", "invalid_product")
@@ -1006,13 +1192,16 @@ class ShopWorkflow:
         if not isinstance(variants_value, list) or not 1 <= len(variants_value) <= max_rows:
             raise SecurityError(400, "Add between 1 and 20 active size variants.", "invalid_product")
         clean_variants: list[dict[str, Any]] = []
-        seen_sizes: set[str] = set()
+        seen_sizes: set[tuple[str, str]] = set()
         seen_ids: set[str] = set()
         total_inventory = 0
         active_count = 0
-        metadata_allowed = trusted_variant_metadata or variants_from_current
+        metadata_allowed = trusted_variant_metadata or variants_from_current or colour_input
         for item in variants_value:
-            allowed_fields = {"size", "inventory", "id", "active"} if metadata_allowed else {"size", "inventory"}
+            allowed_fields = (
+                {"id", "size", "inventory", "active", "colourName", "colourHex", "imageUrls"}
+                if metadata_allowed else {"size", "inventory"}
+            )
             if not isinstance(item, dict) or set(item) - allowed_fields:
                 raise SecurityError(400, "Enter valid size inventory rows.", "invalid_product")
             size = normalize_size_label(item.get("size"), category)
@@ -1022,79 +1211,74 @@ class ShopWorkflow:
             active = item.get("active", True) if metadata_allowed else True
             if not isinstance(active, bool):
                 raise SecurityError(400, "Enter valid size inventory rows.", "invalid_product")
-            variant_id = item.get("id") if metadata_allowed else None
-            if metadata_allowed:
-                if variant_id is not None and (
-                    not isinstance(variant_id, str) or not variant_id.strip() or len(variant_id) > 128
-                ):
-                    raise SecurityError(400, "Enter valid size inventory rows.", "invalid_product")
-                variant_id = variant_id.strip() if isinstance(variant_id, str) else "shopvar_" + secrets.token_hex(12)
+            raw_variant_id = item.get("id") if metadata_allowed else None
+            existing = current_by_id.get(raw_variant_id) if isinstance(raw_variant_id, str) else None
+            if colour_input and not trusted_variant_metadata and raw_variant_id is not None and existing is None:
+                raw_variant_id = None
+            variant_id = raw_variant_id.strip() if isinstance(raw_variant_id, str) and raw_variant_id.strip() else None
+            if variant_id is not None and len(variant_id) > 128:
+                raise SecurityError(400, "Enter valid size inventory rows.", "invalid_product")
+            if variant_id is None and current is not None:
+                variant_id = "shopvar_" + secrets.token_hex(12)
+            if variant_id is not None:
                 if variant_id in seen_ids:
                     raise SecurityError(400, "Duplicate product variant identity.", "invalid_product")
                 seen_ids.add(variant_id)
+
+            existing = current_by_id.get(variant_id) if variant_id is not None else None
+            if not colour_input and "colourName" in payload:
+                fallback_colour = payload.get("colourName")
+            else:
+                fallback_colour = existing.get("colourName") if existing else supplied("colourName", "colour_name")
+            colour_name = clean_text(item.get("colourName", fallback_colour), "colour name", 1, 80)
+            if not colour_input and "colourHex" in payload:
+                raw_colour_hex = payload.get("colourHex")
+            else:
+                raw_colour_hex = item.get("colourHex", existing.get("colourHex") if existing else supplied("colourHex", "colour_hex"))
+            colour_hex_value = _optional_text(raw_colour_hex, "colour", 7)
+            if colour_hex_value is not None and not COLOUR_HEX_PATTERN.fullmatch(colour_hex_value):
+                raise SecurityError(400, "Enter a valid colour.", "invalid_product")
+
+            if not colour_input and "imageUrls" in payload:
+                variant_images_value = payload.get("imageUrls")
+            elif "imageUrls" in item:
+                variant_images_value = item.get("imageUrls")
+            elif existing is not None:
+                variant_images_value = existing.get("imageUrls", [])
+            elif current is not None:
+                variant_images_value = json.loads(current["image_urls_json"] or "[]")
+            else:
+                variant_images_value = []
+            variant_images = clean_image_urls(variant_images_value)
+
             if active:
-                key = size.casefold()
+                key = (colour_name.casefold(), size.casefold())
                 if key in seen_sizes:
-                    raise SecurityError(400, "Each active size can appear only once.", "invalid_product")
+                    raise SecurityError(400, "Each active size can appear only once per colour.", "invalid_product")
                 seen_sizes.add(key)
                 active_count += 1
                 total_inventory += inventory
-            clean = {"size": size, "inventory": inventory}
-            if metadata_allowed:
-                clean.update({"id": variant_id, "active": active})
-            clean_variants.append(clean)
+
+            clean_variant = {
+                "size": size,
+                "inventory": inventory,
+                "active": active,
+                "colourName": colour_name,
+                "colourHex": colour_hex_value,
+                "imageUrls": variant_images,
+            }
+            if variant_id is not None:
+                clean_variant["id"] = variant_id
+            clean_variants.append(clean_variant)
         if not 1 <= active_count <= 20:
             raise SecurityError(400, "Add between 1 and 20 active size variants.", "invalid_product")
         if total_inventory > 100_000:
             raise SecurityError(400, "Total active product inventory cannot exceed 100000.", "invalid_product")
-        size_summary = ", ".join(item["size"] for item in clean_variants if item.get("active", True))
-
-        raw_colour_hex = supplied("colourHex", "colour_hex")
-        colour_hex = _optional_text(raw_colour_hex, "colour", 7)
-        if colour_hex is not None and not COLOUR_HEX_PATTERN.fullmatch(colour_hex):
-            raise SecurityError(400, "Enter a valid colour.", "invalid_product")
-
-        image_value = payload.get("imageUrls") if "imageUrls" in payload else None
-        preserving_current_images = image_value is None and current is not None
-        if preserving_current_images:
-            image_urls = json.loads(current["image_urls_json"])
-        else:
-            image_urls = image_value
-        if not isinstance(image_urls, list) or len(image_urls) > 8:
-            raise SecurityError(400, "Enter valid product images.", "invalid_product")
-        clean_images: list[str] = []
-        has_uploaded_image = any(
-            isinstance(value, str) and PRODUCT_MEDIA_PATH_PATTERN.fullmatch(value)
-            for value in image_urls
-        )
-        for value in image_urls:
-            if not isinstance(value, str) or len(value) > 500:
-                raise SecurityError(400, "Enter valid product images.", "invalid_product")
-            if PRODUCT_MEDIA_PATH_PATTERN.fullmatch(value):
-                clean_images.append(value)
-                continue
-            parsed = urlsplit(value)
-            if (
-                parsed.scheme != "https"
-                or not parsed.netloc
-                or re.search(r"\.html?$", parsed.path, re.IGNORECASE)
-            ):
-                # Older published products can contain webpage URLs that were
-                # accepted before direct-image validation existed. If the seller
-                # has supplied a new uploaded Vibe4You image, silently discard
-                # only those legacy invalid URL strings so stale browser state
-                # cannot block a legitimate repair edit.
-                if has_uploaded_image:
-                    continue
-                if allow_legacy_current_images and preserving_current_images:
-                    clean_images.append(value)
-                    continue
-                raise SecurityError(
-                    400,
-                    "Product image links must point directly to an HTTPS image, not a webpage, or use an uploaded Vibe4You image.",
-                    "invalid_product",
-                )
-            clean_images.append(value)
+        active_variants = [item for item in clean_variants if item.get("active", True)]
+        size_summary = ", ".join(item["size"] for item in active_variants)
+        representative = active_variants[0]
+        clean_images = representative["imageUrls"]
+        colour_hex = representative["colourHex"]
 
         attributes_value = payload.get("attributes") if "attributes" in payload else None
         if attributes_value is None and current is not None:
@@ -1132,9 +1316,7 @@ class ShopWorkflow:
             "inventory": total_inventory,
             "size": size_summary,
             "variants_json": json.dumps(clean_variants, separators=(",", ":")),
-            "colour_name": clean_text(
-                supplied("colourName", "colour_name"), "colour name", 1, 80
-            ),
+            "colour_name": representative["colourName"],
             "colour_hex": colour_hex,
             "image_urls_json": json.dumps(clean_images, separators=(",", ":")),
             "attributes_json": json.dumps(clean_attributes, separators=(",", ":"), sort_keys=True),
@@ -1156,9 +1338,17 @@ class ShopWorkflow:
     @staticmethod
     def _serialize_product(row: sqlite3.Row, *, admin: bool = False) -> dict[str, Any]:
         attributes = json.loads(row["attributes_json"])
+        source_variants = _row_variants(row)
         variants = [
-            {"id": item["id"], "size": item["size"], "inventory": item["inventory"]}
-            for item in _row_variants(row) if item.get("active", True)
+            {
+                "id": item["id"],
+                "size": item["size"],
+                "inventory": item["inventory"],
+                "colourName": item["colourName"],
+                "colourHex": item.get("colourHex"),
+                "imageUrls": item.get("imageUrls") or [],
+            }
+            for item in source_variants if item.get("active", True)
         ]
         result = {
             "id": row["id"],
@@ -1176,6 +1366,7 @@ class ShopWorkflow:
             "inventory": sum(item["inventory"] for item in variants),
             "size": ", ".join(item["size"] for item in variants),
             "variants": variants,
+            "colourVariants": _group_colour_variants(source_variants),
             "colourName": row["colour_name"],
             "colourHex": row["colour_hex"],
             "imageUrls": json.loads(row["image_urls_json"]),
@@ -1188,13 +1379,11 @@ class ShopWorkflow:
             "publishedAt": row["published_at"],
         }
         if admin:
-            result.update(
-                {
-                    "submittedByUserId": row["submitted_by_user_id"],
-                    "reviewedBy": row["reviewed_by"],
-                    "reviewedAt": row["reviewed_at"],
-                }
-            )
+            result.update({
+                "submittedByUserId": row["submitted_by_user_id"],
+                "reviewedBy": row["reviewed_by"],
+                "reviewedAt": row["reviewed_at"],
+            })
         return result
 
     @staticmethod
@@ -1210,7 +1399,15 @@ class ShopWorkflow:
             "deliveryType": attributes.get("deliveryType", "normal"),
             "pricePaise": values["price_paise"],
             "originalPricePaise": values["original_price_paise"],
-            "variants": json.loads(values["variants_json"]),
+            "variants": [
+                {
+                    **({"id": item["id"]} if isinstance(item.get("id"), str) else {}),
+                    "size": item["size"],
+                    "inventory": item["inventory"],
+                    "active": item.get("active", True),
+                }
+                for item in json.loads(values["variants_json"])
+            ],
             "colourName": values["colour_name"],
             "colourHex": values["colour_hex"],
             "imageUrls": json.loads(values["image_urls_json"]),
@@ -1569,17 +1766,42 @@ class ShopWorkflow:
             if not isinstance(payload, dict):
                 db.rollback()
                 raise SecurityError(400, "Unsupported product field.", "invalid_product")
-            if current["status"] == "PUBLISHED" and ({"variants", "inventory", "size"} & set(payload)):
+            structure_fields = {"colourVariants", "variants", "inventory", "size"} & set(payload)
+            if current["status"] == "PUBLISHED" and structure_fields:
                 db.rollback()
                 raise SecurityError(
                     409,
-                    "Unpublish this product before changing its size structure. Live stock can be edited from Inventory.",
+                    "Unpublish this product before changing its colour or size structure. Live stock can be edited from Inventory.",
                     "live_variant_change_blocked",
                 )
-            variant_fields = {"variants", "inventory", "size"} & set(payload)
             trusted_variant_metadata = False
             candidate = dict(payload)
-            if variant_fields:
+            current_variants = _row_variants(current)
+            if "colourVariants" in payload:
+                preview = self._product_payload(payload, current)
+                proposed_active = json.loads(preview["variants_json"])
+                retained_ids = {item["id"] for item in proposed_active}
+                retired = [
+                    {
+                        "id": item["id"],
+                        "size": item["size"],
+                        "inventory": item["inventory"],
+                        "active": False,
+                        "colourName": item["colourName"],
+                        "colourHex": item.get("colourHex"),
+                        "imageUrls": item.get("imageUrls") or [],
+                    }
+                    for item in current_variants
+                    if item["id"] not in retained_ids
+                ]
+                candidate = {
+                    key: value
+                    for key, value in payload.items()
+                    if key not in {"colourVariants", "variants", "inventory", "size"}
+                }
+                candidate["variants"] = proposed_active + retired
+                trusted_variant_metadata = True
+            elif structure_fields:
                 if "variants" in payload and ({"inventory", "size"} & set(payload)):
                     db.rollback()
                     raise SecurityError(
@@ -1587,10 +1809,7 @@ class ShopWorkflow:
                         "Use either variants or legacy size/inventory fields.",
                         "invalid_product",
                     )
-                current_variants = _row_variants(current)
-                active_current = [
-                    item for item in current_variants if item.get("active", True)
-                ]
+                active_current = [item for item in current_variants if item.get("active", True)]
                 if "variants" in payload:
                     proposed_variants = payload["variants"]
                 else:
@@ -1603,42 +1822,39 @@ class ShopWorkflow:
                         )
                     proposed_variants = [{
                         "size": payload.get("size", active_current[0]["size"]),
-                        "inventory": payload.get(
-                            "inventory", active_current[0]["inventory"]
-                        ),
+                        "inventory": payload.get("inventory", active_current[0]["inventory"]),
                     }]
                 if not isinstance(proposed_variants, list):
                     db.rollback()
-                    raise SecurityError(
-                        400,
-                        "Enter valid size inventory rows.",
-                        "invalid_product",
-                    )
-                active_by_size = {
-                    item["size"].casefold(): item for item in active_current
-                }
+                    raise SecurityError(400, "Enter valid size inventory rows.", "invalid_product")
+                active_by_size = {item["size"].casefold(): item for item in active_current}
                 retained_ids: set[str] = set()
                 normalized_variants: list[dict[str, Any]] = []
                 for item in proposed_variants:
                     if not isinstance(item, dict) or set(item) - {"size", "inventory"}:
                         db.rollback()
-                        raise SecurityError(
-                            400,
-                            "Enter valid size inventory rows.",
-                            "invalid_product",
-                        )
+                        raise SecurityError(400, "Enter valid size inventory rows.", "invalid_product")
                     size = clean_text(item.get("size"), "size", 1, 40)
                     existing = active_by_size.get(size.casefold())
                     if existing is not None and existing["id"] not in retained_ids:
                         variant_id = existing["id"]
+                        colour_name = existing["colourName"]
+                        colour_hex = existing.get("colourHex")
+                        image_urls = existing.get("imageUrls") or []
                     else:
                         variant_id = "shopvar_" + secrets.token_hex(12)
+                        colour_name = current["colour_name"]
+                        colour_hex = current["colour_hex"]
+                        image_urls = json.loads(current["image_urls_json"] or "[]")
                     retained_ids.add(variant_id)
                     normalized_variants.append({
                         "id": variant_id,
                         "size": size,
                         "inventory": item.get("inventory"),
                         "active": True,
+                        "colourName": colour_name,
+                        "colourHex": colour_hex,
+                        "imageUrls": image_urls,
                     })
                 normalized_variants.extend(
                     {
@@ -1646,6 +1862,9 @@ class ShopWorkflow:
                         "size": item["size"],
                         "inventory": item["inventory"],
                         "active": False,
+                        "colourName": item["colourName"],
+                        "colourHex": item.get("colourHex"),
+                        "imageUrls": item.get("imageUrls") or [],
                     }
                     for item in current_variants
                     if item["id"] not in retained_ids

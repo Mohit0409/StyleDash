@@ -12,21 +12,28 @@ type E2EUser = {
   password: string;
 };
 
-const USER_A: E2EUser = {
-  name: 'E2E Commerce Customer A',
-  email: 'e2e-commerce-a@example.test',
-  phone: '9876543210',
-  password: PASSWORD,
-};
+let USER_A: E2EUser;
+let USER_B: E2EUser;
 
-const USER_B: E2EUser = {
-  name: 'E2E Commerce Customer B',
-  email: 'e2e-commerce-b@example.test',
-  phone: '9876543211',
-  password: PASSWORD,
-};
-
-test.beforeAll(async () => {
+test.beforeAll(async ({ browserName }, testInfo) => {
+  void browserName;
+  // Desktop and mobile projects intentionally share one isolated E2E server.
+  // Scope identities to the project so the second project never creates a
+  // duplicate account or exercises login rate limits as an accidental setup path.
+  const projectSuffix = testInfo.project.name.replace(/[^a-z0-9]/gi, '-').toLowerCase();
+  const phoneSuffix = testInfo.project.name === 'mobile-chromium' ? '12' : '10';
+  USER_A = {
+    name: `E2E Commerce Customer A ${projectSuffix}`,
+    email: `e2e-commerce-a-${projectSuffix}@example.test`,
+    phone: `98765432${phoneSuffix}`,
+    password: PASSWORD,
+  };
+  USER_B = {
+    name: `E2E Commerce Customer B ${projectSuffix}`,
+    email: `e2e-commerce-b-${projectSuffix}@example.test`,
+    phone: `98765433${phoneSuffix}`,
+    password: PASSWORD,
+  };
   const api = await playwrightRequest.newContext({
     baseURL: 'http://127.0.0.1:4173',
     extraHTTPHeaders: { 'X-Forwarded-For': '198.51.100.12' },
@@ -43,14 +50,10 @@ test.beforeAll(async () => {
         },
       });
 
-      if (response.status() === 409) {
-        const login = await api.post('/api/auth/login', {
-          data: { email: user.email, password: user.password },
-        });
-        expect(login.status()).toBe(200);
-      } else {
-        expect(response.status()).toBe(201);
-      }
+      // Playwright may restart the serial worker after a failed assertion and
+      // re-enter beforeAll against this still-clean shared runtime. The user
+      // already exists in that case; each test performs its own browser login.
+      expect([201, 409]).toContain(response.status());
     }
   } finally {
     await api.dispose();

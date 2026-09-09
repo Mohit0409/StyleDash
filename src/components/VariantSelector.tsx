@@ -21,12 +21,14 @@ export const VariantSelector: React.FC<VariantSelectorProps> = ({
   onOpenSizeGuide
 }) => {
   const colours = Array.from(new Set(product.variants.map(v => v.colourName)));
-  const sizes = Array.from(new Set(product.variants.map(v => v.size)));
+  const sizes = Array.from(new Set(product.variants
+    .filter(variant => !selectedColour || variant.colourName === selectedColour)
+    .map(variant => variant.size)));
 
   return (
     <div className="space-y-5">
-      {/* Colour Selection */}
-      <div>
+      {/* Keep legacy one-colour listings visually simple. */}
+      {colours.length > 1 && <div>
         <label className="block text-xs font-bold text-neutral-700 dark:text-neutral-300 uppercase tracking-wider mb-2">
           Select Colour: <span className="text-lime-600 dark:text-lime-400 font-black">{selectedColour || 'Choose one'}</span>
         </label>
@@ -60,7 +62,7 @@ export const VariantSelector: React.FC<VariantSelectorProps> = ({
             );
           })}
         </div>
-      </div>
+      </div>}
 
       {/* Size Selection */}
       <div>
