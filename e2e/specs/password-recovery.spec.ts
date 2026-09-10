@@ -51,6 +51,7 @@ test('profile can start password recovery without the current password', async (
   await page.getByPlaceholder('Phone number').fill(phone);
   await page.getByPlaceholder('Email').fill(email);
   await page.getByPlaceholder('Password (8+ characters)').fill('E2E-forgot-current-2026!');
+  await page.getByRole('checkbox', { name: /agree to the terms/i }).check();
   await page.getByRole('button', { name: 'Register' }).click();
   await expect(page).toHaveURL(/\/profile$/);
 

@@ -509,6 +509,10 @@ class FederatedAuthTests(unittest.TestCase):
                 db.execute("SELECT COUNT(*) FROM schema_migrations WHERE version=6").fetchone()[0],
                 1,
             )
+            self.assertEqual(
+                db.execute("SELECT COUNT(*) FROM schema_migrations WHERE version=7").fetchone()[0],
+                1,
+            )
             self.assertEqual(db.execute("PRAGMA integrity_check").fetchone()[0], "ok")
             self.assertEqual(len(db.execute("PRAGMA foreign_key_check").fetchall()), 0)
             user = db.execute(

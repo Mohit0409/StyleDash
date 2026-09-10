@@ -2842,7 +2842,9 @@ class StyleDashRequestHandler(SimpleHTTPRequestHandler):
                 return
             if path == "/api/auth/register":
                 self._rate_limit(path, 5)
-                user, raw, csrf = self._security().register(self._read_json())
+                user, raw, csrf = self._security().register(
+                    self._read_json(), record_terms_acceptance=True
+                )
 
                 owner_notifier().send(
                     event="customer_registered",
@@ -2871,14 +2873,18 @@ class StyleDashRequestHandler(SimpleHTTPRequestHandler):
                 return
             if path == "/api/auth/login":
                 self._rate_limit(path, 12)
-                user, raw, csrf = self._security().login(self._read_json(), self._client_key("login"))
+                user, raw, csrf = self._security().login(
+                    self._read_json(), self._client_key("login"), record_terms_acceptance=True
+                )
                 profile = self._security().profile(user["id"])
                 self._json_response(HTTPStatus.OK, {"success": True, "user": profile, "csrfToken": csrf}, headers={"Set-Cookie": self._security().cookie(raw)})
                 return
             if path in ("/api/auth/federated/google", "/api/auth/federated/phone"):
                 self._rate_limit(path, 10)
                 provider = "google" if path.endswith("google") else "phone"
-                user, raw, csrf, created = self._security().federated_session(provider, self._read_json())
+                user, raw, csrf, created = self._security().federated_session(
+                    provider, self._read_json(), record_terms_acceptance=True
+                )
 
                 if created:
                     contact = (

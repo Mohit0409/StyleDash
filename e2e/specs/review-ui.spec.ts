@@ -39,6 +39,7 @@ test('verified delivered customer can publish edit and delete a review', async (
   await page.getByPlaceholder('Phone number').fill(phone);
   await page.getByPlaceholder('Email').fill(`review-${unique}@example.test`);
   await page.getByPlaceholder('Password (8+ characters)').fill('E2E-review-password-2026!');
+  await page.getByRole('checkbox', { name: /agree to the terms/i }).check();
   await page.getByRole('button', { name: 'Register' }).click();
   await expect(page).toHaveURL(/\/profile$/);
 

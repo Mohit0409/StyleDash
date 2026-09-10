@@ -4,9 +4,14 @@ import { SEO } from '../components/SEO';
 import { CONFIG } from '../config';
 
 export const Terms = () => (
-  <div className="max-w-3xl mx-auto p-8 space-y-6">
-    <SEO title="Terms - Vibe4You" />
-    <h1 className="text-3xl font-black">Terms of service</h1>
+  <div className="max-w-3xl mx-auto px-4 py-8 sm:px-6 sm:py-12 space-y-6">
+    <SEO title="Terms and Conditions - Vibe4You" />
+    <header className="rounded-3xl bg-neutral-950 p-6 text-white sm:p-8">
+      <p className="text-xs font-black uppercase tracking-widest text-lime-400">Vibe4You customer agreement</p>
+      <h1 className="mt-2 text-3xl font-black">Terms and Conditions</h1>
+      <p className="mt-3 text-sm leading-relaxed text-neutral-300">Please read these terms before creating an account or signing in. Your acceptance is recorded against the current policy version.</p>
+      <p className="mt-4 text-xs font-semibold text-neutral-400">Effective {CONFIG.LEGAL.POLICY_EFFECTIVE_DATE} · Version {CONFIG.LEGAL.TERMS_VERSION}</p>
+    </header>
 
     <p className="text-sm text-neutral-600">
       Vibe4You is currently operated by {CONFIG.LEGAL.PROPRIETOR_NAME} from{' '}
@@ -98,8 +103,6 @@ export const Terms = () => (
       <p>Support hours: {CONFIG.LEGAL.SUPPORT_HOURS}</p>
     </section>
 
-    <p className="text-xs text-neutral-500">
-      Current policy effective date: {CONFIG.LEGAL.POLICY_EFFECTIVE_DATE}.
-    </p>
+    <p className="text-xs text-neutral-500">Current policy effective date: {CONFIG.LEGAL.POLICY_EFFECTIVE_DATE}. Terms version: {CONFIG.LEGAL.TERMS_VERSION}.</p>
   </div>
 );

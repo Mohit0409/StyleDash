@@ -12,6 +12,7 @@ test('saved profile survives logout and login', async ({ page }) => {
   await page.getByPlaceholder('Phone number').fill(phone);
   await page.getByPlaceholder('Email').fill(email);
   await page.getByPlaceholder('Password (8+ characters)').fill(password);
+  await page.getByRole('checkbox', { name: /agree to the terms/i }).check();
   await page.getByRole('button', { name: 'Register' }).click();
   await expect(page).toHaveURL(/\/profile$/);
 
@@ -24,6 +25,7 @@ test('saved profile survives logout and login', async ({ page }) => {
 
   await page.getByPlaceholder('Email').fill(email);
   await page.getByPlaceholder('Password (8+ characters)').fill(password);
+  await page.getByRole('checkbox', { name: /agree to the terms/i }).check();
   await page.getByRole('button', { name: 'Login' }).click();
   await expect(page).toHaveURL(/\/profile$/);
   await expect(page.getByText('Street address and landmark').locator('input')).toHaveValue(street);

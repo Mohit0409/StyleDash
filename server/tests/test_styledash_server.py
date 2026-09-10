@@ -2105,7 +2105,13 @@ class HttpApiTests(unittest.TestCase):
         self.assertEqual(status, 400)
         self.assertEqual(payload["code"], "malformed_request")
 
-    def post_json(self, path: str, payload: dict, headers: dict | None = None):
+    def post_json(
+        self, path: str, payload: dict, headers: dict | None = None, *, include_terms: bool = True
+    ):
+        if include_terms and path in {
+            "/api/auth/register", "/api/auth/login", "/api/auth/federated/google", "/api/auth/federated/phone",
+        }:
+            payload = {"termsAccepted": True, "termsVersion": "2026-08-14", **payload}
         request = urllib.request.Request(
             f"{self.base_url}{path}", data=json.dumps(payload).encode(),
             headers={"Content-Type": "application/json", **(headers or {})}, method="POST",
@@ -2117,6 +2123,68 @@ class HttpApiTests(unittest.TestCase):
             return status, body, response_headers
         with response:
             return response.status, json.load(response), response.headers
+
+    def test_authentication_requires_and_records_current_terms_consent(self) -> None:
+        registration = {
+            "name": "Terms Customer",
+            "email": "terms-customer@example.test",
+            "password": "very secure terms password 123",
+        }
+        status, rejected, _headers = self.post_json(
+            "/api/auth/register", registration, include_terms=False
+        )
+        self.assertEqual((status, rejected["code"]), (409, "terms_acceptance_required"))
+        status, stale_version, _headers = self.post_json(
+            "/api/auth/register",
+            {**registration, "termsAccepted": True, "termsVersion": "2026-01-01"},
+            include_terms=False,
+        )
+        self.assertEqual((status, stale_version["code"]), (409, "terms_acceptance_required"))
+
+        status, registered, _headers = self.post_json("/api/auth/register", registration)
+        self.assertEqual(status, 201)
+        customer_id = registered["user"]["id"]
+        with self.service.security.connect() as db:
+            acceptance = db.execute(
+                "SELECT terms_version,authentication_method,accepted_at FROM customer_terms_acceptances WHERE user_id=?",
+                (customer_id,),
+            ).fetchone()
+        self.assertEqual(tuple(acceptance[:2]), ("2026-08-14", "password"))
+        self.assertIsNotNone(acceptance[2])
+
+        status, rejected_login, _headers = self.post_json(
+            "/api/auth/login",
+            {"email": registration["email"], "password": registration["password"]},
+            include_terms=False,
+        )
+        self.assertEqual((status, rejected_login["code"]), (409, "terms_acceptance_required"))
+
+        google_token = "terms-google-token-" + ("x" * 20)
+        self.firebase_claims[google_token] = {
+            "uid": "terms-google-user", "email": "terms-google@example.test", "email_verified": True,
+            "firebase": {"sign_in_provider": "google.com"},
+        }
+        status, rejected_google, _headers = self.post_json(
+            "/api/auth/federated/google", {"idToken": google_token}, include_terms=False
+        )
+        self.assertEqual((status, rejected_google["code"]), (409, "terms_acceptance_required"))
+        status, google, _headers = self.post_json("/api/auth/federated/google", {"idToken": google_token})
+        self.assertEqual(status, 201)
+
+        phone_token = "terms-phone-token-" + ("x" * 20)
+        self.firebase_claims[phone_token] = {
+            "uid": "terms-phone-user", "phone_number": "+919876543210",
+            "firebase": {"sign_in_provider": "phone"},
+        }
+        status, phone, _headers = self.post_json("/api/auth/federated/phone", {"idToken": phone_token})
+        self.assertEqual(status, 201)
+        with self.service.security.connect() as db:
+            methods = {
+                row[0] for row in db.execute(
+                    "SELECT authentication_method FROM customer_terms_acceptances"
+                ).fetchall()
+            }
+        self.assertEqual(methods, {"password", "google", "phone"})
 
     def get_json(self, path: str, headers: dict | None = None):
         try:

@@ -47,13 +47,22 @@ test.beforeAll(async ({ browserName }, testInfo) => {
           email: user.email,
           phone: user.phone,
           password: user.password,
+          termsAccepted: true,
+          termsVersion: '2026-08-14',
         },
       });
 
-      // Playwright may restart the serial worker after a failed assertion and
-      // re-enter beforeAll against this still-clean shared runtime. The user
-      // already exists in that case; each test performs its own browser login.
-      expect([201, 409]).toContain(response.status());
+      // Playwright may restart the serial worker and encounter an already-created
+      // user. Re-authenticate with current Terms consent so the fixture remains
+      // restart-safe and compliant with the server-authoritative consent gate.
+      if (response.status() === 409) {
+        const login = await api.post('/api/auth/login', {
+          data: { email: user.email, password: user.password, termsAccepted: true, termsVersion: '2026-08-14' },
+        });
+        expect(login.status()).toBe(200);
+      } else {
+        expect(response.status()).toBe(201);
+      }
     }
   } finally {
     await api.dispose();
@@ -70,6 +79,7 @@ async function loginCustomer(
   await page
     .getByPlaceholder('Password (8+ characters)')
     .fill(user.password);
+  await page.getByRole('checkbox', { name: /agree to the terms/i }).check();
 
   await page.getByRole('button', { name: 'Login' }).click();
 

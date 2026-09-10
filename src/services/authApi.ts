@@ -13,6 +13,11 @@ interface PasswordResetRequestResponse {
   message: string;
 }
 
+export interface TermsAcceptance {
+  termsAccepted: true;
+  termsVersion: string;
+}
+
 const accept = (response: AuthResponse) => {
   setCsrfToken(response.csrfToken);
   return response;
@@ -24,14 +29,14 @@ export const authApi = {
     const response = await apiFetch<AuthResponse>('/api/auth/me');
     return accept(response).user;
   },
-  async login(email: string, password: string): Promise<AuthResponse> {
-    return accept(await apiJson<AuthResponse>('/api/auth/login', 'POST', { email, password }));
+  async login(email: string, password: string, terms: TermsAcceptance): Promise<AuthResponse> {
+    return accept(await apiJson<AuthResponse>('/api/auth/login', 'POST', { email, password, ...terms }));
   },
-  async register(name: string, email: string, password: string, phone?: string): Promise<AuthResponse> {
-    return accept(await apiJson<AuthResponse>('/api/auth/register', 'POST', { name, email, password, phone }));
+  async register(name: string, email: string, password: string, phone: string | undefined, terms: TermsAcceptance): Promise<AuthResponse> {
+    return accept(await apiJson<AuthResponse>('/api/auth/register', 'POST', { name, email, password, phone, ...terms }));
   },
-  async federated(provider: FederatedProvider, idToken: string): Promise<AuthResponse> {
-    return accept(await apiJson<AuthResponse>(`/api/auth/federated/${provider}`, 'POST', { idToken }));
+  async federated(provider: FederatedProvider, idToken: string, terms: TermsAcceptance): Promise<AuthResponse> {
+    return accept(await apiJson<AuthResponse>(`/api/auth/federated/${provider}`, 'POST', { idToken, ...terms }));
   },
   async linkFederated(provider: FederatedProvider, idToken: string): Promise<UserProfile> {
     return (await apiJson<{ success: true; profile: UserProfile }>(`/api/auth/federated/link/${provider}`, 'POST', { idToken })).profile;

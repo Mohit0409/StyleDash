@@ -15,6 +15,8 @@ test('customer can register and receive a working authenticated session', async 
   await page
     .getByPlaceholder('Password (8+ characters)')
     .fill('E2E-only-password-2026!');
+  await expect(page.getByRole('button', { name: 'Register' })).toBeDisabled();
+  await page.getByRole('checkbox', { name: /agree to the terms/i }).check();
 
   await page.getByRole('button', { name: 'Register' }).click();
 

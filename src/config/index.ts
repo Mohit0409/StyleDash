@@ -26,5 +26,6 @@ export const CONFIG = {
     RETURN_PICKUP_FEE: 50,
     EXCHANGE_PICKUP_FEE: 50,
     REFUND_TIMELINE_DAYS: 7,
+    TERMS_VERSION: '2026-08-14',
   },
 };
