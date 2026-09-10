@@ -27,9 +27,9 @@ test('home discovery exposes categories, budget tiers, and Top Picks', async ({ 
 
   await expect(page.getByRole('link', { name: /Categories/ }).first()).toHaveAttribute('href', '/categories');
   await expect(page.getByRole('heading', { name: 'Shop by Budget' })).toBeVisible();
-  await expect(page.getByRole('link', { name: /Under\s*₹199/ })).toHaveAttribute('href', '/products?maxPrice=199');
-  await expect(page.getByRole('link', { name: /Under\s*₹299/ })).toHaveAttribute('href', '/products?maxPrice=299');
-  await expect(page.getByRole('link', { name: /Under\s*₹499/ }).first()).toHaveAttribute('href', '/products?maxPrice=499');
+  await expect(page.getByRole('link', { name: 'Under ₹199', exact: true })).toHaveAttribute('href', '/products?maxPrice=199');
+  await expect(page.getByRole('link', { name: 'Under ₹299', exact: true })).toHaveAttribute('href', '/products?maxPrice=299');
+  await expect(page.getByRole('link', { name: 'Under ₹499', exact: true })).toHaveAttribute('href', '/products?maxPrice=499');
   await expect(page.getByRole('heading', { name: 'Top Picks' })).toBeVisible();
 });
 
