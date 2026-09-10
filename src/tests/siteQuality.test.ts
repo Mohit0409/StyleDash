@@ -37,4 +37,11 @@ describe('site quality guardrails', () => {
     expect(sizeGuide).not.toContain('free of cost');
     expect(sizeGuide).toContain('pickup/exchange charges may apply');
   });
+
+  it('does not make an unsupported size-exchange promise in the homepage trust strip', () => {
+    const home = readText('../pages/Home.tsx');
+    expect(home).not.toContain('Easy Size Exchange');
+    expect(home).toContain('Shop by Budget');
+    expect(home).toContain('/products?maxPrice=499');
+  });
 });

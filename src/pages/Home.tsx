@@ -70,7 +70,9 @@ export const Home: React.FC = () => {
             <div className="pt-6 border-t border-neutral-800 grid grid-cols-3 gap-4 text-xs text-neutral-400">
               <div><strong className="text-white block text-sm">Free Same Day</strong> Delivery</div>
               <div><strong className="text-white block text-sm">Local Stores</strong> Curated Marketplace</div>
-              <div><strong className="text-white block text-sm">7 Days</strong> Easy Size Exchange</div>
+              <Link to="/products?maxPrice=499" className="rounded focus-visible:outline focus-visible:outline-2 focus-visible:outline-lime-400">
+                <strong className="text-white block text-sm">Shop by Budget</strong> Under ₹199, ₹299 &amp; ₹499
+              </Link>
             </div>
           </div>
 
