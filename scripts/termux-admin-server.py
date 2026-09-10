@@ -889,6 +889,14 @@ class AdminHandler(BaseHTTPRequestHandler):
                 owner_user_id = payload.pop("ownerUserId", None)
                 if not isinstance(owner_user_id, str) or not owner_user_id:
                     raise SecurityError(400, "Choose a store-owner account.", "invalid_customer")
+                for field, label in (("bannerImage", "store cover"), ("logoImage", "store logo")):
+                    value = payload.get(field)
+                    if value in (None, ""):
+                        continue
+                    if not isinstance(value, str) or not PRODUCT_MEDIA_PATH_PATTERN.fullmatch(value):
+                        raise SecurityError(400, f"Upload a valid {label} image.", "invalid_store_branding")
+                    if not (self.application.product_image_directory / Path(value).name).is_file():
+                        raise SecurityError(400, f"Upload a valid {label} image.", "invalid_store_branding")
                 result = self._shops().admin_create_application(admin["id"], owner_user_id, payload)
                 self._json(201, {"success": True, "application": result}); return
             if path == "/api/admin/product-images":

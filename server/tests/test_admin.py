@@ -208,8 +208,12 @@ class AdminStoreTests(unittest.TestCase):
             "shopName": "Managed Local Store", "ownerName": "Managed Owner", "category": "Clothing & Fashion",
             "description": "A local store managed initially by the private administrator.", "address": "10 Main Market Road",
             "city": "Neemuch", "state": "Madhya Pradesh", "pincode": "458441", "businessInformation": "Admin-assisted onboarding.",
+            "bannerImage": "/media/product-images/" + "a" * 32 + ".webp",
+            "logoImage": "/media/product-images/" + "b" * 32 + ".png",
         })
         self.assertEqual(shop["status"], "ACTIVE")
+        self.assertEqual(shop["bannerImage"], "/media/product-images/" + "a" * 32 + ".webp")
+        self.assertEqual(shop["logoImage"], "/media/product-images/" + "b" * 32 + ".png")
         product = app.shops.admin_create_product(self.admin["id"], shop["id"], {
             "name": "Managed Cotton Tee", "description": "Admin-listed local cotton tee with size stock.", "brand": "Local",
             "department": "unisex", "category": "Clothing & Fashion", "pricePaise": 79900, "originalPricePaise": 99900,
@@ -767,6 +771,10 @@ class AdminStoreTests(unittest.TestCase):
         self.assertIn('All Shops', admin_ui)
         self.assertIn('No products match the current search and filters.', admin_ui)
         self.assertIn("Promise.all([api('/api/admin/shop-products'),api('/api/admin/vendors')])", admin_ui)
+        self.assertIn("Store cover image (optional)", admin_ui)
+        self.assertIn("Store logo (optional)", admin_ui)
+        self.assertIn("payload.bannerImage", admin_ui)
+        self.assertIn("payload.logoImage", admin_ui)
         self.assertIn("Choose product images from this PC", admin_ui)
         self.assertIn("HTTPS image URLs (optional fallback)", admin_ui)
         self.assertIn("imageFile", admin_ui)

@@ -199,8 +199,13 @@ async function createLocalStore(){
     {name:'state',label:'State',required:true,value:'Madhya Pradesh',maxLength:80},
     {name:'pincode',label:'Pincode',required:true,value:'458441',maxLength:6},
     {name:'businessInformation',label:'Business information (optional)',type:'textarea',maxLength:1000},
+    {name:'bannerUpload',label:'Store cover image (optional)',type:'file',accept:'image/jpeg,image/png,image/webp'},
+    {name:'logoUpload',label:'Store logo (optional)',type:'file',accept:'image/jpeg,image/png,image/webp'},
   ],'Create and activate store'); if(!values)return;
-  await api('/api/admin/vendors',{method:'POST',body:JSON.stringify(values)});
+  const payload={ownerUserId:values.ownerUserId,shopName:values.shopName,ownerName:values.ownerName,category:values.category,description:values.description,address:values.address,city:values.city,state:values.state,pincode:values.pincode,businessInformation:values.businessInformation||undefined};
+  if(values.bannerUpload instanceof File&&values.bannerUpload.size){payload.bannerImage=(await uploadAdminProductImages([values.bannerUpload]))[0];}
+  if(values.logoUpload instanceof File&&values.logoUpload.size){payload.logoImage=(await uploadAdminProductImages([values.logoUpload]))[0];}
+  await api('/api/admin/vendors',{method:'POST',body:JSON.stringify(payload)});
   status(`${values.shopName} created and activated.`);
 }
 async function editStore(button){
