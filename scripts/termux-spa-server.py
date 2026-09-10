@@ -302,6 +302,23 @@ def _notify_finalized_payment(order: dict[str, Any]) -> None:
         )
 
 
+def _notify_shop_product_review(*, result: dict[str, Any], event: str, title: str, request_type: str = "") -> None:
+    try:
+        product_id = str(result.get("productId") or result.get("id") or "-")[:120]
+        product_name = " ".join(str(result.get("productName") or result.get("name") or "-").split())[:120]
+        category = " ".join(str(result.get("category") or "-").split())[:80]
+        status = " ".join(str(result.get("status") or "-").split())[:40]
+        lines = [f"Product: {product_name}", f"Reference: {product_id}"]
+        if request_type:
+            lines.append(f"Request: {request_type}")
+        elif category != "-":
+            lines.append(f"Category: {category}")
+        lines.append(f"Status: {status}")
+        owner_notifier().send(event=event, title=title, message="\n".join(lines), priority=5, tags=["package"])
+    except Exception:
+        print(f"Vibe4You notification preparation failed event={event}", flush=True)
+
+
 def _notify_inventory_alerts(
     alerts: list[dict[str, Any]],
 ) -> None:
@@ -3040,6 +3057,7 @@ class StyleDashRequestHandler(SimpleHTTPRequestHandler):
                 if not product_id or "/" in product_id:
                     raise SecurityError(404, "Product submission not found.", "product_not_found")
                 result = self._shops().submit_product(user["id"], product_id)
+                _notify_shop_product_review(result=result, event="shop_product_submission", title="Shop Product Needs Review")
                 self._json_response(
                     HTTPStatus.OK, {"success": True, "product": result}
                 )
@@ -3057,6 +3075,7 @@ class StyleDashRequestHandler(SimpleHTTPRequestHandler):
                 result = self._shops().create_product_edit_request(
                     user["id"], product_id, self._read_json(), live_inventory
                 )
+                _notify_shop_product_review(result=result, event="shop_product_change_request", title="Shop Product Change Needs Review", request_type="EDIT")
                 self._json_response(
                     HTTPStatus.CREATED, {"success": True, "request": result}
                 )
@@ -3080,6 +3099,7 @@ class StyleDashRequestHandler(SimpleHTTPRequestHandler):
                 result = self._shops().create_product_unpublish_request(
                     user["id"], product_id
                 )
+                _notify_shop_product_review(result=result, event="shop_product_change_request", title="Shop Product Change Needs Review", request_type="UNPUBLISH")
                 self._json_response(
                     HTTPStatus.CREATED, {"success": True, "request": result}
                 )
