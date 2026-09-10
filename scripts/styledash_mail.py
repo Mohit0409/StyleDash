@@ -12,6 +12,7 @@ import queue
 import smtplib
 import ssl
 import threading
+from email.headerregistry import Address
 from email.message import EmailMessage
 from typing import Callable, Mapping, Protocol
 from urllib.parse import urlencode, urlsplit, urlunsplit
@@ -144,11 +145,11 @@ class SmtpPasswordResetSender:
 
     def __call__(self, recipient: str, token: str) -> None:
         message = EmailMessage()
-        message["From"] = self.from_address
+        message["From"] = Address(display_name="Vibe4You Support", addr_spec=self.from_address)
         message["To"] = _validate_email(recipient)
-        message["Subject"] = "Reset your Style Dash password"
+        message["Subject"] = "Reset your Vibe4You password"
         message.set_content(
-            "A password reset was requested for your Style Dash account.\n\n"
+            "A password reset was requested for your Vibe4You account.\n\n"
             f"Reset your password: {self._reset_link(token)}\n\n"
             "This link expires in 30 minutes and can be used once. If you did not request it, you can ignore this email."
         )

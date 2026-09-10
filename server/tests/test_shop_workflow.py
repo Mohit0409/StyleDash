@@ -173,8 +173,42 @@ class ShopWorkflowTests(unittest.TestCase):
                 [row[0] for row in db.execute(
                     "SELECT version FROM shop_schema_migrations ORDER BY version"
                 )],
-                [1, 2, 3, 4, 5],
+                [1, 2, 3, 4, 5, 6],
             )
+            self.assertEqual(db.execute("PRAGMA integrity_check").fetchone()[0], "ok")
+            self.assertEqual(db.execute("PRAGMA foreign_key_check").fetchall(), [])
+
+    def test_new_product_persists_variant_ids_before_and_after_v6_rerun(self) -> None:
+        self.create_active_shop("user-a", "Stable Variant Shop")
+        payload = self.complete_product("Stable Variant Shirt")
+        payload.pop("inventory")
+        payload.pop("size")
+        payload["variants"] = [{"size": "M", "inventory": 7}, {"size": "L", "inventory": 4}]
+        product = self.store.create_product_draft("user-a", payload)
+
+        def snapshot():
+            with self.store.connect() as db:
+                row = db.execute(
+                    "SELECT size,inventory,colour_name,colour_hex,image_urls_json,variants_json "
+                    "FROM shop_product_submissions WHERE id=?", (product["id"],)
+                ).fetchone()
+                return tuple(row)
+
+        before = snapshot()
+        variants = json.loads(before[-1])
+        self.assertEqual([item["id"] for item in variants], [
+            f"{product['id']}-var-1", f"{product['id']}-var-2"
+        ])
+        ShopWorkflow(self.path)
+        self.assertEqual(snapshot(), before)
+        with self.store.connect() as db:
+            db.execute("DELETE FROM shop_schema_migrations WHERE version=6")
+        ShopWorkflow(self.path)
+        self.assertEqual(snapshot(), before)
+        with self.store.connect() as db:
+            self.assertEqual(db.execute(
+                "SELECT COUNT(*) FROM shop_schema_migrations WHERE version=6"
+            ).fetchone()[0], 1)
             self.assertEqual(db.execute("PRAGMA integrity_check").fetchone()[0], "ok")
             self.assertEqual(db.execute("PRAGMA foreign_key_check").fetchall(), [])
 
@@ -243,7 +277,7 @@ class ShopWorkflowTests(unittest.TestCase):
         db = sqlite3.connect(concurrent_path)
         self.assertEqual(
             db.execute("SELECT version,COUNT(*) FROM shop_schema_migrations GROUP BY version").fetchall(),
-            [(1, 1), (2, 1), (3, 1), (4, 1), (5, 1)],
+            [(1, 1), (2, 1), (3, 1), (4, 1), (5, 1), (6, 1)],
         )
         self.assertEqual(db.execute("PRAGMA integrity_check").fetchone()[0], "ok")
         self.assertEqual(db.execute("PRAGMA foreign_key_check").fetchall(), [])
@@ -311,7 +345,12 @@ class ShopWorkflowTests(unittest.TestCase):
             columns = {row[1] for row in db.execute("PRAGMA table_info(shop_product_submissions)")}
             self.assertIn("variants_json", columns)
             raw = db.execute("SELECT variants_json FROM shop_product_submissions WHERE id=?", (product["id"],)).fetchone()[0]
-        self.assertEqual(json.loads(raw), [{"size": "M", "inventory": 8}])
+        migrated = json.loads(raw)
+        self.assertEqual([(item["size"], item["inventory"]) for item in migrated], [("M", 8)])
+        self.assertEqual(migrated[0]["id"], f"{product['id']}-var-1")
+        self.assertTrue(migrated[0]["active"])
+        self.assertEqual(migrated[0]["colourName"], "Blue")
+        self.assertEqual(migrated[0]["imageUrls"], ["https://images.example.test/kurta.jpg"])
         payload = self.complete_product("Repaired Multi Size Product")
         payload.pop("inventory")
         payload.pop("size")
@@ -777,6 +816,8 @@ class ShopWorkflowTests(unittest.TestCase):
             self.store.admin_transition_product("admin-a", product["id"], target)
         public = self.store.list_published_products()[0]
         self.assertEqual((public["subcategory"], public["deliveryType"], public["expressDelivery"]), ("Sliders", "express", True))
+        payment_product = self.store.payment_catalog_products()[0]
+        self.assertEqual((payment_product["deliveryType"], payment_product["expressDelivery"]), ("express", True))
 
     def test_catalog_normalization_applies_to_admin_bulk_and_edit(self) -> None:
         application = self.create_active_shop("user-a", "Normalized Admin Shop")
@@ -796,6 +837,48 @@ class ShopWorkflowTests(unittest.TestCase):
         payload = self.complete_product("Premium Everyday Sneakers")
         payload.update({"department": "footwear", "category": "Footwear"})
         self.assert_error("invalid_product", lambda: self.store.create_product_draft("user-a", payload))
+
+    def test_multi_colour_product_keeps_images_and_stock_per_colour_size(self) -> None:
+        self.create_active_shop("user-a", "Colour Variant Shop")
+        payload = self.complete_product("Two Colour Shirt")
+        for field in ("inventory", "size", "colourName", "colourHex", "imageUrls"):
+            payload.pop(field)
+        payload["colourVariants"] = [
+            {"colourName": "Black", "colourHex": "#000000", "imageUrls": ["https://images.example.test/black.jpg"], "sizes": [{"size": "M", "inventory": 5}, {"size": "L", "inventory": 3}]},
+            {"colourName": "Orange", "colourHex": "#FF6600", "imageUrls": ["https://images.example.test/orange.jpg"], "sizes": [{"size": "M", "inventory": 2}, {"size": "XL", "inventory": 4}]},
+        ]
+        product = self.store.create_product_draft("user-a", payload)
+        self.assertEqual(product["inventory"], 14)
+        self.assertEqual(len(product["colourVariants"]), 2)
+        self.assertEqual([item["id"] for item in product["variants"]], [f"{product['id']}-var-{i}" for i in range(1, 5)])
+        self.assertEqual(product["colourVariants"][1]["imageUrls"], ["https://images.example.test/orange.jpg"])
+        self.assertEqual([(row["size"], row["inventory"]) for row in product["colourVariants"][1]["sizes"]], [("M", 2), ("XL", 4)])
+
+    def test_admin_colour_edit_preserves_ids_and_retires_removed_size(self) -> None:
+        self.create_active_shop("user-a", "Colour Edit Shop")
+        payload = self.complete_product("Colour Edit Shirt")
+        for field in ("inventory", "size", "colourName", "colourHex", "imageUrls"):
+            payload.pop(field)
+        payload["colourVariants"] = [
+            {"colourName": "Black", "imageUrls": ["https://images.example.test/black.jpg"], "sizes": [{"size": "M", "inventory": 5}, {"size": "L", "inventory": 3}]},
+            {"colourName": "Orange", "imageUrls": ["https://images.example.test/orange.jpg"], "sizes": [{"size": "M", "inventory": 2}]},
+        ]
+        product = self.store.create_product_draft("user-a", payload)
+        black_m, black_l, orange_m = [item["id"] for item in product["variants"]]
+        edited = self.store.admin_update_product("admin-a", product["id"], {"colourVariants": [
+            {"colourName": "Black", "imageUrls": ["https://images.example.test/black.jpg"], "sizes": [{"id": black_m, "size": "M", "inventory": 6}]},
+            {"colourName": "Orange", "imageUrls": ["https://images.example.test/orange-new.jpg"], "sizes": [{"id": orange_m, "size": "M", "inventory": 2}, {"size": "XL", "inventory": 1}]},
+        ]})
+        self.assertEqual(edited["colourVariants"][0]["sizes"][0]["id"], black_m)
+        self.assertEqual(edited["colourVariants"][1]["sizes"][0]["id"], orange_m)
+        self.assertNotIn(black_l, [item["id"] for item in edited["variants"]])
+        with self.store.connect() as db:
+            raw = json.loads(db.execute("SELECT variants_json FROM shop_product_submissions WHERE id=?", (product["id"],)).fetchone()[0])
+        retired = next(item for item in raw if item["id"] == black_l)
+        self.assertFalse(retired["active"])
+        self.assertEqual(retired["inventory"], 3)
+        self.assertEqual(retired["colourName"], "Black")
+        self.assertEqual(len({item["id"] for item in raw}), len(raw))
 
 if __name__ == "__main__":
     unittest.main()

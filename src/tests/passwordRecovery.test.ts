@@ -45,6 +45,9 @@ describe('password recovery routes', () => {
     expect(app).toContain('path="forgot-password"');
     expect(app).toContain('path="reset-password"');
     expect(auth).toContain('Forgot password?');
+    const profile = readFileSync(resolve('src/pages/Profile.tsx'), 'utf8');
+    expect(profile).toContain('Forgot current password?');
+    expect(profile).toContain("state={{ email: user?.email || '' }}");
   });
 
   it('keeps reset tokens out of browser storage and removes fragment text after intake', () => {

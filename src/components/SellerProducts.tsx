@@ -10,8 +10,8 @@ import {
   shopProductApi,
 } from '../services/businessApi';
 
-const CATEGORIES = ['Clothing & Fashion', 'Footwear', 'Electronics', 'Home & Living', 'General Store'];
-const DEPARTMENTS = ['men', 'women', 'kids', 'unisex', 'footwear', 'accessories'] as const;
+const CATEGORIES = ['Clothing & Fashion', 'Footwear', 'Accessories', 'Beauty & Personal Care', 'Electronics', 'Home & Living', 'General Store'];
+const DEPARTMENTS = ['men', 'women', 'kids', 'unisex'] as const;
 const INTERNAL_PRODUCT_IMAGE = /^\/media\/product-images\/[0-9a-f]{32}\.(?:webp|jpg|png)$/;
 
 const validExternalImageLink = (value: string) => {
@@ -60,7 +60,7 @@ const toForm = (product: SellerProduct): ProductFormState => {
     department: product.department,
     category: product.category,
     subcategory: product.subcategory || product.attributes.subcategory || '',
-    deliveryType: product.deliveryType || (product.attributes.deliveryType as ProductFormState['deliveryType']) || 'normal',
+    deliveryType: 'normal',
     price: (product.pricePaise / 100).toFixed(2),
     originalPrice: (product.originalPricePaise / 100).toFixed(2),
     variants: product.variants?.length
@@ -124,7 +124,7 @@ const toPayload = (form: ProductFormState): SellerProductDraft => {
     department: form.department,
     category: form.category,
     subcategory: form.subcategory.trim() || undefined,
-    deliveryType: form.deliveryType,
+    deliveryType: 'normal',
     pricePaise,
     originalPricePaise,
     variants,
@@ -460,7 +460,7 @@ export const SellerProducts: React.FC = () => {
             <label className="font-bold">Department<select value={form.department} onChange={event => updateForm('department', event.target.value)} className="mt-1 w-full rounded-xl border p-3 dark:bg-neutral-800">{DEPARTMENTS.map(value => <option key={value} value={value}>{value}</option>)}</select></label>
             <label className="font-bold">Category<select value={form.category} onChange={event => updateForm('category', event.target.value)} className="mt-1 w-full rounded-xl border p-3 dark:bg-neutral-800">{CATEGORIES.map(value => <option key={value} value={value}>{value}</option>)}</select></label>
             <label className="font-bold">Subcategory <span className="font-normal text-neutral-500">(optional; inferred when clear)</span><input maxLength={100} value={form.subcategory} onChange={event => updateForm('subcategory', event.target.value)} placeholder="e.g. Sneakers or Earrings" className="mt-1 w-full rounded-xl border p-3 dark:bg-neutral-800" /></label>
-            <label className="font-bold">Delivery eligibility<select value={form.deliveryType} onChange={event => updateForm('deliveryType', event.target.value)} className="mt-1 w-full rounded-xl border p-3 dark:bg-neutral-800"><option value="normal">Normal delivery</option><option value="express">Weekend Express only</option><option value="both">Normal + Weekend Express</option></select></label>
+            <div className="rounded-xl border p-3 dark:border-neutral-700"><p className="font-bold">Delivery schedule</p><p className="mt-1 text-neutral-500">Same Day Delivery Monday-Friday. Same Day + Express Delivery Saturday-Sunday for every product.</p></div>
             <label className="font-bold">Price (INR)<input required type="number" min="1" step="0.01" value={form.price} onChange={event => updateForm('price', event.target.value)} className="mt-1 w-full rounded-xl border p-3 dark:bg-neutral-800" /></label>
             <label className="font-bold">Original price (INR)<input type="number" min="1" step="0.01" value={form.originalPrice} onChange={event => updateForm('originalPrice', event.target.value)} className="mt-1 w-full rounded-xl border p-3 dark:bg-neutral-800" /></label>
             <div className="sm:col-span-2 space-y-2">

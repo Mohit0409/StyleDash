@@ -13,8 +13,10 @@ import os
 import posixpath
 import re
 import secrets
+import struct
 import threading
 import time
+import zlib
 from http.cookies import SimpleCookie
 from collections import defaultdict, deque
 from datetime import date, datetime, timedelta, timezone
@@ -58,6 +60,11 @@ except ModuleNotFoundError:  # Repository test import path.
     from scripts.styledash_notify import mask_email, mask_phone, owner_notifier
 
 try:
+    from receipt_pdf import build_receipt_pdf
+except ModuleNotFoundError:  # Repository test import path.
+    from scripts.receipt_pdf import build_receipt_pdf
+
+try:
     import razorpay
 except ImportError:  # The static site and COD can still start without the SDK.
     razorpay = None
@@ -68,6 +75,143 @@ PRODUCT_IMAGE_MAX_BYTES = 500 * 1024
 PRODUCT_IMAGE_REQUEST_MAX_BYTES = 700 * 1024
 PRODUCT_IMAGE_ROUTE_PATTERN = re.compile(r"^/media/product-images/([0-9a-f]{32}\.(?:webp|jpg|png))$")
 API_PREFIX = "/api/"
+
+
+
+def _validate_png(content: bytes) -> bool:
+    if not content.startswith(b"\x89PNG\r\n\x1a\n"):
+        return False
+    offset = 8
+    seen_ihdr = False
+    seen_iend = False
+    while offset + 12 <= len(content):
+        length = struct.unpack(">I", content[offset : offset + 4])[0]
+        chunk_type = content[offset + 4 : offset + 8]
+        data_start = offset + 8
+        data_end = data_start + length
+        crc_end = data_end + 4
+        if crc_end > len(content):
+            return False
+        expected_crc = struct.unpack(">I", content[data_end:crc_end])[0]
+        actual_crc = zlib.crc32(chunk_type + content[data_start:data_end]) & 0xFFFFFFFF
+        if actual_crc != expected_crc:
+            return False
+        if not seen_ihdr:
+            if chunk_type != b"IHDR" or length != 13:
+                return False
+            width, height = struct.unpack(">II", content[data_start : data_start + 8])
+            if width < 1 or height < 1 or width > 12000 or height > 12000:
+                return False
+            seen_ihdr = True
+        if chunk_type == b"IEND":
+            if length != 0 or crc_end != len(content):
+                return False
+            seen_iend = True
+            break
+        offset = crc_end
+    return seen_ihdr and seen_iend
+
+
+def _validate_webp(content: bytes) -> bool:
+    if len(content) < 20 or content[:4] != b"RIFF" or content[8:12] != b"WEBP":
+        return False
+    if struct.unpack("<I", content[4:8])[0] != len(content) - 8:
+        return False
+    offset = 12
+    image_chunk = False
+    while offset + 8 <= len(content):
+        chunk_type = content[offset : offset + 4]
+        chunk_size = struct.unpack("<I", content[offset + 4 : offset + 8])[0]
+        data_end = offset + 8 + chunk_size
+        padded_end = data_end + (chunk_size & 1)
+        if data_end > len(content) or padded_end > len(content):
+            return False
+        if chunk_type in {b"VP8 ", b"VP8L", b"ANMF"}:
+            image_chunk = True
+        offset = padded_end
+    return image_chunk and offset == len(content)
+
+
+def _validate_jpeg(content: bytes) -> bool:
+    if len(content) < 16 or not content.startswith(b"\xff\xd8") or not content.endswith(b"\xff\xd9"):
+        return False
+    offset = 2
+    saw_frame = False
+    frame_markers = {0xC0, 0xC1, 0xC2, 0xC3, 0xC5, 0xC6, 0xC7, 0xC9, 0xCA, 0xCB, 0xCD, 0xCE, 0xCF}
+    while offset < len(content) - 2:
+        if content[offset] != 0xFF:
+            return False
+        while offset < len(content) and content[offset] == 0xFF:
+            offset += 1
+        if offset >= len(content):
+            return False
+        marker = content[offset]
+        offset += 1
+        if marker == 0xD9:
+            return saw_frame and offset == len(content)
+        if marker == 0xDA:
+            return saw_frame and content.endswith(b"\xff\xd9")
+        if marker == 0x01 or 0xD0 <= marker <= 0xD7:
+            continue
+        if offset + 2 > len(content):
+            return False
+        segment_length = struct.unpack(">H", content[offset : offset + 2])[0]
+        if segment_length < 2 or offset + segment_length > len(content):
+            return False
+        if marker in frame_markers:
+            if segment_length < 8:
+                return False
+            height, width = struct.unpack(">HH", content[offset + 3 : offset + 7])
+            if width < 1 or height < 1 or width > 12000 or height > 12000:
+                return False
+            saw_frame = True
+        offset += segment_length
+    return False
+
+
+def store_product_image_payload(product_image_directory: Path, payload: dict[str, Any]) -> dict[str, Any]:
+    if set(payload) != {"fileName", "contentType", "dataBase64"}:
+        raise SecurityError(400, "Invalid image upload.", "invalid_product_image")
+    file_name = payload.get("fileName")
+    content_type = payload.get("contentType")
+    encoded = payload.get("dataBase64")
+    if (
+        not isinstance(file_name, str)
+        or not 1 <= len(file_name) <= 120
+        or "/" in file_name
+        or "\\" in file_name
+        or any(ord(character) < 32 for character in file_name)
+    ):
+        raise SecurityError(400, "Invalid image filename.", "invalid_product_image")
+    extensions = {"image/webp": "webp", "image/jpeg": "jpg", "image/png": "png"}
+    validators = {"image/webp": _validate_webp, "image/jpeg": _validate_jpeg, "image/png": _validate_png}
+    extension = extensions.get(content_type)
+    if extension is None or not isinstance(encoded, str) or not encoded:
+        raise SecurityError(400, "Upload a JPEG, PNG or WebP image.", "invalid_product_image")
+    try:
+        content = base64.b64decode(encoded, validate=True)
+    except (binascii.Error, ValueError):
+        raise SecurityError(400, "Invalid image data.", "invalid_product_image") from None
+    if not 32 <= len(content) <= PRODUCT_IMAGE_MAX_BYTES:
+        raise SecurityError(413, "The optimized image must be 500 KB or smaller.", "product_image_too_large")
+    if not validators[content_type](content):
+        raise SecurityError(400, "The uploaded file does not match its image type.", "invalid_product_image")
+    product_image_directory.mkdir(parents=True, exist_ok=True)
+    try:
+        os.chmod(product_image_directory, 0o700)
+    except OSError:
+        pass
+    digest = hashlib.sha256(content).hexdigest()[:32]
+    target = product_image_directory / f"{digest}.{extension}"
+    if not target.exists():
+        temporary = product_image_directory / f".{digest}.{secrets.token_hex(6)}.tmp"
+        temporary.write_bytes(content)
+        try:
+            os.chmod(temporary, 0o644)
+        except OSError:
+            pass
+        os.replace(temporary, target)
+    return {"url": f"/media/product-images/{target.name}", "bytes": len(content), "contentType": content_type}
 # Firebase/Google endpoints are added narrowly (never a wildcard) and only to
 # support the Google + Phone-OTP identity flows; Firebase is never granted
 # order/payment/inventory/admin authority.
@@ -86,6 +230,7 @@ SECURITY_POLICY = (
     "https://accounts.google.com https://*.firebaseapp.com https://www.google.com https://www.recaptcha.net; "
     "form-action 'self' https://api.razorpay.com https://*.razorpay.com"
 )
+HSTS_POLICY = "max-age=31536000"
 ACCESS_LOG_TOKEN_PATTERN = re.compile(r"([?&](?:token|reset_token)=)[^&#\s]*", re.IGNORECASE)
 PAYMENT_TEST_PRODUCT_ID = "styledash-payment-test-item"
 PAYMENT_TEST_PRODUCT_SLUG = "styledash-payment-test-item"
@@ -388,6 +533,55 @@ def _rounded_rupees(value: Decimal) -> int:
     return int(value.quantize(Decimal("1"), rounding=ROUND_HALF_UP))
 
 
+def _pdf_escape(value: Any) -> str:
+    text = str(value or "").encode("latin-1", "replace").decode("latin-1")
+    text = "".join(character if ord(character) >= 32 else " " for character in text)
+    return text.replace("\\", "\\\\").replace("(", "\\(").replace(")", "\\)")
+
+
+def _simple_pdf(lines: list[str]) -> bytes:
+    wrapped: list[str] = []
+    for line in lines:
+        text = str(line or "")
+        if not text:
+            wrapped.append("")
+            continue
+        while len(text) > 88:
+            split = text.rfind(" ", 0, 89)
+            split = split if split > 20 else 88
+            wrapped.append(text[:split].rstrip())
+            text = text[split:].lstrip()
+        wrapped.append(text)
+    pages = [wrapped[index:index + 38] for index in range(0, len(wrapped), 38)] or [[""]]
+    font_number = 3 + (2 * len(pages))
+    kids = " ".join(f"{3 + (2 * index)} 0 R" for index in range(len(pages)))
+    objects: list[bytes] = [
+        b"<< /Type /Catalog /Pages 2 0 R >>",
+        f"<< /Type /Pages /Kids [{kids}] /Count {len(pages)} >>".encode(),
+    ]
+    for index, page_lines in enumerate(pages):
+        page_number = 3 + (2 * index)
+        content_number = page_number + 1
+        commands = ["BT", "/F1 11 Tf", "48 760 Td"]
+        for line_index, line in enumerate(page_lines):
+            if line_index:
+                commands.append("0 -17 Td")
+            commands.append(f"({_pdf_escape(line)}) Tj")
+        commands.append("ET")
+        stream = "\n".join(commands).encode("latin-1", "replace")
+        objects.append(f"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 {font_number} 0 R >> >> /Contents {content_number} 0 R >>".encode())
+        objects.append(b"<< /Length %d >>\nstream\n" % len(stream) + stream + b"\nendstream")
+    objects.append(b"<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>")
+    pdf = bytearray(b"%PDF-1.4\n")
+    offsets = [0]
+    for number, obj in enumerate(objects, 1):
+        offsets.append(len(pdf)); pdf.extend(f"{number} 0 obj\n".encode()); pdf.extend(obj); pdf.extend(b"\nendobj\n")
+    xref = len(pdf); pdf.extend(f"xref\n0 {len(objects)+1}\n0000000000 65535 f \n".encode())
+    for offset in offsets[1:]: pdf.extend(f"{offset:010d} 00000 n \n".encode())
+    pdf.extend(f"trailer\n<< /Size {len(objects)+1} /Root 1 0 R >>\nstartxref\n{xref}\n%%EOF\n".encode())
+    return bytes(pdf)
+
+
 def _clean_string(value: Any, field: str, minimum: int, maximum: int) -> str:
     if not isinstance(value, str):
         raise ApiError(HTTPStatus.UNPROCESSABLE_ENTITY, f"Invalid {field}.", "invalid_customer")
@@ -495,6 +689,41 @@ class PaymentService:
         with self._products_lock:
             return self.products
 
+    def order_for_display(self, order: dict[str, Any]) -> dict[str, Any]:
+        """Enrich safe order-item snapshots with current display-only metadata."""
+        self.refresh_shop_products()
+        products = self.product_snapshot()
+        result = dict(order)
+        if "items" not in order:
+            return result
+        display_items: list[dict[str, Any]] = []
+        for source in order.get("items", []) or []:
+            item = dict(source)
+            product = products.get(item.get("productId"))
+            if product is not None:
+                for key, product_key in (
+                    ("storeId", "vendorId"), ("storeName", "storeName"),
+                    ("storeSlug", "storeSlug"),
+                ):
+                    value = product.get(product_key)
+                    if value and not item.get(key):
+                        item[key] = value
+                variant = next((candidate for candidate in product.get("variants", [])
+                                if candidate.get("id") == item.get("variantId")), None)
+                images = (variant or {}).get("images") or product.get("images") or []
+                image_url = item.get("imageUrl") or product.get("thumbnail") or (images[0] if images else None)
+                if image_url:
+                    item["imageUrl"] = image_url
+            display_items.append(item)
+        result["items"] = display_items
+        return result
+
+    def receipt_pdf(self, order: dict[str, Any]) -> bytes:
+        display = self.order_for_display(order)
+        if display.get("status") != "delivered":
+            raise SecurityError(409, "Receipt is available after delivery.", "receipt_not_ready")
+        return build_receipt_pdf(display)
+
     @staticmethod
     def express_delivery_available(now: datetime | None = None) -> bool:
         current = now or datetime.now(timezone.utc)
@@ -502,25 +731,34 @@ class PaymentService:
         return india_time.weekday() >= 5
 
     @staticmethod
+    def product_express_eligible(product: dict[str, Any]) -> bool:
+        # Express eligibility is site-wide on Saturday/Sunday. Per-product
+        # deliveryType is retained only for backward-compatible catalogue data
+        # and no longer gates checkout. Inactive products are still rejected
+        # separately by calculate_order before this helper is consulted.
+        return product.get("active") is not False
+
+    @staticmethod
     def estimated_delivery_label(delivery_method: str) -> str:
-        return "60 minutes" if delivery_method == "express" else "within a day"
+        return "60 minutes" if delivery_method == "express" else "same day"
 
     def is_serviceable_pincode(self, pincode: str) -> bool:
         return _is_six_ascii_digits(pincode) and pincode in self.supported_pincodes
 
-    def check_serviceability(self, pincode: Any) -> dict[str, Any]:
+    def check_serviceability(self, pincode: Any, now: datetime | None = None) -> dict[str, Any]:
         if not _is_six_ascii_digits(pincode):
             raise ApiError(HTTPStatus.BAD_REQUEST, "A valid 6-digit pincode is required.", "invalid_pincode")
         if not self.is_serviceable_pincode(pincode):
             return {"success": True, "pincode": pincode, "serviceable": False}
+        express_available = self.express_delivery_available(now)
         return {
             "success": True,
             "pincode": pincode,
             "serviceable": True,
             "city": "Neemuch",
             "state": "Madhya Pradesh",
-            "expressAvailable": self.express_delivery_available(),
-            "estimatedDeliveryMinutes": 60 if self.express_delivery_available() else None,
+            "expressAvailable": express_available,
+            "estimatedDeliveryMinutes": 60 if express_available else None,
         }
 
     def can_access_payment_test_product(self, user: Any) -> bool:
@@ -688,7 +926,7 @@ class PaymentService:
             "pincode": pincode,
         }
 
-    def calculate_order(self, payload: dict[str, Any]) -> dict[str, Any]:
+    def calculate_order(self, payload: dict[str, Any], now: datetime | None = None) -> dict[str, Any]:
         self.refresh_shop_products()
         products = self.product_snapshot()
         if not isinstance(payload, dict):
@@ -701,8 +939,12 @@ class PaymentService:
         delivery_fees = self.settings["deliveryFees"]
         if delivery_method not in delivery_fees:
             raise ApiError(HTTPStatus.UNPROCESSABLE_ENTITY, "Unsupported delivery method.", "invalid_delivery")
-        if delivery_method == "express" and not self.express_delivery_available():
-            delivery_method = "standard"
+        if delivery_method == "express" and not self.express_delivery_available(now):
+            raise ApiError(
+                HTTPStatus.UNPROCESSABLE_ENTITY,
+                "Express Delivery is available Saturday and Sunday in Neemuch.",
+                "express_delivery_unavailable",
+            )
 
         wallet_amount = payload.get("walletAmount", 0)
         if wallet_amount not in (0, None):
@@ -731,6 +973,12 @@ class PaymentService:
                 product = products[product_id]
                 if not product.get("active"):
                     raise ApiError(HTTPStatus.UNPROCESSABLE_ENTITY, "A product is unavailable.", "invalid_product")
+                if delivery_method == "express" and not self.product_express_eligible(product):
+                    raise ApiError(
+                        HTTPStatus.UNPROCESSABLE_ENTITY,
+                        f"Express Delivery is unavailable because {product['name']} is not Express-eligible.",
+                        "express_delivery_ineligible",
+                    )
                 variant = next(
                     (candidate for candidate in product["variants"] if candidate["id"] == variant_id),
                     None,
@@ -752,8 +1000,7 @@ class PaymentService:
                 unit_price = _money(variant.get("price", product["price"]), "price")
                 line_total = unit_price * quantity
                 subtotal += line_total
-                trusted_items.append(
-                    {
+                trusted_item = {
                         "productId": product_id,
                         "productName": product["name"],
                         "productSlug": product["slug"],
@@ -765,7 +1012,18 @@ class PaymentService:
                         "unitPrice": _rounded_rupees(unit_price),
                         "lineTotal": _rounded_rupees(line_total),
                     }
-                )
+                for key, value in (
+                    ("storeId", product.get("vendorId")),
+                    ("storeName", product.get("storeName")),
+                    ("storeSlug", product.get("storeSlug")),
+                ):
+                    if value:
+                        trusted_item[key] = value
+                images = variant.get("images") or product.get("images") or []
+                image_url = product.get("thumbnail") or (images[0] if images else None)
+                if image_url:
+                    trusted_item["imageUrl"] = image_url
+                trusted_items.append(trusted_item)
 
         coupon_code = payload.get("couponCode")
         coupon_discount = Decimal("0")
@@ -791,11 +1049,15 @@ class PaymentService:
             coupon_discount = min(coupon_discount, subtotal)
             applied_coupon = normalized
 
-        delivery_fee = Decimal("0")
-        if subtotal < _money(self.settings["freeDeliveryThreshold"], "delivery threshold"):
-            delivery_fee = _money(delivery_fees[delivery_method], "delivery fee")
-        taxes = Decimal(_rounded_rupees((subtotal - coupon_discount) * _money(self.settings["taxRate"], "tax")))
-        grand_total = max(Decimal("0"), subtotal - coupon_discount + delivery_fee + taxes)
+        delivery_fee = _money(delivery_fees[delivery_method], "delivery fee")
+        taxable_merchandise_total = max(Decimal("0"), subtotal - coupon_discount)
+        tax_rate = _money(self.settings["taxRate"], "tax")
+        taxes = Decimal("0") if tax_rate == 0 else Decimal(
+            _rounded_rupees(
+                taxable_merchandise_total * tax_rate / (Decimal("1") + tax_rate)
+            )
+        )
+        grand_total = taxable_merchandise_total + delivery_fee
         amount_paise = _rounded_rupees(grand_total * Decimal("100"))
         if amount_paise < 100:
             raise ApiError(HTTPStatus.UNPROCESSABLE_ENTITY, "Order total is below the minimum amount.", "invalid_amount")
@@ -829,15 +1091,18 @@ class PaymentService:
         return value
 
     def _public_order(self, order: dict[str, Any]) -> dict[str, Any]:
+        display_order = self.order_for_display(order)
         allowed = (
             "id", "userId", "items", "address", "paymentMethod", "paymentStatus",
             "subtotal", "discount", "walletAmount", "deliveryFee", "taxes", "grandTotal",
             "deliveryMethod", "estimatedDelivery", "status", "statusHistory", "createdAt",
             "updatedAt", "razorpayOrderId", "razorpayPaymentId", "paymentVerifiedAt",
+            "paymentCollectionMethod", "paymentCollectedAt",
             "isPaymentTestOrder", "fulfillmentRequired", "adminLabels", "inventoryCommitted",
             "inventoryReleasedAt", "refundId", "refundAmount", "refundCurrency", "refundProcessedAt",
+            "cancellationReason", "cancelledAt",
         )
-        return {key: order[key] for key in allowed if key in order}
+        return {key: display_order[key] for key in allowed if key in display_order}
 
     def _create_response(self, order: dict[str, Any]) -> dict[str, Any]:
         return {
@@ -1936,6 +2201,8 @@ class StyleDashRequestHandler(SimpleHTTPRequestHandler):
         path = urlsplit(self.path).path
         if path.startswith(("/assets/", "/media/product-images/")):
             self.send_header("Cache-Control", "public, max-age=31536000, immutable")
+        if self._is_canonical_public_host():
+            self.send_header("Strict-Transport-Security", HSTS_POLICY)
         self.send_header("X-Content-Type-Options", "nosniff")
         self.send_header("Referrer-Policy", "strict-origin-when-cross-origin")
         self.send_header("X-Frame-Options", "SAMEORIGIN")
@@ -1958,6 +2225,14 @@ class StyleDashRequestHandler(SimpleHTTPRequestHandler):
         if not head_only:
             self.wfile.write(encoded)
 
+    def _binary_response(self, status: int, body: bytes, content_type: str, headers: dict[str, str] | None = None) -> None:
+        self.send_response(status)
+        self.send_header("Content-Type", content_type)
+        self.send_header("Content-Length", str(len(body)))
+        self.send_header("Cache-Control", "no-store")
+        for name, value in (headers or {}).items(): self.send_header(name, value)
+        self.end_headers(); self.wfile.write(body)
+
     def _text_response(
         self, status: int, body: str, content_type: str, *, head_only: bool = False,
     ) -> None:
@@ -1973,6 +2248,58 @@ class StyleDashRequestHandler(SimpleHTTPRequestHandler):
     @staticmethod
     def _public_origin() -> str:
         return os.environ.get("STYLEDASH_PUBLIC_ORIGIN", "").rstrip("/")
+
+    def _request_hostname(self) -> str | None:
+        return urlsplit(f"//{self.headers.get('Host', '').strip()}").hostname
+
+    def _is_canonical_public_host(self) -> bool:
+        origin = self._public_origin()
+        canonical_host = urlsplit(origin).hostname if origin else None
+        request_host = self._request_hostname()
+        return bool(
+            canonical_host
+            and request_host
+            and request_host.lower() == canonical_host.lower()
+        )
+
+    def _trusted_forwarded_scheme(self) -> str | None:
+        peer = self.client_address[0]
+        trusted_proxy = (
+            os.environ.get("STYLEDASH_TRUST_LOOPBACK_PROXY") == "1"
+            and peer in ("127.0.0.1", "::1")
+        )
+        if not trusted_proxy:
+            return None
+
+        forwarded = self.headers.get("X-Forwarded-Proto", "").split(",", 1)[0].strip().lower()
+        if forwarded in {"http", "https"}:
+            return forwarded
+
+        try:
+            visitor = json.loads(self.headers.get("CF-Visitor", ""))
+        except (TypeError, json.JSONDecodeError):
+            return None
+        scheme = visitor.get("scheme") if isinstance(visitor, dict) else None
+        return scheme.lower() if isinstance(scheme, str) and scheme.lower() in {"http", "https"} else None
+
+    def _redirect_http_to_https(self) -> bool:
+        origin = self._public_origin()
+        if (
+            urlsplit(origin).scheme.lower() != "https"
+            or not self._is_canonical_public_host()
+            or self._trusted_forwarded_scheme() != "http"
+        ):
+            return False
+
+        request_target = self.path if self.path.startswith("/") else f"/{self.path}"
+        self.send_response(HTTPStatus.PERMANENT_REDIRECT)
+        self.send_header("Location", f"{origin}{request_target}")
+        self.send_header("Content-Length", "0")
+        self.send_header("Cache-Control", "no-store")
+        self.send_header("Connection", "close")
+        self.close_connection = True
+        self.end_headers()
+        return True
 
     def _product_image_file(self, request_path: str) -> tuple[Path, str] | None:
         match = PRODUCT_IMAGE_ROUTE_PATTERN.fullmatch(request_path)
@@ -2000,52 +2327,7 @@ class StyleDashRequestHandler(SimpleHTTPRequestHandler):
             self.wfile.write(body)
 
     def _store_product_image(self, payload: dict[str, Any]) -> dict[str, Any]:
-        if set(payload) != {"fileName", "contentType", "dataBase64"}:
-            raise SecurityError(400, "Invalid image upload.", "invalid_product_image")
-        file_name = payload.get("fileName")
-        content_type = payload.get("contentType")
-        encoded = payload.get("dataBase64")
-        if (
-            not isinstance(file_name, str)
-            or not 1 <= len(file_name) <= 120
-            or "/" in file_name
-            or "\\" in file_name
-            or any(ord(character) < 32 for character in file_name)
-        ):
-            raise SecurityError(400, "Invalid image filename.", "invalid_product_image")
-        extensions = {"image/webp": "webp", "image/jpeg": "jpg", "image/png": "png"}
-        extension = extensions.get(content_type)
-        if extension is None or not isinstance(encoded, str) or not encoded:
-            raise SecurityError(400, "Upload a JPEG, PNG or WebP image.", "invalid_product_image")
-        try:
-            content = base64.b64decode(encoded, validate=True)
-        except (binascii.Error, ValueError):
-            raise SecurityError(400, "Invalid image data.", "invalid_product_image") from None
-        if not 32 <= len(content) <= PRODUCT_IMAGE_MAX_BYTES:
-            raise SecurityError(413, "The optimized image must be 500 KB or smaller.", "product_image_too_large")
-        magic_ok = (
-            (content_type == "image/jpeg" and content.startswith(b"\xff\xd8\xff"))
-            or (content_type == "image/png" and content.startswith(b"\x89PNG\r\n\x1a\n"))
-            or (content_type == "image/webp" and len(content) >= 12 and content[:4] == b"RIFF" and content[8:12] == b"WEBP")
-        )
-        if not magic_ok:
-            raise SecurityError(400, "The uploaded file does not match its image type.", "invalid_product_image")
-        digest = hashlib.sha256(content).hexdigest()[:32]
-        self.product_image_directory.mkdir(parents=True, exist_ok=True)
-        try:
-            os.chmod(self.product_image_directory, 0o700)
-        except OSError:
-            pass
-        target = self.product_image_directory / f"{digest}.{extension}"
-        if not target.exists():
-            temporary = self.product_image_directory / f".{digest}.{secrets.token_hex(6)}.tmp"
-            temporary.write_bytes(content)
-            try:
-                os.chmod(temporary, 0o644)
-            except OSError:
-                pass
-            os.replace(temporary, target)
-        return {"url": f"/media/product-images/{target.name}", "bytes": len(content), "contentType": content_type}
+        return store_product_image_payload(self.product_image_directory, payload)
 
     def _require_product_image_seller(self) -> dict[str, Any]:
         user, _session = self._current_user()
@@ -2077,7 +2359,7 @@ class StyleDashRequestHandler(SimpleHTTPRequestHandler):
     def _redirect_to_canonical_host(self) -> bool:
         origin = self._public_origin()
         canonical_host = urlsplit(origin).hostname if origin else None
-        request_host = urlsplit(f"//{self.headers.get('Host', '').strip()}").hostname
+        request_host = self._request_hostname()
         if not canonical_host or not request_host:
             return False
         if request_host.lower() in {canonical_host.lower(), "localhost", "127.0.0.1", "::1"}:
@@ -2237,6 +2519,8 @@ class StyleDashRequestHandler(SimpleHTTPRequestHandler):
         parsed = urlsplit(self.path)
         path = parsed.path
         try:
+            if self._redirect_http_to_https():
+                return
             if self._redirect_to_canonical_host():
                 return
             if self._sensitive_path(path):
@@ -2343,7 +2627,8 @@ class StyleDashRequestHandler(SimpleHTTPRequestHandler):
             if path == "/api/orders":
                 user, _session = self._current_user()
                 orders = self._security().list_orders(self.payment_service.store, user["id"])
-                self._json_response(HTTPStatus.OK, {"success": True, "orders": orders})
+                display_orders = [self.payment_service.order_for_display(order) for order in orders]
+                self._json_response(HTTPStatus.OK, {"success": True, "orders": display_orders})
                 return
             if path == "/api/profile":
                 user, _session = self._current_user()
@@ -2384,10 +2669,19 @@ class StyleDashRequestHandler(SimpleHTTPRequestHandler):
                     },
                 )
                 return
+            if path.startswith("/api/orders/") and path.endswith("/receipt"):
+                user, _session = self._current_user()
+                order_id = unquote(path.removeprefix("/api/orders/").removesuffix("/receipt"))
+                order = self._security().get_order(self.payment_service.store, order_id, user["id"])
+                pdf = self.payment_service.receipt_pdf(order)
+                safe_id = re.sub(r"[^A-Za-z0-9_-]+", "-", order_id)[:80] or "order"
+                self._binary_response(HTTPStatus.OK, pdf, "application/pdf", {"Content-Disposition": f'attachment; filename="vibe4you-receipt-{safe_id}.pdf"'})
+                return
             if path.startswith("/api/orders/"):
                 user, _session = self._current_user()
-                order = self._security().get_order(self.payment_service.store, path.removeprefix("/api/orders/"), user["id"])
-                self._json_response(HTTPStatus.OK, {"success": True, "order": order})
+                order_id = unquote(path.removeprefix("/api/orders/"))
+                order = self._security().get_order(self.payment_service.store, order_id, user["id"])
+                self._json_response(HTTPStatus.OK, {"success": True, "order": self.payment_service.order_for_display(order)})
                 return
             if path.startswith(API_PREFIX):
                 self._json_response(HTTPStatus.NOT_FOUND, {"success": False, "error": "API endpoint not found.", "code": "not_found"})
@@ -2400,6 +2694,8 @@ class StyleDashRequestHandler(SimpleHTTPRequestHandler):
 
     def do_HEAD(self) -> None:  # noqa: N802 - stdlib override name
         path = urlsplit(self.path).path
+        if self._redirect_http_to_https():
+            return
         if self._redirect_to_canonical_host():
             return
         if self._sensitive_path(path):
@@ -2444,6 +2740,8 @@ class StyleDashRequestHandler(SimpleHTTPRequestHandler):
     def do_POST(self) -> None:  # noqa: N802 - stdlib override name
         path = urlsplit(self.path).path
         try:
+            if self._redirect_http_to_https():
+                return
             if self._sensitive_path(path):
                 self._json_response(HTTPStatus.NOT_FOUND, {"success": False, "error": "Not found.", "code": "not_found"})
                 return
@@ -2544,7 +2842,9 @@ class StyleDashRequestHandler(SimpleHTTPRequestHandler):
                 return
             if path == "/api/auth/register":
                 self._rate_limit(path, 5)
-                user, raw, csrf = self._security().register(self._read_json())
+                user, raw, csrf = self._security().register(
+                    self._read_json(), record_terms_acceptance=True
+                )
 
                 owner_notifier().send(
                     event="customer_registered",
@@ -2558,11 +2858,12 @@ class StyleDashRequestHandler(SimpleHTTPRequestHandler):
                     tags=["bust_in_silhouette"],
                 )
 
+                profile = self._security().profile(user["id"])
                 self._json_response(
                     HTTPStatus.CREATED,
                     {
                         "success": True,
-                        "user": user,
+                        "user": profile,
                         "csrfToken": csrf,
                     },
                     headers={
@@ -2572,13 +2873,18 @@ class StyleDashRequestHandler(SimpleHTTPRequestHandler):
                 return
             if path == "/api/auth/login":
                 self._rate_limit(path, 12)
-                user, raw, csrf = self._security().login(self._read_json(), self._client_key("login"))
-                self._json_response(HTTPStatus.OK, {"success": True, "user": user, "csrfToken": csrf}, headers={"Set-Cookie": self._security().cookie(raw)})
+                user, raw, csrf = self._security().login(
+                    self._read_json(), self._client_key("login"), record_terms_acceptance=True
+                )
+                profile = self._security().profile(user["id"])
+                self._json_response(HTTPStatus.OK, {"success": True, "user": profile, "csrfToken": csrf}, headers={"Set-Cookie": self._security().cookie(raw)})
                 return
             if path in ("/api/auth/federated/google", "/api/auth/federated/phone"):
                 self._rate_limit(path, 10)
                 provider = "google" if path.endswith("google") else "phone"
-                user, raw, csrf, created = self._security().federated_session(provider, self._read_json())
+                user, raw, csrf, created = self._security().federated_session(
+                    provider, self._read_json(), record_terms_acceptance=True
+                )
 
                 if created:
                     contact = (
@@ -2599,13 +2905,15 @@ class StyleDashRequestHandler(SimpleHTTPRequestHandler):
                         tags=["bust_in_silhouette"],
                     )
 
+                needs_profile = bool(user.get("needsProfile"))
+                profile = self._security().profile(user["id"])
                 self._json_response(
                     HTTPStatus.OK if not created else HTTPStatus.CREATED,
                     {
                         "success": True,
-                        "user": user,
+                        "user": profile,
                         "csrfToken": csrf,
-                        "needsProfile": bool(user.get("needsProfile")),
+                        "needsProfile": needs_profile,
                     },
                     headers={"Set-Cookie": self._security().cookie(raw)},
                 )
@@ -2791,6 +3099,8 @@ class StyleDashRequestHandler(SimpleHTTPRequestHandler):
             )
 
     def do_PUT(self) -> None:  # noqa: N802 - stdlib override name
+        if self._redirect_http_to_https():
+            return
         if self._sensitive_path(urlsplit(self.path).path):
             self._json_response(HTTPStatus.NOT_FOUND, {"success": False, "error": "Not found.", "code": "not_found"})
             return
@@ -2808,6 +3118,8 @@ class StyleDashRequestHandler(SimpleHTTPRequestHandler):
     def do_PATCH(self) -> None:  # noqa: N802 - stdlib override name
         path = urlsplit(self.path).path
         try:
+            if self._redirect_http_to_https():
+                return
             if self._sensitive_path(path):
                 self._json_response(HTTPStatus.NOT_FOUND, {"success": False, "error": "Not found.", "code": "not_found"})
                 return

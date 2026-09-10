@@ -15,9 +15,9 @@ export const Footer: React.FC = () => {
             <div className="p-3 bg-neutral-900 rounded-full text-lime-400">
               <Zap className="w-6 h-6 fill-lime-400" />
             </div>
-            <h4 className="font-bold text-white text-sm">Local Delivery</h4>
+            <h4 className="font-bold text-white text-sm">Same Day Delivery</h4>
             <p className="text-xs text-neutral-400">
-              Hyperlocal fashion dispatch in {CONFIG.SERVICE_CITY}
+              FREE across our supported {CONFIG.SERVICE_CITY} service area
             </p>
           </div>
           <div className="flex flex-col items-center gap-2">
@@ -44,9 +44,9 @@ export const Footer: React.FC = () => {
             <div className="p-3 bg-neutral-900 rounded-full text-lime-400">
               <Truck className="w-6 h-6" />
             </div>
-            <h4 className="font-bold text-white text-sm">Free Shipping</h4>
+            <h4 className="font-bold text-white text-sm">Express Delivery</h4>
             <p className="text-xs text-neutral-400">
-              On eligible orders above INR {CONFIG.FREE_DELIVERY_THRESHOLD}
+              ₹80 on Saturday and Sunday
             </p>
           </div>
         </div>
@@ -77,6 +77,7 @@ export const Footer: React.FC = () => {
               <li><Link to="/products?dept=kids" className="hover:text-lime-400">Kids Wear</Link></li>
               <li><Link to="/products?category=Footwear" className="hover:text-lime-400">Footwear Spotlight</Link></li>
               <li><Link to="/products?category=Accessories" className="hover:text-lime-400">Accessories &amp; Bags</Link></li>
+              <li><Link to="/products?category=Beauty%20%26%20Personal%20Care" className="hover:text-lime-400">Beauty &amp; Personal Care</Link></li>
             </ul>
           </div>
 

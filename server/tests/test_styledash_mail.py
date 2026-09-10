@@ -49,7 +49,7 @@ class SmtpPasswordResetSenderTests(unittest.TestCase):
             "STYLEDASH_SMTP_USERNAME": "mailer@example.test",
             "STYLEDASH_SMTP_PASSWORD": "not-a-real-test-secret",
             "STYLEDASH_PASSWORD_RESET_FROM": "mailer@example.test",
-            "STYLEDASH_PASSWORD_RESET_URL": "https://styledash.example.test/reset-password?source=email",
+            "STYLEDASH_PASSWORD_RESET_URL": "https://vibe4you.in/reset-password?source=email",
         }
 
     def test_missing_or_partial_private_configuration_fails_closed(self) -> None:
@@ -83,19 +83,25 @@ class SmtpPasswordResetSenderTests(unittest.TestCase):
         self.assertTrue(connection.quit_called)
         self.assertEqual(len(connection.messages), 1)
         message = connection.messages[0]
+        self.assertEqual(message["From"], "Vibe4You Support <mailer@example.test>")
         self.assertEqual(message["To"], "customer@example.test")
+        self.assertEqual(message["Subject"], "Reset your Vibe4You password")
+        self.assertIn("Vibe4You account", message.get_content())
+        self.assertNotIn("Style Dash", message.get_content())
         self.assertNotIn(token, message["From"])
         self.assertNotIn(token, message["To"])
         self.assertNotIn(token, message["Subject"])
         self.assertIn(token, message.get_content())
         link = next(line.removeprefix("Reset your password: ") for line in message.get_content().splitlines() if line.startswith("Reset your password: "))
         parsed = urlsplit(link)
+        self.assertEqual(parsed.netloc, "vibe4you.in")
+        self.assertEqual(parsed.path, "/reset-password")
         self.assertEqual(parsed.query, "source=email")
         self.assertEqual(parse_qs(parsed.fragment), {"token": [token]})
 
     def test_sender_rejects_insecure_or_header_injection_configuration(self) -> None:
         insecure = self.configuration()
-        insecure["STYLEDASH_PASSWORD_RESET_URL"] = "http://styledash.example.test/reset-password"
+        insecure["STYLEDASH_PASSWORD_RESET_URL"] = "http://vibe4you.in/reset-password"
         with self.assertRaises(MAIL.SmtpConfigurationError):
             MAIL.SmtpPasswordResetSender.from_environment(insecure)
         injected = self.configuration()

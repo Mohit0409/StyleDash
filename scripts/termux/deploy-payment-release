@@ -29,6 +29,10 @@ if [ ! -f "$STAGE/scripts/styledash_firebase.py" ]; then
   echo "release is missing styledash_firebase.py; deployment aborted" >&2
   exit 1
 fi
+if [ ! -f "$STAGE/scripts/receipt_pdf.py" ]; then
+  echo "release is missing receipt_pdf.py; deployment aborted" >&2
+  exit 1
+fi
 if [ ! -f "$STAGE/scripts/styledash_shops.py" ] || \
    [ ! -f "$STAGE/scripts/catalog_normalization.py" ] || \
    [ ! -f "$STAGE/scripts/styledash_reviews.py" ] || \
@@ -180,9 +184,22 @@ for cloudflare_pid in $(pgrep -f "$cloudflare_marker" 2>/dev/null || true); do
 done
 rm -f -- "$HOME/run/styledash-cloudflare.pid" "$HOME/run/styledash-cloudflare-url"
 
+admin_marker="$HOME/admin/serve.py --bind 127.0.0.1 --port 8081"
+for admin_pid in $(pgrep -f "$HOME/admin/serve.py" 2>/dev/null || true); do
+  if tr '\0' ' ' < "/proc/$admin_pid/cmdline" 2>/dev/null | grep -Fq "$admin_marker"; then
+    kill "$admin_pid" 2>/dev/null || true
+    for _ in $(seq 1 20); do
+      kill -0 "$admin_pid" 2>/dev/null || break
+      sleep 0.25
+    done
+  fi
+done
+rm -f -- "$HOME/run/styledash-admin.pid"
+
 if [ -d "$HOME/server/assets" ]; then rm -rf -- "$HOME/server/assets"; fi
 cp -a "$STAGE/dist/." "$HOME/server/"
 install -m 755 "$STAGE/scripts/termux-spa-server.py" "$HOME/server/serve.py"
+install -m 600 "$STAGE/scripts/receipt_pdf.py" "$HOME/server/receipt_pdf.py"
 install -m 600 "$STAGE/scripts/styledash_security.py" "$HOME/server/styledash_security.py"
 install -m 600 "$STAGE/scripts/catalog_normalization.py" "$HOME/server/catalog_normalization.py"
 install -m 600 "$STAGE/scripts/styledash_firebase.py" "$HOME/server/styledash_firebase.py"
@@ -195,6 +212,7 @@ mkdir -p "$HOME/admin/admin" "$HOME/admin/tools"
 install -m 600 "$STAGE/scripts/styledash_mail.py" "$HOME/admin/styledash_mail.py"
 install -m 600 "$STAGE/scripts/styledash_notify.py" "$HOME/admin/styledash_notify.py"
 install -m 600 "$STAGE/scripts/styledash_reviews.py" "$HOME/admin/styledash_reviews.py"
+install -m 600 "$STAGE/scripts/receipt_pdf.py" "$HOME/admin/receipt_pdf.py"
 chmod 700 "$HOME/admin" "$HOME/admin/admin" "$HOME/admin/tools"
 install -m 600 "$STAGE/scripts/termux-admin-server.py" "$HOME/admin/serve.py"
 install -m 600 "$STAGE/scripts/styledash_admin.py" "$HOME/admin/styledash_admin.py"
@@ -213,6 +231,10 @@ for runtime_module in styledash_security.py catalog_normalization.py styledash_m
     exit 1
   fi
 done
+if [ ! -f "$HOME/server/receipt_pdf.py" ] || [ ! -f "$HOME/admin/receipt_pdf.py" ]; then
+  echo "deployed runtime is missing receipt_pdf.py; deployment aborted" >&2
+  exit 1
+fi
 
 mkdir -p "$HOME/.local/share/styledash/runtime"
 chmod 700 "$HOME/.local/share/styledash" "$HOME/.local/share/styledash/runtime"
@@ -248,14 +270,6 @@ if [ -s "$HOME/run/styledash.pid" ]; then
   fi
 fi
 
-if [ -s "$HOME/run/styledash-admin.pid" ]; then
-  admin_pid="$(cat "$HOME/run/styledash-admin.pid")"
-  if kill -0 "$admin_pid" 2>/dev/null && \
-     tr '\0' ' ' < "/proc/$admin_pid/cmdline" 2>/dev/null | grep -Fq "$HOME/admin/serve.py"; then
-    kill "$admin_pid"
-  fi
-fi
-
 "$HOME/bin/start-styledash"
 "$HOME/bin/start-styledash-admin"
 python3 -c 'import razorpay; print("razorpay_sdk=ok")'
@@ -275,7 +289,7 @@ try:
     foreign_keys = connection.execute("PRAGMA foreign_key_check").fetchall()
 finally:
     connection.close()
-if 6 not in identity_versions or not {1, 2, 3, 4, 5}.issubset(shop_versions) or 1 not in review_versions:
+if 7 not in identity_versions or not {1, 2, 3, 4, 5, 6}.issubset(shop_versions) or 1 not in review_versions:
     raise SystemExit("Vibe4You schema migrations are incomplete")
 if "variants_json" not in shop_product_columns:
     raise SystemExit("Vibe4You product variant schema is incomplete")

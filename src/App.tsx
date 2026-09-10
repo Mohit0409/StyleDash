@@ -18,6 +18,7 @@ const VendorOnboarding = lazy(() => import('./pages/VendorOnboarding').then(m =>
 const Wishlist = lazy(() => import('./pages/Wishlist').then(m => ({ default: m.Wishlist })));
 const Checkout = lazy(() => import('./pages/Checkout').then(m => ({ default: m.Checkout })));
 const OrderSuccess = lazy(() => import('./pages/OrderSuccess').then(m => ({ default: m.OrderSuccess })));
+const OrderTracking = lazy(() => import('./pages/OrderTracking').then(m => ({ default: m.OrderTracking })));
 const Orders = lazy(() => import('./pages/Orders').then(m => ({ default: m.Orders })));
 const Profile = lazy(() => import('./pages/Profile').then(m => ({ default: m.Profile })));
 const NotFound = lazy(() => import('./pages/NotFound').then(m => ({ default: m.NotFound })));
@@ -60,6 +61,7 @@ export const App: React.FC = () => {
                       <Route path="payment-test/styledash-payment-test-item" element={<PaymentTestProduct />} />
                       <Route path="checkout" element={<ProtectedRoute><Checkout /></ProtectedRoute>} />
                       <Route path="order-success/:orderId" element={<ProtectedRoute><OrderSuccess /></ProtectedRoute>} />
+                      <Route path="orders/:orderId/track" element={<ProtectedRoute><OrderTracking /></ProtectedRoute>} />
                       <Route path="orders" element={<ProtectedRoute><Orders /></ProtectedRoute>} />
                       <Route path="profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
                       <Route path="help" element={<Help />} />

@@ -37,8 +37,8 @@ export const OrderSuccess: React.FC = () => {
             <div className="border-t pt-3 flex justify-between font-black"><span>Order total</span><span>₹{order.grandTotal}</span></div>
           </div> : <p role="alert">This order is unavailable to the current account.</p>}
       <div className="flex justify-center gap-4">
-        <Link to="/orders" className="px-6 py-3 bg-neutral-950 text-white rounded-xl font-bold">Track order</Link>
-        <Link to="/" className="px-6 py-3 bg-neutral-100 rounded-xl font-bold">Continue shopping</Link>
+        <Link to={`/orders/${encodeURIComponent(orderId)}/track`} className="px-6 py-3 bg-neutral-950 text-white dark:bg-lime-400 dark:text-neutral-950 rounded-xl font-bold">Track order</Link>
+        <Link to="/" className="px-6 py-3 bg-white dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-700 text-neutral-950 dark:text-white rounded-xl font-bold">Continue shopping</Link>
       </div>
     </div>
   );

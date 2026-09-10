@@ -25,6 +25,7 @@ PASSWORD_MAX = 256
 CUSTOMER_ABSOLUTE_HOURS = 24 * 7
 CUSTOMER_IDLE_HOURS = 24
 PASSWORD_RESET_MINUTES = 30
+TERMS_VERSION = "2026-08-14"
 PasswordResetDispatcher = Callable[[str, str, Callable[[], None]], None]
 
 
@@ -439,6 +440,40 @@ class SecurityStore:
                 if db.execute("PRAGMA foreign_key_check").fetchall():
                     raise RuntimeError("identity uniqueness migration failed foreign key check")
                 db.commit()
+            # Migration 7: retain an auditable acceptance event for every
+            # public customer sign-in. This is additive; no customer or
+            # financial history is rewritten.
+            migration_versions = {
+                row["version"] for row in db.execute("SELECT version FROM schema_migrations")
+            }
+            if 7 not in migration_versions:
+                db.execute("BEGIN IMMEDIATE")
+                if db.execute("SELECT 1 FROM schema_migrations WHERE version=7").fetchone():
+                    db.rollback()
+                else:
+                    db.execute(
+                        """
+                        CREATE TABLE customer_terms_acceptances(
+                          id TEXT PRIMARY KEY,
+                          user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                          terms_version TEXT NOT NULL,
+                          authentication_method TEXT NOT NULL
+                            CHECK(authentication_method IN ('password','google','phone')),
+                          accepted_at TEXT NOT NULL
+                        )
+                        """
+                    )
+                    db.execute(
+                        "CREATE INDEX customer_terms_acceptances_user_version_idx "
+                        "ON customer_terms_acceptances(user_id, terms_version, accepted_at)"
+                    )
+                    db.execute(
+                        "INSERT INTO schema_migrations(version,applied_at) VALUES(7,?)",
+                        (iso(utc_now()),),
+                    )
+                    if db.execute("PRAGMA foreign_key_check").fetchall():
+                        raise RuntimeError("terms acceptance migration failed foreign key check")
+                    db.commit()
         self._secure_files()
 
     def _secure_files(self) -> None:
@@ -478,7 +513,28 @@ class SecurityStore:
     def clear_cookie() -> str:
         return f"{COOKIE_NAME}=; Path=/; Max-Age=0; HttpOnly; Secure; SameSite=Lax"
 
-    def register(self, payload: dict[str, Any]) -> tuple[dict[str, Any], str, str]:
+    @staticmethod
+    def _require_current_terms(payload: dict[str, Any]) -> None:
+        if payload.get("termsAccepted") is not True or payload.get("termsVersion") != TERMS_VERSION:
+            raise SecurityError(
+                409,
+                "Please read and accept the current Terms and Conditions to continue.",
+                "terms_acceptance_required",
+            )
+
+    @staticmethod
+    def _record_terms_acceptance(
+        db: sqlite3.Connection, user_id: str, authentication_method: str
+    ) -> None:
+        db.execute(
+            "INSERT INTO customer_terms_acceptances(id,user_id,terms_version,authentication_method,accepted_at) "
+            "VALUES(?,?,?,?,?)",
+            ("tac_" + secrets.token_hex(12), user_id, TERMS_VERSION, authentication_method, iso(utc_now())),
+        )
+
+    def register(
+        self, payload: dict[str, Any], *, record_terms_acceptance: bool = False
+    ) -> tuple[dict[str, Any], str, str]:
         if any(field in payload for field in (
             "role", "isAdmin", "admin", "emailVerified", "email_verified",
             "emailVerifiedAt", "email_verified_at",
@@ -491,6 +547,8 @@ class SecurityStore:
         name = clean_text(payload.get("name"), "name", 2, 80)
         phone_value = payload.get("phone")
         phone = normalize_indian_phone(phone_value) if phone_value else None
+        if record_terms_acceptance:
+            self._require_current_terms(payload)
         now = iso(utc_now())
         user_id = "usr_" + secrets.token_hex(12)
         encoded = self.passwords.hash(password)
@@ -517,6 +575,8 @@ class SecurityStore:
                     (user_id, email, email, encoded, name, phone, phone, now, now, now),
                 )
                 user = db.execute("SELECT * FROM users WHERE id=?", (user_id,)).fetchone()
+                if record_terms_acceptance:
+                    self._record_terms_acceptance(db, user_id, "password")
                 raw, csrf = self._new_session(db, user)
                 db.commit()
             except SecurityError:
@@ -528,11 +588,15 @@ class SecurityStore:
         self._secure_files()
         return self.safe_user(user), raw, csrf
 
-    def login(self, payload: dict[str, Any], client_key: str) -> tuple[dict[str, Any], str, str]:
+    def login(
+        self, payload: dict[str, Any], client_key: str, *, record_terms_acceptance: bool = False
+    ) -> tuple[dict[str, Any], str, str]:
         email = normalize_email(payload.get("email"))
         password = payload.get("password")
         if not isinstance(password, str) or len(password) > PASSWORD_MAX:
             raise SecurityError(401, "Invalid email or password.", "invalid_credentials")
+        if record_terms_acceptance:
+            self._require_current_terms(payload)
         account = token_hash(email)
         cutoff = iso(utc_now() - timedelta(minutes=15))
         with self.connect() as db:
@@ -555,6 +619,8 @@ class SecurityStore:
             )
             if not valid:
                 raise SecurityError(401, "Invalid email or password.", "invalid_credentials")
+            if record_terms_acceptance:
+                self._record_terms_acceptance(db, user["id"], "password")
             raw, csrf = self._new_session(db, user)
         return self.safe_user(user), raw, csrf
 
@@ -589,7 +655,7 @@ class SecurityStore:
             db.execute("UPDATE sessions SET revoked_at=? WHERE token_hash=?", (iso(utc_now()), token_hash(raw_session)))
 
     def federated_session(
-        self, provider: str, payload: dict[str, Any]
+        self, provider: str, payload: dict[str, Any], *, record_terms_acceptance: bool = False
     ) -> tuple[dict[str, Any], str, str, bool]:
         """Exchange a verified Firebase ID token for a normal StyleDash session.
 
@@ -600,6 +666,8 @@ class SecurityStore:
         """
         if provider not in ("google", "phone"):
             raise SecurityError(400, "Unsupported sign-in method.", "invalid_provider")
+        if record_terms_acceptance:
+            self._require_current_terms(payload)
         id_token = payload.get("idToken")
         if not isinstance(id_token, str) or not 20 <= len(id_token) <= 4096:
             raise SecurityError(400, "A valid identity token is required.", "invalid_token")
@@ -676,6 +744,8 @@ class SecurityStore:
                     user, created = self._google_identity(db, uid, claims, now)
                 else:
                     user, created = self._phone_identity(db, uid, claims, now)
+                if record_terms_acceptance:
+                    self._record_terms_acceptance(db, user["id"], provider)
                 raw, csrf = self._new_session(db, user)
                 db.commit()
         except sqlite3.IntegrityError:

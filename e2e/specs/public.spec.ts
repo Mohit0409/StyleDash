@@ -69,7 +69,7 @@ test('customer policy pages publish launch contacts without pre-live warnings', 
   }
 
   await page.goto('/help');
-  await expect(page.locator('main')).toContainText('+91 8963942394');
+  await expect(page.locator('main')).toContainText('+91 8085810758');
   await expect(page.locator('main')).toContainText('Grievance officer: Mohit Jangde');
 
   await page.goto('/returns');
@@ -148,7 +148,7 @@ test('weekday Weekend Express request keeps normal catalogue visible', async ({ 
   await expect(page.locator('main').getByRole('heading', { level: 3 }).first()).toBeVisible();
 });
 
-test('weekend Weekend Express request applies express product filtering', async ({ page }) => {
+test('weekend Weekend Express request keeps the full active catalogue available', async ({ page }) => {
   await page.clock.setFixedTime(new Date('2026-08-29T06:00:00Z'));
   await page.goto('/products?filter=express');
   await expect(page.getByText('Weekend Express is available Saturday and Sunday.')).toHaveCount(0);

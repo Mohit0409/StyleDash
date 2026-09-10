@@ -64,22 +64,83 @@ class PaymentServiceTests(unittest.TestCase):
     def tearDown(self) -> None:
         self.temporary.cleanup()
 
-    def test_weekday_express_is_coerced_to_standard_and_weekend_is_available(self):
-        monday = SERVER.datetime(2026, 8, 31, 6, 0, tzinfo=SERVER.timezone.utc)
-        saturday = SERVER.datetime(2026, 8, 29, 6, 0, tzinfo=SERVER.timezone.utc)
-        self.assertFalse(self.service.express_delivery_available(monday))
-        self.assertTrue(self.service.express_delivery_available(saturday))
-        self.assertEqual(self.service.estimated_delivery_label("express"), "60 minutes")
-        self.assertEqual(self.service.estimated_delivery_label("standard"), "within a day")
-        with patch.object(SERVER.PaymentService, "express_delivery_available", return_value=False):
-            quote = self.service.calculate_order(self.payload(deliveryMethod="express"))
-            cod = self.service.place_cod_order(
-                self.payload(deliveryMethod="express", paymentMethod="cod"),
-                "delivery-standard-test",
+    def test_express_delivery_uses_india_weekend_and_rejects_weekday_bypass(self):
+        monday = SERVER.datetime(2026, 9, 7, 6, 30, tzinfo=SERVER.timezone.utc)
+        friday = SERVER.datetime(2026, 9, 4, 6, 30, tzinfo=SERVER.timezone.utc)
+        saturday = SERVER.datetime(2026, 9, 5, 6, 30, tzinfo=SERVER.timezone.utc)
+        sunday = SERVER.datetime(2026, 9, 6, 6, 30, tzinfo=SERVER.timezone.utc)
+
+        for blocked in (monday, friday):
+            self.assertFalse(self.service.express_delivery_available(blocked))
+            self.assertFalse(self.service.check_serviceability("458441", blocked)["expressAvailable"])
+            self.assert_api_error(
+                "express_delivery_unavailable",
+                lambda blocked=blocked: self.service.calculate_order(
+                    self.payload(deliveryMethod="express"), now=blocked
+                ),
             )
-        self.assertEqual(quote["deliveryMethod"], "standard")
-        self.assertEqual(cod["order"]["deliveryMethod"], "standard")
-        self.assertEqual(cod["order"]["estimatedDelivery"], "within a day")
+
+        for weekend in (saturday, sunday):
+            self.assertTrue(self.service.express_delivery_available(weekend))
+            self.assertTrue(self.service.check_serviceability("458441", weekend)["expressAvailable"])
+            quote = self.service.calculate_order(self.payload(deliveryMethod="express"), now=weekend)
+            self.assertEqual(quote["deliveryMethod"], "express")
+
+        self.assertEqual(self.service.estimated_delivery_label("express"), "60 minutes")
+        self.assertEqual(self.service.estimated_delivery_label("standard"), "same day")
+        with patch.object(SERVER.PaymentService, "express_delivery_available", return_value=False):
+            self.assert_api_error(
+                "express_delivery_unavailable",
+                lambda: self.service.place_cod_order(
+                    self.payload(deliveryMethod="express", paymentMethod="cod"),
+                    "weekday-bypass-test",
+                ),
+            )
+
+    def test_weekend_express_accepts_every_active_product_regardless_stored_delivery_type(self):
+        saturday = SERVER.datetime(2026, 9, 5, 6, 30, tzinfo=SERVER.timezone.utc)
+        monday = SERVER.datetime(2026, 9, 7, 6, 30, tzinfo=SERVER.timezone.utc)
+        product_id = "sd-prod-001"
+        original = self.service._static_products[product_id]
+        self.service._static_products[product_id] = {
+            **original,
+            "deliveryType": "normal",
+            "expressDelivery": False,
+        }
+        try:
+            self.assertTrue(self.service.product_express_eligible(self.service._static_products[product_id]))
+            weekend = self.service.calculate_order(
+                self.payload(deliveryMethod="express"), now=saturday
+            )
+            self.assertEqual(weekend["deliveryMethod"], "express")
+            self.assertEqual(weekend["deliveryFee"], 80)
+
+            weekday_normal = self.service.calculate_order(
+                self.payload(deliveryMethod="standard"), now=monday
+            )
+            self.assertEqual(weekday_normal["deliveryMethod"], "standard")
+            self.assertEqual(weekday_normal["deliveryFee"], 0)
+            self.assertEqual(weekday_normal["taxes"], 45)
+            self.assertEqual(weekday_normal["grandTotal"], 946)
+            with self.assertRaises(SERVER.ApiError) as caught:
+                self.service.calculate_order(
+                    self.payload(deliveryMethod="express"), now=monday
+                )
+            self.assertEqual(caught.exception.code, "express_delivery_unavailable")
+        finally:
+            self.service._static_products[product_id] = original
+
+    def test_express_fee_remains_flat_above_legacy_free_delivery_threshold(self):
+        saturday = SERVER.datetime(2026, 9, 5, 6, 30, tzinfo=SERVER.timezone.utc)
+        payload = self.payload(
+            deliveryMethod="express",
+            items=[{"productId": "sd-prod-001", "variantId": "sd-prod-001-var-2", "quantity": 3}],
+        )
+        quote = self.service.calculate_order(payload, now=saturday)
+        self.assertEqual(quote["subtotal"], 1419)
+        self.assertEqual(quote["deliveryFee"], 80)
+        self.assertEqual(quote["taxes"], 68)
+        self.assertEqual(quote["grandTotal"], 1499)
 
     def payload(self, **overrides):
         payload = {
@@ -92,7 +153,7 @@ class PaymentServiceTests(unittest.TestCase):
                 "pincode": "458441",
             },
             "userId": "test-user",
-            "deliveryMethod": "express",
+            "deliveryMethod": "standard",
             "couponCode": None,
             "paymentMethod": "upi",
         }
@@ -1023,17 +1084,18 @@ class PaymentServiceTests(unittest.TestCase):
 
 
     def test_server_calculates_trusted_amount_in_paise(self) -> None:
-        with patch.object(SERVER.PaymentService, "express_delivery_available", return_value=True):
-            response = self.service.create_razorpay_order(self.payload(), "checkout-test-001")
+        with patch.object(SERVER.PaymentService, "express_delivery_available", return_value=True), \
+             patch.object(SERVER.PaymentService, "product_express_eligible", return_value=True):
+            response = self.service.create_razorpay_order(self.payload(deliveryMethod="express"), "checkout-test-001")
         self.assertEqual(response["trustedTotals"], {
             "subtotal": 946,
             "discount": 0,
-            "deliveryFee": 79,
-            "taxes": 47,
-            "grandTotal": 1072,
+            "deliveryFee": 80,
+            "taxes": 45,
+            "grandTotal": 1026,
         })
-        self.assertEqual(response["amount"], 107200)
-        self.assertEqual(self.gateway.calls[0]["amount"], 107200)
+        self.assertEqual(response["amount"], 102600)
+        self.assertEqual(self.gateway.calls[0]["amount"], 102600)
         self.assertEqual(self.gateway.calls[0]["currency"], "INR")
 
     def test_create_order_is_idempotent(self) -> None:
@@ -1268,11 +1330,12 @@ class PaymentServiceTests(unittest.TestCase):
         self.assert_api_error("missing_payment_fields", lambda: self.service.verify_payment({}))
 
     def test_cod_is_server_authoritative_and_idempotent(self) -> None:
-        payload = self.payload(paymentMethod="cod")
-        with patch.object(SERVER.PaymentService, "express_delivery_available", return_value=True):
+        payload = self.payload(paymentMethod="cod", deliveryMethod="express")
+        with patch.object(SERVER.PaymentService, "express_delivery_available", return_value=True), \
+             patch.object(SERVER.PaymentService, "product_express_eligible", return_value=True):
             first = self.service.place_cod_order(payload, "checkout-cod-001")
             second = self.service.place_cod_order(payload, "checkout-cod-001")
-        self.assertEqual(first["order"]["grandTotal"], 1072)
+        self.assertEqual(first["order"]["grandTotal"], 1026)
         self.assertEqual(first["order"]["paymentStatus"], "pending")
         self.assertTrue(second["idempotent"])
         self.assertEqual(self.service.store.state["inventory"]["sd-prod-001-var-2"], 13)
@@ -1796,7 +1859,9 @@ class HttpApiTests(unittest.TestCase):
             payment_test_allowed_emails={"http-payment-owner@example.test"},
         )
         self.previous_origin = os.environ.get("STYLEDASH_PUBLIC_ORIGIN")
+        self.previous_trust_loopback_proxy = os.environ.get("STYLEDASH_TRUST_LOOPBACK_PROXY")
         os.environ["STYLEDASH_PUBLIC_ORIGIN"] = "https://styledash.test"
+        os.environ["STYLEDASH_TRUST_LOOPBACK_PROXY"] = "1"
         self.service = service
         self.server = SERVER.create_server(
             "127.0.0.1", 0, web_root,
@@ -1817,6 +1882,10 @@ class HttpApiTests(unittest.TestCase):
             os.environ.pop("STYLEDASH_PUBLIC_ORIGIN", None)
         else:
             os.environ["STYLEDASH_PUBLIC_ORIGIN"] = self.previous_origin
+        if self.previous_trust_loopback_proxy is None:
+            os.environ.pop("STYLEDASH_TRUST_LOOPBACK_PROXY", None)
+        else:
+            os.environ["STYLEDASH_TRUST_LOOPBACK_PROXY"] = self.previous_trust_loopback_proxy
         self.temporary.cleanup()
 
     def test_health_and_security_headers(self) -> None:
@@ -1830,6 +1899,85 @@ class HttpApiTests(unittest.TestCase):
             self.assertIn("checkout.razorpay.com", policy)
             self.assertIn("https://static.cloudflareinsights.com", policy)
             self.assertIn("https://cloudflareinsights.com", policy)
+
+    def test_forwarded_https_canonical_host_adds_hsts(self) -> None:
+        connection = http.client.HTTPConnection("127.0.0.1", self.server.server_address[1])
+        connection.request(
+            "GET",
+            "/api/health",
+            headers={"Host": "styledash.test", "X-Forwarded-Proto": "https"},
+        )
+        response = connection.getresponse()
+        self.assertEqual(response.status, 200)
+        self.assertEqual(response.getheader("Strict-Transport-Security"), "max-age=31536000")
+        response.read()
+        connection.close()
+
+    def test_forwarded_http_canonical_host_redirects_to_https(self) -> None:
+        connection = http.client.HTTPConnection("127.0.0.1", self.server.server_address[1])
+        connection.request(
+            "GET",
+            "/products?dept=men&sort=price-asc",
+            headers={"Host": "styledash.test", "X-Forwarded-Proto": "http"},
+        )
+        response = connection.getresponse()
+        self.assertEqual(response.status, 308)
+        self.assertEqual(
+            response.getheader("Location"),
+            "https://styledash.test/products?dept=men&sort=price-asc",
+        )
+        self.assertEqual(response.getheader("Connection"), "close")
+        response.read()
+        connection.close()
+
+    def test_forwarded_http_post_redirects_before_auth_processing(self) -> None:
+        connection = http.client.HTTPConnection("127.0.0.1", self.server.server_address[1])
+        body = b'{"email":"nobody@example.test","password":"invalid-password"}'
+        connection.request(
+            "POST",
+            "/api/auth/login",
+            body=body,
+            headers={
+                "Host": "styledash.test",
+                "X-Forwarded-Proto": "http",
+                "Content-Type": "application/json",
+                "Content-Length": str(len(body)),
+            },
+        )
+        response = connection.getresponse()
+        self.assertEqual(response.status, 308)
+        self.assertEqual(response.getheader("Location"), "https://styledash.test/api/auth/login")
+        response.read()
+        connection.close()
+
+    def test_cf_visitor_scheme_is_used_when_forwarded_proto_is_missing(self) -> None:
+        connection = http.client.HTTPConnection("127.0.0.1", self.server.server_address[1])
+        connection.request(
+            "GET",
+            "/products",
+            headers={"Host": "styledash.test", "CF-Visitor": '{"scheme":"http"}'},
+        )
+        response = connection.getresponse()
+        self.assertEqual(response.status, 308)
+        self.assertEqual(response.getheader("Location"), "https://styledash.test/products")
+        response.read()
+        connection.close()
+
+    def test_forwarded_proto_is_ignored_when_loopback_proxy_trust_is_disabled(self) -> None:
+        os.environ["STYLEDASH_TRUST_LOOPBACK_PROXY"] = "0"
+        try:
+            connection = http.client.HTTPConnection("127.0.0.1", self.server.server_address[1])
+            connection.request(
+                "GET",
+                "/api/health",
+                headers={"Host": "styledash.test", "X-Forwarded-Proto": "http"},
+            )
+            response = connection.getresponse()
+            self.assertEqual(response.status, 200)
+            response.read()
+            connection.close()
+        finally:
+            os.environ["STYLEDASH_TRUST_LOOPBACK_PROXY"] = "1"
 
     def test_static_utf8_assets_declare_charset(self) -> None:
         with urllib.request.urlopen(f"{self.base_url}/utf8.js") as response:
@@ -1957,7 +2105,13 @@ class HttpApiTests(unittest.TestCase):
         self.assertEqual(status, 400)
         self.assertEqual(payload["code"], "malformed_request")
 
-    def post_json(self, path: str, payload: dict, headers: dict | None = None):
+    def post_json(
+        self, path: str, payload: dict, headers: dict | None = None, *, include_terms: bool = True
+    ):
+        if include_terms and path in {
+            "/api/auth/register", "/api/auth/login", "/api/auth/federated/google", "/api/auth/federated/phone",
+        }:
+            payload = {"termsAccepted": True, "termsVersion": "2026-08-14", **payload}
         request = urllib.request.Request(
             f"{self.base_url}{path}", data=json.dumps(payload).encode(),
             headers={"Content-Type": "application/json", **(headers or {})}, method="POST",
@@ -1969,6 +2123,68 @@ class HttpApiTests(unittest.TestCase):
             return status, body, response_headers
         with response:
             return response.status, json.load(response), response.headers
+
+    def test_authentication_requires_and_records_current_terms_consent(self) -> None:
+        registration = {
+            "name": "Terms Customer",
+            "email": "terms-customer@example.test",
+            "password": "very secure terms password 123",
+        }
+        status, rejected, _headers = self.post_json(
+            "/api/auth/register", registration, include_terms=False
+        )
+        self.assertEqual((status, rejected["code"]), (409, "terms_acceptance_required"))
+        status, stale_version, _headers = self.post_json(
+            "/api/auth/register",
+            {**registration, "termsAccepted": True, "termsVersion": "2026-01-01"},
+            include_terms=False,
+        )
+        self.assertEqual((status, stale_version["code"]), (409, "terms_acceptance_required"))
+
+        status, registered, _headers = self.post_json("/api/auth/register", registration)
+        self.assertEqual(status, 201)
+        customer_id = registered["user"]["id"]
+        with self.service.security.connect() as db:
+            acceptance = db.execute(
+                "SELECT terms_version,authentication_method,accepted_at FROM customer_terms_acceptances WHERE user_id=?",
+                (customer_id,),
+            ).fetchone()
+        self.assertEqual(tuple(acceptance[:2]), ("2026-08-14", "password"))
+        self.assertIsNotNone(acceptance[2])
+
+        status, rejected_login, _headers = self.post_json(
+            "/api/auth/login",
+            {"email": registration["email"], "password": registration["password"]},
+            include_terms=False,
+        )
+        self.assertEqual((status, rejected_login["code"]), (409, "terms_acceptance_required"))
+
+        google_token = "terms-google-token-" + ("x" * 20)
+        self.firebase_claims[google_token] = {
+            "uid": "terms-google-user", "email": "terms-google@example.test", "email_verified": True,
+            "firebase": {"sign_in_provider": "google.com"},
+        }
+        status, rejected_google, _headers = self.post_json(
+            "/api/auth/federated/google", {"idToken": google_token}, include_terms=False
+        )
+        self.assertEqual((status, rejected_google["code"]), (409, "terms_acceptance_required"))
+        status, google, _headers = self.post_json("/api/auth/federated/google", {"idToken": google_token})
+        self.assertEqual(status, 201)
+
+        phone_token = "terms-phone-token-" + ("x" * 20)
+        self.firebase_claims[phone_token] = {
+            "uid": "terms-phone-user", "phone_number": "+919876543210",
+            "firebase": {"sign_in_provider": "phone"},
+        }
+        status, phone, _headers = self.post_json("/api/auth/federated/phone", {"idToken": phone_token})
+        self.assertEqual(status, 201)
+        with self.service.security.connect() as db:
+            methods = {
+                row[0] for row in db.execute(
+                    "SELECT authentication_method FROM customer_terms_acceptances"
+                ).fetchall()
+            }
+        self.assertEqual(methods, {"password", "google", "phone"})
 
     def get_json(self, path: str, headers: dict | None = None):
         try:
@@ -1992,6 +2208,70 @@ class HttpApiTests(unittest.TestCase):
             return status, body, response_headers
         with response:
             return response.status, json.load(response), response.headers
+
+    def test_saved_profile_is_returned_after_logout_and_password_login(self) -> None:
+        user, _raw, _csrf = self.service.security.register({
+            "name": "Persistent Customer", "email": "persistent-http@example.test",
+            "password": "long persistent password 123", "phone": "9876543210",
+        })
+        status, login, headers = self.post_json(
+            "/api/auth/login", {"email": user["email"], "password": "long persistent password 123"}
+        )
+        self.assertEqual(status, 200)
+        session = {"Cookie": headers["Set-Cookie"].split(";", 1)[0], "X-CSRF-Token": login["csrfToken"], "Origin": "https://styledash.test"}
+        address = {"name": "Persistent Customer", "phone": "9876543210", "street": "12 Persistent Market Road",
+                   "city": "Neemuch", "state": "Madhya Pradesh", "pincode": "458441", "type": "home", "isDefault": True}
+        status, saved, _headers = self.patch_json(
+            "/api/profile", {"name": "Persistent Customer", "phone": "9876543210", "addresses": [address]}, session
+        )
+        self.assertEqual((status, len(saved["profile"]["addresses"])), (200, 1))
+        status, _body, _headers = self.post_json("/api/auth/logout", {}, session)
+        self.assertEqual(status, 200)
+        status, relogin, _headers = self.post_json(
+            "/api/auth/login", {"email": user["email"], "password": "long persistent password 123"}
+        )
+        self.assertEqual(status, 200)
+        self.assertEqual(relogin["user"]["uid"], user["id"])
+        self.assertEqual(relogin["user"]["addresses"][0]["street"], address["street"])
+
+    def test_returning_phone_and_google_auth_hydrate_profile_without_duplicate_users(self) -> None:
+        phone_token = "phone-profile-" + "x" * 24
+        self.firebase_claims[phone_token] = {
+            "uid": "phone-profile-uid", "phone_number": "+919876543210",
+            "firebase": {"sign_in_provider": "phone"},
+        }
+        phone_user, _raw, _csrf, created = self.service.security.federated_session("phone", {"idToken": phone_token})
+        self.assertTrue(created)
+        self.service.security.update_profile(phone_user["id"], {
+            "name": "Phone Customer", "phone": "+919876543210",
+            "addresses": [{"name": "Phone Customer", "phone": "+919876543210", "street": "21 OTP Market Road",
+                           "city": "Neemuch", "state": "Madhya Pradesh", "pincode": "458441", "type": "home", "isDefault": True}],
+        })
+        status, phone_login, _headers = self.post_json("/api/auth/federated/phone", {"idToken": phone_token})
+        self.assertEqual(status, 200)
+        self.assertEqual(phone_login["user"]["uid"], phone_user["id"])
+        self.assertEqual(phone_login["user"]["addresses"][0]["street"], "21 OTP Market Road")
+
+        google_token = "google-profile-" + "x" * 24
+        self.firebase_claims[google_token] = {
+            "uid": "google-profile-uid", "email": "google-profile@example.test", "email_verified": True,
+            "name": "Google Customer", "firebase": {"sign_in_provider": "google.com"},
+        }
+        google_user, _raw, _csrf, created = self.service.security.federated_session("google", {"idToken": google_token})
+        self.assertTrue(created)
+        self.service.security.update_profile(google_user["id"], {
+            "name": "Google Customer",
+            "addresses": [{"name": "Google Customer", "phone": "9876500000", "street": "31 Google Market Road",
+                           "city": "Neemuch", "state": "Madhya Pradesh", "pincode": "458441", "type": "home", "isDefault": True}],
+        })
+        status, google_login, _headers = self.post_json("/api/auth/federated/google", {"idToken": google_token})
+        self.assertEqual(status, 200)
+        self.assertEqual(google_login["user"]["uid"], google_user["id"])
+        self.assertEqual(google_login["user"]["addresses"][0]["street"], "31 Google Market Road")
+        with self.service.security.connect() as db:
+            users = db.execute("SELECT COUNT(*) FROM users").fetchone()[0]
+            identities = db.execute("SELECT COUNT(*) FROM customer_auth_identities").fetchone()[0]
+        self.assertEqual((users, identities), (2, 2))
 
     def test_shop_draft_approval_publication_inventory_and_checkout_contract(self) -> None:
         status, registered, headers = self.post_json(
@@ -2098,7 +2378,7 @@ class HttpApiTests(unittest.TestCase):
             self.assertEqual(image_response.headers.get_content_type(), "image/png")
             self.assertIn("immutable", image_response.headers["Cache-Control"])
 
-        branding_bytes = png + b"store-branding"
+        branding_bytes = base64.b64decode("iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAYAAABytg0kAAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAAJcEhZcwAADsMAAA7DAcdvqGQAAAARSURBVBhXYxAyCfsPwgwwBgA0DAZtjW+muAAAAABJRU5ErkJggg==")
         branding_payload = {
             "fileName": "store-cover.png",
             "contentType": "image/png",
@@ -2296,7 +2576,7 @@ class HttpApiTests(unittest.TestCase):
                     "city": "Neemuch",
                     "pincode": "458441",
                 },
-                "deliveryMethod": "express",
+                "deliveryMethod": "standard",
                 "paymentMethod": "cod",
             },
             cod_headers,
@@ -2321,7 +2601,7 @@ class HttpApiTests(unittest.TestCase):
                     "city": "Neemuch",
                     "pincode": "458441",
                 },
-                "deliveryMethod": "express",
+                "deliveryMethod": "standard",
                 "paymentMethod": "cod",
             },
             {**session_headers, "Idempotency-Key": "shop-http-cod-002"},
@@ -2603,7 +2883,7 @@ class HttpApiTests(unittest.TestCase):
                 "city": "Neemuch",
                 "pincode": "458441",
             },
-            "deliveryMethod": "express",
+            "deliveryMethod": "standard",
             "paymentMethod": "cod",
             "couponCode": None,
         }
@@ -2733,7 +3013,7 @@ class HttpApiTests(unittest.TestCase):
                 "city": "Neemuch",
                 "pincode": "458441",
             },
-            "deliveryMethod": "express",
+            "deliveryMethod": "standard",
             "paymentMethod": "cod",
             "couponCode": None,
         }
@@ -3007,6 +3287,14 @@ class HttpApiTests(unittest.TestCase):
             urllib.request.urlopen(anonymous_admin)
         self.assertEqual(caught.exception.code, 404); caught.exception.close()
 
+        public_admin_upload = urllib.request.Request(
+            f"{self.base_url}/api/admin/product-images", data=b"{}",
+            headers={"Content-Type": "application/json"}, method="POST",
+        )
+        with self.assertRaises(urllib.error.HTTPError) as caught:
+            urllib.request.urlopen(public_admin_upload)
+        self.assertEqual(caught.exception.code, 404); caught.exception.close()
+
         customer_admin = urllib.request.Request(f"{self.base_url}/api/admin/orders", headers={"Cookie": cookie})
         with self.assertRaises(urllib.error.HTTPError) as caught:
             urllib.request.urlopen(customer_admin)
@@ -3023,7 +3311,7 @@ class HttpApiTests(unittest.TestCase):
         payment_payload = {
             "items": [{"productId": "sd-prod-001", "variantId": "sd-prod-001-var-2", "quantity": 1}],
             "address": {"name": "HTTP Customer", "phone": "9999999999", "street": "123 Test Street", "city": "Neemuch", "pincode": "458441"},
-            "deliveryMethod": "express", "paymentMethod": "upi", "userId": "attacker-controlled-user",
+            "deliveryMethod": "standard", "paymentMethod": "upi", "userId": "attacker-controlled-user",
         }
         base_headers = {"Cookie": cookie, "X-CSRF-Token": csrf, "Idempotency-Key": "http-auth-test"}
         status, body, _headers = self.post_json("/api/create-order", payment_payload, {**base_headers, "Origin": "https://evil.test"})
@@ -3345,7 +3633,7 @@ class HttpApiTests(unittest.TestCase):
                 "name": "HTTP Payment Owner", "phone": "9999999999",
                 "street": "123 Test Street", "city": "Neemuch", "pincode": "458441",
             },
-            "deliveryMethod": "express", "paymentMethod": "cod", "couponCode": None,
+            "deliveryMethod": "standard", "paymentMethod": "cod", "couponCode": None,
         }
         status, ordinary_cod, _headers = self.post_json(
             "/api/place-cod-order", ordinary_payload,
@@ -3394,6 +3682,62 @@ class HttpApiTests(unittest.TestCase):
         self.assertEqual(status, 200)
         self.assertEqual(historical["order"]["adminLabels"], ["TEST", "NO FULFILLMENT REQUIRED"])
         self.assertEqual(historical["order"]["paymentStatus"], "paid")
+
+    def test_delivered_receipt_is_owner_only_and_unavailable_before_delivery(self) -> None:
+        status, owner, owner_headers = self.post_json('/api/auth/register', {
+            'name': 'Receipt Owner', 'email': 'receipt-owner@example.test',
+            'password': 'long receipt owner password 123', 'phone': '9888800001',
+        })
+        self.assertEqual(status, 201)
+        status, other, other_headers = self.post_json('/api/auth/register', {
+            'name': 'Receipt Other', 'email': 'receipt-other@example.test',
+            'password': 'long receipt other password 123', 'phone': '9888800002',
+        })
+        self.assertEqual(status, 201)
+        now = '2026-09-03T12:00:00+00:00'
+        base = {
+            'userId': owner['user']['id'], 'paymentMethod': 'cod', 'paymentStatus': 'pending',
+            'subtotal': 100, 'discount': 0, 'walletAmount': 0, 'deliveryFee': 0, 'taxes': 0, 'grandTotal': 100,
+            'deliveryMethod': 'standard', 'estimatedDelivery': 'Same Day Delivery',
+            'address': {'id': 'addr', 'name': 'Receipt Owner', 'phone': '9888800001', 'street': '1 Test Road', 'city': 'Neemuch', 'state': 'Madhya Pradesh', 'pincode': '458441'},
+            'items': [{'productId': 'sd-prod-001', 'productName': 'Receipt Product', 'productSlug': 'receipt-product', 'variantId': 'sd-prod-001-var-2', 'sku': 'TEST', 'size': 'M', 'colourName': 'Black', 'quantity': 1, 'unitPrice': 100, 'lineTotal': 100}],
+            'statusHistory': [{'status': 'placed', 'timestamp': now}], 'createdAt': now, 'updatedAt': now,
+        }
+        with self.service.store.lock:
+            self.service.store.state['orders']['receipt-ready'] = {**base, 'id': 'receipt-ready', 'status': 'delivered'}
+            self.service.store.state['orders']['receipt-not-ready'] = {**base, 'id': 'receipt-not-ready', 'status': 'placed'}
+            self.service.store.save()
+        owner_cookie = owner_headers['Set-Cookie'].split(';', 1)[0]
+        other_cookie = other_headers['Set-Cookie'].split(';', 1)[0]
+        request = urllib.request.Request(
+            f'{self.base_url}/api/orders/receipt-ready/receipt', headers={'Cookie': owner_cookie}
+        )
+        with urllib.request.urlopen(request) as response:
+            body = response.read()
+            self.assertEqual(response.status, 200)
+            self.assertEqual(response.headers.get_content_type(), 'application/pdf')
+            self.assertIn('vibe4you-receipt-receipt-ready.pdf', response.headers['Content-Disposition'])
+            self.assertTrue(body.startswith(b'%PDF-1.4'))
+            self.assertIn(b'receipt-ready', body)
+            self.assertIn(b'Total: INR 100', body)
+
+        request = urllib.request.Request(
+            f'{self.base_url}/api/orders/receipt-not-ready/receipt', headers={'Cookie': owner_cookie}
+        )
+        with self.assertRaises(urllib.error.HTTPError) as caught:
+            urllib.request.urlopen(request)
+        self.assertEqual(caught.exception.code, 409)
+        self.assertEqual(json.loads(caught.exception.read())['code'], 'receipt_not_ready')
+        caught.exception.close()
+
+        request = urllib.request.Request(
+            f'{self.base_url}/api/orders/receipt-ready/receipt', headers={'Cookie': other_cookie}
+        )
+        with self.assertRaises(urllib.error.HTTPError) as caught:
+            urllib.request.urlopen(request)
+        self.assertEqual(caught.exception.code, 404)
+        self.assertEqual(json.loads(caught.exception.read())['code'], 'order_not_found')
+        caught.exception.close()
 
     def test_password_reset_http_is_generic_rate_limited_and_never_returns_tokens(self) -> None:
         registered_payload = {

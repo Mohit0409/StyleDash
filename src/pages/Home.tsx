@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import { ArrowRight, Zap, Sparkles, ChevronRight } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { ArrowRight, Zap, ChevronRight, Grid2X2, Trophy } from 'lucide-react';
 import { SEO } from '../components/SEO';
+import { HomepageMerchandising } from '../components/HomepageMerchandising';
 import { ProductCard } from '../components/ProductCard';
 import { Product } from '../types';
 import { productRepository } from '../repositories/productRepository';
@@ -9,7 +10,6 @@ import { BANNERS } from '../data/banners';
 import { CONFIG } from '../config';
 
 export const Home: React.FC = () => {
-  const navigate = useNavigate();
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -20,10 +20,9 @@ export const Home: React.FC = () => {
     });
   }, []);
 
-  const newDrops = products.filter(p => p.newArrival).slice(0, 8);
-  const trending = products.filter(p => p.trending).slice(0, 8);
-  const expressPicks = products.filter(p => p.expressDelivery).slice(0, 8);
-  const under499 = products.filter(p => p.price <= 499).slice(0, 8);
+  const topPicks = [...products]
+    .sort((first, second) => Number(second.trending) - Number(first.trending) || second.rating - first.rating || second.reviewCount - first.reviewCount)
+    .slice(0, 8);
 
   return (
     <div className="space-y-12 pb-16">
@@ -34,7 +33,7 @@ export const Home: React.FC = () => {
         <div className="max-w-7xl mx-auto grid lg:grid-cols-2 gap-12 items-center">
           <div className="space-y-6 z-10">
             <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-lime-400 text-neutral-950 text-xs font-black uppercase tracking-wider">
-              <Zap className="w-3.5 h-3.5 fill-neutral-950" /> Within-a-Day Fashion Delivery in {CONFIG.SERVICE_CITY}
+              <Zap className="w-3.5 h-3.5 fill-neutral-950" /> FREE Same Day Delivery in {CONFIG.SERVICE_CITY}
             </div>
 
             <h1 className="text-4xl sm:text-6xl font-black tracking-tight leading-none">
@@ -69,9 +68,11 @@ export const Home: React.FC = () => {
 
             {/* Quick Specs */}
             <div className="pt-6 border-t border-neutral-800 grid grid-cols-3 gap-4 text-xs text-neutral-400">
-              <div><strong className="text-white block text-sm">Within a Day</strong> Local Delivery</div>
+              <div><strong className="text-white block text-sm">Free Same Day</strong> Delivery</div>
               <div><strong className="text-white block text-sm">Local Stores</strong> Curated Marketplace</div>
-              <div><strong className="text-white block text-sm">7 Days</strong> Easy Size Exchange</div>
+              <Link to="/products?maxPrice=499" className="rounded focus-visible:outline focus-visible:outline-2 focus-visible:outline-lime-400">
+                <strong className="text-white block text-sm">Shop by Budget</strong> Under ₹199, ₹299 &amp; ₹499
+              </Link>
             </div>
           </div>
 
@@ -104,15 +105,19 @@ export const Home: React.FC = () => {
               <h2 className="text-2xl font-black text-neutral-900 dark:text-white">Shop by Department</h2>
               <p className="text-xs text-neutral-500">Explore curated collections across all categories</p>
             </div>
+            <Link to="/categories" className="text-xs font-bold text-lime-600 dark:text-lime-400 hover:underline flex items-center gap-1">
+              All Categories <Grid2X2 className="w-3.5 h-3.5" />
+            </Link>
           </div>
 
-          <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
             {[
               { name: "Men's Fashion", query: 'dept=men', img: 'https://images.unsplash.com/photo-1516826957135-700dedea698c?auto=format&fit=crop&w=500&q=80' },
               { name: "Women's Fashion", query: 'dept=women', img: 'https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?auto=format&fit=crop&w=500&q=80' },
               { name: 'Kids Wear', query: 'dept=kids', img: 'https://images.unsplash.com/photo-1529374255404-311a2a4f1fd9?auto=format&fit=crop&w=500&q=80' },
               { name: 'Footwear', query: 'category=Footwear', img: 'https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&w=500&q=80' },
-              { name: 'Accessories', query: 'category=Accessories', img: 'https://images.unsplash.com/photo-1523293182086-7651a899d37f?auto=format&fit=crop&w=500&q=80' }
+              { name: 'Accessories', query: 'category=Accessories', img: 'https://images.unsplash.com/photo-1515562141207-7a88fb7ce338?auto=format&fit=crop&w=500&q=80' },
+              { name: 'Beauty & Personal Care', query: 'category=Beauty%20%26%20Personal%20Care', img: 'https://images.unsplash.com/photo-1596462502278-27bfdc403348?auto=format&fit=crop&w=500&q=80' }
             ].map(item => (
               <Link
                 key={item.query}
@@ -131,72 +136,35 @@ export const Home: React.FC = () => {
           </div>
         </section>
 
-        {/* Express Delivery Picks */}
-        <section className="space-y-6">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <div className="p-2 bg-amber-400 text-neutral-950 rounded-xl">
-                <Zap className="w-5 h-5 fill-neutral-950" />
-              </div>
-              <div>
-                <h2 className="text-2xl font-black text-neutral-900 dark:text-white">Weekend Express Picks</h2>
-                <p className="text-xs text-neutral-500">In stock nearby and ready for immediate dispatch in Neemuch</p>
-              </div>
-            </div>
-            <Link to="/products?filter=express" className="text-xs font-bold text-lime-600 dark:text-lime-400 hover:underline flex items-center gap-1">
-              View All <ArrowRight className="w-3.5 h-3.5" />
-            </Link>
+        <section className="space-y-4" aria-labelledby="shop-by-budget">
+          <div>
+            <span className="text-xs font-black uppercase text-lime-700 dark:text-lime-400 tracking-wider">Easy on the pocket</span>
+            <h2 id="shop-by-budget" className="text-2xl font-black text-neutral-900 dark:text-white">Shop by Budget</h2>
           </div>
-
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 sm:gap-6">
-            {expressPicks.map(p => (
-              <ProductCard key={p.id} product={p} />
+          <div className="grid grid-cols-3 gap-3 sm:gap-4">
+            {[199, 299, 499].map(price => (
+              <Link key={price} to={`/products?maxPrice=${price}`} className="rounded-2xl border border-lime-200 bg-lime-50 px-3 py-5 text-center transition-colors hover:bg-lime-100 dark:border-lime-900 dark:bg-lime-950/20 dark:hover:bg-lime-950/40">
+                <span className="block text-xs font-bold text-neutral-600 dark:text-neutral-300">Under</span>
+                <span className="mt-1 block text-xl font-black text-neutral-900 dark:text-white">₹{price}</span>
+              </Link>
             ))}
           </div>
         </section>
 
-        {/* Styles Under 499 */}
-        <section className="space-y-6 bg-lime-50 dark:bg-lime-950/20 p-6 sm:p-8 rounded-3xl border border-lime-200 dark:border-lime-900">
-          <div className="flex items-center justify-between">
-            <div>
-              <span className="text-xs font-black uppercase text-lime-700 dark:text-lime-400 tracking-wider">Budget Deals</span>
-              <h2 className="text-2xl font-black text-neutral-900 dark:text-white">Styles Under ₹499</h2>
-            </div>
-            <Link to="/products?maxPrice=499" className="text-xs font-bold text-neutral-900 dark:text-white hover:underline flex items-center gap-1">
-              Shop All Deals <ArrowRight className="w-3.5 h-3.5" />
-            </Link>
-          </div>
-
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 sm:gap-6">
-            {under499.map(p => (
-              <ProductCard key={p.id} product={p} />
-            ))}
-          </div>
-        </section>
-
-        {/* New Drops */}
-        <section className="space-y-6">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <div className="p-2 bg-emerald-500 text-white rounded-xl">
-                <Sparkles className="w-5 h-5" />
+        {topPicks.length > 0 && (
+          <section className="space-y-6">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className="p-2 bg-violet-600 text-white rounded-xl"><Trophy className="w-5 h-5" /></div>
+                <div><h2 className="text-2xl font-black text-neutral-900 dark:text-white">Top Picks</h2><p className="text-xs text-neutral-500">Customer favourites and highly rated local styles</p></div>
               </div>
-              <div>
-                <h2 className="text-2xl font-black text-neutral-900 dark:text-white">New Drops & Arrivals</h2>
-                <p className="text-xs text-neutral-500">Fresh streetwear and seasonal styles added this week</p>
-              </div>
+              <Link to="/products?sort=rating" className="text-xs font-bold text-lime-600 dark:text-lime-400 hover:underline flex items-center gap-1">View All <ArrowRight className="w-3.5 h-3.5" /></Link>
             </div>
-            <Link to="/products?filter=new" className="text-xs font-bold text-lime-600 dark:text-lime-400 hover:underline flex items-center gap-1">
-              View All <ArrowRight className="w-3.5 h-3.5" />
-            </Link>
-          </div>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 sm:gap-6">{topPicks.map(product => <ProductCard key={product.id} product={product} />)}</div>
+          </section>
+        )}
 
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 sm:gap-6">
-            {newDrops.map(p => (
-              <ProductCard key={p.id} product={p} />
-            ))}
-          </div>
-        </section>
+        <HomepageMerchandising products={products} loading={loading} />
 
       </div>
     </div>

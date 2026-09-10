@@ -3,8 +3,8 @@
   "taxRate": 0.05,
   "freeDeliveryThreshold": 999,
   "deliveryFees": {
-    "express": 79,
-    "standard": 49
+    "express": 80,
+    "standard": 0
   },
   "supportedPincodes": [
     "458441",

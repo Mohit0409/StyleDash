@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { UserProfile } from '../types';
 import { authApi } from '../services/authApi';
+import type { TermsAcceptance } from '../services/authApi';
 import { ApiError, clearCsrfToken } from '../services/apiClient';
 
 export type FederatedProvider = 'google' | 'phone';
@@ -10,9 +11,9 @@ interface AuthContextType {
   needsProfile: boolean;
   loading: boolean;
   error: string;
-  login: (email: string, password: string) => Promise<boolean>;
-  register: (name: string, email: string, password: string, phone?: string) => Promise<boolean>;
-  federatedLogin: (provider: FederatedProvider, idToken: string) => Promise<boolean>;
+  login: (email: string, password: string, terms: TermsAcceptance) => Promise<boolean>;
+  register: (name: string, email: string, password: string, phone: string | undefined, terms: TermsAcceptance) => Promise<boolean>;
+  federatedLogin: (provider: FederatedProvider, idToken: string, terms: TermsAcceptance) => Promise<boolean>;
   logout: () => Promise<void>;
   refresh: () => Promise<void>;
 }
@@ -35,24 +36,24 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   useEffect(() => { refresh().finally(() => setLoading(false)); }, []);
 
-  const login = async (email: string, password: string) => {
+  const login = async (email: string, password: string, terms: TermsAcceptance) => {
     setLoading(true); setError('');
-    try { const response = await authApi.login(email, password); setUser(response.user); setNeedsProfile(false); return true; }
+    try { const response = await authApi.login(email, password, terms); setUser(response.user); setNeedsProfile(false); return true; }
     catch (cause) { setError(cause instanceof ApiError ? cause.message : 'Login failed.'); return false; }
     finally { setLoading(false); }
   };
 
-  const register = async (name: string, email: string, password: string, phone?: string) => {
+  const register = async (name: string, email: string, password: string, phone: string | undefined, terms: TermsAcceptance) => {
     setLoading(true); setError('');
-    try { const response = await authApi.register(name, email, password, phone); setUser(response.user); setNeedsProfile(false); return true; }
+    try { const response = await authApi.register(name, email, password, phone, terms); setUser(response.user); setNeedsProfile(false); return true; }
     catch (cause) { setError(cause instanceof ApiError ? cause.message : 'Registration failed.'); return false; }
     finally { setLoading(false); }
   };
 
-  const federatedLogin = async (provider: FederatedProvider, idToken: string) => {
+  const federatedLogin = async (provider: FederatedProvider, idToken: string, terms: TermsAcceptance) => {
     setLoading(true); setError('');
     try {
-      const response = await authApi.federated(provider, idToken);
+      const response = await authApi.federated(provider, idToken, terms);
       setUser(response.user);
       setNeedsProfile(Boolean(response.needsProfile || (response.user.phone && !response.user.name)));
       return true;

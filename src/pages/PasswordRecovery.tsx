@@ -7,7 +7,11 @@ import { ApiError } from '../services/apiClient';
 const GENERIC_REQUEST_MESSAGE = 'If an account exists, reset instructions will be sent shortly.';
 
 export const ForgotPassword: React.FC = () => {
-  const [email, setEmail] = useState('');
+  const location = useLocation();
+  const [email, setEmail] = useState(() => {
+    const state = location.state as { email?: unknown } | null;
+    return typeof state?.email === 'string' ? state.email.trim().slice(0, 254) : '';
+  });
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -27,7 +31,7 @@ export const ForgotPassword: React.FC = () => {
     <SEO title="Reset password - Vibe4You" noIndex />
     <form onSubmit={submit} className="bg-white dark:bg-neutral-900 border dark:border-neutral-800 rounded-3xl p-7 space-y-4 shadow-sm">
       <h1 className="text-2xl font-black">Reset your password</h1>
-      <p className="text-sm text-neutral-500">Enter your account email. For privacy, the result is the same whether or not an account exists.</p>
+      <p className="text-sm text-neutral-500">Enter your account email. We’ll send a secure reset link so you can choose a new password without entering the old one. For privacy, the result is the same whether or not an account exists.</p>
       <input aria-label="Account email address" required type="email" autoComplete="email" maxLength={254} value={email} onChange={event => setEmail(event.target.value)} placeholder="Email address" className="w-full p-3 rounded-xl border dark:bg-neutral-800" />
       {error && <p role="alert" className="text-sm text-red-600">{error}</p>}
       {message && <p role="status" className="text-sm text-green-700">{message}</p>}

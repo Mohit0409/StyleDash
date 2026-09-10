@@ -49,7 +49,8 @@ export const matchesCatalogueProduct = (
   if (product.price > filters.maxPrice) return false;
   if (!matchesSearch(product, filters.searchQuery)) return false;
 
-  if (filters.filterBadge === 'express' && filters.expressFilterActive && !product.expressDelivery) return false;
+  // Weekend Express is a site-wide delivery mode, so the active Express
+  // catalogue contains every otherwise-matching active product.
   if (filters.filterBadge === 'new' && !product.newArrival) return false;
   if (filters.filterBadge === 'sale' && product.discount === 0) return false;
   return true;

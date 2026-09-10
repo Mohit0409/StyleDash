@@ -57,11 +57,11 @@ export const LocationSelector: React.FC<{ isOpen: boolean; onClose: () => void }
         </button>
 
         <div className="flex items-center gap-2 mb-2 text-lime-600 dark:text-lime-400 font-extrabold text-sm">
-          <MapPin className="w-5 h-5" /> Hyperlocal Delivery Check
+          <MapPin className="w-5 h-5" /> Same Day Delivery Check
         </div>
 
         <h3 id="location-dialog-title" className="text-lg font-black text-neutral-900 dark:text-white mb-2">Check Delivery Availability</h3>
-        <p className="text-xs text-neutral-500 mb-6">Enter your 6-digit area pincode in {CONFIG.SERVICE_CITY} to check local delivery availability.</p>
+        <p className="text-xs text-neutral-500 mb-6">Enter your 6-digit area pincode in {CONFIG.SERVICE_CITY} to check Same Day Delivery availability.</p>
 
         <form onSubmit={handleCheck} className="flex gap-2 mb-4">
           <input
@@ -101,8 +101,8 @@ export const LocationSelector: React.FC<{ isOpen: boolean; onClose: () => void }
               <p className="mt-0.5">
                 {isSuccess
                   ? result?.expressAvailable && result?.estimatedDeliveryMinutes
-                    ? `Normal delivery is available within a day. Weekend express is also available within ${result.estimatedDeliveryMinutes} minutes.`
-                    : 'Normal delivery is available within a day. Express delivery is disabled Monday–Friday.'
+                    ? `Same Day Delivery is FREE. Express Delivery is also available within ${result.estimatedDeliveryMinutes} minutes for ₹80.`
+                    : 'Same Day Delivery is FREE. Express Delivery is unavailable Monday–Friday.'
                   : null}
                 {isProblem && checkState === 'unserviceable' ? 'We are not delivering to this pincode yet.' : null}
                 {isProblem && checkState === 'invalid' ? 'Pincodes must contain exactly six numbers.' : null}

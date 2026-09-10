@@ -115,6 +115,42 @@ class AdminStoreTests(unittest.TestCase):
         actions = {row["action"] for row in self.store.audit()}
         self.assertTrue({"order_status", "inventory_adjustment", "vendor_approved", "customer_disabled"}.issubset(actions))
 
+    def test_cod_payment_collection_is_separate_audited_and_never_spoofs_razorpay(self):
+        app = ADMIN_SERVER.AdminApplication(
+            self.database, self.key, ROOT / "server/payment-data/catalog.json",
+            ROOT / "server/payment-data/settings.json", self.root / "data-cod-payment",
+        )
+        with app.payments.store.lock:
+            app.payments.store.state["orders"]["COD-PENDING"] = {
+                "id": "COD-PENDING", "paymentMethod": "cod", "paymentStatus": "pending",
+                "status": "placed", "fulfillmentRequired": True, "createdAt": "2026-09-04T10:00:00+00:00",
+            }
+            app.payments.store.state["orders"]["COD-CONFIRM-FIRST"] = {
+                "id": "COD-CONFIRM-FIRST", "paymentMethod": "cod", "paymentStatus": "pending",
+                "status": "placed", "fulfillmentRequired": True, "createdAt": "2026-09-04T10:01:00+00:00",
+            }
+            app.payments.store.state["orders"]["RAZORPAY-PENDING"] = {
+                "id": "RAZORPAY-PENDING", "paymentMethod": "upi", "paymentStatus": "pending",
+                "status": "payment_pending", "fulfillmentRequired": True, "razorpayOrderId": "order_secure",
+                "createdAt": "2026-09-04T10:02:00+00:00",
+            }
+            app.payments.store.save()
+        paid = app.mark_cod_paid(self.admin["id"], "COD-PENDING", "cash")
+        self.assertEqual((paid["paymentMethod"], paid["paymentStatus"], paid["status"]), ("cod", "paid", "placed"))
+        self.assertEqual(paid["paymentCollectionMethod"], "cash")
+        self.assertTrue(paid["paymentCollectedAt"].endswith("+00:00"))
+        public = app.payments._public_order(paid)
+        self.assertEqual(public["paymentCollectionMethod"], "cash")
+        self.assertEqual(public["paymentCollectedAt"], paid["paymentCollectedAt"])
+        confirmed = app.update_order_status(self.admin["id"], "COD-CONFIRM-FIRST", "confirmed")
+        self.assertEqual((confirmed["status"], confirmed["paymentStatus"]), ("confirmed", "pending"))
+        self.assert_error("manual_payment_forbidden", lambda: app.mark_cod_paid(self.admin["id"], "RAZORPAY-PENDING", "cash"))
+        self.assert_error("payment_not_pending", lambda: app.mark_cod_paid(self.admin["id"], "COD-PENDING", "upi_at_delivery"))
+        audit = next(row for row in self.store.audit() if row["action"] == "cod_payment_marked_paid")
+        metadata = json.loads(audit["metadata_json"])
+        self.assertEqual(metadata["collectionMethod"], "cash")
+        self.assertEqual(metadata["paymentCollectedAt"], paid["paymentCollectedAt"])
+
     def test_private_admin_owner_mobile_required_email_optional_and_otp_binds(self):
         owner = self.store.create_customer_account(self.admin["id"], {
             "name": "Phone First Owner", "phone": "9876501234", "password": "TempPass8!",
@@ -386,9 +422,11 @@ class AdminStoreTests(unittest.TestCase):
                 self.admin["id"],
                 "ORDER-CANCEL-NOTIFY",
                 "cancelled",
+                "Customer requested cancellation before dispatch",
             )
 
             self.assertEqual(result["status"], "cancelled")
+            self.assertEqual(result["cancellationReason"], "Customer requested cancellation before dispatch")
             self.assertEqual(notifier.send.call_count, 1)
 
             notification = notifier.send.call_args.kwargs
@@ -464,9 +502,11 @@ class AdminStoreTests(unittest.TestCase):
                 self.admin["id"],
                 "ORDER-CANCEL-FAILURE",
                 "cancelled",
+                "Item unavailable after order review",
             )
 
         self.assertEqual(result["status"], "cancelled")
+        self.assertEqual(result["cancellationReason"], "Item unavailable after order review")
 
         persisted = app.get_order("ORDER-CANCEL-FAILURE")
 
@@ -719,9 +759,23 @@ class AdminStoreTests(unittest.TestCase):
         self.assertIn('All Shops', admin_ui)
         self.assertIn('No products for the selected shop.', admin_ui)
         self.assertIn("Promise.all([api('/api/admin/shop-products'),api('/api/admin/vendors')])", admin_ui)
+        self.assertIn("Choose product images from this PC", admin_ui)
+        self.assertIn("HTTPS image URLs (optional fallback)", admin_ui)
+        self.assertIn("imageFile", admin_ui)
+        self.assertIn("Select the local product images referenced by the CSV", admin_ui)
+        self.assertIn("previewImages:true", admin_ui)
+        self.assertIn("new DataTransfer()", admin_ui)
+        self.assertIn("csvText,images", admin_ui)
+        self.assertIn("progressOffset=0,progressTotal=null", admin_ui)
+        self.assertIn("uploadAdminProductImages([file],uploaded,requiredFiles.size)", admin_ui)
         self.assertIn("payment_pending:'amber'", admin_ui)
         self.assertIn("delivered:'green'", admin_ui)
         self.assertIn("cancelled:'red'", admin_ui)
+        self.assertIn("async function cancellationReasonFor()", admin_ui)
+        self.assertIn("Customer requested cancellation", admin_ui)
+        self.assertIn("Other", admin_ui)
+        self.assertIn("Cancellation reason", admin_ui)
+        self.assertIn("orderItemMarkup", admin_ui)
         self.assertNotIn("prompt(", admin_ui)
         self.assertNotIn("alert(", admin_ui)
         self.assertNotIn("confirm(", admin_ui)
@@ -773,6 +827,25 @@ class AdminHttpTests(unittest.TestCase):
             content = response.read()
             return response.status, json.loads(content) if response.headers.get_content_type() == "application/json" else content.decode(), response.headers
 
+    def test_cloudflare_access_admin_origin_is_allowed_but_other_origins_are_rejected(self):
+        status, body, headers = self.request(
+            "/api/admin/login",
+            {"username": "local-owner", "password": "long administrator password 123"},
+            headers={"Origin": "https://admin.vibe4you.in"},
+            method="POST",
+        )
+        self.assertEqual(status, 200)
+        self.assertTrue(body["requiresTotp"])
+        self.assertIn("styledash_admin_challenge=", headers.get("Set-Cookie", ""))
+
+        status, body, _headers = self.request(
+            "/api/admin/login",
+            {"username": "local-owner", "password": "long administrator password 123"},
+            headers={"Origin": "https://evil.example"},
+            method="POST",
+        )
+        self.assertEqual((status, body["code"]), (403, "admin_request_rejected"))
+
     def test_loopback_host_password_totp_and_separate_cookie(self):
         status, html, _headers = self.request("/", headers={"Origin": ""})
         self.assertEqual(status, 200); self.assertIn("Vibe4You Local Administration", html)
@@ -810,6 +883,36 @@ class AdminHttpTests(unittest.TestCase):
         self.assertEqual((status, body["code"]), (403, "admin_csrf_failed"))
         status, body, _headers = self.request("/api/admin/logout", {}, headers={"X-CSRF-Token": csrf}, method="POST")
         self.assertEqual(status, 200)
+
+    def test_cod_mark_paid_http_is_private_csrf_protected_and_cod_only(self):
+        app = self.server.RequestHandlerClass.application
+        with app.payments.store.lock:
+            app.payments.store.state["orders"]["HTTP-COD"] = {
+                "id": "HTTP-COD", "paymentMethod": "cod", "paymentStatus": "pending",
+                "status": "placed", "fulfillmentRequired": True, "createdAt": "2026-09-04T10:00:00+00:00",
+            }
+            app.payments.store.state["orders"]["HTTP-RAZORPAY"] = {
+                "id": "HTTP-RAZORPAY", "paymentMethod": "card", "paymentStatus": "pending",
+                "status": "payment_pending", "fulfillmentRequired": True, "razorpayOrderId": "order_http_secure",
+                "createdAt": "2026-09-04T10:01:00+00:00",
+            }
+            app.payments.store.save()
+        status, body, _ = self.request('/api/admin/orders/HTTP-COD/payment', {'collectionMethod':'cash'}, method='PATCH')
+        self.assertEqual((status, body['code']), (401, 'admin_authentication_required'))
+        self.request('/api/admin/login', {'username':'local-owner','password':'long administrator password 123'}, method='POST')
+        status, auth, _ = self.request('/api/admin/totp', {'code':pyotp.TOTP(self.secret).now()}, method='POST')
+        self.assertEqual(status, 200)
+        csrf = auth["csrfToken"]
+        status, missing, _ = self.request('/api/admin/orders/HTTP-COD/payment', {'collectionMethod':'cash'}, method='PATCH')
+        self.assertEqual((status, missing['code']), (403, 'admin_csrf_failed'))
+        status, paid, _ = self.request('/api/admin/orders/HTTP-COD/payment', {'collectionMethod':'upi_at_delivery'}, headers={'X-CSRF-Token':csrf}, method='PATCH')
+        self.assertEqual(status, 200)
+        self.assertEqual((paid['order']['paymentStatus'], paid['order']['paymentCollectionMethod'], paid['order']['status']), ('paid','upi_at_delivery','placed'))
+        status, blocked, _ = self.request('/api/admin/orders/HTTP-RAZORPAY/payment', {'collectionMethod':'cash'}, headers={'X-CSRF-Token':csrf}, method='PATCH')
+        self.assertEqual((status, blocked['code']), (409, 'manual_payment_forbidden'))
+        status, audit, _ = self.request('/api/admin/audit')
+        self.assertEqual(status, 200)
+        self.assertTrue(any(row['action']=='cod_payment_marked_paid' for row in audit['audit']))
 
     def test_shop_transition_success_does_not_depend_on_admin_catalog_refresh(self):
         customers = SECURITY.SecurityStore(self.database, self.key)
@@ -967,6 +1070,122 @@ class AdminHttpTests(unittest.TestCase):
         self.assertRegex(body["image"]["url"], r"^/media/product-images/[0-9a-f]{32}\.png$")
         stored = self.database.parent / "product-images" / Path(body["image"]["url"]).name
         self.assertEqual(stored.read_bytes(), png)
+
+    def test_admin_product_image_upload_security_and_supported_formats(self):
+        import base64
+        png = base64.b64decode("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=")
+        jpeg = base64.b64decode("/9j/4AAQSkZJRgABAQEAYABgAAD/2wBDAAMCAgMCAgMDAwMEAwMEBQgFBQQEBQoHBwYIDAoMDAsKCwsNDhIQDQ4RDgsLEBYQERMUFRUVDA8XGBYUGBIUFRT/2wBDAQMEBAUEBQkFBQkUDQsNFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBT/wAARCAACAAIDASIAAhEBAxEB/8QAHwAAAQUBAQEBAQEAAAAAAAAAAAECAwQFBgcICQoL/8QAtRAAAgEDAwIEAwUFBAQAAAF9AQIDAAQRBRIhMUEGE1FhByJxFDKBkaEII0KxwRVS0fAkM2JyggkKFhcYGRolJicoKSo0NTY3ODk6Q0RFRkdISUpTVFVWV1hZWmNkZWZnaGlqc3R1dnd4eXqDhIWGh4iJipKTlJWWl5iZmqKjpKWmp6ipqrKztLW2t7i5usLDxMXGx8jJytLT1NXW19jZ2uHi4+Tl5ufo6erx8vP09fb3+Pn6/8QAHwEAAwEBAQEBAQEBAQAAAAAAAAECAwQFBgcICQoL/8QAtREAAgECBAQDBAcFBAQAAQJ3AAECAxEEBSExBhJBUQdhcRMiMoEIFEKRobHBCSMzUvAVYnLRChYkNOEl8RcYGRomJygpKjU2Nzg5OkNERUZHSElKU1RVVldYWVpjZGVmZ2hpanN0dXZ3eHl6goOEhYaHiImKkpOUlZaXmJmaoqOkpaanqKmqsrO0tba3uLm6wsPExcbHyMnK0tPU1dbX2Nna4uPk5ebn6Onq8vP09fb3+Pn6/9oADAMBAAIRAxEAPwD4kooor70+KP/Z")
+        webp = base64.b64decode("UklGRhYCAABXRUJQVlA4WAoAAAAgAAAAAQAAAQAASUNDUMgBAAAAAAHIAAAAAAQwAABtbnRyUkdCIFhZWiAH4AABAAEAAAAAAABhY3NwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAQAA9tYAAQAAAADTLQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAlkZXNjAAAA8AAAACRyWFlaAAABFAAAABRnWFlaAAABKAAAABRiWFlaAAABPAAAABR3dHB0AAABUAAAABRyVFJDAAABZAAAAChnVFJDAAABZAAAAChiVFJDAAABZAAAAChjcHJ0AAABjAAAADxtbHVjAAAAAAAAAAEAAAAMZW5VUwAAAAgAAAAcAHMAUgBHAEJYWVogAAAAAAAAb6IAADj1AAADkFhZWiAAAAAAAABimQAAt4UAABjaWFlaIAAAAAAAACSgAAAPhAAAts9YWVogAAAAAAAA9tYAAQAAAADTLXBhcmEAAAAAAAQAAAACZmYAAPKnAAANWQAAE9AAAApbAAAAAAAAAABtbHVjAAAAAAAAAAEAAAAMZW5VUwAAACAAAAAcAEcAbwBvAGcAbABlACAASQBuAGMALgAgADIAMAAxADZWUDggKAAAAJABAJ0BKgIAAgABQCYliAJ0ugADmAD++ajv7U2Kqed36FGyiXzAAAA=")
+        def payload(name, mime, raw):
+            return {"fileName": name, "contentType": mime, "dataBase64": base64.b64encode(raw).decode("ascii")}
+
+        status, body, _ = self.request("/api/admin/product-images", payload("anonymous.png", "image/png", png), method="POST")
+        self.assertEqual((status, body["code"]), (401, "admin_authentication_required"))
+        non_admin = urllib.request.Request(
+            self.base + "/api/admin/product-images",
+            data=json.dumps(payload("customer.png", "image/png", png)).encode(),
+            method="POST",
+            headers={
+                "Host": "127.0.0.1:8081", "Origin": "http://127.0.0.1:8081",
+                "Content-Type": "application/json",
+                "Cookie": "__Host-styledash_session=customer-cookie-is-not-an-admin-session",
+            },
+        )
+        with self.assertRaises(urllib.error.HTTPError) as caught:
+            urllib.request.urlopen(non_admin)
+        self.assertEqual(caught.exception.code, 401); caught.exception.close()
+        self.request("/api/admin/login", {"username": "local-owner", "password": "long administrator password 123"}, method="POST")
+        status, auth, _ = self.request("/api/admin/totp", {"code": pyotp.TOTP(self.secret).now()}, method="POST")
+        self.assertEqual(status, 200); csrf = auth["csrfToken"]
+        status, body, _ = self.request("/api/admin/product-images", payload("missing.png", "image/png", png), method="POST")
+        self.assertEqual((status, body["code"]), (403, "admin_csrf_failed"))
+        status, body, _ = self.request("/api/admin/product-images", payload("wrong.png", "image/png", png), headers={"X-CSRF-Token": "wrong"}, method="POST")
+        self.assertEqual((status, body["code"]), (403, "admin_csrf_failed"))
+
+        generated = []
+        for filename, mime, raw, suffix in (("client-name.jpg", "image/jpeg", jpeg, ".jpg"), ("client-name.png", "image/png", png, ".png"), ("client-name.webp", "image/webp", webp, ".webp")):
+            status, body, _ = self.request("/api/admin/product-images", payload(filename, mime, raw), headers={"X-CSRF-Token": csrf}, method="POST")
+            self.assertEqual(status, 201)
+            url = body["image"]["url"]; generated.append(url)
+            self.assertRegex(url, rf"^/media/product-images/[0-9a-f]{{32}}{suffix}$")
+            self.assertNotIn("client-name", url)
+            self.assertEqual((self.database.parent / "product-images" / Path(url).name).read_bytes(), raw)
+
+        for bad_payload, expected_status in (
+            ({"fileName": "../outside.png", "contentType": "image/png", "dataBase64": base64.b64encode(png).decode()}, 400),
+            ({"fileName": "bad.gif", "contentType": "image/gif", "dataBase64": base64.b64encode(b"GIF89a" * 8).decode()}, 400),
+            ({"fileName": "bad.png", "contentType": "image/png", "dataBase64": "not-base64!!!"}, 400),
+            ({"fileName": "html.jpg", "contentType": "image/jpeg", "dataBase64": base64.b64encode(b"<html>not an image</html>" * 3).decode()}, 400),
+            ({"fileName": "large.png", "contentType": "image/png", "dataBase64": base64.b64encode(b"x" * (500 * 1024 + 1)).decode()}, 413),
+        ):
+            status, body, _ = self.request("/api/admin/product-images", bad_payload, headers={"X-CSRF-Token": csrf}, method="POST")
+            self.assertEqual(status, expected_status)
+        self.assertEqual(len(list((self.database.parent / "product-images").glob("*"))), 3)
+
+        request = urllib.request.Request(self.base + "/api/admin/product-images", data=b"{bad-json", method="POST", headers={"Host":"127.0.0.1:8081","Origin":"http://127.0.0.1:8081","Content-Type":"application/json","X-CSRF-Token":csrf})
+        try:
+            self.client.open(request)
+        except urllib.error.HTTPError as caught:
+            malformed = json.loads(caught.read()); self.assertEqual((caught.code, malformed["code"]), (400, "malformed_request")); caught.close()
+        else:
+            self.fail("Malformed JSON upload unexpectedly succeeded")
+
+    def test_admin_uploaded_image_supports_create_and_filename_mapped_bulk_import(self):
+        import base64
+        png = base64.b64decode("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=")
+        customers = SECURITY.SecurityStore(self.database, self.key)
+        user, _raw, _csrf = customers.register({"name":"Image Bulk Seller","email":"image-bulk@example.test","password":"long seller password 123","phone":"9999999966"})
+        shops = ADMIN_SERVER.ShopWorkflow(self.database)
+        self.request("/api/admin/login", {"username":"local-owner","password":"long administrator password 123"}, method="POST")
+        status, auth, _ = self.request("/api/admin/totp", {"code":pyotp.TOTP(self.secret).now()}, method="POST")
+        self.assertEqual(status, 200); csrf=auth["csrfToken"]; admin_id=auth["admin"]["id"]
+        application = shops.admin_create_application(admin_id, user["id"], {"shopName":"Existing Image Shop","ownerName":"Image Bulk Seller","category":"Footwear","description":"Existing shop for safe image import.","address":"7 Main Market","city":"Neemuch","state":"Madhya Pradesh","pincode":"458441"})
+        status, uploaded, _ = self.request("/api/admin/product-images", {"fileName":"product1.png","contentType":"image/png","dataBase64":base64.b64encode(png).decode()}, headers={"X-CSRF-Token":csrf}, method="POST")
+        self.assertEqual(status,201); image_path=uploaded["image"]["url"]
+
+        direct_product={"applicationId":application["id"],"name":"Uploaded Image Shoe","description":"Product created with private admin uploaded image.","brand":"Local","department":"unisex","category":"Footwear","pricePaise":90000,"originalPricePaise":90000,"variants":[{"size":"8","inventory":5}],"colourName":"Blue","imageUrls":[image_path],"attributes":{}}
+        status, created, _ = self.request("/api/admin/shop-products", direct_product, headers={"X-CSRF-Token":csrf}, method="POST")
+        self.assertEqual(status,201); self.assertEqual(created["product"]["imageUrls"],[image_path])
+        https_product={**direct_product,"name":"HTTPS Compatibility Shoe","imageUrls":["https://example.test/shoe.jpg"]}
+        status, https_created, _ = self.request("/api/admin/shop-products", https_product, headers={"X-CSRF-Token":csrf}, method="POST")
+        self.assertEqual(status,201); self.assertEqual(https_created["product"]["imageUrls"],["https://example.test/shoe.jpg"])
+
+        before={product["id"]:product for product in shops.admin_list_products(admin_id)}
+        csv_text='name,description,brand,department,category,price,originalPrice,variants,colourName,colourHex,imageFile,imageUrls\nMapped Campus,Campus sports shoe,Campus,unisex,Footwear,1720,1720,"6:5, 7:5",Multi,,product1.png,\nDirect URL Shoe,Direct URL compatibility,JQR,unisex,Footwear,1350,1350,"8:5, 9:5",Olive,,,https://example.test/direct.jpg\n'
+        status, bulk, _ = self.request("/api/admin/shop-products/bulk", {"applicationId":application["id"],"csvText":csv_text,"images":{"product1.png":image_path}}, headers={"X-CSRF-Token":csrf}, method="POST")
+        self.assertEqual((status,bulk["created"]),(201,2))
+        by_name={product["name"]:product for product in bulk["products"]}
+        self.assertEqual(by_name["Mapped Campus"]["imageUrls"][0],image_path)
+        self.assertEqual(by_name["Direct URL Shoe"]["imageUrls"],["https://example.test/direct.jpg"])
+
+        fifteen_header = "name,description,brand,department,category,price,originalPrice,variants,colourName,colourHex,imageFile,imageUrls"
+        fifteen_rows = [
+            f'Bulk Shoe {index},Bulk shoe {index},Brand,unisex,Footwear,1099,1099,"6:5, 7:5",Color {index},,product{index}.png,'
+            for index in range(1, 16)
+        ]
+        fifteen_csv = "\n".join([fifteen_header, *fifteen_rows]) + "\n"
+        fifteen_images = {f"product{index}.png": image_path for index in range(1, 16)}
+        status, fifteen_bulk, _ = self.request(
+            "/api/admin/shop-products/bulk",
+            {"applicationId": application["id"], "csvText": fifteen_csv, "images": fifteen_images},
+            headers={"X-CSRF-Token": csrf}, method="POST",
+        )
+        self.assertEqual((status, fifteen_bulk["created"]), (201, 15))
+        for product_id, original in before.items():
+            after=next(product for product in shops.admin_list_products(admin_id) if product["id"]==product_id)
+            self.assertEqual((after["name"],after["imageUrls"]),(original["name"],original["imageUrls"]))
+
+        count_before=len(shops.admin_list_products(admin_id))
+        missing_csv='name,description,department,category,price,variants,colourName,imageFile\nMissing Image,Should fail,unisex,Footwear,999,"8:5",Black,missing.jpg\n'
+        status, missing, _ = self.request("/api/admin/shop-products/bulk", {"applicationId":application["id"],"csvText":missing_csv,"images":{}}, headers={"X-CSRF-Token":csrf}, method="POST")
+        self.assertEqual((status,missing["code"]),(400,"invalid_product_import"))
+        self.assertEqual(missing["error"],'Row 1: Image file "missing.jpg" was not selected.')
+        self.assertEqual(len(shops.admin_list_products(admin_id)),count_before)
+        nan_csv='name,description,department,category,price,variants,colourName,imageUrls\nBad Price,Must fail,unisex,Footwear,nan,"8:5",Black,https://example.test/a.jpg\n'
+        status, invalid_price, _ = self.request("/api/admin/shop-products/bulk", {"applicationId":application["id"],"csvText":nan_csv,"images":{}}, headers={"X-CSRF-Token":csrf}, method="POST")
+        self.assertEqual((status, invalid_price["code"]), (400, "invalid_product_import"))
+        self.assertIn("Row 1: Invalid price.", invalid_price["error"])
+        self.assertEqual(len(shops.admin_list_products(admin_id)),count_before)
 
     def test_non_loopback_bind_refused(self):
         with self.assertRaises(RuntimeError):

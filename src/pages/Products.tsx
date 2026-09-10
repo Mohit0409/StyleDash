@@ -136,18 +136,13 @@ export const Products: React.FC = () => {
     [products, catalogueFilters],
   );
 
-  // Drop stale facet query values when another filter changes the available
-  // inventory scope. This prevents an invisible old brand/size from trapping
-  // customers on a zero-result page.
+  // Drop stale brand/size facet values when another filter changes the available
+  // inventory scope. Preserve an explicitly selected category even when it has
+  // zero products so customers never fall through into an unrelated catalogue.
   useEffect(() => {
     if (loading) return;
     const nextParams = new URLSearchParams(searchParams);
     let changed = false;
-    if (category !== 'all' && !categoryOptions.includes(category)) {
-      nextParams.delete('category');
-      nextParams.delete('subcategory');
-      changed = true;
-    }
     if (brand !== 'all' && !brandOptions.includes(brand)) {
       nextParams.delete('brand');
       changed = true;
@@ -157,7 +152,7 @@ export const Products: React.FC = () => {
       changed = true;
     }
     if (changed) setSearchParams(nextParams, { replace: true });
-  }, [brand, brandOptions, category, categoryOptions, loading, searchParams, setSearchParams, size, sizeOptions]);
+  }, [brand, brandOptions, loading, searchParams, setSearchParams, size, sizeOptions]);
 
   const filteredProducts = products.filter(product => matchesCatalogueProduct(product, catalogueFilters));
 
@@ -193,7 +188,7 @@ export const Products: React.FC = () => {
             {searchQuery ? (
               <>Found <strong>{matchingStores.length}</strong> local store{matchingStores.length === 1 ? '' : 's'} and <strong>{sortedProducts.length}</strong> available product{sortedProducts.length === 1 ? '' : 's'} in Neemuch</>
             ) : (
-              <>Showing <strong>{sortedProducts.length}</strong> available items for within-a-day delivery in Neemuch</>
+              <>Showing <strong>{sortedProducts.length}</strong> available items from local Neemuch stores. Free Same Day Delivery is available every day; all products also support ₹80 Express Delivery on Saturday and Sunday.</>
             )}
           </p>
         </div>
@@ -229,7 +224,7 @@ export const Products: React.FC = () => {
                   <h3 className="font-extrabold text-neutral-900 dark:text-white truncate group-hover:text-lime-600">{store.storeName}</h3>
                   <p className="text-xs text-neutral-500 truncate">{store.category}</p>
                   <p className="mt-1 flex items-center gap-1 text-xs text-neutral-500 truncate"><MapPin className="w-3 h-3 shrink-0" /> {store.address}</p>
-                  <p className="mt-1 flex items-center gap-1 text-[11px] font-bold text-emerald-600 dark:text-emerald-400"><Zap className="w-3 h-3" /> Within-a-Day Local Delivery</p>
+                  <p className="mt-1 flex items-center gap-1 text-[11px] font-bold text-emerald-600 dark:text-emerald-400"><Zap className="w-3 h-3" /> Same Day Delivery</p>
                 </div>
               </Link>
             ))}
@@ -242,14 +237,14 @@ export const Products: React.FC = () => {
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <p className="font-black">Weekend Express is available Saturday and Sunday.</p>
-              <p className="mt-1 text-xs opacity-80">Today we are showing the normal within-a-day catalogue instead, so you can keep shopping.</p>
+              <p className="mt-1 text-xs opacity-80">Today we are showing the regular local catalogue instead, so you can keep shopping.</p>
             </div>
             <button
               type="button"
               onClick={() => updateParam('filter', 'all')}
               className="shrink-0 rounded-xl bg-neutral-950 px-4 py-2 text-xs font-bold text-white dark:bg-lime-400 dark:text-neutral-950"
             >
-              Browse Normal Delivery
+              Browse Same Day Delivery
             </button>
           </div>
         </div>
@@ -292,13 +287,13 @@ export const Products: React.FC = () => {
                 {expressFilterActive ? 'No Weekend Express products are available right now' : 'No matching products found'}
               </h3>
               <p className="text-xs text-neutral-500 mb-6">
-                {expressFilterActive ? 'Normal within-a-day delivery is still available from local Neemuch stores.' : 'Try relaxing your search terms or clearing filters to view more items.'}
+                {expressFilterActive ? 'Free Same Day Delivery is still available from local Neemuch stores.' : 'Try relaxing your search terms or clearing filters to view more items.'}
               </p>
               <button
                 onClick={expressFilterActive ? () => updateParam('filter', 'all') : handleClearAll}
                 className="px-6 py-2.5 bg-neutral-950 dark:bg-lime-400 text-white dark:text-neutral-950 font-bold text-xs rounded-xl"
               >
-                {expressFilterActive ? 'Browse Normal Delivery' : 'Clear All Filters'}
+                {expressFilterActive ? 'Browse Same Day Delivery' : 'Clear All Filters'}
               </button>
             </div>
           ) : (

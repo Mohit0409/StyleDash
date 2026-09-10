@@ -47,7 +47,7 @@ class ReleasePaymentTests(unittest.TestCase):
         return {
             "items":[{"productId":"sd-prod-001","variantId":"sd-prod-001-var-2","quantity":2}],
             "address":{"name":"Release Test","phone":"9999999999","street":"123 Release Street","city":"Neemuch","pincode":"458441"},
-            "deliveryMethod":"express","couponCode":None,"paymentMethod":"upi",
+            "deliveryMethod":"standard","couponCode":None,"paymentMethod":"upi",
         }
     def create(self, key): return self.service.create_razorpay_order(self.payload(), key)
     def captured(self, created, payment_id):
@@ -203,21 +203,29 @@ class AdminCancellationTests(unittest.TestCase):
     def test_cod_cancel_releases_inventory_once(self):
         o = self.order("SD-COD", "cod", "pending", "placed", None)
         self.seed(o)
-        result = self.app.update_order_status("adm_test", o["id"], "cancelled")
+        result = self.app.update_order_status("adm_test", o["id"], "cancelled", "Customer requested cancellation")
         self.assertEqual(result["status"], "cancelled")
         self.assertEqual(self.app.payments.store.state["inventory"]["sd-prod-001-var-2"], 15)
-        with self.assertRaises(ADMIN.SecurityError): self.app.update_order_status("adm_test", o["id"], "cancelled")
+        with self.assertRaises(ADMIN.SecurityError): self.app.update_order_status("adm_test", o["id"], "cancelled", "Refund completed; order cancelled")
         self.assertEqual(self.app.payments.store.state["inventory"]["sd-prod-001-var-2"], 15)
+
+    def test_cancel_requires_customer_visible_reason(self):
+        o = self.order("SD-CANCEL-REASON", "cod", "pending", "placed", None)
+        self.seed(o)
+        with self.assertRaises(ADMIN.SecurityError) as caught:
+            self.app.update_order_status("adm_test", o["id"], "cancelled")
+        self.assertEqual(caught.exception.code, "cancellation_reason_required")
+        self.assertEqual(self.app.payments.store.state["orders"][o["id"]]["status"], "placed")
 
     def test_paid_online_requires_refund_before_cancel(self):
         o = self.order("SD-ONLINE", "upi", "paid", "placed")
         self.seed(o)
-        with self.assertRaises(ADMIN.SecurityError) as caught: self.app.update_order_status("adm_test", o["id"], "cancelled")
+        with self.assertRaises(ADMIN.SecurityError) as caught: self.app.update_order_status("adm_test", o["id"], "cancelled", "Admin cancellation after refund review")
         self.assertEqual(caught.exception.code, "refund_required")
         with self.app.payments.store.lock:
             self.app.payments.store.state["orders"][o["id"]]["paymentStatus"] = "refunded"
             self.app.payments.store.save()
-        self.app.update_order_status("adm_test", o["id"], "cancelled")
+        self.app.update_order_status("adm_test", o["id"], "cancelled", "Refund completed; order cancelled")
         self.assertEqual(self.app.payments.store.state["inventory"]["sd-prod-001-var-2"], 15)
 
     def test_refunded_payment_pending_order_closes_without_restock(self):
@@ -233,6 +241,7 @@ class AdminCancellationTests(unittest.TestCase):
             "adm_test",
             o["id"],
             "cancelled",
+            "Refund completed before fulfillment",
         )
         self.assertEqual(cancelled["status"], "cancelled")
         self.assertFalse(cancelled.get("inventoryCommitted", False))
@@ -256,6 +265,7 @@ class AdminCancellationTests(unittest.TestCase):
             "adm_test",
             o["id"],
             "cancelled",
+            "Refund completed before dispatch",
         )
         self.assertEqual(cancelled["status"], "cancelled")
         self.assertEqual(
@@ -351,11 +361,19 @@ class DeploymentAndTaxTests(unittest.TestCase):
             text,
         )
         self.assertIn(
+            'install -m 600 "$STAGE/scripts/receipt_pdf.py" "$HOME/admin/receipt_pdf.py"',
+            text,
+        )
+        self.assertIn('admin_marker="$HOME/admin/serve.py --bind 127.0.0.1 --port 8081"', text)
+        self.assertIn('pgrep -f "$HOME/admin/serve.py"', text)
+        self.assertIn('rm -f -- "$HOME/run/styledash-admin.pid"', text)
+        self.assertLess(text.index('admin_marker="$HOME/admin/serve.py'), text.index('install -m 600 "$STAGE/server/admin/admin.js"'))
+        self.assertIn(
             'install -m 600 "$STAGE/scripts/audit_identity_duplicates.py" "$HOME/server/audit_identity_duplicates.py"',
             text,
         )
         self.assertIn("styledash_migrations=ok", text)
-        self.assertIn("{1, 2, 3, 4, 5}.issubset(shop_versions)", text)
+        self.assertIn("{1, 2, 3, 4, 5, 6}.issubset(shop_versions)", text)
         self.assertIn("1 not in review_versions", text)
         self.assertIn('SELECT version FROM review_schema_migrations', text)
         self.assertIn('PRAGMA table_info(product_reviews)', text)
@@ -382,6 +400,13 @@ class DeploymentAndTaxTests(unittest.TestCase):
         self.assertIn('PRODUCT_IMAGES="$DATA_ROOT/product-images"', backup_text)
         self.assertIn('cp -a "$PRODUCT_IMAGES/." "$target/product-images/"', backup_text)
 
+    def test_admin_start_script_recovers_stale_pid_without_accepting_wrong_process(self):
+        text = (ROOT / "scripts/termux/start-styledash-admin").read_text(encoding="utf-8")
+        self.assertIn('ADMIN_MARKER="$APP_DIR/serve.py --bind 127.0.0.1 --port 8081"', text)
+        self.assertIn('pgrep -f "$APP_DIR/serve.py"', text)
+        self.assertIn("printf '%s\\n' \"$candidate\" > \"$PID_FILE\"", text)
+        self.assertIn('grep -Fq "$ADMIN_MARKER"', text)
+
     def test_boot_uses_only_the_managed_ngrok_stack(self):
         text = (ROOT / "scripts/termux/boot-start-styledash").read_text(encoding="utf-8")
         self.assertIn('"$HOME/bin/start-styledash-stack"', text)
@@ -398,12 +423,18 @@ class DeploymentAndTaxTests(unittest.TestCase):
     def test_refund_processed_is_documented_for_live_webhook(self):
         readme = (ROOT / "server/README.md").read_text(encoding="utf-8")
         self.assertIn("`refund.processed`", readme)
-    def test_choice_a(self):
+    def test_tax_inclusive_pricing_and_delivery_fee_policy(self):
         settings = json.loads((ROOT / "server/payment-data/settings.json").read_text(encoding="utf-8"))
         self.assertEqual(settings["taxRate"], 0.05)
+        self.assertEqual(settings["deliveryFees"], {"express": 80, "standard": 0})
         product = (ROOT / "src/pages/ProductDetail.tsx").read_text(encoding="utf-8")
-        self.assertIn("GST calculated at checkout", product)
-        self.assertNotIn("Inclusive of all GST taxes", product)
+        checkout = (ROOT / "src/pages/Checkout.tsx").read_text(encoding="utf-8")
+        server = (ROOT / "scripts/termux-spa-server.py").read_text(encoding="utf-8")
+        self.assertIn("Price includes GST", product)
+        self.assertNotIn("GST calculated at checkout", product)
+        self.assertNotIn("GST Taxes (5%)", checkout)
+        self.assertIn("taxable_merchandise_total", server)
+        self.assertIn("grand_total = taxable_merchandise_total + delivery_fee", server)
 
 if __name__ == "__main__": unittest.main()
 
@@ -412,12 +443,14 @@ class AdminFullProductEditTests(unittest.TestCase):
     def test_admin_full_product_edit_exposes_catalog_fields_and_safe_live_stock_sync(self):
         source = (ROOT / "server" / "admin" / "admin.js").read_text(encoding="utf-8")
         for label in (
-            "Brand (optional)", "Department", "Category", "Sizes and stock",
-            "Colour name", "Colour hex (optional)", "HTTPS image URLs separated by commas",
+            "Brand (optional)", "Department", "Category", "Colours & Variants",
+            "Sizes & stock", "Colour name", "Colour hex (optional)",
+            "HTTPS image URLs (optional fallback)",
         ):
             self.assertIn(label, source)
         self.assertIn("const wasPublished=item.status==='PUBLISHED'", source)
         self.assertIn("JSON.stringify({status:'APPROVED'})", source)
         self.assertIn("JSON.stringify({status:'PUBLISHED'})", source)
         self.assertIn("/api/admin/inventory?low=0&q=", source)
-        self.assertIn("All product details, images, sizes and stock updated.", source)
+        self.assertIn("record.variantId===variant.id", source)
+        self.assertIn("All product colours, images, sizes, stock and details updated.", source)

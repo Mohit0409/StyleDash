@@ -4,7 +4,7 @@ set -eu
 PAYLOAD_FILE="$PREFIX/tmp/styledash-razorpay-config-request.json"
 RESPONSE_FILE="$PREFIX/tmp/styledash-razorpay-config-response.json"
 
-printf '%s' '{"items":[{"productId":"sd-prod-001","variantId":"sd-prod-001-var-2","quantity":1}],"address":{"name":"Vibe4You Payment Test","phone":"9999999999","street":"123 Test Street","city":"Neemuch","pincode":"458441"},"userId":"razorpay-config-test","deliveryMethod":"express","couponCode":null,"walletAmount":0,"paymentMethod":"card"}' > "$PAYLOAD_FILE"
+printf '%s' '{"items":[{"productId":"sd-prod-001","variantId":"sd-prod-001-var-2","quantity":1}],"address":{"name":"Vibe4You Payment Test","phone":"9999999999","street":"123 Test Street","city":"Neemuch","pincode":"458441"},"userId":"razorpay-config-test","deliveryMethod":"standard","couponCode":null,"walletAmount":0,"paymentMethod":"card"}' > "$PAYLOAD_FILE"
 
 status="$(curl -sS --max-time 30 -o "$RESPONSE_FILE" -w '%{http_code}' \
   -H 'Content-Type: application/json' \

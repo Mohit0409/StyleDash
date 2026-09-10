@@ -52,6 +52,12 @@ export const ProductDetail: React.FC = () => {
     });
   }, [slug]);
 
+  useEffect(() => {
+    if (!product) return;
+    const colourImages = product.variants.find(variant => variant.colourName === selectedColour)?.images || product.images;
+    setSelectedImage(colourImages[0] || product.thumbnail);
+  }, [product, selectedColour]);
+
   if (loading) {
     return <div className="max-w-7xl mx-auto p-12 text-center text-neutral-500">Loading Vibe4You Product...</div>;
   }
@@ -72,6 +78,7 @@ export const ProductDetail: React.FC = () => {
   const selectedVariant = product.variants.find(
     v => v.size === selectedSize && v.colourName === selectedColour
   ) || null;
+  const selectedColourImages = product.variants.find(v => v.colourName === selectedColour)?.images || product.images;
 
   const isWishlisted = isInWishlist(product.id);
 
@@ -153,7 +160,7 @@ export const ProductDetail: React.FC = () => {
           </div>
 
           <div className="flex gap-3 overflow-x-auto no-scrollbar">
-            {product.images.map((img, idx) => (
+            {selectedColourImages.map((img, idx) => (
               <button
                 key={idx}
                 onClick={() => setSelectedImage(img)}
@@ -199,7 +206,7 @@ export const ProductDetail: React.FC = () => {
                 </span>
               </>
             )}
-            <span className="text-[10px] text-neutral-400 ml-auto">GST calculated at checkout</span>
+            <span className="text-[10px] text-neutral-400 ml-auto">Price includes GST</span>
           </div>
 
           {/* Variant Selector */}
@@ -210,7 +217,12 @@ export const ProductDetail: React.FC = () => {
             selectedSize={selectedSize}
             onSelectSize={(s) => setSelectedSize(s)}
             selectedColour={selectedColour}
-            onSelectColour={(c) => setSelectedColour(c)}
+            onSelectColour={(c) => {
+              setSelectedColour(c);
+              const firstSize = product.variants.find(variant => variant.colourName === c && variant.available === true)
+                || product.variants.find(variant => variant.colourName === c);
+              setSelectedSize(firstSize?.size || null);
+            }}
             onOpenSizeGuide={() => setSizeGuideOpen(true)}
           />
 
@@ -261,7 +273,7 @@ export const ProductDetail: React.FC = () => {
               <Zap className="w-4 h-4 fill-lime-500" />
               <span>Dispatched from Neemuch Partner Boutique</span>
             </div>
-            <p>Normal delivery within <strong>a day</strong> to pincode 458441. Weekend express is offered at checkout when available.</p>
+            <p>Same Day Delivery is free to pincode 458441. Weekend Express is available at checkout on Saturday and Sunday.</p>
           </div>
 
           {/* Specifications */}

@@ -53,6 +53,36 @@ class CatalogNormalizationTests(unittest.TestCase):
             'Footwear',
         )
 
+    def test_beauty_category_is_inferred_without_misclassifying_as_accessories(self) -> None:
+        self.assertEqual(
+            normalize_product_category(
+                'Accessories',
+                name='Premium Rose Perfume',
+                description='Long lasting fragrance for daily use',
+            ),
+            'Beauty & Personal Care',
+        )
+        self.assertEqual(
+            normalize_product_category(
+                'Clothing & Fashion',
+                name='Vitamin C Face Wash',
+                description='Skin care cleanser',
+            ),
+            'Beauty & Personal Care',
+        )
+        self.assertEqual(
+            normalize_subcategory(None, name='Premium Rose Perfume', category='Beauty & Personal Care'),
+            'Perfume',
+        )
+        self.assertEqual(
+            normalize_product_category(
+                'Accessories',
+                name='Rose Gold Bangles',
+                description='Fashion jewellery bangles',
+            ),
+            'Accessories',
+        )
+
     def test_known_brand_is_inferred_only_when_deterministic(self) -> None:
         self.assertEqual(normalize_brand(None, name='Puma Slider'), 'Puma')
         self.assertEqual(normalize_brand('skechers', name='Comfort Slider'), 'Skechers')

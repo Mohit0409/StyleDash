@@ -4,14 +4,13 @@
 from __future__ import annotations
 
 import argparse
-import base64
-import binascii
-import hashlib
+import csv
+import io
 import importlib.util
 import json
+import math
 import os
 import sqlite3
-import secrets
 from http import HTTPStatus
 from http.cookies import SimpleCookie
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -39,15 +38,133 @@ except ModuleNotFoundError:
 
 
 MAX_BODY_BYTES = 64 * 1024
-PRODUCT_IMAGE_MAX_BYTES = 500 * 1024
 PRODUCT_IMAGE_REQUEST_MAX_BYTES = 700 * 1024
+BULK_PRODUCT_REQUEST_MAX_BYTES = 1024 * 1024
+PUBLIC_ADMIN_ORIGIN = "https://admin.vibe4you.in"
 ALLOWED_HOSTS = {"127.0.0.1:8081", "localhost:8081"}
-ALLOWED_ORIGINS = {"http://127.0.0.1:8081", "http://localhost:8081"}
+ALLOWED_ORIGINS = {"http://127.0.0.1:8081", "http://localhost:8081", PUBLIC_ADMIN_ORIGIN}
 SECURITY_POLICY = (
     "default-src 'self'; base-uri 'none'; object-src 'none'; frame-ancestors 'none'; "
     "form-action 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; "
     "connect-src 'self'"
 )
+
+def _import_error(row_number: int, message: str) -> None:
+    raise SecurityError(400, f"Row {row_number}: {message}", "invalid_product_import")
+
+
+def require_existing_admin_product_media(payload: Any, product_image_directory: Path, row_number: int | None = None) -> None:
+    if not isinstance(payload, dict):
+        return
+    image_urls = payload.get("imageUrls")
+    if not isinstance(image_urls, list):
+        return
+    root = product_image_directory.resolve()
+    for value in image_urls:
+        if not isinstance(value, str) or not PRODUCT_MEDIA_PATH_PATTERN.fullmatch(value):
+            continue
+        target = (product_image_directory / Path(value).name).resolve()
+        if target.parent != root or not target.is_file():
+            prefix = f"Row {row_number}: " if row_number is not None else ""
+            raise SecurityError(400, f"{prefix}Uploaded product image is unavailable.", "invalid_product_image")
+
+
+def _bulk_variants(raw: str, row_number: int) -> list[dict[str, Any]]:
+    variants: list[dict[str, Any]] = []
+    for chunk in raw.split(","):
+        value = chunk.strip()
+        if not value:
+            continue
+        size, separator, stock_text = value.rpartition(":")
+        if not separator or not size.strip():
+            _import_error(row_number, "Use size:stock format, for example 6:5, 7:5.")
+        try:
+            stock = int(stock_text.strip())
+        except ValueError:
+            _import_error(row_number, "Each size needs a whole-number stock quantity.")
+        if stock < 0 or stock > 100000:
+            _import_error(row_number, "Each size needs a stock quantity between 0 and 100000.")
+        variants.append({"size": size.strip(), "inventory": stock})
+    if not variants:
+        _import_error(row_number, "At least one size and stock value is required.")
+    return variants
+
+
+def parse_admin_product_csv(csv_text: Any, image_map: Any, product_image_directory: Path) -> list[dict[str, Any]]:
+    if not isinstance(csv_text, str) or not csv_text.strip() or len(csv_text.encode("utf-8")) > 1024 * 1024:
+        raise SecurityError(400, "CSV is missing or too large.", "invalid_product_import")
+    if image_map is None:
+        image_map = {}
+    if not isinstance(image_map, dict) or len(image_map) > 100:
+        raise SecurityError(400, "Invalid image selection map.", "invalid_product_import")
+    stream = io.StringIO(csv_text, newline="")
+    try:
+        reader = csv.DictReader(stream)
+    except csv.Error:
+        raise SecurityError(400, "CSV could not be parsed.", "invalid_product_import") from None
+    if reader.fieldnames is None:
+        raise SecurityError(400, "CSV needs a header row.", "invalid_product_import")
+    fieldnames = [(name or "").lstrip("\ufeff").strip() for name in reader.fieldnames]
+    if len(fieldnames) != len(set(fieldnames)) or any(not name for name in fieldnames):
+        raise SecurityError(400, "CSV headers must be unique and non-empty.", "invalid_product_import")
+    reader.fieldnames = fieldnames
+    required = {"name", "description", "department", "category", "price", "variants", "colourName"}
+    missing = sorted(required - set(fieldnames))
+    if missing:
+        raise SecurityError(400, f"CSV is missing required column: {missing[0]}", "invalid_product_import")
+    if "imageFile" not in fieldnames and "imageUrls" not in fieldnames:
+        raise SecurityError(400, "CSV requires imageFile or imageUrls.", "invalid_product_import")
+    products: list[dict[str, Any]] = []
+    image_root = product_image_directory.resolve()
+    row_number = 0
+    for row in reader:
+        if row is None or not any(str(value or "").strip() for value in row.values()):
+            continue
+        row_number += 1
+        if row_number > 100:
+            raise SecurityError(400, "Upload a maximum of 100 products at a time.", "invalid_product_import")
+        values = {key: str(value or "").strip() for key, value in row.items() if key is not None}
+        name = values.get("name", "")
+        if not name:
+            _import_error(row_number, "Product name is required.")
+        try:
+            price = float(values.get("price", ""))
+            original = float(values.get("originalPrice") or values.get("price", ""))
+        except ValueError:
+            _import_error(row_number, "Invalid price.")
+        if not math.isfinite(price) or not math.isfinite(original) or price < 1 or original < price or price > 10000000 or original > 10000000:
+            _import_error(row_number, "Invalid price.")
+        image_urls = [value.strip() for value in values.get("imageUrls", "").split("|") if value.strip()]
+        image_file = values.get("imageFile", "")
+        if image_file:
+            if len(image_file) > 120 or "/" in image_file or "\\" in image_file or any(ord(ch) < 32 for ch in image_file):
+                _import_error(row_number, f'Image file "{image_file}" is invalid.')
+            mapped_path = image_map.get(image_file)
+            if mapped_path is None:
+                _import_error(row_number, f'Image file "{image_file}" was not selected.')
+            if not isinstance(mapped_path, str) or not PRODUCT_MEDIA_PATH_PATTERN.fullmatch(mapped_path):
+                _import_error(row_number, f'Image file "{image_file}" has an invalid uploaded path.')
+            target = (product_image_directory / Path(mapped_path).name).resolve()
+            if target.parent != image_root or not target.is_file():
+                _import_error(row_number, f'Image file "{image_file}" was not uploaded successfully.')
+            image_urls.insert(0, mapped_path)
+        if not image_urls:
+            _import_error(row_number, "At least one product image is required.")
+        product = {
+            "name": name, "description": values.get("description", ""), "brand": values.get("brand") or None,
+            "department": values.get("department", ""), "category": values.get("category", ""),
+            "subcategory": values.get("subcategory") or None, "deliveryType": values.get("deliveryType") or "normal",
+            "pricePaise": round(price * 100), "originalPricePaise": round(original * 100),
+            "variants": _bulk_variants(values.get("variants", ""), row_number),
+            "colourName": values.get("colourName", ""), "colourHex": values.get("colourHex") or None,
+            "imageUrls": image_urls, "attributes": {},
+        }
+        require_existing_admin_product_media(product, product_image_directory, row_number)
+        products.append(product)
+    if not products:
+        raise SecurityError(400, "CSV needs at least one product row.", "invalid_product_import")
+    return products
+
 
 
 def load_public_module():
@@ -131,6 +248,7 @@ class AdminApplication:
         finally:
             probe.close()
         self.shops = ShopWorkflow(database) if has_customers else None
+        self._store_product_image_payload = public.store_product_image_payload
         self.product_image_directory = database.parent / "product-images"
         self.payments = public.PaymentService(
             catalog, settings, data_dir, key_id="", key_secret="", webhook_secret="",
@@ -139,35 +257,7 @@ class AdminApplication:
         )
 
     def store_product_image(self, payload: dict[str, Any]) -> dict[str, Any]:
-        if set(payload) != {"fileName", "contentType", "dataBase64"}:
-            raise SecurityError(400, "Invalid image upload.", "invalid_product_image")
-        file_name = payload.get("fileName")
-        content_type = payload.get("contentType")
-        encoded = payload.get("dataBase64")
-        if not isinstance(file_name, str) or not 1 <= len(file_name) <= 120 or "/" in file_name or "\\" in file_name:
-            raise SecurityError(400, "Invalid image filename.", "invalid_product_image")
-        extensions = {"image/webp": "webp", "image/jpeg": "jpg", "image/png": "png"}
-        extension = extensions.get(content_type)
-        if extension is None or not isinstance(encoded, str) or not encoded:
-            raise SecurityError(400, "Upload a JPEG, PNG or WebP image.", "invalid_product_image")
-        try:
-            content = base64.b64decode(encoded, validate=True)
-        except (binascii.Error, ValueError):
-            raise SecurityError(400, "Invalid image data.", "invalid_product_image") from None
-        if not 32 <= len(content) <= PRODUCT_IMAGE_MAX_BYTES:
-            raise SecurityError(413, "The optimized image must be 500 KB or smaller.", "product_image_too_large")
-        magic_ok = ((content_type == "image/jpeg" and content.startswith(b"\xff\xd8\xff")) or (content_type == "image/png" and content.startswith(b"\x89PNG\r\n\x1a\n")) or (content_type == "image/webp" and len(content) >= 12 and content[:4] == b"RIFF" and content[8:12] == b"WEBP"))
-        if not magic_ok:
-            raise SecurityError(400, "The uploaded file does not match its image type.", "invalid_product_image")
-        digest = hashlib.sha256(content).hexdigest()[:32]
-        self.product_image_directory.mkdir(parents=True, exist_ok=True)
-        target = self.product_image_directory / f"{digest}.{extension}"
-        if not target.exists():
-            temporary = self.product_image_directory / f".{digest}.{secrets.token_hex(6)}.tmp"
-            temporary.write_bytes(content)
-            os.chmod(temporary, 0o644)
-            os.replace(temporary, target)
-        return {"url": f"/media/product-images/{target.name}", "bytes": len(content), "contentType": content_type}
+        return self._store_product_image_payload(self.product_image_directory, payload)
 
     def list_orders(self, query: str = "") -> list[dict[str, Any]]:
         needle = query.strip().casefold()[:100]
@@ -175,7 +265,8 @@ class AdminApplication:
             orders = list(self.payments.store.state["orders"].values())
             if needle:
                 orders = [order for order in orders if needle in str(order.get("id", "")).casefold()]
-            return [dict(order) for order in sorted(orders, key=lambda item: item.get("createdAt", ""), reverse=True)[:250]]
+            selected = [dict(order) for order in sorted(orders, key=lambda item: item.get("createdAt", ""), reverse=True)[:250]]
+        return [self.payments.order_for_display(order) for order in selected]
 
     def payment_alerts(self) -> list[dict[str, Any]]:
         with self.payments.store.lock:
@@ -190,7 +281,8 @@ class AdminApplication:
             order = self.payments.store.state["orders"].get(order_id)
             if order is None:
                 raise SecurityError(404, "Order not found.", "order_not_found")
-            return dict(order)
+            selected = dict(order)
+        return self.payments.order_for_display(selected)
 
     def _resolve_order_alerts(
         self,
@@ -216,7 +308,37 @@ class AdminApplication:
             for alert in state.get("operationalAlerts", {}).values()
         )
 
-    def update_order_status(self, admin_id: str, order_id: str, requested: Any) -> dict[str, Any]:
+    def mark_cod_paid(self, admin_id: str, order_id: str, collection_method: Any) -> dict[str, Any]:
+        methods = {"cash": "cash", "upi_at_delivery": "upi_at_delivery"}
+        if not isinstance(collection_method, str) or collection_method not in methods:
+            raise SecurityError(400, "Choose Cash or UPI at delivery.", "invalid_cod_collection_method")
+        with self.payments.store.lock:
+            order = self.payments.store.state["orders"].get(order_id)
+            if order is None:
+                raise SecurityError(404, "Order not found.", "order_not_found")
+            if order.get("fulfillmentRequired") is False:
+                raise SecurityError(409, "Payment validation orders cannot be marked manually.", "manual_payment_forbidden")
+            if order.get("paymentMethod") != "cod":
+                raise SecurityError(409, "Razorpay payments cannot be marked paid manually.", "manual_payment_forbidden")
+            if order.get("status") == "cancelled":
+                raise SecurityError(409, "A cancelled order cannot be marked paid.", "cancelled_order")
+            if order.get("paymentStatus") != "pending":
+                raise SecurityError(409, "This COD payment is no longer pending.", "payment_not_pending")
+            now = iso(utc_now())
+            order["paymentStatus"] = "paid"
+            order["paymentCollectionMethod"] = methods[collection_method]
+            order["paymentCollectedAt"] = now
+            order["updatedAt"] = now
+            self.payments.store.save()
+            result = dict(order)
+        self.identity.record_action(admin_id, "cod_payment_marked_paid", "order", order_id, "success", {
+            "collectionMethod": result["paymentCollectionMethod"], "paymentCollectedAt": result["paymentCollectedAt"]
+        })
+        return self.payments.order_for_display(result)
+
+    def update_order_status(
+        self, admin_id: str, order_id: str, requested: Any, reason: Any = None
+    ) -> dict[str, Any]:
         transitions = {
             "payment_pending": {"cancelled"},
             "payment_review_required": {"placed", "cancelled"},
@@ -247,6 +369,15 @@ class AdminApplication:
             current = order.get("status", "placed")
             if requested not in transitions.get(current, set()):
                 raise SecurityError(409, "Invalid order status transition.", "invalid_transition")
+            cancellation_reason = None
+            if requested == "cancelled":
+                if not isinstance(reason, str) or not 3 <= len(reason.strip()) <= 500:
+                    raise SecurityError(
+                        400,
+                        "A cancellation reason is required.",
+                        "cancellation_reason_required",
+                    )
+                cancellation_reason = " ".join(reason.strip().split())
             now = iso(utc_now())
             inventory_released = False
 
@@ -296,10 +427,13 @@ class AdminApplication:
                     raise
                 order["status"] = "cancelled"
                 order["updatedAt"] = now
+                order["cancelledAt"] = now
+                order["cancellationReason"] = cancellation_reason
+                base_note = "Cancelled after verified Razorpay refund" if online else "Cash on Delivery order cancelled"
                 order.setdefault("statusHistory", []).append({
                     "status": "cancelled",
                     "timestamp": now,
-                    "note": "Cancelled after verified Razorpay refund" if online else "Cash on Delivery order cancelled",
+                    "note": f"{base_note}. Reason: {cancellation_reason}",
                 })
                 self._resolve_order_alerts(
                     state,
@@ -328,6 +462,7 @@ class AdminApplication:
                 "from": current,
                 "to": requested,
                 "inventoryReleased": inventory_released,
+                "cancellationReason": cancellation_reason,
             },
         )
 
@@ -355,7 +490,8 @@ class AdminApplication:
                         f"Order: {order_id}\n"
                         f"Amount: {amount_text}\n"
                         f"Payment: {payment_method}\n"
-                        f"Status: Cancelled"
+                        f"Status: Cancelled\n"
+                        f"Reason: {result.get('cancellationReason') or '-'}"
                     ),
                     priority=5,
                     tags=["no_entry_sign"],
@@ -456,7 +592,7 @@ class AdminApplication:
                     record = {
                         "productId": product["id"], "productName": product["name"],
                         "variantId": variant["id"], "size": variant.get("size"),
-                        "colour": variant.get("colour"), "stock": stock,
+                        "colour": variant.get("colourName") or variant.get("colour"), "stock": stock,
                     }
                     searchable = f"{record['productId']} {record['productName']} {record['variantId']}".casefold()
                     if needle and needle not in searchable:
@@ -678,6 +814,8 @@ class AdminHandler(BaseHTTPRequestHandler):
                 self._serve_asset("index.html", "text/html; charset=utf-8"); return
             if path == "/admin.css":
                 self._serve_asset("admin.css", "text/css; charset=utf-8"); return
+            if path == "/admin-variants.css":
+                self._serve_asset("admin-variants.css", "text/css; charset=utf-8"); return
             if path == "/admin.js":
                 self._serve_asset("admin.js", "text/javascript; charset=utf-8"); return
             if path == "/api/admin/me":
@@ -710,6 +848,18 @@ class AdminHandler(BaseHTTPRequestHandler):
                 self._admin(); self._json(200, {"success": True, "audit": self.application.identity.audit()}); return
             if path == "/api/admin/system":
                 self._admin(); self._json(200, {"success": True, "system": self.application.system_health(self.backup_root)}); return
+            if path.startswith("/media/product-images/"):
+                self._admin()
+                if not PRODUCT_MEDIA_PATH_PATTERN.fullmatch(path):
+                    self._json(404, {"success": False, "error": "Image not found.", "code": "not_found"}); return
+                root = self.application.product_image_directory.resolve()
+                image = (root / Path(path).name).resolve()
+                if image.parent != root or not image.is_file():
+                    self._json(404, {"success": False, "error": "Image not found.", "code": "not_found"}); return
+                content_type = {".webp":"image/webp",".jpg":"image/jpeg",".png":"image/png"}.get(image.suffix.lower())
+                if content_type is None:
+                    self._json(404, {"success": False, "error": "Image not found.", "code": "not_found"}); return
+                body=image.read_bytes(); self._headers(200, content_type, len(body), [("Cache-Control","private, no-store")]); self.wfile.write(body); return
             self._json(404, {"success": False, "error": "Not found.", "code": "not_found"})
         except SecurityError as error:
             self._error(error)
@@ -746,17 +896,25 @@ class AdminHandler(BaseHTTPRequestHandler):
                 result = self.application.store_product_image(self._body(PRODUCT_IMAGE_REQUEST_MAX_BYTES))
                 self._json(201, {"success": True, "image": result}); return
             if path == "/api/admin/shop-products/bulk":
-                admin, _session = self._admin(); self._csrf(); payload = self._body()
+                admin, _session = self._admin(); self._csrf(); payload = self._body(BULK_PRODUCT_REQUEST_MAX_BYTES)
                 application_id = payload.get("applicationId")
                 if not isinstance(application_id, str) or not application_id:
                     raise SecurityError(400, "Choose a local store.", "vendor_application_not_found")
-                result = self._shops().admin_bulk_create_products(admin["id"], application_id, payload.get("products"))
+                if "csvText" in payload:
+                    products = parse_admin_product_csv(payload.get("csvText"), payload.get("images"), self.application.product_image_directory)
+                else:
+                    products = payload.get("products")
+                    if isinstance(products, list):
+                        for row_number, product in enumerate(products, 1):
+                            require_existing_admin_product_media(product, self.application.product_image_directory, row_number)
+                result = self._shops().admin_bulk_create_products(admin["id"], application_id, products)
                 self._json(201, {"success": True, "products": result, "created": len(result)}); return
             if path == "/api/admin/shop-products":
                 admin, _session = self._admin(); self._csrf(); payload = self._body()
                 application_id = payload.pop("applicationId", None)
                 if not isinstance(application_id, str) or not application_id:
                     raise SecurityError(400, "Choose a local store.", "vendor_application_not_found")
+                require_existing_admin_product_media(payload, self.application.product_image_directory)
                 result = self._shops().admin_create_product(admin["id"], application_id, payload)
                 self._json(201, {"success": True, "product": result}); return
             self._json(404, {"success": False, "error": "Not found.", "code": "not_found"})
@@ -771,9 +929,15 @@ class AdminHandler(BaseHTTPRequestHandler):
         path = urlsplit(self.path).path
         try:
             admin, _session = self._admin(); self._csrf(); payload = self._body()
+            if path.startswith("/api/admin/orders/") and path.endswith("/payment"):
+                order_id = unquote(path.removeprefix("/api/admin/orders/").removesuffix("/payment"))
+                result = self.application.mark_cod_paid(admin["id"], order_id, payload.get("collectionMethod"))
+                self._json(200, {"success": True, "order": result}); return
             if path.startswith("/api/admin/orders/") and path.endswith("/status"):
                 order_id = unquote(path.removeprefix("/api/admin/orders/").removesuffix("/status"))
-                result = self.application.update_order_status(admin["id"], order_id, payload.get("status"))
+                result = self.application.update_order_status(
+                    admin["id"], order_id, payload.get("status"), payload.get("reason")
+                )
                 self._json(200, {"success": True, "order": result}); return
             if path.startswith("/api/admin/vendors/") and path.endswith("/details"):
                 application_id = unquote(path.removeprefix("/api/admin/vendors/").removesuffix("/details"))
@@ -801,6 +965,7 @@ class AdminHandler(BaseHTTPRequestHandler):
                 self._json(200, {"success": True, "request": result}); return
             if path.startswith("/api/admin/shop-products/") and path.endswith("/details"):
                 product_id = unquote(path.removeprefix("/api/admin/shop-products/").removesuffix("/details"))
+                require_existing_admin_product_media(payload, self.application.product_image_directory)
                 result = self._shops().admin_update_product(admin["id"], product_id, payload)
                 self._json(200, {"success": True, "product": result}); return
             if path.startswith("/api/admin/customers/") and path.endswith("/password"):

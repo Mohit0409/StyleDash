@@ -90,6 +90,11 @@ class ProductionReliabilityTests(unittest.TestCase):
         self.assertIn('"service":"Vibe4You"', script)
         self.assertIn("public_origin_failed", script)
 
+    def test_cloudflare_tunnel_uses_auto_transport_fallback(self) -> None:
+        script = self.read("scripts/termux/start-styledash-cloudflare")
+        self.assertIn("cloudflared tunnel run --protocol auto", script)
+        self.assertNotIn("cloudflared tunnel run --protocol http2", script)
+
     def test_rollback_preserves_live_database_history(self) -> None:
         script = self.read("scripts/termux/rollback-payment-release")
         self.assertIn('backup-styledash-data" --local-only', script)

@@ -1,4 +1,4 @@
-import { apiFetch, apiJson } from './apiClient';
+import { apiFetch, apiJson, ApiError } from './apiClient';
 import { ServerOrder } from './paymentApi';
 import { Product, UserProfile, VendorStore } from '../types';
 
@@ -8,6 +8,16 @@ export const orderApi = {
   },
   async one(id: string): Promise<ServerOrder> {
     return (await apiFetch<{ success: true; order: ServerOrder }>(`/api/orders/${encodeURIComponent(id)}`)).order;
+  },
+  async receipt(id: string): Promise<{ blob: Blob; filename: string }> {
+    const response = await fetch(`/api/orders/${encodeURIComponent(id)}/receipt`, { credentials: 'include' });
+    if (!response.ok) {
+      const payload = await response.json().catch(() => ({ error: 'Receipt download failed.', code: 'receipt_failed' }));
+      throw new ApiError(payload.error || 'Receipt download failed.', payload.code || 'receipt_failed', response.status);
+    }
+    const disposition = response.headers.get('Content-Disposition') || '';
+    const match = /filename="?([^";]+)"?/i.exec(disposition);
+    return { blob: await response.blob(), filename: match?.[1] || `vibe4you-receipt-${id}.pdf` };
   },
 };
 

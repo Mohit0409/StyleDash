@@ -33,7 +33,7 @@ const createdOrder: CreatePaymentOrderResponse = {
   amount: 107200,
   currency: 'INR',
   receipt: 'SD-TEST-001',
-  trustedTotals: { subtotal: 946, discount: 0, deliveryFee: 79, taxes: 47, grandTotal: 1072 },
+  trustedTotals: { subtotal: 946, discount: 0, deliveryFee: 80, taxes: 45, grandTotal: 1026 },
 };
 
 const jsonResponse = (body: unknown, status = 200) =>

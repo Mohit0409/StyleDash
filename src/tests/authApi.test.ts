@@ -2,6 +2,8 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import viteConfig from '../../vite.config';
 import { authApi } from '../services/authApi';
 
+const terms = { termsAccepted: true as const, termsVersion: '2026-08-14' };
+
 describe('federated auth API', () => {
   afterEach(() => {
     vi.restoreAllMocks();
@@ -16,14 +18,31 @@ describe('federated auth API', () => {
       headers: { 'Content-Type': 'application/json' },
     }) as Response);
 
-    await authApi.federated(provider, 'token-123');
+    await authApi.federated(provider, 'token-123', terms);
 
     expect(fetchSpy).toHaveBeenCalledTimes(1);
     const [input, init] = fetchSpy.mock.calls[0] as [RequestInfo | URL, RequestInit | undefined];
     expect(input).toBe(endpoint);
     expect(init?.method).toBe('POST');
     expect(init?.credentials).toBe('include');
-    expect(JSON.parse(String(init?.body))).toEqual({ idToken: 'token-123' });
+    expect(JSON.parse(String(init?.body))).toEqual({ idToken: 'token-123', ...terms });
+  });
+
+  it('sends the policy acceptance with email registration and login', async () => {
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(async () => new Response(JSON.stringify({ success: true, user: { uid: 'u1', name: 'Ada', role: 'customer' }, csrfToken: 'csrf' }), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' },
+    }) as Response);
+
+    await authApi.register('Ada', 'ada@example.test', 'correct horse battery staple', undefined, terms);
+    await authApi.login('ada@example.test', 'correct horse battery staple', terms);
+
+    expect(JSON.parse(String(fetchSpy.mock.calls[0][1]?.body))).toMatchObject({
+      name: 'Ada', email: 'ada@example.test', ...terms,
+    });
+    expect(JSON.parse(String(fetchSpy.mock.calls[1][1]?.body))).toEqual({
+      email: 'ada@example.test', password: 'correct horse battery staple', ...terms,
+    });
   });
 
   it('proxies /api traffic to the Vibe4You backend during local development', () => {

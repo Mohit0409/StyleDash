@@ -12,21 +12,28 @@ type E2EUser = {
   password: string;
 };
 
-const USER_A: E2EUser = {
-  name: 'E2E Commerce Customer A',
-  email: 'e2e-commerce-a@example.test',
-  phone: '9876543210',
-  password: PASSWORD,
-};
+let USER_A: E2EUser;
+let USER_B: E2EUser;
 
-const USER_B: E2EUser = {
-  name: 'E2E Commerce Customer B',
-  email: 'e2e-commerce-b@example.test',
-  phone: '9876543211',
-  password: PASSWORD,
-};
-
-test.beforeAll(async () => {
+test.beforeAll(async ({ browserName }, testInfo) => {
+  void browserName;
+  // Desktop and mobile projects intentionally share one isolated E2E server.
+  // Scope identities to the project so the second project never creates a
+  // duplicate account or exercises login rate limits as an accidental setup path.
+  const projectSuffix = testInfo.project.name.replace(/[^a-z0-9]/gi, '-').toLowerCase();
+  const phoneSuffix = testInfo.project.name === 'mobile-chromium' ? '12' : '10';
+  USER_A = {
+    name: `E2E Commerce Customer A ${projectSuffix}`,
+    email: `e2e-commerce-a-${projectSuffix}@example.test`,
+    phone: `98765432${phoneSuffix}`,
+    password: PASSWORD,
+  };
+  USER_B = {
+    name: `E2E Commerce Customer B ${projectSuffix}`,
+    email: `e2e-commerce-b-${projectSuffix}@example.test`,
+    phone: `98765433${phoneSuffix}`,
+    password: PASSWORD,
+  };
   const api = await playwrightRequest.newContext({
     baseURL: 'http://127.0.0.1:4173',
     extraHTTPHeaders: { 'X-Forwarded-For': '198.51.100.12' },
@@ -40,12 +47,17 @@ test.beforeAll(async () => {
           email: user.email,
           phone: user.phone,
           password: user.password,
+          termsAccepted: true,
+          termsVersion: '2026-08-14',
         },
       });
 
+      // Playwright may restart the serial worker and encounter an already-created
+      // user. Re-authenticate with current Terms consent so the fixture remains
+      // restart-safe and compliant with the server-authoritative consent gate.
       if (response.status() === 409) {
         const login = await api.post('/api/auth/login', {
-          data: { email: user.email, password: user.password },
+          data: { email: user.email, password: user.password, termsAccepted: true, termsVersion: '2026-08-14' },
         });
         expect(login.status()).toBe(200);
       } else {
@@ -67,6 +79,7 @@ async function loginCustomer(
   await page
     .getByPlaceholder('Password (8+ characters)')
     .fill(user.password);
+  await page.getByRole('checkbox', { name: /agree to the terms/i }).check();
 
   await page.getByRole('button', { name: 'Login' }).click();
 
@@ -117,6 +130,38 @@ async function prepareCheckout(page: Page, label: string) {
   await expect(page.getByLabel('Pincode')).toHaveAttribute('readonly', '');
 }
 
+test('checkout enables Express and recalculates totals on a simulated Saturday', async ({ page }) => {
+  await page.clock.install({ time: new Date('2026-09-05T06:30:00Z') });
+  await prepareCheckout(page, 'weekend-express-selector');
+
+  const sameDay = page.getByRole('radio', { name: /Same Day Delivery/ });
+  const express = page.getByRole('radio', { name: /Express Delivery/ });
+  const summary = page.getByRole('heading', { name: 'Order Summary' }).locator('..');
+
+  await expect(sameDay).toBeChecked();
+  await expect(express).toBeEnabled();
+  await expect(summary.getByText('FREE', { exact: true })).toBeVisible();
+  await expect(summary).toContainText('Product prices include GST.');
+  await expect(summary.getByText(/GST Taxes/)).toHaveCount(0);
+
+  await express.check();
+  await expect(express).toBeChecked();
+  await expect(summary.getByText('₹80', { exact: true })).toBeVisible();
+  await expect(summary.getByText('About 60 minutes', { exact: true })).toBeVisible();
+  await expect(page.getByText('Express selected. Delivery charge and estimated total have been recalculated below.')).toBeVisible();
+});
+
+test('checkout disables Express on a simulated Monday and keeps free Same Day Delivery', async ({ page }) => {
+  await page.clock.install({ time: new Date('2026-09-07T06:30:00Z') });
+  await prepareCheckout(page, 'weekday-normal-selector');
+
+  const sameDay = page.getByRole('radio', { name: /Same Day Delivery/ });
+  const express = page.getByRole('radio', { name: /Express Delivery/ });
+
+  await expect(sameDay).toBeChecked();
+  await expect(express).toBeDisabled();
+  await expect(page.getByRole('status')).toContainText('Express Delivery is available Saturday and Sunday in Neemuch for every product.');
+});
 test('single-city launch fixes profile and checkout delivery area to Neemuch 458441', async ({ page }) => {
   await loginCustomer(page, USER_A);
 
@@ -248,6 +293,12 @@ test('isolated COD order succeeds and another account cannot read it', async ({
   );
 
   expect(orderId.length).toBeGreaterThan(0);
+
+  await page.getByRole('link', { name: 'Track order' }).click();
+  await expect(page).toHaveURL(/\/orders\/[^/?#]+\/track$/);
+  await expect(page.getByRole('heading', { name: orderId })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Order items' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Download receipt' })).toHaveCount(0);
 
   await page.goto('/profile');
 
