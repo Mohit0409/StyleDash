@@ -178,6 +178,40 @@ class ShopWorkflowTests(unittest.TestCase):
             self.assertEqual(db.execute("PRAGMA integrity_check").fetchone()[0], "ok")
             self.assertEqual(db.execute("PRAGMA foreign_key_check").fetchall(), [])
 
+    def test_new_product_persists_variant_ids_before_and_after_v6_rerun(self) -> None:
+        self.create_active_shop("user-a", "Stable Variant Shop")
+        payload = self.complete_product("Stable Variant Shirt")
+        payload.pop("inventory")
+        payload.pop("size")
+        payload["variants"] = [{"size": "M", "inventory": 7}, {"size": "L", "inventory": 4}]
+        product = self.store.create_product_draft("user-a", payload)
+
+        def snapshot():
+            with self.store.connect() as db:
+                row = db.execute(
+                    "SELECT size,inventory,colour_name,colour_hex,image_urls_json,variants_json "
+                    "FROM shop_product_submissions WHERE id=?", (product["id"],)
+                ).fetchone()
+                return tuple(row)
+
+        before = snapshot()
+        variants = json.loads(before[-1])
+        self.assertEqual([item["id"] for item in variants], [
+            f"{product['id']}-var-1", f"{product['id']}-var-2"
+        ])
+        ShopWorkflow(self.path)
+        self.assertEqual(snapshot(), before)
+        with self.store.connect() as db:
+            db.execute("DELETE FROM shop_schema_migrations WHERE version=6")
+        ShopWorkflow(self.path)
+        self.assertEqual(snapshot(), before)
+        with self.store.connect() as db:
+            self.assertEqual(db.execute(
+                "SELECT COUNT(*) FROM shop_schema_migrations WHERE version=6"
+            ).fetchone()[0], 1)
+            self.assertEqual(db.execute("PRAGMA integrity_check").fetchone()[0], "ok")
+            self.assertEqual(db.execute("PRAGMA foreign_key_check").fetchall(), [])
+
     def test_migration_refuses_duplicate_customer_applications(self) -> None:
         duplicate_path = Path(self.temporary.name) / "duplicate.db"
         create_base_database(duplicate_path)

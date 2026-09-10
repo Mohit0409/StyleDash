@@ -127,6 +127,27 @@ def _row_dict(row: sqlite3.Row) -> dict[str, Any]:
 def _store_slug(application_id: str) -> str:
     return f"local-shop-{application_id[-12:]}"
 
+def _created_variants_json(product_id: str, raw_json: str) -> str:
+    """Persist server-owned stable IDs for variants created after migration v6."""
+    variants = json.loads(raw_json)
+    canonical = []
+    seen_ids: set[str] = set()
+    for index, item in enumerate(variants):
+        variant_id = item.get("id")
+        if not isinstance(variant_id, str) or not variant_id.strip() or variant_id in seen_ids:
+            variant_id = f"{product_id}-var-{index + 1}"
+        seen_ids.add(variant_id)
+        canonical.append({
+            "id": variant_id,
+            "size": item["size"],
+            "inventory": item["inventory"],
+            "active": item.get("active", True),
+            "colourName": item["colourName"],
+            "colourHex": item.get("colourHex"),
+            "imageUrls": item.get("imageUrls") or [],
+        })
+    return json.dumps(canonical, separators=(",", ":"))
+
 def _row_variants(row: sqlite3.Row) -> list[dict[str, Any]]:
     raw = row["variants_json"] if "variants_json" in row.keys() else None
     try:
@@ -1491,6 +1512,7 @@ class ShopWorkflow:
         values = self._product_payload(payload)
         now = iso(utc_now())
         product_id = "shopprod_" + secrets.token_hex(12)
+        values["variants_json"] = _created_variants_json(product_id, values["variants_json"])
         slug = self._product_slug(values["name"], product_id)
         with self.connect() as db:
             db.execute("BEGIN IMMEDIATE")
@@ -1636,6 +1658,7 @@ class ShopWorkflow:
     ) -> dict[str, Any]:
         values = self._product_payload(payload)
         product_id = "shopprod_" + secrets.token_hex(12)
+        values["variants_json"] = _created_variants_json(product_id, values["variants_json"])
         slug = self._product_slug(values["name"], product_id)
         now = iso(utc_now())
         with self.connect() as db:
@@ -1735,12 +1758,13 @@ class ShopWorkflow:
                 raise SecurityError(409, "Fix these rows: " + " | ".join(duplicates[:20]), "duplicate_product")
             for _index, values in validated:
                 product_id = "shopprod_" + secrets.token_hex(12)
+                variants_json = _created_variants_json(product_id, values["variants_json"])
                 slug = self._product_slug(values["name"], product_id)
                 db.execute(
                     """INSERT INTO shop_product_submissions(
                       id,slug,application_id,submitted_by_user_id,name,description,brand,department,category,price_paise,original_price_paise,inventory,size,variants_json,colour_name,colour_hex,image_urls_json,attributes_json,status,reviewed_by,created_at,updated_at,submitted_at,reviewed_at,published_at
                     ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,'PUBLISHED',?,?,?,?,?,?)""",
-                    (product_id,slug,application_id,application["submitted_by_user_id"],values["name"],values["description"],values["brand"],values["department"],values["category"],values["price_paise"],values["original_price_paise"],values["inventory"],values["size"],values["variants_json"],values["colour_name"],values["colour_hex"],values["image_urls_json"],values["attributes_json"],admin_id,now,now,now,now,now),
+                    (product_id,slug,application_id,application["submitted_by_user_id"],values["name"],values["description"],values["brand"],values["department"],values["category"],values["price_paise"],values["original_price_paise"],values["inventory"],values["size"],variants_json,values["colour_name"],values["colour_hex"],values["image_urls_json"],values["attributes_json"],admin_id,now,now,now,now,now),
                 )
                 created_ids.append(product_id)
                 self._audit_if_available(db,admin_id,"shop_product_admin_bulk_created","shop_product",product_id,{"applicationId":application_id,"status":"PUBLISHED"})
