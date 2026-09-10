@@ -3057,6 +3057,31 @@ class HttpApiTests(unittest.TestCase):
         self.assertTrue(persisted["inventoryCommitted"])
 
 
+    def test_shop_product_review_notification_payload_and_route_hooks(self) -> None:
+        with patch.object(SERVER, "owner_notifier") as notifier_factory:
+            SERVER._notify_shop_product_review(
+                result={
+                    "id": "shopprod_test",
+                    "name": "Review Shoe",
+                    "category": "Footwear",
+                    "status": "SUBMITTED",
+                },
+                event="shop_product_submission",
+                title="Shop Product Needs Review",
+            )
+            notification = notifier_factory.return_value.send.call_args.kwargs
+            self.assertEqual(notification["event"], "shop_product_submission")
+            self.assertIn("Review Shoe", notification["message"])
+            self.assertIn("Footwear", notification["message"])
+            self.assertNotIn("email", notification["message"].lower())
+            self.assertNotIn("phone", notification["message"].lower())
+
+        source = (ROOT / "scripts" / "termux-spa-server.py").read_text(encoding="utf-8")
+        self.assertIn('event="shop_product_submission"', source)
+        self.assertGreaterEqual(source.count('event="shop_product_change_request"'), 2)
+        self.assertIn('request_type="EDIT"', source)
+        self.assertIn('request_type="UNPUBLISH"', source)
+
     def test_vendor_application_sends_one_private_owner_notification(self) -> None:
         # Registration itself is not part of this notification test.
         with patch.dict(
