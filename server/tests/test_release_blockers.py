@@ -373,7 +373,7 @@ class DeploymentAndTaxTests(unittest.TestCase):
             text,
         )
         self.assertIn("styledash_migrations=ok", text)
-        self.assertIn("{1, 2, 3, 4, 5}.issubset(shop_versions)", text)
+        self.assertIn("{1, 2, 3, 4, 5, 6}.issubset(shop_versions)", text)
         self.assertIn("1 not in review_versions", text)
         self.assertIn('SELECT version FROM review_schema_migrations', text)
         self.assertIn('PRAGMA table_info(product_reviews)', text)
