@@ -57,7 +57,12 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const hydrationPromiseRef = useRef<Promise<void>>(Promise.resolve());
   const saveQueueRef = useRef<Promise<void>>(Promise.resolve());
   const serverCartSignatureRef = useRef('');
+  const itemsRef = useRef<CartItem[]>(items);
   const expressCart = cartExpressEligibility(items.map(item => item.product));
+
+  useEffect(() => {
+    itemsRef.current = items;
+  }, [items]);
 
   const setDeliveryMethod = (method: 'express' | 'standard') => {
     const expressAllowed = isExpressDeliveryAvailable() && expressCart.eligible;
@@ -78,7 +83,9 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
     serverCartSignatureRef.current = '';
 
     if (userId === 'guest') {
-      setItems(readGuestCart());
+      const guestItems = readGuestCart();
+      itemsRef.current = guestItems;
+      setItems(guestItems);
       ownerRef.current = 'guest';
       hydratedRef.current = true;
       hydrationPromiseRef.current = Promise.resolve();
@@ -92,12 +99,14 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
         ownerRef.current = userId;
         hydratedRef.current = true;
         serverCartSignatureRef.current = cartSignature(nextItems);
+        itemsRef.current = nextItems;
         setItems(nextItems);
       })
       .catch(() => {
         if (cancelled) return;
         ownerRef.current = `unavailable:${userId}`;
         hydratedRef.current = false;
+        itemsRef.current = [];
         setItems([]);
       });
     hydrationPromiseRef.current = hydrate.then(() => undefined);
@@ -133,6 +142,7 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
           const nextItems = await accountCartRepository.loadAndMigrate();
           if (ownerRef.current === owner) {
             serverCartSignatureRef.current = cartSignature(nextItems);
+            itemsRef.current = nextItems;
             setItems(nextItems);
           }
         } catch { /* Keep the last known account cart if refresh fails. */ }
@@ -155,20 +165,47 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (!await canAddVariantToCart(variantId)) return false;
 
     const lineId = `${product.id}:${variantId}`;
-    setItems(prev => {
-      const existingIdx = prev.findIndex(item => item.lineId === lineId);
+    const buildNextItems = (current: CartItem[]): CartItem[] => {
+      const existingIdx = current.findIndex(item => item.lineId === lineId);
       if (existingIdx >= 0) {
-        const existing = prev[existingIdx];
-        const updated = [...prev];
+        const existing = current[existingIdx];
+        const updated = [...current];
         updated[existingIdx] = { ...existing, quantity: existing.quantity + quantity };
         return updated;
       }
-      return [...prev, {
+      return [...current, {
         lineId, productId: product.id, product, variantId: variant.id,
         selectedSize: variant.size, selectedColour: variant.colourName,
         sku: variant.sku, quantity, unitPrice: variant.price ?? product.price,
       }];
-    });
+    };
+
+    if (userId === 'guest') {
+      const nextItems = buildNextItems(itemsRef.current);
+      itemsRef.current = nextItems;
+      setItems(nextItems);
+    } else {
+      const owner = userId;
+      let committed = false;
+      const save = saveQueueRef.current.catch(() => undefined).then(async () => {
+        if (!hydratedRef.current || ownerRef.current !== owner) return;
+        const nextItems = buildNextItems(itemsRef.current);
+        const signature = cartSignature(nextItems);
+        await accountCartRepository.save(nextItems);
+        if (!hydratedRef.current || ownerRef.current !== owner) return;
+        serverCartSignatureRef.current = signature;
+        itemsRef.current = nextItems;
+        setItems(nextItems);
+        committed = true;
+      });
+      saveQueueRef.current = save;
+      try {
+        await save;
+      } catch {
+        return false;
+      }
+      if (!committed) return false;
+    }
 
     trackEvent('add_to_cart', {
       item_id: product.id,

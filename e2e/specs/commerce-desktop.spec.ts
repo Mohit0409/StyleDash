@@ -47,9 +47,10 @@ test.beforeAll(async ({ browserName }, testInfo) => {
     phone: `98765434${phoneSuffix}`,
     password: PASSWORD,
   };
+  const setupIp = '198.51.100.' + (12 + (testInfo.workerIndex % 100));
   const api = await playwrightRequest.newContext({
     baseURL: 'http://127.0.0.1:4173',
-    extraHTTPHeaders: { 'X-Forwarded-For': '198.51.100.12' },
+    extraHTTPHeaders: { 'X-Forwarded-For': setupIp },
   });
 
   try {
