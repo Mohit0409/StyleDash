@@ -907,7 +907,21 @@ class ShopWorkflow:
     def admin_create_application(
         self, admin_id: str, user_id: str, payload: dict[str, Any]
     ) -> dict[str, Any]:
-        values = self._application_payload(payload, require_complete=True)
+        allowed = APPLICATION_PAYLOAD_FIELDS | {"bannerImage", "logoImage"}
+        if not isinstance(payload, dict) or set(payload) - allowed:
+            raise SecurityError(400, "Unsupported shop creation field.", "invalid_vendor_application")
+
+        def clean_image(value: Any, label: str) -> str | None:
+            if value is None or value == "":
+                return None
+            if not isinstance(value, str) or not PRODUCT_MEDIA_PATH_PATTERN.fullmatch(value):
+                raise SecurityError(400, f"Upload a valid {label} image.", "invalid_store_branding")
+            return value
+
+        metadata = {key: value for key, value in payload.items() if key in APPLICATION_PAYLOAD_FIELDS}
+        values = self._application_payload(metadata, require_complete=True)
+        banner = clean_image(payload.get("bannerImage"), "store cover")
+        logo = clean_image(payload.get("logoImage"), "store logo")
         application_id = "vendor_" + secrets.token_hex(12)
         now = iso(utc_now())
         with self.connect() as db:
@@ -922,15 +936,15 @@ class ShopWorkflow:
                 INSERT INTO vendor_applications(
                   id,submitted_by_user_id,shop_name,owner_name,email,phone,
                   category,description,address,city,state,pincode,business_information,
-                  status,reviewed_by,created_at,updated_at,submitted_at,reviewed_at,
+                  banner_image_url,logo_image_url,status,reviewed_by,created_at,updated_at,submitted_at,reviewed_at,
                   approved_at,activated_at
-                ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,'ACTIVE',?,?,?,?,?,?,?)
+                ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,'ACTIVE',?,?,?,?,?,?,?)
                 """,
                 (
                     application_id, user_id, values["shop_name"], values["owner_name"],
                     user["email"], user["phone"], values["category"], values["description"],
                     values["address"], values["city"], values["state"], values["pincode"],
-                    values["business_information"], admin_id, now, now, now, now, now, now,
+                    values["business_information"], banner, logo, admin_id, now, now, now, now, now, now,
                 ),
             )
             self._audit_if_available(
