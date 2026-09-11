@@ -298,25 +298,6 @@ class SecurityStoreTests(unittest.TestCase):
             user["id"], {"emailVerified": True, "email_verified_at": "2099-01-01T00:00:00+00:00"}
         ))
 
-    def test_account_cart_and_wishlist_are_server_stored_and_isolated(self):
-        user_a, _raw_a, _csrf_a = self.registration()
-        user_b, _raw_b, _csrf_b = self.store.register({
-            "name": "Customer B", "email": "customer-b@example.test",
-            "password": "long test password 456", "phone": "9888888888",
-        })
-        cart_a = [{"productId": "prod-a", "variantId": "var-a", "quantity": 2}]
-        wishlist_a = ["prod-a", "prod-b"]
-        self.assertEqual(self.store.replace_cart(user_a["id"], {"items": cart_a}), cart_a)
-        self.assertEqual(self.store.replace_wishlist(user_a["id"], {"productIds": wishlist_a}), wishlist_a)
-        self.assertEqual(self.store.account_state(user_a["id"]), {"cart": cart_a, "wishlist": wishlist_a})
-        self.assertEqual(self.store.account_state(user_b["id"]), {"cart": [], "wishlist": []})
-        cart_b = [{"productId": "prod-b", "variantId": "var-b", "quantity": 1}]
-        self.store.replace_cart(user_b["id"], {"items": cart_b})
-        self.assertEqual(self.store.account_state(user_b["id"])["cart"], cart_b)
-        self.assertEqual(self.store.account_state(user_a["id"])["cart"], cart_a)
-        self.assert_security_error("invalid_cart_state", lambda: self.store.replace_cart(user_a["id"], {"items": [{"productId": "x", "variantId": "y", "quantity": True}]}))
-        self.assert_security_error("invalid_wishlist_state", lambda: self.store.replace_wishlist(user_a["id"], {"productIds": [123]}))
-
     def test_customer_web_login_rejects_non_customer_role(self):
         user, raw, _csrf = self.registration()
         self.store.revoke(raw)
@@ -329,11 +310,8 @@ class SecurityStoreTests(unittest.TestCase):
             self.assertEqual(db.execute("PRAGMA foreign_keys").fetchone()[0], 1)
             self.assertEqual(db.execute("PRAGMA journal_mode").fetchone()[0], "wal")
             self.assertEqual(db.execute("PRAGMA integrity_check").fetchone()[0], "ok")
-            self.assertEqual(db.execute("SELECT MAX(version) FROM schema_migrations").fetchone()[0], 8)
+            self.assertEqual(db.execute("SELECT MAX(version) FROM schema_migrations").fetchone()[0], 7)
             self.assertEqual(db.execute("SELECT COUNT(*) FROM customer_terms_acceptances").fetchone()[0], 0)
-            tables = {row[0] for row in db.execute("SELECT name FROM sqlite_master WHERE type='table'")}
-            self.assertIn("customer_cart_items", tables)
-            self.assertIn("customer_wishlist_items", tables)
             backup_path = Path(self.temporary.name) / "backup.db"
             backup = sqlite3.connect(backup_path)
             db.backup(backup)
@@ -382,7 +360,7 @@ class SecurityStoreTests(unittest.TestCase):
             ).fetchone()
             self.assertEqual((row["email"], row["email_verified"]), ("legacy-owner@example.test", 1))
             self.assertIsNone(row["email_verified_at"])
-            self.assertEqual(db.execute("SELECT MAX(version) FROM schema_migrations").fetchone()[0], 8)
+            self.assertEqual(db.execute("SELECT MAX(version) FROM schema_migrations").fetchone()[0], 7)
             self.assertEqual(db.execute("PRAGMA integrity_check").fetchone()[0], "ok")
         self.assertFalse(migrated.profile("usr_legacy")["emailVerified"])
 
@@ -402,10 +380,6 @@ class SecurityStoreTests(unittest.TestCase):
             )
             self.assertEqual(
                 db.execute("SELECT COUNT(*) FROM schema_migrations WHERE version=7").fetchone()[0],
-                1,
-            )
-            self.assertEqual(
-                db.execute("SELECT COUNT(*) FROM schema_migrations WHERE version=8").fetchone()[0],
                 1,
             )
             self.assertEqual(db.execute("PRAGMA integrity_check").fetchone()[0], "ok")

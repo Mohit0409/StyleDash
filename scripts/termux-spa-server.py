@@ -2641,12 +2641,6 @@ class StyleDashRequestHandler(SimpleHTTPRequestHandler):
                 profile = self._security().profile(user["id"])
                 self._json_response(HTTPStatus.OK, {"success": True, "user": profile, "csrfToken": self._security().csrf_token(raw or "")})
                 return
-            if path == "/api/account-state":
-                self._rate_limit(path, 120)
-                user, _session = self._current_user()
-                state = self._security().account_state(user["id"])
-                self._json_response(HTTPStatus.OK, {"success": True, **state})
-                return
             if path == "/api/orders":
                 user, _session = self._current_user()
                 orders = self._security().list_orders(self.payment_service.store, user["id"])
@@ -3148,20 +3142,6 @@ class StyleDashRequestHandler(SimpleHTTPRequestHandler):
                 return
             if self._sensitive_path(path):
                 self._json_response(HTTPStatus.NOT_FOUND, {"success": False, "error": "Not found.", "code": "not_found"})
-                return
-            if path == "/api/account-state/cart":
-                self._rate_limit(path, 120)
-                user, _session = self._current_user()
-                self._csrf()
-                cart = self._security().replace_cart(user["id"], self._read_json())
-                self._json_response(HTTPStatus.OK, {"success": True, "cart": cart})
-                return
-            if path == "/api/account-state/wishlist":
-                self._rate_limit(path, 120)
-                user, _session = self._current_user()
-                self._csrf()
-                wishlist = self._security().replace_wishlist(user["id"], self._read_json())
-                self._json_response(HTTPStatus.OK, {"success": True, "wishlist": wishlist})
                 return
             if path == "/api/profile":
                 self._rate_limit(path, 30)
