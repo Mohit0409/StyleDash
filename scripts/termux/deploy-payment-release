@@ -289,7 +289,7 @@ try:
     foreign_keys = connection.execute("PRAGMA foreign_key_check").fetchall()
 finally:
     connection.close()
-if 7 not in identity_versions or not {1, 2, 3, 4, 5, 6}.issubset(shop_versions) or 1 not in review_versions:
+if 8 not in identity_versions or not {1, 2, 3, 4, 5, 6}.issubset(shop_versions) or 1 not in review_versions:
     raise SystemExit("Vibe4You schema migrations are incomplete")
 if "variants_json" not in shop_product_columns:
     raise SystemExit("Vibe4You product variant schema is incomplete")

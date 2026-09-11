@@ -36,6 +36,7 @@ test('rejected shop owner can correct and resubmit the application', async ({ pa
     });
 
     if (path === '/api/auth/me') return void await json(authResponse);
+    if (path === '/api/account-state') return void await json({ success: true, cart: [], wishlist: [] });
     if (path === '/api/vendor-applications/me' && method === 'GET') {
       return void await json({ success: true, application: current });
     }
@@ -73,6 +74,7 @@ test('active shop progress points the seller to products', async ({ page }) => {
       status: 200, contentType: 'application/json', body: JSON.stringify(body),
     });
     if (path === '/api/auth/me') return void await json(authResponse);
+    if (path === '/api/account-state') return void await json({ success: true, cart: [], wishlist: [] });
     if (path === '/api/vendor-applications/me') {
       return void await json({ success: true, application: application('ACTIVE') });
     }
