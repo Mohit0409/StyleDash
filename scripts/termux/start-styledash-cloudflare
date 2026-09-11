@@ -1,31 +1,63 @@
 #!/data/data/com.termux/files/usr/bin/bash
-# Start the named Cloudflare Tunnel without exposing its token in argv.
+# Start exactly one named Cloudflare Tunnel without exposing its token in argv.
 set -eu
 
 TOKEN_FILE="$HOME/.config/styledash/cloudflare-tunnel-token"
 PID_FILE="$HOME/run/styledash-cloudflare.pid"
 LOG_FILE="$HOME/logs/styledash-cloudflare.log"
+PROCESS_LIB="$HOME/bin/styledash-process-lib"
+LOCK_DIR="$HOME/run/styledash-cloudflare-start.lock"
+CLOUDFLARE_MARKER='cloudflared tunnel run'
+CLOUDFLARE_IDENTITY="--token-file $TOKEN_FILE"
 mkdir -p "$HOME/run" "$HOME/logs"
 
-[ -s "$TOKEN_FILE" ] || {
-  echo "Cloudflare tunnel token file is missing" >&2
-  exit 1
-}
+[ -s "$TOKEN_FILE" ] || { echo "Cloudflare tunnel token file is missing" >&2; exit 1; }
+[ -r "$PROCESS_LIB" ] || { echo "StyleDash process control library is missing" >&2; exit 1; }
+# shellcheck disable=SC1090
+. "$PROCESS_LIB"
 
-if [ -s "$PID_FILE" ]; then
-  pid="$(cat "$PID_FILE" 2>/dev/null || true)"
-  if [ -n "$pid" ] && kill -0 "$pid" 2>/dev/null && \
-     tr '\0' ' ' < "/proc/$pid/cmdline" 2>/dev/null | grep -Fq 'cloudflared tunnel run'; then
-    exit 0
+if ! mkdir "$LOCK_DIR" 2>/dev/null; then
+  lock_pid="$(cat "$LOCK_DIR/pid" 2>/dev/null || true)"
+  case "$lock_pid" in ''|*[!0-9]*) lock_pid='' ;; esac
+  if [ -z "$lock_pid" ] || ! kill -0 "$lock_pid" 2>/dev/null; then
+    rm -rf -- "$LOCK_DIR"
+    mkdir "$LOCK_DIR"
+  else
+    echo "StyleDash Cloudflare startup is already in progress" >&2
+    exit 1
   fi
-  rm -f "$PID_FILE"
 fi
+printf '%s\n' "$$" > "$LOCK_DIR/pid"
+cleanup() { rm -rf -- "$LOCK_DIR"; }
+trap cleanup EXIT INT TERM
+
+pid="$(styledash_read_pid_file "$PID_FILE" 2>/dev/null || true)"
+if [ -n "$pid" ] && styledash_assert_single_process "$pid" "$CLOUDFLARE_MARKER" "$CLOUDFLARE_IDENTITY"; then
+  chmod 600 "$PID_FILE"
+  printf 'styledash_cloudflare_pid=%s\n' "$pid"
+  exit 0
+fi
+
+# Normalize stale, missing, unrelated, and duplicate PID-file states.
+styledash_stop_matching_processes "StyleDash Cloudflare tunnel" "$CLOUDFLARE_MARKER" "$CLOUDFLARE_IDENTITY"
+rm -f -- "$PID_FILE"
 nohup cloudflared tunnel run --protocol auto --token-file "$TOKEN_FILE" >> "$LOG_FILE" 2>&1 &
-pid=$!
+pid="$!"
 printf '%s\n' "$pid" > "$PID_FILE"
 chmod 600 "$PID_FILE"
-sleep 3
-kill -0 "$pid" 2>/dev/null || {
-  echo "Cloudflare tunnel failed to stay running; see $LOG_FILE" >&2
-  exit 1
-}
+
+for _ in $(seq 1 12); do
+  if kill -0 "$pid" 2>/dev/null && \
+     styledash_assert_single_process "$pid" "$CLOUDFLARE_MARKER" "$CLOUDFLARE_IDENTITY"; then
+    [ "$(styledash_read_pid_file "$PID_FILE")" = "$pid" ] || break
+    printf 'styledash_cloudflare_pid=%s\n' "$pid"
+    printf 'styledash_cloudflare_process_count=1\n'
+    exit 0
+  fi
+  sleep 0.5
+done
+
+styledash_stop_matching_processes "StyleDash Cloudflare tunnel" "$CLOUDFLARE_MARKER" "$CLOUDFLARE_IDENTITY" || true
+rm -f -- "$PID_FILE"
+echo "Cloudflare tunnel failed process identity validation; see $LOG_FILE" >&2
+exit 1

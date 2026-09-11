@@ -2225,6 +2225,10 @@ class StyleDashRequestHandler(SimpleHTTPRequestHandler):
         self.send_header("X-Frame-Options", "SAMEORIGIN")
         self.send_header("Content-Security-Policy", SECURITY_POLICY)
         self.send_header("Permissions-Policy", "camera=(), microphone=(), geolocation=()")
+        # Local launch/deploy probes use this to prove which process owns 8080.
+        # Never expose the runtime PID through the public hostname.
+        if (self.headers.get("Host") or "").lower() in {"127.0.0.1:8080", "localhost:8080"}:
+            self.send_header("X-StyleDash-Process-Id", str(os.getpid()))
         super().end_headers()
 
     def _json_response(

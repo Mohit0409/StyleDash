@@ -11,6 +11,15 @@ CLOUDFLARE_PID_FILE="$RUN_DIR/styledash-cloudflare.pid"
 URL_FILE="$RUN_DIR/styledash-public-url"
 EXPECTED_CMD='ngrok http http://127.0.0.1:8080'
 PRIMARY_PUBLIC_URL='https://vibe4you.in'
+PROCESS_LIB="$HOME/bin/styledash-process-lib"
+PUBLIC_PID_FILE="$RUN_DIR/styledash.pid"
+ADMIN_PID_FILE="$RUN_DIR/styledash-admin.pid"
+PUBLIC_MARKER="$HOME/server/serve.py --bind 127.0.0.1 --port 8080"
+PUBLIC_IDENTITY="--directory $HOME/server"
+ADMIN_MARKER="$HOME/admin/serve.py --bind 127.0.0.1 --port 8081"
+ADMIN_IDENTITY="--assets $HOME/admin/admin"
+CLOUDFLARE_MARKER='cloudflared tunnel run'
+CLOUDFLARE_IDENTITY="--token-file $HOME/.config/styledash/cloudflare-tunnel-token"
 LAST_BACKUP_FILE="$RUN_DIR/styledash-last-backup-date"
 LAST_BACKUP_ATTEMPT_FILE="$RUN_DIR/styledash-last-backup-attempt"
 BACKUP_RETRY_SECONDS=3600
@@ -20,11 +29,22 @@ LAST_RECOVERY_ATTEMPT_FILE="$RUN_DIR/styledash-last-recovery-attempt"
 RECOVERY_RETRY_SECONDS=3600
 
 mkdir -p "$RUN_DIR" "$LOG_DIR"
+[ -r "$PROCESS_LIB" ] || {
+  echo "$(date -Iseconds) process control library missing; watchdog refused" >> "$LOG_FILE"
+  exit 1
+}
+# shellcheck disable=SC1090
+. "$PROCESS_LIB"
 
-if [ -s "$PID_FILE" ] && kill -0 "$(cat "$PID_FILE")" 2>/dev/null; then
+WATCHDOG_MARKER="$HOME/bin/styledash-health"
+existing_pid="$(styledash_read_pid_file "$PID_FILE" 2>/dev/null || true)"
+if [ -n "$existing_pid" ] && [ "$existing_pid" != "$$" ] && \
+   styledash_pid_matches "$existing_pid" "$WATCHDOG_MARKER" ""; then
   exit 0
 fi
+rm -f -- "$PID_FILE"
 printf '%s\n' "$$" > "$PID_FILE"
+chmod 600 "$PID_FILE"
 
 cleanup() {
   if [ -s "$PID_FILE" ] && [ "$(cat "$PID_FILE" 2>/dev/null)" = "$$" ]; then
@@ -53,11 +73,22 @@ ngrok_process_ok() {
   tr '\0' ' ' < "/proc/$pid/cmdline" 2>/dev/null | grep -Fq "$EXPECTED_CMD"
 }
 
+public_process_ok() {
+  pid="$(styledash_read_pid_file "$PUBLIC_PID_FILE" 2>/dev/null || true)"
+  [ -n "$pid" ] || return 1
+  styledash_assert_single_process "$pid" "$PUBLIC_MARKER" "$PUBLIC_IDENTITY"
+}
+
+admin_process_ok() {
+  pid="$(styledash_read_pid_file "$ADMIN_PID_FILE" 2>/dev/null || true)"
+  [ -n "$pid" ] || return 1
+  styledash_assert_single_process "$pid" "$ADMIN_MARKER" "$ADMIN_IDENTITY"
+}
+
 cloudflare_process_ok() {
-  [ -s "$CLOUDFLARE_PID_FILE" ] || return 1
-  pid="$(cat "$CLOUDFLARE_PID_FILE")"
-  kill -0 "$pid" 2>/dev/null || return 1
-  tr '\0' ' ' < "/proc/$pid/cmdline" 2>/dev/null | grep -Fq 'cloudflared tunnel run'
+  pid="$(styledash_read_pid_file "$CLOUDFLARE_PID_FILE" 2>/dev/null || true)"
+  [ -n "$pid" ] || return 1
+  styledash_assert_single_process "$pid" "$CLOUDFLARE_MARKER" "$CLOUDFLARE_IDENTITY"
 }
 
 public_unhealthy=0
@@ -98,7 +129,7 @@ while true; do
     fi
   fi
 
-  if curl -fsS --max-time 5 http://127.0.0.1:8080/api/health >/dev/null; then
+  if public_process_ok && curl -fsS --max-time 5 http://127.0.0.1:8080/api/health >/dev/null; then
     if [ "$public_unhealthy" -eq 1 ]; then
       echo "$(date -Iseconds) local public service recovered" >> "$LOG_FILE"
       notify public_recovered "Vibe4You public service recovered" "Port 8080 is healthy again." 3 white_check_mark
@@ -116,7 +147,7 @@ while true; do
     fi
   fi
 
-  if curl -fsS --max-time 3 -H 'Host: 127.0.0.1:8081' http://127.0.0.1:8081/ >/dev/null; then
+  if admin_process_ok && curl -fsS --max-time 3 -H 'Host: 127.0.0.1:8081' http://127.0.0.1:8081/ >/dev/null; then
     if [ "$admin_unhealthy" -eq 1 ]; then
       echo "$(date -Iseconds) local admin service recovered" >> "$LOG_FILE"
       notify admin_recovered "Vibe4You admin service recovered" "Private port 8081 is healthy again." 3 white_check_mark

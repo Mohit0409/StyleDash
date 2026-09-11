@@ -731,6 +731,10 @@ class AdminHandler(BaseHTTPRequestHandler):
         self.send_header("Referrer-Policy", "no-referrer")
         self.send_header("Permissions-Policy", "camera=(), microphone=(), geolocation=()")
         self.send_header("X-Frame-Options", "DENY")
+        # Local launch/deploy probes use this to prove which process owns 8081.
+        # Keep the process identity private even when Cloudflare Access proxies Admin.
+        if (self.headers.get("Host") or "").lower() in {"127.0.0.1:8081", "localhost:8081"}:
+            self.send_header("X-StyleDash-Process-Id", str(os.getpid()))
         for name, value in extra or []:
             self.send_header(name, value)
         self.end_headers()

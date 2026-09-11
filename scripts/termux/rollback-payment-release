@@ -9,6 +9,13 @@ DATA_ROOT="$HOME/.local/share/styledash"
 LOG_FILE="$HOME/logs/styledash-rollback.log"
 
 mkdir -p "$RUN_DIR" "$BACKUP_ROOT" "$HOME/logs"
+PROCESS_LIB="$HOME/bin/styledash-process-lib"
+[ -r "$PROCESS_LIB" ] || {
+  echo "StyleDash process control library is missing; refusing unsafe rollback" >&2
+  exit 1
+}
+# shellcheck disable=SC1090 -- installed by the release before runtime mutation.
+. "$PROCESS_LIB"
 
 notify() {
   if [ -x "$HOME/bin/styledash-notify" ]; then
@@ -76,22 +83,26 @@ for config in catalog.json settings.json; do
 done
 printf 'recovery_snapshot=%s\n' "$recovery"
 
-if [ -s "$RUN_DIR/styledash-health.pid" ]; then
-  health_pid="$(cat "$RUN_DIR/styledash-health.pid")"
-  kill "$health_pid" 2>/dev/null || true
-fi
+watchdog_marker="$HOME/bin/styledash-health"
+public_marker="$HOME/server/serve.py --bind 127.0.0.1 --port 8080"
+public_identity="--directory $HOME/server"
+admin_marker="$HOME/admin/serve.py --bind 127.0.0.1 --port 8081"
+admin_identity="--assets $HOME/admin/admin"
+cloudflare_marker='cloudflared tunnel run'
+cloudflare_identity="--token-file $HOME/.config/styledash/cloudflare-tunnel-token"
+
+# Stop the watchdog first so it cannot restart the code being rolled back.
+styledash_stop_matching_processes "StyleDash health watchdog" "$watchdog_marker" ""
 if [ -x "$HOME/bin/stop-styledash-ngrok" ]; then
   "$HOME/bin/stop-styledash-ngrok" || true
 fi
-
-for service in styledash styledash-admin; do
-  pid_file="$RUN_DIR/$service.pid"
-  if [ -s "$pid_file" ]; then
-    pid="$(cat "$pid_file")"
-    kill "$pid" 2>/dev/null || true
-  fi
-done
-sleep 1
+styledash_stop_matching_processes "StyleDash Cloudflare tunnel" "$cloudflare_marker" "$cloudflare_identity"
+styledash_stop_matching_processes "StyleDash administrator service" "$admin_marker" "$admin_identity"
+styledash_stop_matching_processes "StyleDash public service" "$public_marker" "$public_identity"
+rm -f -- "$RUN_DIR/styledash-health.pid" "$RUN_DIR/styledash.pid" \
+  "$RUN_DIR/styledash-admin.pid" "$RUN_DIR/styledash-cloudflare.pid"
+styledash_wait_for_port_release 8080 "StyleDash public service"
+styledash_wait_for_port_release 8081 "StyleDash administrator service"
 
 rm -rf -- "$HOME/server"
 cp -a "$backup/server" "$HOME/server"

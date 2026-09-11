@@ -78,6 +78,10 @@ class ProductionReliabilityTests(unittest.TestCase):
         script = self.read("scripts/termux/styledash-health")
         self.assertIn("http://127.0.0.1:8080/api/health", script)
         self.assertIn("http://127.0.0.1:8081/", script)
+        self.assertIn('PROCESS_LIB="$HOME/bin/styledash-process-lib"', script)
+        self.assertIn("public_process_ok", script)
+        self.assertIn("admin_process_ok", script)
+        self.assertIn("styledash_assert_single_process", script)
         self.assertIn("public_restart_failed", script)
         self.assertIn("admin_restart_failed", script)
         self.assertIn("backup_failed", script)
@@ -94,6 +98,9 @@ class ProductionReliabilityTests(unittest.TestCase):
         script = self.read("scripts/termux/start-styledash-cloudflare")
         self.assertIn("cloudflared tunnel run --protocol auto", script)
         self.assertNotIn("cloudflared tunnel run --protocol http2", script)
+        self.assertIn("styledash_assert_single_process", script)
+        self.assertIn('styledash_stop_matching_processes "StyleDash Cloudflare tunnel"', script)
+        self.assertIn("styledash_cloudflare_process_count=1", script)
 
     def test_rollback_preserves_live_database_history(self) -> None:
         script = self.read("scripts/termux/rollback-payment-release")
@@ -101,6 +108,13 @@ class ProductionReliabilityTests(unittest.TestCase):
         self.assertIn("production_data=preserved", script)
         self.assertNotIn("styledash.db", script)
         self.assertNotIn("orders.json", script)
+        self.assertIn('PROCESS_LIB="$HOME/bin/styledash-process-lib"', script)
+        self.assertIn('styledash_stop_matching_processes "StyleDash health watchdog"', script)
+        self.assertIn('styledash_stop_matching_processes "StyleDash public service"', script)
+        self.assertIn('styledash_stop_matching_processes "StyleDash administrator service"', script)
+        self.assertIn('styledash_stop_matching_processes "StyleDash Cloudflare tunnel"', script)
+        self.assertIn('styledash_wait_for_port_release 8080', script)
+        self.assertIn('styledash_wait_for_port_release 8081', script)
 
     def test_deploy_records_and_installs_rollback_tooling(self) -> None:
         script = self.read("scripts/termux/deploy-payment-release")
@@ -132,6 +146,16 @@ class ProductionReliabilityTests(unittest.TestCase):
         self.assertIn('install -m 600 "$STAGE/scripts/catalog_normalization.py" "$HOME/admin/catalog_normalization.py"', script)
         self.assertIn("catalog_normalization.py styledash_mail.py", script)
         self.assertNotIn("razorpay-script-missing", script)
+
+    def test_deploy_stops_watchdog_before_runtime_mutation_and_uses_patch_canary(self) -> None:
+        script = self.read("scripts/termux/deploy-payment-release")
+        watchdog_stop = script.index('styledash_stop_matching_processes "StyleDash health watchdog"')
+        public_copy = script.index('install -m 755 "$STAGE/scripts/termux-spa-server.py"')
+        self.assertLess(watchdog_stop, public_copy)
+        self.assertIn('styledash_patch_canary=auth_required', script)
+        self.assertIn('account-state PATCH returned HTTP 405', script)
+        self.assertIn('styledash_watchdog_process_count=1', script)
+        self.assertIn('install -m 755 "$STAGE/scripts/termux/styledash-process-lib" "$HOME/bin/styledash-process-lib"', script)
 
     def test_repository_production_branch_is_main(self) -> None:
         agents = self.read("AGENTS.md")
