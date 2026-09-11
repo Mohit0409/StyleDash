@@ -1,0 +1,124 @@
+#!/data/data/com.termux/files/usr/bin/bash
+# Shared process-identity and listener checks for StyleDash Termux services.
+# This file is sourced by the launch/deploy scripts; it does not start services.
+
+styledash_cmdline() {
+  styledash_cmd_pid="${1:-}"
+  case "$styledash_cmd_pid" in
+    ''|*[!0-9]*) return 1 ;;
+  esac
+  [ -r "/proc/$styledash_cmd_pid/cmdline" ] || return 1
+  tr '\0' ' ' < "/proc/$styledash_cmd_pid/cmdline"
+}
+
+styledash_pid_matches() {
+  styledash_match_pid="${1:-}"
+  styledash_match_primary="${2:-}"
+  styledash_match_secondary="${3:-}"
+  [ -n "$styledash_match_primary" ] || return 1
+  kill -0 "$styledash_match_pid" 2>/dev/null || return 1
+  styledash_match_command="$(styledash_cmdline "$styledash_match_pid" 2>/dev/null)" || return 1
+  printf '%s' "$styledash_match_command" | grep -Fq -- "$styledash_match_primary" || return 1
+  if [ -n "$styledash_match_secondary" ]; then
+    printf '%s' "$styledash_match_command" | grep -Fq -- "$styledash_match_secondary" || return 1
+  fi
+}
+
+styledash_matching_pids() {
+  styledash_list_primary="${1:-}"
+  styledash_list_secondary="${2:-}"
+  for styledash_proc_dir in /proc/[0-9]*; do
+    [ -d "$styledash_proc_dir" ] || continue
+    styledash_list_pid="${styledash_proc_dir##*/}"
+    if styledash_pid_matches "$styledash_list_pid" "$styledash_list_primary" "$styledash_list_secondary"; then
+      printf '%s\n' "$styledash_list_pid"
+    fi
+  done
+}
+
+styledash_process_count() {
+  styledash_count_primary="${1:-}"
+  styledash_count_secondary="${2:-}"
+  styledash_count=0
+  for styledash_count_pid in $(styledash_matching_pids "$styledash_count_primary" "$styledash_count_secondary"); do
+    styledash_count=$((styledash_count + 1))
+  done
+  printf '%s\n' "$styledash_count"
+}
+
+styledash_assert_single_process() {
+  styledash_assert_expected="${1:-}"
+  styledash_assert_primary="${2:-}"
+  styledash_assert_secondary="${3:-}"
+  styledash_assert_pids="$(styledash_matching_pids "$styledash_assert_primary" "$styledash_assert_secondary")"
+  [ "$(printf '%s\n' "$styledash_assert_pids" | awk 'NF { count++ } END { print count + 0 }')" -eq 1 ] || return 1
+  [ "$styledash_assert_pids" = "$styledash_assert_expected" ] || return 1
+  styledash_pid_matches "$styledash_assert_expected" "$styledash_assert_primary" "$styledash_assert_secondary"
+}
+
+styledash_stop_matching_processes() {
+  styledash_stop_name="${1:-StyleDash service}"
+  styledash_stop_primary="${2:-}"
+  styledash_stop_secondary="${3:-}"
+  styledash_stop_pids="$(styledash_matching_pids "$styledash_stop_primary" "$styledash_stop_secondary")"
+
+  for styledash_stop_pid in $styledash_stop_pids; do
+    # Re-check identity immediately before signalling so PID reuse cannot target
+    # an unrelated process.
+    if styledash_pid_matches "$styledash_stop_pid" "$styledash_stop_primary" "$styledash_stop_secondary"; then
+      kill "$styledash_stop_pid" 2>/dev/null || true
+    fi
+  done
+
+  for _ in $(seq 1 20); do
+    [ "$(styledash_process_count "$styledash_stop_primary" "$styledash_stop_secondary")" -eq 0 ] && return 0
+    sleep 0.25
+  done
+
+  for styledash_stop_pid in $(styledash_matching_pids "$styledash_stop_primary" "$styledash_stop_secondary"); do
+    if styledash_pid_matches "$styledash_stop_pid" "$styledash_stop_primary" "$styledash_stop_secondary"; then
+      kill -KILL "$styledash_stop_pid" 2>/dev/null || true
+    fi
+  done
+
+  for _ in $(seq 1 20); do
+    [ "$(styledash_process_count "$styledash_stop_primary" "$styledash_stop_secondary")" -eq 0 ] && return 0
+    sleep 0.25
+  done
+  echo "$styledash_stop_name still has a matching process after shutdown" >&2
+  return 1
+}
+
+styledash_port_is_free() {
+  styledash_port="${1:-}"
+  python3 - "$styledash_port" <<'PY'
+import socket
+import sys
+
+port = int(sys.argv[1])
+with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as listener:
+    listener.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+    listener.bind(("127.0.0.1", port))
+PY
+}
+
+styledash_wait_for_port_release() {
+  styledash_release_port="${1:-}"
+  styledash_release_name="${2:-StyleDash service}"
+  for _ in $(seq 1 20); do
+    styledash_port_is_free "$styledash_release_port" 2>/dev/null && return 0
+    sleep 0.25
+  done
+  echo "$styledash_release_name cannot start: port $styledash_release_port is occupied unexpectedly" >&2
+  return 1
+}
+
+styledash_read_pid_file() {
+  styledash_read_file="${1:-}"
+  [ -s "$styledash_read_file" ] || return 1
+  styledash_read_pid="$(cat "$styledash_read_file" 2>/dev/null)" || return 1
+  case "$styledash_read_pid" in
+    ''|*[!0-9]*) return 1 ;;
+  esac
+  printf '%s\n' "$styledash_read_pid"
+}

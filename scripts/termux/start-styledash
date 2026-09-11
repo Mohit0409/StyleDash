@@ -1,6 +1,6 @@
 #!/data/data/com.termux/files/usr/bin/bash
 # Starts exactly one localhost-only StyleDash SPA server.
-set -u
+set -eu
 
 APP_DIR="$HOME/server"
 RUN_DIR="$HOME/run"
@@ -10,9 +10,37 @@ SECRET_FILE="$PRIVATE_DIR/secrets.env"
 DATA_ROOT="$HOME/.local/share/styledash"
 PID_FILE="$RUN_DIR/styledash.pid"
 LOG_FILE="$LOG_DIR/styledash.log"
+PROCESS_LIB="$HOME/bin/styledash-process-lib"
+LOCK_DIR="$RUN_DIR/styledash-start.lock"
+PUBLIC_MARKER="$APP_DIR/serve.py --bind 127.0.0.1 --port 8080"
+PUBLIC_IDENTITY="--directory $APP_DIR"
 
 mkdir -p "$RUN_DIR" "$LOG_DIR" "$PRIVATE_DIR" "$DATA_ROOT/runtime"
 chmod 700 "$PRIVATE_DIR" "$DATA_ROOT" "$DATA_ROOT/runtime"
+
+[ -r "$PROCESS_LIB" ] || {
+  echo "StyleDash process control library is missing" >&2
+  exit 1
+}
+# shellcheck disable=SC1090 -- installed alongside this launcher.
+. "$PROCESS_LIB"
+
+if ! mkdir "$LOCK_DIR" 2>/dev/null; then
+  lock_pid="$(cat "$LOCK_DIR/pid" 2>/dev/null || true)"
+  case "$lock_pid" in
+    ''|*[!0-9]*) lock_pid='' ;;
+  esac
+  if [ -z "$lock_pid" ] || ! kill -0 "$lock_pid" 2>/dev/null; then
+    rm -rf -- "$LOCK_DIR"
+    mkdir "$LOCK_DIR"
+  else
+    echo "StyleDash public startup is already in progress" >&2
+    exit 1
+  fi
+fi
+printf '%s\n' "$$" > "$LOCK_DIR/pid"
+cleanup() { rm -rf -- "$LOCK_DIR"; }
+trap cleanup EXIT INT TERM
 
 if [ -f "$SECRET_FILE" ]; then
   chmod 600 "$SECRET_FILE"
@@ -50,33 +78,81 @@ export STYLEDASH_TRUST_LOOPBACK_PROXY=1
 
 trim_log() {
   [ -f "$1" ] && [ "$(wc -l < "$1")" -gt 2000 ] && tail -n 1500 "$1" > "$1.trim" && mv "$1.trim" "$1"
+  return 0
 }
 
-healthy() {
-  curl -fsS --max-time 5 http://127.0.0.1:8080/api/health >/dev/null
+healthy_for_pid() {
+  expected_pid="$1"
+  headers_file="$(mktemp "$RUN_DIR/styledash-health.XXXXXX")"
+  if ! curl -fsS --max-time 5 -D "$headers_file" -o /dev/null http://127.0.0.1:8080/api/health; then
+    rm -f -- "$headers_file"
+    return 1
+  fi
+  serving_pid="$(awk -F ': *' 'tolower($1)=="x-styledash-process-id" {gsub("\\r", "", $2); print $2}' "$headers_file" | tail -n 1)"
+  rm -f -- "$headers_file"
+  [ "$serving_pid" = "$expected_pid" ]
 }
 
-if [ -s "$PID_FILE" ]; then
-  pid="$(cat "$PID_FILE")"
-  if kill -0 "$pid" 2>/dev/null && healthy; then
-    exit 0
+patch_canary_for_pid() {
+  expected_pid="$1"
+  headers_file="$(mktemp "$RUN_DIR/styledash-patch-canary.XXXXXX")"
+  status="$(curl -sS --max-time 5 -D "$headers_file" -o /dev/null -w '%{http_code}' \
+    -X PATCH -H 'Content-Type: application/json' --data '{"items":[]}' \
+    http://127.0.0.1:8080/api/account-state/cart)" || {
+      rm -f -- "$headers_file"
+      return 1
+    }
+  serving_pid="$(awk -F ': *' 'tolower($1)=="x-styledash-process-id" {gsub("\\r", "", $2); print $2}' "$headers_file" | tail -n 1)"
+  rm -f -- "$headers_file"
+  if [ "$status" = 405 ]; then
+    echo "StyleDash PATCH capability canary reached an obsolete runtime (HTTP 405)" >&2
+    return 1
   fi
-  if kill -0 "$pid" 2>/dev/null && tr '\0' ' ' < "/proc/$pid/cmdline" 2>/dev/null | grep -Fq "$APP_DIR/serve.py"; then
-    kill "$pid" 2>/dev/null || true
-    sleep 2
-  fi
-  rm -f "$PID_FILE"
+  case "$status" in
+    401|403) ;;
+    *) echo "StyleDash PATCH capability canary returned unexpected HTTP $status" >&2; return 1 ;;
+  esac
+  [ "$serving_pid" = "$expected_pid" ] || {
+    echo "StyleDash public listener is not served by expected PID $expected_pid" >&2
+    return 1
+  }
+}
+
+managed_pid="$(styledash_read_pid_file "$PID_FILE" 2>/dev/null || true)"
+if [ -n "$managed_pid" ] && \
+   styledash_assert_single_process "$managed_pid" "$PUBLIC_MARKER" "$PUBLIC_IDENTITY" && \
+   healthy_for_pid "$managed_pid" && patch_canary_for_pid "$managed_pid"; then
+  printf 'styledash_public_pid=%s\n' "$managed_pid"
+  printf 'styledash_patch_canary=auth_required\n'
+  exit 0
 fi
+
+# A stale/missing/unrelated PID file or duplicate runtime is never adopted.
+# Stop every verified StyleDash public runtime before checking the listener.
+styledash_stop_matching_processes "StyleDash public service" "$PUBLIC_MARKER" "$PUBLIC_IDENTITY"
+rm -f -- "$PID_FILE"
+styledash_wait_for_port_release 8080 "StyleDash public service"
 
 trim_log "$LOG_FILE"
 nohup python3 "$APP_DIR/serve.py" --bind 127.0.0.1 --port 8080 --directory "$APP_DIR" >> "$LOG_FILE" 2>&1 &
 pid="$!"
 printf '%s\n' "$pid" > "$PID_FILE"
+chmod 600 "$PID_FILE"
 
-for _ in $(seq 1 10); do
-  healthy && exit 0
+for _ in $(seq 1 15); do
+  if kill -0 "$pid" 2>/dev/null && \
+     styledash_assert_single_process "$pid" "$PUBLIC_MARKER" "$PUBLIC_IDENTITY" && \
+     healthy_for_pid "$pid" && patch_canary_for_pid "$pid"; then
+    [ "$(styledash_read_pid_file "$PID_FILE")" = "$pid" ] || break
+    printf 'styledash_public_pid=%s\n' "$pid"
+    printf 'styledash_public_process_count=1\n'
+    printf 'styledash_patch_canary=auth_required\n'
+    exit 0
+  fi
   sleep 1
 done
 
-echo "$(date -Iseconds) Vibe4You did not become healthy; see $LOG_FILE" >> "$LOG_FILE"
+styledash_stop_matching_processes "StyleDash public service" "$PUBLIC_MARKER" "$PUBLIC_IDENTITY" || true
+rm -f -- "$PID_FILE"
+echo "$(date -Iseconds) Vibe4You did not start as one verified PATCH-capable process; see $LOG_FILE" >> "$LOG_FILE"
 exit 1

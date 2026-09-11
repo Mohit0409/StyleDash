@@ -2,6 +2,10 @@
 set -eu
 
 mkdir -p "$HOME/logs" "$HOME/run"
+PROCESS_LIB="$HOME/bin/styledash-process-lib"
+[ -r "$PROCESS_LIB" ] || { echo "StyleDash process control library is missing" >&2; exit 1; }
+# shellcheck disable=SC1090
+. "$PROCESS_LIB"
 "$HOME/bin/start-styledash"
 "$HOME/bin/start-styledash-admin" || echo "$(date -Iseconds) local admin service failed to start" >> "$HOME/logs/styledash-health.log"
 
@@ -21,6 +25,10 @@ fi
 
 "$HOME/bin/start-styledash-ngrok" || echo "$(date -Iseconds) ngrok is not established yet; watchdog will retry" >> "$HOME/logs/styledash-health.log"
 "$HOME/bin/start-styledash-cloudflare" || echo "$(date -Iseconds) Cloudflare tunnel is not established yet; startup will retry on next stack launch" >> "$HOME/logs/styledash-health.log"
-if [ ! -s "$HOME/run/styledash-health.pid" ] || ! kill -0 "$(cat "$HOME/run/styledash-health.pid")" 2>/dev/null; then
+watchdog_marker="$HOME/bin/styledash-health"
+watchdog_pid="$(styledash_read_pid_file "$HOME/run/styledash-health.pid" 2>/dev/null || true)"
+if [ -z "$watchdog_pid" ] || ! styledash_assert_single_process "$watchdog_pid" "$watchdog_marker" ""; then
+  styledash_stop_matching_processes "StyleDash health watchdog" "$watchdog_marker" "" || true
+  rm -f -- "$HOME/run/styledash-health.pid"
   nohup "$HOME/bin/styledash-health" >> "$HOME/logs/styledash-health.log" 2>&1 &
 fi

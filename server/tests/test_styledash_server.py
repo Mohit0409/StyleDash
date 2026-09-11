@@ -1900,6 +1900,20 @@ class HttpApiTests(unittest.TestCase):
             self.assertIn("https://static.cloudflareinsights.com", policy)
             self.assertIn("https://cloudflareinsights.com", policy)
 
+    def test_process_identity_header_is_localhost_only(self) -> None:
+        port = self.server.server_address[1]
+        for host, expected in (("127.0.0.1:8080", True), ("localhost:8080", True), ("styledash.test", False)):
+            connection = http.client.HTTPConnection("127.0.0.1", port)
+            connection.request("GET", "/api/health", headers={"Host": host})
+            response = connection.getresponse()
+            self.assertEqual(response.status, 200)
+            header = response.getheader("X-StyleDash-Process-Id")
+            self.assertEqual(header is not None, expected, host)
+            if expected:
+                self.assertEqual(header, str(os.getpid()))
+            response.read()
+            connection.close()
+
     def test_forwarded_https_canonical_host_adds_hsts(self) -> None:
         connection = http.client.HTTPConnection("127.0.0.1", self.server.server_address[1])
         connection.request(

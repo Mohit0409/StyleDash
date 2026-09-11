@@ -364,10 +364,19 @@ class DeploymentAndTaxTests(unittest.TestCase):
             'install -m 600 "$STAGE/scripts/receipt_pdf.py" "$HOME/admin/receipt_pdf.py"',
             text,
         )
+        self.assertIn('watchdog_marker="$HOME/bin/styledash-health"', text)
         self.assertIn('admin_marker="$HOME/admin/serve.py --bind 127.0.0.1 --port 8081"', text)
-        self.assertIn('pgrep -f "$HOME/admin/serve.py"', text)
-        self.assertIn('rm -f -- "$HOME/run/styledash-admin.pid"', text)
-        self.assertLess(text.index('admin_marker="$HOME/admin/serve.py'), text.index('install -m 600 "$STAGE/server/admin/admin.js"'))
+        self.assertIn('styledash_stop_matching_processes "StyleDash health watchdog"', text)
+        self.assertIn('styledash_stop_matching_processes "StyleDash public service"', text)
+        self.assertIn('styledash_stop_matching_processes "StyleDash administrator service"', text)
+        self.assertIn('styledash_stop_matching_processes "StyleDash Cloudflare tunnel"', text)
+        self.assertIn('styledash_wait_for_port_release 8080', text)
+        self.assertIn('styledash_wait_for_port_release 8081', text)
+        self.assertIn('styledash_patch_canary=auth_required', text)
+        self.assertIn('account-state PATCH returned HTTP 405', text)
+        self.assertIn('styledash_watchdog_process_count=1', text)
+        self.assertLess(text.index('styledash_stop_matching_processes "StyleDash health watchdog"'), text.index('if [ -d "$HOME/server/assets" ]'))
+        self.assertLess(text.index('styledash_stop_matching_processes "StyleDash public service"'), text.index('install -m 755 "$STAGE/scripts/termux-spa-server.py"'))
         self.assertIn(
             'install -m 600 "$STAGE/scripts/audit_identity_duplicates.py" "$HOME/server/audit_identity_duplicates.py"',
             text,
@@ -402,10 +411,13 @@ class DeploymentAndTaxTests(unittest.TestCase):
 
     def test_admin_start_script_recovers_stale_pid_without_accepting_wrong_process(self):
         text = (ROOT / "scripts/termux/start-styledash-admin").read_text(encoding="utf-8")
+        self.assertIn('PROCESS_LIB="$HOME/bin/styledash-process-lib"', text)
         self.assertIn('ADMIN_MARKER="$APP_DIR/serve.py --bind 127.0.0.1 --port 8081"', text)
-        self.assertIn('pgrep -f "$APP_DIR/serve.py"', text)
-        self.assertIn("printf '%s\\n' \"$candidate\" > \"$PID_FILE\"", text)
-        self.assertIn('grep -Fq "$ADMIN_MARKER"', text)
+        self.assertIn('ADMIN_IDENTITY="--assets $APP_DIR/admin"', text)
+        self.assertIn('styledash_assert_single_process "$managed_pid" "$ADMIN_MARKER" "$ADMIN_IDENTITY"', text)
+        self.assertIn('styledash_stop_matching_processes "StyleDash administrator service"', text)
+        self.assertIn('styledash_wait_for_port_release 8081', text)
+        self.assertIn('styledash_admin_process_count=1', text)
 
     def test_boot_uses_only_the_managed_ngrok_stack(self):
         text = (ROOT / "scripts/termux/boot-start-styledash").read_text(encoding="utf-8")
@@ -418,11 +430,31 @@ class DeploymentAndTaxTests(unittest.TestCase):
         self.assertNotIn('source "$PREFIX/etc/profile.d/start-services.sh"\nsv up sshd || true', text)
 
         verifier = (ROOT / "scripts/termux/verify-styledash-processes").read_text(encoding="utf-8")
-        self.assertIn("styledash_cloudflare=absent", verifier)
+        self.assertIn("legacy_quick_cloudflare=absent", verifier)
+        self.assertIn("check_managed cloudflare", verifier)
+        self.assertIn("managed_process_counts=one-each", verifier)
 
     def test_refund_processed_is_documented_for_live_webhook(self):
         readme = (ROOT / "server/README.md").read_text(encoding="utf-8")
         self.assertIn("`refund.processed`", readme)
+    def test_runtime_process_identity_and_private_probe_headers_are_release_blockers(self):
+        public_start = (ROOT / "scripts/termux/start-styledash").read_text(encoding="utf-8")
+        cloudflare = (ROOT / "scripts/termux/start-styledash-cloudflare").read_text(encoding="utf-8")
+        public_server = (ROOT / "scripts/termux-spa-server.py").read_text(encoding="utf-8")
+        admin_server = (ROOT / "scripts/termux-admin-server.py").read_text(encoding="utf-8")
+        rollback = (ROOT / "scripts/termux/rollback-payment-release").read_text(encoding="utf-8")
+        self.assertIn('PUBLIC_IDENTITY="--directory $APP_DIR"', public_start)
+        self.assertIn('styledash_patch_canary=auth_required', public_start)
+        self.assertIn('if [ "$status" = 405 ]', public_start)
+        self.assertIn('styledash_assert_single_process', public_start)
+        self.assertIn('styledash_stop_matching_processes "StyleDash Cloudflare tunnel"', cloudflare)
+        self.assertIn('styledash_cloudflare_process_count=1', cloudflare)
+        self.assertIn('{"127.0.0.1:8080", "localhost:8080"}', public_server)
+        self.assertIn('{"127.0.0.1:8081", "localhost:8081"}', admin_server)
+        self.assertIn('styledash_stop_matching_processes "StyleDash health watchdog"', rollback)
+        self.assertIn('styledash_wait_for_port_release 8080', rollback)
+        self.assertIn('styledash_wait_for_port_release 8081', rollback)
+
     def test_tax_inclusive_pricing_and_delivery_fee_policy(self):
         settings = json.loads((ROOT / "server/payment-data/settings.json").read_text(encoding="utf-8"))
         self.assertEqual(settings["taxRate"], 0.05)

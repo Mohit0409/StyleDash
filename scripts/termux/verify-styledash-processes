@@ -1,28 +1,33 @@
 #!/data/data/com.termux/files/usr/bin/bash
 set -eu
 
-check_process() {
-  name="$1"; pid_file="$2"; marker="$3"
-  pid="$(cat "$pid_file")"
-  kill -0 "$pid"
-  command="$(tr '\0' ' ' < "/proc/$pid/cmdline")"
-  printf '%s=%s\n' "$name" "$command"
-  printf '%s' "$command" | grep -Fq "$marker"
+PROCESS_LIB="$HOME/bin/styledash-process-lib"
+[ -r "$PROCESS_LIB" ] || { echo 'process_control_library=missing' >&2; exit 1; }
+# shellcheck disable=SC1090
+. "$PROCESS_LIB"
+
+check_managed() {
+  name="$1"; pid_file="$2"; primary="$3"; secondary="${4:-}"
+  pid="$(styledash_read_pid_file "$pid_file")"
+  styledash_assert_single_process "$pid" "$primary" "$secondary"
+  command="$(styledash_cmdline "$pid")"
+  printf '%s_pid=%s
+' "$name" "$pid"
+  printf '%s=%s
+' "$name" "$command"
 }
 
-check_process public "$HOME/run/styledash.pid" "$HOME/server/serve.py"
-check_process admin "$HOME/run/styledash-admin.pid" "$HOME/admin/serve.py --bind 127.0.0.1 --port 8081"
-check_process ngrok "$HOME/run/styledash-ngrok.pid" 'ngrok http http://127.0.0.1:8080'
-
-test "$(pgrep -f "$HOME/server/serve.py" | wc -l)" -eq 1
-test "$(pgrep -f "$HOME/admin/serve.py" | wc -l)" -eq 1
-test "$(pgrep -f 'ngrok http http://127.0.0.1:8080' | wc -l)" -eq 1
+check_managed public "$HOME/run/styledash.pid"   "$HOME/server/serve.py --bind 127.0.0.1 --port 8080" "--directory $HOME/server"
+check_managed admin "$HOME/run/styledash-admin.pid"   "$HOME/admin/serve.py --bind 127.0.0.1 --port 8081" "--assets $HOME/admin/admin"
+check_managed ngrok "$HOME/run/styledash-ngrok.pid" 'ngrok http http://127.0.0.1:8080'
+check_managed cloudflare "$HOME/run/styledash-cloudflare.pid"   'cloudflared tunnel run' "--token-file $HOME/.config/styledash/cloudflare-tunnel-token"
 echo 'managed_process_counts=one-each'
+
 if pgrep -f 'cloudflared tunnel --no-autoupdate --url http://127.0.0.1:8080' >/dev/null 2>&1; then
-  echo 'styledash_cloudflare=running' >&2
+  echo 'legacy_quick_cloudflare=running' >&2
   exit 1
 fi
-echo 'styledash_cloudflare=absent'
+echo 'legacy_quick_cloudflare=absent'
 printf 'ngrok_url='; cat "$HOME/run/styledash-public-url"
 if curl -fsS --max-time 2 http://192.168.1.7:8081/ >/dev/null 2>&1; then
   echo 'admin_lan=reachable' >&2; exit 1

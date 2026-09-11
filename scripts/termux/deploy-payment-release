@@ -16,7 +16,7 @@ if [ ! -f "$STAGE/server/payment-data/production-catalog.json" ]; then
   echo "release is missing production-catalog.json; deployment aborted" >&2
   exit 1
 fi
-for required_ops_script in styledash-health styledash-notify rollback-payment-release backup-styledash-recovery start-styledash-cloudflare; do
+for required_ops_script in styledash-health styledash-notify rollback-payment-release backup-styledash-recovery start-styledash start-styledash-admin start-styledash-stack start-styledash-cloudflare styledash-process-lib; do
   if [ ! -f "$STAGE/scripts/termux/$required_ops_script" ]; then
     echo "release is missing $required_ops_script; deployment aborted" >&2
     exit 1
@@ -165,7 +165,7 @@ cp -a \
   "$HOME/bin/start-styledash-stack" \
   "$HOME/bin/styledash-health" \
   "$BACKUP/bin/"
-for optional in start-styledash-admin styledash-create-admin audit-styledash-network backup-styledash-data backup-styledash-recovery rollback-payment-release styledash-notify stop-styledash-ngrok start-styledash-ngrok verify-styledash-processes; do
+for optional in start-styledash-admin styledash-create-admin audit-styledash-network backup-styledash-data backup-styledash-recovery rollback-payment-release styledash-notify styledash-process-lib stop-styledash-ngrok start-styledash-ngrok verify-styledash-processes; do
   if [ -f "$HOME/bin/$optional" ]; then cp -a "$HOME/bin/$optional" "$BACKUP/bin/"; fi
 done
 cp -a "$HOME/.termux/boot/start-styledash" "$BACKUP/boot/"
@@ -175,26 +175,31 @@ printf '%s\n' "$BACKUP" > "$HOME/run/styledash-last-release-backup"
 chmod 600 "$HOME/run/styledash-last-release-backup"
 install -m 755 "$STAGE/scripts/termux/rollback-payment-release" "$HOME/bin/rollback-payment-release"
 install -m 755 "$STAGE/scripts/termux/styledash-notify" "$HOME/bin/styledash-notify"
+# Install process control before stopping anything so rollback remains safe even
+# if a later release-copy step fails.
+install -m 755 "$STAGE/scripts/termux/styledash-process-lib" "$HOME/bin/styledash-process-lib"
 
-cloudflare_marker='cloudflared tunnel --no-autoupdate --url http://127.0.0.1:8080'
-for cloudflare_pid in $(pgrep -f "$cloudflare_marker" 2>/dev/null || true); do
-  if tr '\0' ' ' < "/proc/$cloudflare_pid/cmdline" 2>/dev/null | grep -Fq "$cloudflare_marker"; then
-    kill "$cloudflare_pid"
-  fi
-done
-rm -f -- "$HOME/run/styledash-cloudflare.pid" "$HOME/run/styledash-cloudflare-url"
-
+# Stop the watchdog first. Otherwise it can race this deployment and restart an
+# old in-memory public/admin runtime while executable files are being replaced.
+# PID files are hints only: discovery is based on complete process identity.
+# shellcheck disable=SC1090 -- installed immediately above.
+. "$HOME/bin/styledash-process-lib"
+watchdog_marker="$HOME/bin/styledash-health"
+public_marker="$HOME/server/serve.py --bind 127.0.0.1 --port 8080"
+public_identity="--directory $HOME/server"
 admin_marker="$HOME/admin/serve.py --bind 127.0.0.1 --port 8081"
-for admin_pid in $(pgrep -f "$HOME/admin/serve.py" 2>/dev/null || true); do
-  if tr '\0' ' ' < "/proc/$admin_pid/cmdline" 2>/dev/null | grep -Fq "$admin_marker"; then
-    kill "$admin_pid" 2>/dev/null || true
-    for _ in $(seq 1 20); do
-      kill -0 "$admin_pid" 2>/dev/null || break
-      sleep 0.25
-    done
-  fi
-done
-rm -f -- "$HOME/run/styledash-admin.pid"
+admin_identity="--assets $HOME/admin/admin"
+cloudflare_marker='cloudflared tunnel run'
+cloudflare_identity="--token-file $HOME/.config/styledash/cloudflare-tunnel-token"
+styledash_stop_matching_processes "StyleDash health watchdog" "$watchdog_marker" ""
+styledash_stop_matching_processes "StyleDash Cloudflare tunnel" "$cloudflare_marker" "$cloudflare_identity"
+styledash_stop_matching_processes "StyleDash administrator service" "$admin_marker" "$admin_identity"
+styledash_stop_matching_processes "StyleDash public service" "$public_marker" "$public_identity"
+rm -f -- "$HOME/run/styledash.pid" "$HOME/run/styledash-admin.pid" \
+  "$HOME/run/styledash-cloudflare.pid" "$HOME/run/styledash-cloudflare-url" \
+  "$HOME/run/styledash-health.pid"
+styledash_wait_for_port_release 8080 "StyleDash public service"
+styledash_wait_for_port_release 8081 "StyleDash administrator service"
 
 if [ -d "$HOME/server/assets" ]; then rm -rf -- "$HOME/server/assets"; fi
 cp -a "$STAGE/dist/." "$HOME/server/"
@@ -258,20 +263,22 @@ install -m 755 "$STAGE/scripts/termux/audit-styledash-network" "$HOME/bin/audit-
 install -m 755 "$STAGE/scripts/termux/verify-styledash-processes" "$HOME/bin/verify-styledash-processes"
 install -m 755 "$STAGE/scripts/termux/boot-start-styledash" "$HOME/.termux/boot/start-styledash"
 
-if [ -s "$HOME/run/styledash.pid" ]; then
-  pid="$(cat "$HOME/run/styledash.pid")"
-  if kill -0 "$pid" 2>/dev/null && \
-     tr '\0' ' ' < "/proc/$pid/cmdline" 2>/dev/null | grep -Fq "$HOME/server/serve.py"; then
-    kill "$pid"
-    for _ in $(seq 1 20); do
-      kill -0 "$pid" 2>/dev/null || break
-      sleep 0.25
-    done
-  fi
-fi
-
 "$HOME/bin/start-styledash"
 "$HOME/bin/start-styledash-admin"
+"$HOME/bin/start-styledash-cloudflare"
+
+# Capability canary: health alone is insufficient because an obsolete Python
+# runtime can still answer /api/health. The account-state PATCH must reach the
+# current PATCH handler and fail only for missing authentication/CSRF.
+patch_status="$(curl -sS --max-time 5 -o /dev/null -w '%{http_code}' \
+  -X PATCH -H 'Content-Type: application/json' --data '{"items":[]}' \
+  http://127.0.0.1:8080/api/account-state/cart)"
+case "$patch_status" in
+  401|403) printf 'styledash_patch_canary=auth_required\n' ;;
+  405) echo "deployment reached an obsolete runtime: account-state PATCH returned HTTP 405" >&2; exit 1 ;;
+  *) echo "account-state PATCH capability canary returned unexpected HTTP $patch_status" >&2; exit 1 ;;
+esac
+
 python3 -c 'import razorpay; print("razorpay_sdk=ok")'
 PYTHONPATH="$HOME/server${PYTHONPATH:+:$PYTHONPATH}" python3 -c 'import firebase_admin, styledash_firebase; print("firebase_sdk=ok")'
 PYTHONPATH="$HOME/server${PYTHONPATH:+:$PYTHONPATH}" python3 "$HOME/server/audit_identity_duplicates.py" "$LIVE_DB"
@@ -301,6 +308,29 @@ if integrity != "ok" or foreign_keys:
     raise SystemExit("Vibe4You post-migration database validation failed")
 print("styledash_migrations=ok")
 PY
+
+# Restart the newly installed watchdog only after the new runtimes and capability
+# canary are proven. This prevents deployment-time restart races.
+nohup "$HOME/bin/styledash-health" >> "$HOME/logs/styledash-health.log" 2>&1 &
+watchdog_started=0
+for _ in $(seq 1 20); do
+  watchdog_pid="$(styledash_read_pid_file "$HOME/run/styledash-health.pid" 2>/dev/null || true)"
+  if [ -n "$watchdog_pid" ] && \
+     styledash_assert_single_process "$watchdog_pid" "$watchdog_marker" ""; then
+    watchdog_started=1
+    printf 'styledash_watchdog_pid=%s\n' "$watchdog_pid"
+    printf 'styledash_watchdog_process_count=1\n'
+    break
+  fi
+  sleep 0.25
+done
+if [ "$watchdog_started" -ne 1 ]; then
+  styledash_stop_matching_processes "StyleDash health watchdog" "$watchdog_marker" "" || true
+  rm -f -- "$HOME/run/styledash-health.pid"
+  echo "new StyleDash watchdog failed process identity validation" >&2
+  exit 1
+fi
+
 printf 'backup=%s\n' "$BACKUP"
 printf 'health='
 curl -fsS http://127.0.0.1:8080/api/health
