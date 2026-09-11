@@ -2209,6 +2209,45 @@ class HttpApiTests(unittest.TestCase):
         with response:
             return response.status, json.load(response), response.headers
 
+    def test_account_state_requires_auth_csrf_and_is_session_scoped(self) -> None:
+        users = []
+        for suffix, phone in (("a", "9876543210"), ("b", "9876543211")):
+            status, body, headers = self.post_json("/api/auth/register", {
+                "name": f"Account State {suffix.upper()}", "email": f"account-state-{suffix}@example.test",
+                "password": "long account state password 123", "phone": phone,
+            })
+            self.assertEqual(status, 201)
+            users.append({
+                "id": body["user"]["id"], "cookie": headers["Set-Cookie"].split(";", 1)[0],
+                "csrf": body["csrfToken"],
+            })
+
+        status, body, _headers = self.get_json("/api/account-state")
+        self.assertEqual((status, body["code"]), (401, "authentication_required"))
+        status, body, _headers = self.patch_json(
+            "/api/account-state/cart", {"items": []}, {"Cookie": users[0]["cookie"]}
+        )
+        self.assertEqual((status, body["code"]), (403, "csrf_failed"))
+
+        headers_a = {"Cookie": users[0]["cookie"], "X-CSRF-Token": users[0]["csrf"], "Origin": "https://styledash.test"}
+        cart_a = [{"productId": "prod-a", "variantId": "var-a", "quantity": 2}]
+        self.assertEqual(self.patch_json("/api/account-state/cart", {"items": cart_a}, headers_a)[0], 200)
+        self.assertEqual(self.patch_json("/api/account-state/wishlist", {"productIds": ["prod-a"]}, headers_a)[0], 200)
+        status, state_a, _headers = self.get_json("/api/account-state", {"Cookie": users[0]["cookie"]})
+        self.assertEqual((status, state_a["cart"], state_a["wishlist"]), (200, cart_a, ["prod-a"]))
+
+        headers_b = {"Cookie": users[1]["cookie"], "X-CSRF-Token": users[1]["csrf"], "Origin": "https://styledash.test"}
+        cart_b = [{"productId": "prod-b", "variantId": "var-b", "quantity": 1}]
+        self.assertEqual(self.patch_json("/api/account-state/cart", {"items": cart_b}, headers_b)[0], 200)
+        status, state_b, _headers = self.get_json("/api/account-state", {"Cookie": users[1]["cookie"]})
+        self.assertEqual((status, state_b["cart"], state_b["wishlist"]), (200, cart_b, []))
+        self.assertEqual(self.get_json("/api/account-state", {"Cookie": users[0]["cookie"]})[1]["cart"], cart_a)
+
+        status, injected, _headers = self.patch_json(
+            "/api/account-state/cart", {"items": [], "userId": users[1]["id"]}, headers_a
+        )
+        self.assertEqual((status, injected["code"]), (400, "invalid_cart_state"))
+
     def test_saved_profile_is_returned_after_logout_and_password_login(self) -> None:
         user, _raw, _csrf = self.service.security.register({
             "name": "Persistent Customer", "email": "persistent-http@example.test",

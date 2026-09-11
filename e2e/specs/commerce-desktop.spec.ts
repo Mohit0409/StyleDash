@@ -14,6 +14,13 @@ type E2EUser = {
 
 let USER_A: E2EUser;
 let USER_B: E2EUser;
+let USER_SYNC: E2EUser;
+
+test.beforeEach(async ({ page }) => {
+  // Keep commerce auth traffic isolated from other full-suite specs while still
+  // exercising the real server rate limiter.
+  await page.setExtraHTTPHeaders({ 'X-Forwarded-For': '198.51.100.40' });
+});
 
 test.beforeAll(async ({ browserName }, testInfo) => {
   void browserName;
@@ -34,13 +41,20 @@ test.beforeAll(async ({ browserName }, testInfo) => {
     phone: `98765433${phoneSuffix}`,
     password: PASSWORD,
   };
+  USER_SYNC = {
+    name: `E2E Commerce Sync Customer ${projectSuffix}`,
+    email: `e2e-commerce-sync-${projectSuffix}@example.test`,
+    phone: `98765434${phoneSuffix}`,
+    password: PASSWORD,
+  };
+  const setupIp = '198.51.100.' + (12 + (testInfo.workerIndex % 100));
   const api = await playwrightRequest.newContext({
     baseURL: 'http://127.0.0.1:4173',
-    extraHTTPHeaders: { 'X-Forwarded-For': '198.51.100.12' },
+    extraHTTPHeaders: { 'X-Forwarded-For': setupIp },
   });
 
   try {
-    for (const user of [USER_A, USER_B]) {
+    for (const user of [USER_A, USER_B, USER_SYNC]) {
       const response = await api.post('/api/auth/register', {
         data: {
           name: user.name,
@@ -72,6 +86,7 @@ test.beforeAll(async ({ browserName }, testInfo) => {
 async function loginCustomer(
   page: Page,
   user: E2EUser,
+  resetAccountState = true,
 ) {
   await page.goto('/login');
 
@@ -82,8 +97,25 @@ async function loginCustomer(
   await page.getByRole('checkbox', { name: /agree to the terms/i }).check();
 
   await page.getByRole('button', { name: 'Login' }).click();
-
   await expect(page).toHaveURL(/\/profile$/);
+
+  if (resetAccountState) {
+    const statuses = await page.evaluate(async () => {
+      const me = await fetch('/api/auth/me');
+      const auth = await me.json();
+      const headers = { 'Content-Type': 'application/json', 'X-CSRF-Token': auth.csrfToken };
+      const cart = await fetch('/api/account-state/cart', {
+        method: 'PATCH', headers, body: JSON.stringify({ items: [] }),
+      });
+      const wishlist = await fetch('/api/account-state/wishlist', {
+        method: 'PATCH', headers, body: JSON.stringify({ productIds: [] }),
+      });
+      return [cart.status, wishlist.status];
+    });
+    expect(statuses).toEqual([200, 200]);
+    await page.reload();
+    await expect(page.getByRole('button', { name: /^Cart\s+0$/ })).toBeVisible();
+  }
 }
 
 async function addKnownProduct(page: Page) {
@@ -146,7 +178,7 @@ test('checkout enables Express and recalculates totals on a simulated Saturday',
 
   await express.check();
   await expect(express).toBeChecked();
-  await expect(summary.getByText('₹80', { exact: true })).toBeVisible();
+  await expect(summary.getByText('\u20b980', { exact: true })).toBeVisible();
   await expect(summary.getByText('About 60 minutes', { exact: true })).toBeVisible();
   await expect(page.getByText('Express selected. Delivery charge and estimated total have been recalculated below.')).toBeVisible();
 });
@@ -605,13 +637,132 @@ test('wishlist remains isolated between authenticated accounts in the same brows
     page.getByText(PRODUCT_NAME, { exact: true }),
   ).toHaveCount(0);
 
-  // Account A's scoped data can exist in localStorage,
-  // but must not be visible to account B.
-  const scopedKeys = await page.evaluate(() =>
-    Object.keys(localStorage).filter(
-      key => key.startsWith('sd_wishlist_ids:'),
-    ),
-  );
+  // Switching back proves Account A's wishlist is server-backed,
+  // not merely retained in this browser's localStorage.
+  await page.goto('/profile');
+  await page.getByRole('button', { name: 'Logout' }).click();
+  await loginCustomer(page, USER_A, false);
+  await page.goto('/wishlist');
+  await expect(page.getByRole('heading', { name: 'Saved Wishlist (1)' })).toBeVisible();
+  await expect(page.getByText(PRODUCT_NAME, { exact: true })).toBeVisible();
+});
 
-  expect(scopedKeys.length).toBeGreaterThanOrEqual(1);
+
+test('same account cart and wishlist sync across isolated browser contexts', async ({ browser }) => {
+  const contextA = await browser.newContext({ extraHTTPHeaders: { 'X-Forwarded-For': '198.51.100.21' } });
+  const contextB = await browser.newContext({ extraHTTPHeaders: { 'X-Forwarded-For': '198.51.100.22' } });
+  const pageA = await contextA.newPage();
+  const pageB = await contextB.newPage();
+
+  try {
+    await loginCustomer(pageA, USER_SYNC);
+    await pageA.goto(PRODUCT_ROUTE);
+    const cartSaved = pageA.waitForResponse(response =>
+      response.url().endsWith('/api/account-state/cart') && response.request().method() === 'PATCH' && response.status() === 200,
+    );
+    await addKnownProduct(pageA);
+    await cartSaved;
+
+    const detailActions = pageA.locator('div.flex.gap-4.pt-4');
+    const wishlistSaved = pageA.waitForResponse(response =>
+      response.url().endsWith('/api/account-state/wishlist') && response.request().method() === 'PATCH' && response.status() === 200,
+    );
+    await detailActions.getByRole('button').last().click();
+    await wishlistSaved;
+    await loginCustomer(pageB, USER_SYNC, false);
+    await pageB.goto('/wishlist');
+    await expect(pageB.getByRole('heading', { name: 'Saved Wishlist (1)' })).toBeVisible();
+    await expect(pageB.getByText(PRODUCT_NAME, { exact: true })).toBeVisible();
+
+    await pageB.goto(PRODUCT_ROUTE);
+    await expect(pageB.getByRole('button', { name: /^Cart\s+\d+$/ })).toContainText('1');
+    await pageB.getByRole('button', { name: /^Cart\s+\d+$/ }).click();
+    await expect(pageB.getByRole('dialog', { name: 'Your Cart' })).toBeVisible();
+    await expect(pageB.getByRole('dialog', { name: 'Your Cart' }).getByText(PRODUCT_NAME, { exact: true })).toBeVisible();
+  } finally {
+    await contextA.close();
+    await contextB.close();
+  }
+});
+
+
+test('already-open second browser refreshes cart without writing stale state back', async ({ browser }) => {
+  const contextA = await browser.newContext({ extraHTTPHeaders: { 'X-Forwarded-For': '198.51.100.21' } });
+  const contextB = await browser.newContext({ extraHTTPHeaders: { 'X-Forwarded-For': '198.51.100.22' } });
+  const pageA = await contextA.newPage();
+  const pageB = await contextB.newPage();
+
+  try {
+    await loginCustomer(pageA, USER_SYNC);
+    await loginCustomer(pageB, USER_SYNC, false);
+    await pageB.goto(PRODUCT_ROUTE);
+    await expect(pageB.getByRole('button', { name: /^Cart\s+0$/ })).toBeVisible();
+
+    let browserBCartPatches = 0;
+    pageB.on('request', request => {
+      if (request.url().endsWith('/api/account-state/cart') && request.method() === 'PATCH') browserBCartPatches += 1;
+    });
+
+    await pageA.goto(PRODUCT_ROUTE);
+    const saved = pageA.waitForResponse(r => r.url().endsWith('/api/account-state/cart') && r.request().method() === 'PATCH' && r.status() === 200);
+    await addKnownProduct(pageA);
+    await saved;
+
+    await pageB.evaluate(() => window.dispatchEvent(new Event('focus')));
+    await expect(pageB.getByRole('button', { name: /^Cart\s+1$/ })).toBeVisible();
+    await pageB.waitForTimeout(250);
+    expect(browserBCartPatches).toBe(0);
+
+    const serverCount = await pageB.evaluate(async () => {
+      const response = await fetch('/api/account-state');
+      const state = await response.json() as { cart: Array<{ quantity: number }> };
+      return state.cart.reduce((sum, line) => sum + line.quantity, 0);
+    });
+    expect(serverCount).toBe(1);
+  } finally {
+    await contextA.close();
+    await contextB.close();
+  }
+});
+
+
+test('guest cart and wishlist migrate into the signed-in account', async ({ page, request }) => {
+  const user: E2EUser = {
+    name: 'E2E Guest Migration Customer',
+    email: 'e2e-guest-migration@example.test',
+    phone: '9876543599',
+    password: PASSWORD,
+  };
+  const registered = await request.post('/api/auth/register', { data: {
+    name: user.name, email: user.email, phone: user.phone, password: user.password,
+    termsAccepted: true, termsVersion: '2026-08-14',
+  }});
+  expect(registered.status()).toBe(201);
+
+  // Seed legacy guest convenience state directly so this migration test is
+  // independent of inventory consumed by earlier full-suite order scenarios.
+  await page.goto('/');
+  await page.evaluate(() => {
+    localStorage.setItem('sd_cart_v2', JSON.stringify([
+      { productId: 'sd-prod-001', variantId: 'sd-prod-001-var-1', quantity: 1 },
+    ]));
+    localStorage.setItem('sd_wishlist_ids', JSON.stringify(['sd-prod-001']));
+  });
+  await expect.poll(async () => page.evaluate(() => Boolean(
+    localStorage.getItem('sd_cart_v2') && localStorage.getItem('sd_wishlist_ids'),
+  ))).toBe(true);
+  const cartMigrated = page.waitForResponse(r => r.url().endsWith('/api/account-state/cart') && r.request().method() === 'PATCH' && r.status() === 200);
+  const wishlistMigrated = page.waitForResponse(r => r.url().endsWith('/api/account-state/wishlist') && r.request().method() === 'PATCH' && r.status() === 200);
+  await loginCustomer(page, user, false);
+  await Promise.all([cartMigrated, wishlistMigrated]);
+
+  await expect.poll(async () => page.evaluate(() => ({
+    cart: localStorage.getItem('sd_cart_v2'),
+    wishlist: localStorage.getItem('sd_wishlist_ids'),
+  }))).toEqual({ cart: null, wishlist: null });
+
+  await page.goto('/wishlist');
+  await expect(page.getByRole('heading', { name: 'Saved Wishlist (1)' })).toBeVisible();
+  await page.goto(PRODUCT_ROUTE);
+  await expect(page.getByRole('button', { name: /^Cart\s+\d+$/ })).toContainText('1');
 });

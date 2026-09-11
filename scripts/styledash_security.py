@@ -474,6 +474,29 @@ class SecurityStore:
                     if db.execute("PRAGMA foreign_key_check").fetchall():
                         raise RuntimeError("terms acceptance migration failed foreign key check")
                     db.commit()
+
+            # Migration 8: account-scoped cart and wishlist state. These tables
+            # contain only product/variant identifiers and quantities; pricing,
+            # inventory and order truth remain authoritative elsewhere.
+            migration_versions = {
+                row["version"] for row in db.execute("SELECT version FROM schema_migrations")
+            }
+            if 8 not in migration_versions:
+                db.execute("BEGIN IMMEDIATE")
+                if db.execute("SELECT 1 FROM schema_migrations WHERE version=8").fetchone():
+                    db.rollback()
+                else:
+                    db.execute("CREATE TABLE customer_cart_items(user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,product_id TEXT NOT NULL,variant_id TEXT NOT NULL,quantity INTEGER NOT NULL CHECK(quantity BETWEEN 1 AND 50),updated_at TEXT NOT NULL,PRIMARY KEY(user_id,product_id,variant_id))")
+                    db.execute("CREATE INDEX customer_cart_items_user_idx ON customer_cart_items(user_id)")
+                    db.execute("CREATE TABLE customer_wishlist_items(user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,product_id TEXT NOT NULL,created_at TEXT NOT NULL,PRIMARY KEY(user_id,product_id))")
+                    db.execute("CREATE INDEX customer_wishlist_items_user_idx ON customer_wishlist_items(user_id)")
+                    db.execute(
+                        "INSERT INTO schema_migrations(version,applied_at) VALUES(8,?)",
+                        (iso(utc_now()),),
+                    )
+                    if db.execute("PRAGMA foreign_key_check").fetchall():
+                        raise RuntimeError("account state migration failed foreign key check")
+                    db.commit()
         self._secure_files()
 
     def _secure_files(self) -> None:
@@ -1147,6 +1170,75 @@ class SecurityStore:
         with self.connect() as db:
             rows = db.execute("SELECT * FROM vendor_applications ORDER BY created_at DESC").fetchall()
         return [{key: row[key] for key in row.keys()} for row in rows]
+
+    def account_state(self, user_id: str) -> dict[str, Any]:
+        with self.connect() as db:
+            cart_rows = db.execute(
+                "SELECT product_id,variant_id,quantity FROM customer_cart_items "
+                "WHERE user_id=? ORDER BY rowid", (user_id,)
+            ).fetchall()
+            wishlist_rows = db.execute(
+                "SELECT product_id FROM customer_wishlist_items WHERE user_id=? ORDER BY rowid",
+                (user_id,),
+            ).fetchall()
+        return {
+            "cart": [{"productId": row["product_id"], "variantId": row["variant_id"], "quantity": row["quantity"]} for row in cart_rows],
+            "wishlist": [row["product_id"] for row in wishlist_rows],
+        }
+
+    def replace_cart(self, user_id: str, payload: dict[str, Any]) -> list[dict[str, Any]]:
+        if not isinstance(payload, dict) or set(payload) != {"items"}:
+            raise SecurityError(400, "Invalid cart state.", "invalid_cart_state")
+        items = payload.get("items")
+        if not isinstance(items, list) or len(items) > 50:
+            raise SecurityError(400, "Invalid cart state.", "invalid_cart_state")
+        cleaned: list[dict[str, Any]] = []
+        lines: set[tuple[str, str]] = set()
+        for item in items:
+            if not isinstance(item, dict) or set(item) != {"productId", "variantId", "quantity"}:
+                raise SecurityError(400, "Invalid cart state.", "invalid_cart_state")
+            product_id, variant_id, quantity = item.get("productId"), item.get("variantId"), item.get("quantity")
+            if (not isinstance(product_id, str) or not 1 <= len(product_id) <= 128 or
+                not isinstance(variant_id, str) or not 1 <= len(variant_id) <= 128 or
+                isinstance(quantity, bool) or not isinstance(quantity, int) or not 1 <= quantity <= 50 or
+                (product_id, variant_id) in lines):
+                raise SecurityError(400, "Invalid cart state.", "invalid_cart_state")
+            lines.add((product_id, variant_id))
+            cleaned.append({"productId": product_id, "variantId": variant_id, "quantity": quantity})
+        now = iso(utc_now())
+        with self.connect() as db:
+            db.execute("BEGIN IMMEDIATE")
+            db.execute("DELETE FROM customer_cart_items WHERE user_id=?", (user_id,))
+            db.executemany(
+                "INSERT INTO customer_cart_items(user_id,product_id,variant_id,quantity,updated_at) VALUES(?,?,?,?,?)",
+                [(user_id, item["productId"], item["variantId"], item["quantity"], now) for item in cleaned],
+            )
+            db.commit()
+        return cleaned
+
+    def replace_wishlist(self, user_id: str, payload: dict[str, Any]) -> list[str]:
+        if not isinstance(payload, dict) or set(payload) != {"productIds"}:
+            raise SecurityError(400, "Invalid wishlist state.", "invalid_wishlist_state")
+        product_ids = payload.get("productIds")
+        if not isinstance(product_ids, list) or len(product_ids) > 200:
+            raise SecurityError(400, "Invalid wishlist state.", "invalid_wishlist_state")
+        cleaned: list[str] = []
+        seen: set[str] = set()
+        for product_id in product_ids:
+            if not isinstance(product_id, str) or not 1 <= len(product_id) <= 128:
+                raise SecurityError(400, "Invalid wishlist state.", "invalid_wishlist_state")
+            if product_id not in seen:
+                seen.add(product_id); cleaned.append(product_id)
+        now = iso(utc_now())
+        with self.connect() as db:
+            db.execute("BEGIN IMMEDIATE")
+            db.execute("DELETE FROM customer_wishlist_items WHERE user_id=?", (user_id,))
+            db.executemany(
+                "INSERT INTO customer_wishlist_items(user_id,product_id,created_at) VALUES(?,?,?)",
+                [(user_id, product_id, now) for product_id in cleaned],
+            )
+            db.commit()
+        return cleaned
 
     def profile(self, user_id: str) -> dict[str, Any]:
         with self.connect() as db:
