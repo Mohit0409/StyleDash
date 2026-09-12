@@ -122,3 +122,84 @@ styledash_read_pid_file() {
   esac
   printf '%s\n' "$styledash_read_pid"
 }
+
+styledash_watchdog_service_dir() {
+  [ -n "${PREFIX:-}" ] || return 1
+  printf '%s\n' "$PREFIX/var/service/styledash-health"
+}
+
+styledash_watchdog_service_exists() {
+  styledash_watchdog_dir="$(styledash_watchdog_service_dir 2>/dev/null)" || return 1
+  [ -d "$styledash_watchdog_dir" ] && [ -f "$styledash_watchdog_dir/run" ]
+}
+
+styledash_watchdog_stop() {
+  styledash_watchdog_marker="${1:-$HOME/bin/styledash-health}"
+  styledash_watchdog_pid_file="${2:-$HOME/run/styledash-health.pid}"
+  if styledash_watchdog_service_exists; then
+    command -v sv >/dev/null 2>&1 || {
+      echo "StyleDash watchdog is supervised by runit but sv is unavailable" >&2
+      return 1
+    }
+    styledash_watchdog_dir="$(styledash_watchdog_service_dir)"
+    sv down "$styledash_watchdog_dir" >/dev/null 2>&1 || {
+      echo "StyleDash watchdog runit supervisor could not be stopped" >&2
+      return 1
+    }
+  fi
+  styledash_stop_matching_processes "StyleDash health watchdog" "$styledash_watchdog_marker" ""
+  rm -f -- "$styledash_watchdog_pid_file"
+  if styledash_watchdog_service_exists; then
+    printf 'styledash_watchdog_supervisor=down\n'
+  fi
+  return 0
+}
+
+styledash_watchdog_start() {
+  styledash_watchdog_marker="${1:-$HOME/bin/styledash-health}"
+  styledash_watchdog_pid_file="${2:-$HOME/run/styledash-health.pid}"
+  styledash_watchdog_log_file="${3:-$HOME/logs/styledash-health.log}"
+  if styledash_watchdog_service_exists; then
+    command -v sv >/dev/null 2>&1 || {
+      echo "StyleDash watchdog is supervised by runit but sv is unavailable" >&2
+      return 1
+    }
+    styledash_watchdog_dir="$(styledash_watchdog_service_dir)"
+    sv down "$styledash_watchdog_dir" >/dev/null 2>&1 || return 1
+    styledash_stop_matching_processes "StyleDash health watchdog" "$styledash_watchdog_marker" "" || return 1
+    rm -f -- "$styledash_watchdog_pid_file"
+    sv up "$styledash_watchdog_dir" >/dev/null 2>&1 || {
+      echo "StyleDash watchdog runit supervisor could not be started" >&2
+      return 1
+    }
+  else
+    styledash_stop_matching_processes "StyleDash health watchdog" "$styledash_watchdog_marker" "" || return 1
+    rm -f -- "$styledash_watchdog_pid_file"
+    nohup "$HOME/bin/styledash-health" >> "$styledash_watchdog_log_file" 2>&1 &
+  fi
+  styledash_watchdog_stable_pid=''
+  styledash_watchdog_stable_checks=0
+  for _ in $(seq 1 40); do
+    styledash_watchdog_pid="$(styledash_read_pid_file "$styledash_watchdog_pid_file" 2>/dev/null || true)"
+    if [ -n "$styledash_watchdog_pid" ] && styledash_assert_single_process "$styledash_watchdog_pid" "$styledash_watchdog_marker" ""; then
+      if [ "$styledash_watchdog_pid" = "$styledash_watchdog_stable_pid" ]; then
+        styledash_watchdog_stable_checks=$((styledash_watchdog_stable_checks + 1))
+      else
+        styledash_watchdog_stable_pid="$styledash_watchdog_pid"
+        styledash_watchdog_stable_checks=1
+      fi
+      if [ "$styledash_watchdog_stable_checks" -ge 4 ]; then
+        printf 'styledash_watchdog_pid=%s\n' "$styledash_watchdog_pid"
+        printf 'styledash_watchdog_process_count=1\n'
+        styledash_watchdog_service_exists && printf 'styledash_watchdog_supervisor=up\n'
+        return 0
+      fi
+    else
+      styledash_watchdog_stable_pid=''
+      styledash_watchdog_stable_checks=0
+    fi
+    sleep 0.25
+  done
+  echo "new StyleDash watchdog failed process identity validation" >&2
+  return 1
+}

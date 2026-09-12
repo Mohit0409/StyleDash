@@ -92,7 +92,7 @@ cloudflare_marker='cloudflared tunnel run'
 cloudflare_identity="--token-file $HOME/.config/styledash/cloudflare-tunnel-token"
 
 # Stop the watchdog first so it cannot restart the code being rolled back.
-styledash_stop_matching_processes "StyleDash health watchdog" "$watchdog_marker" ""
+styledash_watchdog_stop "$watchdog_marker" "$RUN_DIR/styledash-health.pid"
 if [ -x "$HOME/bin/stop-styledash-ngrok" ]; then
   "$HOME/bin/stop-styledash-ngrok" || true
 fi
@@ -124,6 +124,10 @@ for config in catalog.json settings.json; do
 done
 
 "$HOME/bin/start-styledash-stack"
+# A restored older stack script may have launched a manual watchdog. Normalize
+# back to the runit-managed service when that supervisor exists.
+styledash_watchdog_stop "$watchdog_marker" "$RUN_DIR/styledash-health.pid"
+styledash_watchdog_start "$watchdog_marker" "$RUN_DIR/styledash-health.pid" "$HOME/logs/styledash-health.log"
 
 curl -fsS --max-time 5 http://127.0.0.1:8080/api/health >/dev/null
 curl -fsS --max-time 5 -H 'Host: 127.0.0.1:8081' http://127.0.0.1:8081/ >/dev/null

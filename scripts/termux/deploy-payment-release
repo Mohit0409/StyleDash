@@ -191,7 +191,7 @@ admin_marker="$HOME/admin/serve.py --bind 127.0.0.1 --port 8081"
 admin_identity="--assets $HOME/admin/admin"
 cloudflare_marker='cloudflared tunnel run'
 cloudflare_identity="--token-file $HOME/.config/styledash/cloudflare-tunnel-token"
-styledash_stop_matching_processes "StyleDash health watchdog" "$watchdog_marker" ""
+styledash_watchdog_stop "$watchdog_marker" "$HOME/run/styledash-health.pid"
 styledash_stop_matching_processes "StyleDash Cloudflare tunnel" "$cloudflare_marker" "$cloudflare_identity"
 styledash_stop_matching_processes "StyleDash administrator service" "$admin_marker" "$admin_identity"
 styledash_stop_matching_processes "StyleDash public service" "$public_marker" "$public_identity"
@@ -310,24 +310,10 @@ print("styledash_migrations=ok")
 PY
 
 # Restart the newly installed watchdog only after the new runtimes and capability
-# canary are proven. This prevents deployment-time restart races.
-nohup "$HOME/bin/styledash-health" >> "$HOME/logs/styledash-health.log" 2>&1 &
-watchdog_started=0
-for _ in $(seq 1 20); do
-  watchdog_pid="$(styledash_read_pid_file "$HOME/run/styledash-health.pid" 2>/dev/null || true)"
-  if [ -n "$watchdog_pid" ] && \
-     styledash_assert_single_process "$watchdog_pid" "$watchdog_marker" ""; then
-    watchdog_started=1
-    printf 'styledash_watchdog_pid=%s\n' "$watchdog_pid"
-    printf 'styledash_watchdog_process_count=1\n'
-    break
-  fi
-  sleep 0.25
-done
-if [ "$watchdog_started" -ne 1 ]; then
-  styledash_stop_matching_processes "StyleDash health watchdog" "$watchdog_marker" "" || true
-  rm -f -- "$HOME/run/styledash-health.pid"
-  echo "new StyleDash watchdog failed process identity validation" >&2
+# canary are proven. On production phones runit owns this process, so bring the
+# supervisor back up instead of launching a competing manual watchdog.
+if ! styledash_watchdog_start "$watchdog_marker" "$HOME/run/styledash-health.pid" "$HOME/logs/styledash-health.log"; then
+  styledash_watchdog_stop "$watchdog_marker" "$HOME/run/styledash-health.pid" || true
   exit 1
 fi
 

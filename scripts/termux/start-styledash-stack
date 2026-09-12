@@ -26,9 +26,7 @@ fi
 "$HOME/bin/start-styledash-ngrok" || echo "$(date -Iseconds) ngrok is not established yet; watchdog will retry" >> "$HOME/logs/styledash-health.log"
 "$HOME/bin/start-styledash-cloudflare" || echo "$(date -Iseconds) Cloudflare tunnel is not established yet; startup will retry on next stack launch" >> "$HOME/logs/styledash-health.log"
 watchdog_marker="$HOME/bin/styledash-health"
-watchdog_pid="$(styledash_read_pid_file "$HOME/run/styledash-health.pid" 2>/dev/null || true)"
-if [ -z "$watchdog_pid" ] || ! styledash_assert_single_process "$watchdog_pid" "$watchdog_marker" ""; then
-  styledash_stop_matching_processes "StyleDash health watchdog" "$watchdog_marker" "" || true
-  rm -f -- "$HOME/run/styledash-health.pid"
-  nohup "$HOME/bin/styledash-health" >> "$HOME/logs/styledash-health.log" 2>&1 &
+if ! styledash_watchdog_start "$watchdog_marker" "$HOME/run/styledash-health.pid" "$HOME/logs/styledash-health.log"; then
+  echo "$(date -Iseconds) watchdog failed to start under its configured supervisor" >> "$HOME/logs/styledash-health.log"
+  exit 1
 fi
