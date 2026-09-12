@@ -967,14 +967,28 @@ class SecurityStore:
             )
             return user, False
         phone_owner = db.execute(
-            "SELECT id FROM users WHERE normalized_phone=?", (phone,)
+            "SELECT * FROM users WHERE normalized_phone=?", (phone,)
         ).fetchone()
         if phone_owner is not None:
-            raise SecurityError(
-                409,
-                "An account already uses this mobile number. Sign in to that account and link mobile securely.",
-                "account_link_required",
+            if not phone_owner["is_active"] or phone_owner["role"] != "customer":
+                raise SecurityError(401, "Unable to complete sign in. Please try again.", "identity_verification_failed")
+            google_identity = db.execute(
+                "SELECT 1 FROM customer_auth_identities "
+                "WHERE user_id=? AND provider='google' AND verified_email IS NOT NULL",
+                (phone_owner["id"],),
+            ).fetchone()
+            if phone_owner["password_hash"] or google_identity is None:
+                raise SecurityError(
+                    409,
+                    "An account already uses this mobile number. Sign in to that account and link mobile securely.",
+                    "account_link_required",
+                )
+            db.execute(
+                "INSERT INTO customer_auth_identities(id,user_id,provider,provider_subject,verified_phone,created_at,last_used_at) "
+                "VALUES(?,?,?,?,?,?,?)",
+                ("cai_" + secrets.token_hex(12), phone_owner["id"], "phone", uid, phone, now, now),
             )
+            return phone_owner, False
         # A password account with this canonical phone is never auto-linked:
         # the caller must authenticate that account and use the explicit link
         # endpoint, proving control of both the StyleDash session and OTP.
