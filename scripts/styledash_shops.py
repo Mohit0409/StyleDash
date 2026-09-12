@@ -2531,14 +2531,14 @@ class ShopWorkflow:
                 "id": item["id"],
                 "sku": f"SD-SHOP-{row['id'][-12:].upper()}" if index == 0 else f"SD-SHOP-{row['id'][-12:].upper()}-{index + 1}",
                 "size": item["size"],
-                "colourName": row["colour_name"],
+                "colourName": item["colourName"],
                 "stock": item["inventory"],
                 "available": False,
                 "price": price,
-                "images": images,
+                "images": item.get("imageUrls") or images,
             }
-            if row["colour_hex"]:
-                variant["colourHex"] = row["colour_hex"]
+            if item.get("colourHex"):
+                variant["colourHex"] = item["colourHex"]
             variants.append(variant)
         return {
             "id": row["id"],
@@ -2549,6 +2549,7 @@ class ShopWorkflow:
             "category": row["category"],
             "subcategory": attributes.get("subcategory"),
             "deliveryType": attributes.get("deliveryType", "normal"),
+            "optionMode": attributes.get("optionMode"),
             "shortDescription": row["description"][:180],
             "description": row["description"],
             "material": attributes.get("material", "Not specified"),
@@ -2616,6 +2617,10 @@ class ShopWorkflow:
                     "vendorId": row["application_id"],
                     "storeName": row["shop_name"],
                     "storeSlug": store_slug,
+                    "brand": row["brand"] or row["shop_name"],
+                    "department": row["department"],
+                    "category": row["category"],
+                    "optionMode": attributes.get("optionMode"),
                     "deliveryType": delivery_type,
                     "expressDelivery": delivery_type in {"express", "both"},
                     "images": images,
@@ -2627,10 +2632,11 @@ class ShopWorkflow:
                             "id": item["id"],
                             "sku": f"SD-SHOP-{row['id'][-12:].upper()}" if index == 0 else f"SD-SHOP-{row['id'][-12:].upper()}-{index + 1}",
                             "size": item["size"],
-                            "colourName": row["colour_name"],
+                            "colourName": item["colourName"],
+                            "colourHex": item.get("colourHex"),
                             "stock": item["inventory"],
                             "price": price,
-                            "images": images,
+                            "images": item.get("imageUrls") or images,
                             "active": item.get("active", True),
                         }
                         for index, item in enumerate(_row_variants(row))

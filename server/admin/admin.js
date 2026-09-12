@@ -10,7 +10,7 @@ let adminFilters = {
   vendors:{status:'all',category:'all'},
   'shop-products':{status:'all',category:'all'},
   'shop-product-requests':{status:'all',action:'all'},
-  inventory:{stock:'low'},
+  inventory:{stock:'attention',category:'all',department:'all',shop:'all',brand:'all'},
   customers:{status:'all'},
   'payment-alerts':{status:'all',type:'all'},
   audit:{result:'all',target:'all',action:'all'},
@@ -60,6 +60,20 @@ byId('content').addEventListener('change', event => {
 });
 
 function status(message) { byId('app-status').textContent = message || ''; }
+const DEFAULT_VARIANT_SIZE='One Size';
+const DEFAULT_VARIANT_COLOUR='Default';
+const PRODUCT_OPTION_MODE_VALUES=new Set(['single','size','colour','both']);
+function defaultProductOptionMode(category){return ['Clothing & Fashion','Footwear'].includes(category)?'both':'single';}
+function inferProductOptionMode(item){
+  const explicit=String(item?.attributes?.optionMode||''); if(PRODUCT_OPTION_MODE_VALUES.has(explicit))return explicit;
+  const variants=Array.isArray(item?.variants)?item.variants:[];
+  const sizes=new Set(variants.map(row=>String(row.size||'').trim()).filter(Boolean));
+  const colours=new Set(variants.map(row=>String(row.colourName||item?.colourName||'').trim()).filter(Boolean));
+  const meaningfulSize=Array.from(sizes).some(value=>value!==DEFAULT_VARIANT_SIZE);
+  const meaningfulColour=Array.from(colours).some(value=>value!==DEFAULT_VARIANT_COLOUR&&value!=='Multi');
+  if(meaningfulSize&&meaningfulColour)return 'both'; if(meaningfulSize)return 'size'; if(meaningfulColour)return 'colour'; return 'single';
+}
+function productOptionModeLabel(mode){return ({single:'Single stock (no size/colour)',size:'Size / volume only',colour:'Colour / shade only',both:'Colour + size'})[mode]||mode;}
 function newColourCard(source={}) {
   const key=typeof crypto?.randomUUID==='function'?crypto.randomUUID():`colour-${Date.now()}-${Math.random().toString(16).slice(2)}`;
   return {cardKey:key,colourName:source.colourName||'',colourHex:source.colourHex||'',imageUrls:Array.isArray(source.imageUrls)?source.imageUrls.filter(value=>typeof value==='string'):[],pendingFiles:[],httpsDraft:'',sizes:Array.isArray(source.sizes)&&source.sizes.length?source.sizes.map(size=>({id:typeof size.id==='string'?size.id:undefined,size:size.size||'',inventory:Number.isInteger(size.inventory)?size.inventory:0})):[{size:'',inventory:0}]};
@@ -87,34 +101,45 @@ function formDialog(title, fields, submitLabel='Continue') {
     byId('admin-dialog-error').textContent='';
     fieldsRoot.replaceChildren();
     let colourVariantsGetter=null;
+    const controlsByName=new Map();
     for(const field of fields){
       if(field.type==='colourVariants'){
         const section=document.createElement('section');section.className='variant-editor';
         const heading=document.createElement('h3');heading.textContent=field.label;section.appendChild(heading);
-        const hint=document.createElement('p');hint.className='muted';hint.textContent='Each colour has its own images, sizes and stock. Local files upload only when you save.';section.appendChild(hint);
+        const hint=document.createElement('p');hint.className='muted';section.appendChild(hint);
         const cards=document.createElement('div');cards.className='variant-cards';section.appendChild(cards);
-        const addColour=document.createElement('button');addColour.type='button';addColour.className='secondary';addColour.textContent='+ Add another colour';section.appendChild(addColour);
+        const addColour=document.createElement('button');addColour.type='button';addColour.className='secondary';addColour.textContent='+ Add another colour / shade';section.appendChild(addColour);
+        const modeControl=controlsByName.get('optionMode');
+        const currentMode=()=>PRODUCT_OPTION_MODE_VALUES.has(modeControl?.value)?modeControl.value:'both';
         const colours=Array.isArray(field.value)&&field.value.length?field.value.map(newColourCard):[newColourCard()];
         const makeInput=(text,value,type='text')=>{const label=document.createElement('label');label.textContent=text;const control=document.createElement(type==='textarea'?'textarea':'input');control.value=value??'';if(type!=='textarea')control.type=type;label.appendChild(control);return [label,control];};
         const tile=(source,labelText,onRemove,isLocal=true)=>{const node=document.createElement('div');node.className='image-tile';if(isLocal){const image=document.createElement('img');image.src=source;image.alt=labelText;image.loading='lazy';node.appendChild(image);}else{const text=document.createElement('span');text.textContent=labelText;text.title=source;node.appendChild(text);}const remove=document.createElement('button');remove.type='button';remove.className='danger';remove.textContent='Remove';remove.onclick=onRemove;node.appendChild(remove);return node;};
-        const render=()=>{cards.replaceChildren();colours.forEach((colour,index)=>{
-          const card=document.createElement('article');card.className='variant-card';card.dataset.cardKey=colour.cardKey;const title=document.createElement('h4');title.textContent=`Colour ${index+1}`;card.appendChild(title);
-          const grid=document.createElement('div');grid.className='dialog-fields';const [nameLabel,name]=makeInput('Colour name',colour.colourName);const [hexLabel,hex]=makeInput('Colour hex (optional)',colour.colourHex);name.oninput=()=>colour.colourName=name.value;hex.oninput=()=>colour.colourHex=hex.value;grid.append(nameLabel,hexLabel);card.appendChild(grid);
-          const sizesTitle=document.createElement('strong');sizesTitle.textContent='Sizes & stock';card.appendChild(sizesTitle);const sizes=document.createElement('div');sizes.className='variant-sizes';
-          colour.sizes.forEach((size,sizeIndex)=>{const row=document.createElement('div');row.className='variant-size-row';const [sizeLabel,sizeInput]=makeInput('Size',size.size);const [stockLabel,stockInput]=makeInput('Stock',String(size.inventory),'number');stockInput.min='0';stockInput.step='1';sizeInput.oninput=()=>size.size=sizeInput.value;stockInput.oninput=()=>size.inventory=Number(stockInput.value);row.append(sizeLabel,stockLabel);if(colour.sizes.length>1){const remove=document.createElement('button');remove.type='button';remove.className='danger';remove.textContent='Remove size';remove.onclick=()=>{colour.sizes.splice(sizeIndex,1);render();};row.appendChild(remove);}sizes.appendChild(row);});card.appendChild(sizes);
-          const addSize=document.createElement('button');addSize.type='button';addSize.className='secondary';addSize.textContent='+ Add size';addSize.onclick=()=>{colour.sizes.push({size:'',inventory:0});render();};card.appendChild(addSize);
+        const render=()=>{
+          const mode=currentMode(),usesColour=mode==='colour'||mode==='both',usesSize=mode==='size'||mode==='both';
+          hint.textContent=mode==='single'?'Add product images and one stock quantity. Size and colour are not required.':mode==='size'?'Add sizes or volumes (for example 50 ml / 100 ml) with stock. Colour is not required.':mode==='colour'?'Add colours or shades with stock. Size is not required.':'Each colour has its own images, sizes and stock. Local files upload only when you save.';
+          addColour.hidden=!usesColour; cards.replaceChildren();
+          const visibleColours=usesColour?colours:colours.slice(0,1);
+          visibleColours.forEach((colour,index)=>{
+          if(!colour.sizes.length)colour.sizes.push({size:'',inventory:0});
+          const card=document.createElement('article');card.className='variant-card';card.dataset.cardKey=colour.cardKey;const title=document.createElement('h4');title.textContent=usesColour?`Colour / shade ${index+1}`:'Product images & stock';card.appendChild(title);
+          if(usesColour){const grid=document.createElement('div');grid.className='dialog-fields';const [nameLabel,name]=makeInput('Colour / shade name',colour.colourName);const [hexLabel,hex]=makeInput('Colour hex (optional)',colour.colourHex);name.oninput=()=>colour.colourName=name.value;hex.oninput=()=>colour.colourHex=hex.value;grid.append(nameLabel,hexLabel);card.appendChild(grid);}
+          const sizesTitle=document.createElement('strong');sizesTitle.textContent=usesSize?'Sizes / volumes & stock':'Stock';card.appendChild(sizesTitle);const sizes=document.createElement('div');sizes.className='variant-sizes';
+          const visibleSizes=usesSize?colour.sizes:colour.sizes.slice(0,1);
+          visibleSizes.forEach((size,sizeIndex)=>{const row=document.createElement('div');row.className='variant-size-row';const [stockLabel,stockInput]=makeInput('Stock',String(size.inventory),'number');stockInput.min='0';stockInput.step='1';stockInput.oninput=()=>size.inventory=Number(stockInput.value);if(usesSize){const [sizeLabel,sizeInput]=makeInput(mode==='size'?'Size / volume':'Size',size.size);sizeInput.oninput=()=>size.size=sizeInput.value;row.append(sizeLabel,stockLabel);}else row.append(stockLabel);if(usesSize&&colour.sizes.length>1){const remove=document.createElement('button');remove.type='button';remove.className='danger';remove.textContent='Remove size';remove.onclick=()=>{colour.sizes.splice(sizeIndex,1);render();};row.appendChild(remove);}sizes.appendChild(row);});card.appendChild(sizes);
+          if(usesSize){const addSize=document.createElement('button');addSize.type='button';addSize.className='secondary';addSize.textContent='+ Add size / volume';addSize.onclick=()=>{colour.sizes.push({size:'',inventory:0});render();};card.appendChild(addSize);}
           const images=document.createElement('div');images.className='image-tiles';colour.imageUrls.forEach((url,imageIndex)=>images.appendChild(tile(url,`Existing image ${imageIndex+1}`,()=>{colour.imageUrls.splice(imageIndex,1);render();},url.startsWith('/media/product-images/'))));colour.pendingFiles.forEach((entry,imageIndex)=>images.appendChild(tile(entry.preview,`Pending image ${imageIndex+1}`,()=>{colour.pendingFiles.splice(imageIndex,1);render();},true)));card.appendChild(images);
           const uploadLabel=document.createElement('label');uploadLabel.textContent='Choose product images from this PC';const upload=document.createElement('input');upload.type='file';upload.accept='image/jpeg,image/png,image/webp';upload.multiple=true;upload.onchange=async()=>{try{await queueColourFiles(colour,upload.files);render();}catch(cause){byId('admin-dialog-error').textContent=cause.message;}finally{upload.value='';}};uploadLabel.appendChild(upload);card.appendChild(uploadLabel);
           const [urlsLabel,urls]=makeInput('HTTPS image URLs (optional fallback)',colour.httpsDraft,'textarea');urls.oninput=()=>colour.httpsDraft=urls.value;card.appendChild(urlsLabel);
-          if(colours.length>1){const removeColour=document.createElement('button');removeColour.type='button';removeColour.className='danger';removeColour.textContent='Remove colour';removeColour.onclick=()=>{colours.splice(index,1);render();};card.appendChild(removeColour);}cards.appendChild(card);
+          if(usesColour&&colours.length>1){const removeColour=document.createElement('button');removeColour.type='button';removeColour.className='danger';removeColour.textContent='Remove colour / shade';removeColour.onclick=()=>{colours.splice(index,1);render();};card.appendChild(removeColour);}cards.appendChild(card);
         });};
         addColour.onclick=()=>{colours.push(newColourCard());render();};
-        colourVariantsGetter=()=>{const normalized=colours.map(colour=>({cardKey:colour.cardKey,colourName:String(colour.colourName||'').trim(),colourHex:String(colour.colourHex||'').trim()||undefined,imageUrls:colour.imageUrls.map(value=>String(value).trim()).filter(Boolean),httpsDraft:colour.httpsDraft,pendingFiles:[...colour.pendingFiles],sizes:colour.sizes.map(size=>({...(size.id?{id:size.id}:{}),size:String(size.size||'').trim(),inventory:Number(size.inventory)}))}));if(!normalized.length||normalized.some(colour=>!colour.colourName||!colour.sizes.length||colour.sizes.some(size=>!size.size||!Number.isInteger(size.inventory)||size.inventory<0)))throw new Error('Every colour needs a name and valid size/stock rows.');return normalized;};
+        if(modeControl){modeControl.addEventListener('change',render);modeControl.addEventListener('option-mode-sync',render);}
+        colourVariantsGetter=()=>{const mode=currentMode(),usesColour=mode==='colour'||mode==='both',usesSize=mode==='size'||mode==='both';const source=usesColour?colours:colours.slice(0,1);const normalized=source.map(colour=>({cardKey:colour.cardKey,colourName:usesColour?String(colour.colourName||'').trim():DEFAULT_VARIANT_COLOUR,colourHex:usesColour?(String(colour.colourHex||'').trim()||undefined):undefined,imageUrls:colour.imageUrls.map(value=>String(value).trim()).filter(Boolean),httpsDraft:colour.httpsDraft,pendingFiles:[...colour.pendingFiles],sizes:(usesSize?colour.sizes:colour.sizes.slice(0,1)).map(size=>({...(size.id?{id:size.id}:{}),size:usesSize?String(size.size||'').trim():DEFAULT_VARIANT_SIZE,inventory:Number(size.inventory)}))}));if(!normalized.length||normalized.some(colour=>!colour.colourName||!colour.sizes.length||colour.sizes.some(size=>!size.size||!Number.isInteger(size.inventory)||size.inventory<0)))throw new Error(usesColour||usesSize?'Complete the selected product options and enter valid stock.':'Enter a valid stock quantity.');return normalized;};
         render();fieldsRoot.appendChild(section);continue;
       }
       const label=document.createElement('label'); label.textContent=field.label;
       const control=field.type==='textarea'?document.createElement('textarea'):field.type==='select'?document.createElement('select'):document.createElement('input');
-      control.name=field.name; control.required=field.required===true;
+      control.name=field.name; control.required=field.required===true; controlsByName.set(field.name,control);
       if(field.type==='select'){for(const option of field.options||[]){const node=document.createElement('option');node.value=option.value;node.textContent=option.label;control.appendChild(node);}}
       else if(field.type&&field.type!=='textarea')control.type=field.type;
       if(field.accept)control.accept=field.accept; if(field.multiple)control.multiple=true;
@@ -130,6 +155,9 @@ function formDialog(title, fields, submitLabel='Continue') {
       if(field.type==='file'&&field.previewImages){const preview=document.createElement('div');preview.className='image-preview-grid';label.appendChild(preview);attachImagePreview(control,preview);}
       fieldsRoot.appendChild(label);
     }
+    const categoryControl=controlsByName.get('category'),optionModeControl=controlsByName.get('optionMode');
+    const optionModeField=fields.find(field=>field.name==='optionMode');
+    if(categoryControl&&optionModeControl&&optionModeField?.autoCategoryDefault){let touched=false;optionModeControl.addEventListener('change',event=>{if(event.isTrusted)touched=true;});categoryControl.addEventListener('change',()=>{if(touched)return;optionModeControl.value=defaultProductOptionMode(categoryControl.value);optionModeControl.dispatchEvent(new Event('option-mode-sync'));});}
     let settled=false;
     const finish=value=>{if(settled)return;settled=true;form.onsubmit=null;byId('admin-dialog-cancel').onclick=null;dialog.oncancel=null;if(dialog.open)dialog.close();resolve(value);};
     form.onsubmit=event=>{event.preventDefault();if(!form.reportValidity())return;try{const values=Object.fromEntries(new FormData(form).entries());for(const field of fields){if(field.type==='file'&&field.multiple)values[field.name]=Array.from(form.elements[field.name]?.files||[]);}if(colourVariantsGetter)values.colourVariants=colourVariantsGetter();finish(values);}catch(cause){byId('admin-dialog-error').textContent=cause.message;}};
@@ -241,6 +269,12 @@ async function editStore(button){
 
 const PRODUCT_DEPARTMENTS=['men','women','kids','unisex'];
 const PRODUCT_CATEGORIES=['Clothing & Fashion','Footwear','Accessories','Beauty & Personal Care','Electronics','Home & Living','General Store'];
+const PRODUCT_OPTION_MODES=[
+  {value:'single',label:'Single stock - no size or colour'},
+  {value:'size',label:'Size / volume only'},
+  {value:'colour',label:'Colour / shade only'},
+  {value:'both',label:'Colour + size'},
+];
 const DELIVERY_OPTIONS=[{value:'normal',label:'Site-wide: Normal Mon-Fri; Normal + Express Sat-Sun'}];
 
 function downloadProductCsvTemplate(){
@@ -277,13 +311,14 @@ async function createStoreProduct(){
     {name:'applicationId',label:'Store',type:'select',required:true,options:applications.map(item=>({value:item.id,label:item.shopName}))},
     {name:'name',label:'Product name',required:true,maxLength:140},{name:'description',label:'Product description',type:'textarea',required:true,maxLength:2000},{name:'brand',label:'Brand (optional)',maxLength:100},
     {name:'department',label:'Department',type:'select',required:true,value:'unisex',options:PRODUCT_DEPARTMENTS.map(value=>({value,label:value}))},{name:'category',label:'Category',type:'select',required:true,value:'Clothing & Fashion',options:PRODUCT_CATEGORIES.map(value=>({value,label:value}))},{name:'subcategory',label:'Subcategory (optional; inferred when clear)',maxLength:100},{name:'deliveryType',label:'Delivery schedule',type:'select',required:true,value:'normal',options:DELIVERY_OPTIONS},
+    {name:'optionMode',label:'Product options',type:'select',required:true,value:'both',options:PRODUCT_OPTION_MODES,autoCategoryDefault:true,help:'Choose only the options customers actually need. Beauty, electronics, home and general items default to single stock; clothing and footwear default to colour + size.'},
     {name:'price',label:'Selling price in rupees',type:'number',required:true,min:1,step:'0.01'},{name:'originalPrice',label:'Original/MRP price in rupees',type:'number',min:1,step:'0.01'},
-    {name:'colourVariants',label:'Colours & Variants',type:'colourVariants'},
+    {name:'colourVariants',label:'Images, options & stock',type:'colourVariants'},
   ],'Upload images & publish');if(!values)return;
   const price=Number(values.price),originalPrice=Number(values.originalPrice||values.price);if(!Number.isFinite(price)||price<1||!Number.isFinite(originalPrice)||originalPrice<price)throw new Error('Enter valid selling and original prices.');
   const colourVariants=await uploadColourVariantImages(values.colourVariants);
-  const payload={applicationId:values.applicationId,name:values.name,description:values.description,brand:values.brand||undefined,department:values.department,category:values.category,subcategory:values.subcategory||undefined,deliveryType:values.deliveryType,pricePaise:Math.round(price*100),originalPricePaise:Math.round(originalPrice*100),colourVariants,attributes:{}};
-  await api('/api/admin/shop-products',{method:'POST',body:JSON.stringify(payload)});status(`${values.name} published with ${colourVariants.length} colour${colourVariants.length===1?'':'s'}.`);
+  const payload={applicationId:values.applicationId,name:values.name,description:values.description,brand:values.brand||undefined,department:values.department,category:values.category,subcategory:values.subcategory||undefined,deliveryType:values.deliveryType,pricePaise:Math.round(price*100),originalPricePaise:Math.round(originalPrice*100),colourVariants,attributes:{optionMode:values.optionMode}};
+  await api('/api/admin/shop-products',{method:'POST',body:JSON.stringify(payload)});status(`${values.name} published successfully (${productOptionModeLabel(values.optionMode)}).`);
 }
 async function editStoreProduct(button){
   const item=currentShopProducts.find(product=>product.id===button.dataset.id);if(!item)throw new Error('Product details are no longer available. Refresh and try again.');
@@ -292,16 +327,17 @@ async function editStoreProduct(button){
   const values=await formDialog('Edit product details',[
     {name:'name',label:'Product name',required:true,value:item.name||'',maxLength:140},{name:'description',label:'Description',type:'textarea',required:true,value:item.description||'',maxLength:2000},{name:'brand',label:'Brand (optional)',value:item.brand||'',maxLength:100},
     {name:'department',label:'Department',type:'select',required:true,value:PRODUCT_DEPARTMENTS.includes(item.department)?item.department:'unisex',options:PRODUCT_DEPARTMENTS.map(value=>({value,label:value}))},{name:'category',label:'Category',type:'select',required:true,value:PRODUCT_CATEGORIES.includes(item.category)?item.category:'Clothing & Fashion',options:PRODUCT_CATEGORIES.map(value=>({value,label:value}))},{name:'subcategory',label:'Subcategory (optional; inferred when clear)',value:item.subcategory||item.attributes?.subcategory||'',maxLength:100},{name:'deliveryType',label:'Delivery schedule',type:'select',required:true,value:'normal',options:DELIVERY_OPTIONS},
+    {name:'optionMode',label:'Product options',type:'select',required:true,value:inferProductOptionMode(item),options:PRODUCT_OPTION_MODES,help:'Use Single stock when size/colour do not apply; Size / volume for perfume volumes; Colour / shade for cosmetics such as foundation.'},
     {name:'price',label:'Selling price in rupees',type:'number',required:true,value:(item.pricePaise/100).toFixed(2),min:1,step:'0.01'},{name:'original',label:'Original/MRP price in rupees',type:'number',required:true,value:(item.originalPricePaise/100).toFixed(2),min:1,step:'0.01'},
-    {name:'colourVariants',label:'Colours & Variants',type:'colourVariants',value:colourSource},
+    {name:'colourVariants',label:'Images, options & stock',type:'colourVariants',value:colourSource},
   ],'Save all changes');if(!values)return;
   const price=Number(values.price),original=Number(values.original);if(!Number.isFinite(price)||price<1||!Number.isFinite(original)||original<price)throw new Error('Enter valid selling and original prices.');
   const colourVariants=await uploadColourVariantImages(values.colourVariants);
-  const payload={name:values.name,description:values.description,brand:values.brand||undefined,department:values.department,category:values.category,subcategory:values.subcategory||undefined,deliveryType:values.deliveryType,pricePaise:Math.round(price*100),originalPricePaise:Math.round(original*100),colourVariants,attributes:item.attributes||{}};
+  const payload={name:values.name,description:values.description,brand:values.brand||undefined,department:values.department,category:values.category,subcategory:values.subcategory||undefined,deliveryType:values.deliveryType,pricePaise:Math.round(price*100),originalPricePaise:Math.round(original*100),colourVariants,attributes:{...(item.attributes||{}),optionMode:values.optionMode}};
   const wasPublished=item.status==='PUBLISHED';let unpublished=false,updatedProduct=null;
   try{if(wasPublished){await api(`/api/admin/shop-products/${encodeURIComponent(item.id)}`,{method:'PATCH',body:JSON.stringify({status:'APPROVED'})});unpublished=true;}const result=await api(`/api/admin/shop-products/${encodeURIComponent(item.id)}/details`,{method:'PATCH',body:JSON.stringify(payload)});updatedProduct=result.product;if(wasPublished){await api(`/api/admin/shop-products/${encodeURIComponent(item.id)}`,{method:'PATCH',body:JSON.stringify({status:'PUBLISHED'})});unpublished=false;}}catch(cause){if(unpublished){try{await api(`/api/admin/shop-products/${encodeURIComponent(item.id)}`,{method:'PATCH',body:JSON.stringify({status:'PUBLISHED'})});}catch{}}throw cause;}
   if(wasPublished&&updatedProduct){const current=(await api(`/api/admin/inventory?low=0&q=${encodeURIComponent(item.id)}`)).inventory||[];for(const variant of updatedProduct.variants||[]){const row=current.find(record=>record.variantId===variant.id);if(!row)throw new Error(`Inventory row ${variant.id} is unavailable after product update.`);const delta=Number(variant.inventory)-Number(row.stock);if(delta)await api(`/api/admin/inventory/${encodeURIComponent(variant.id)}`,{method:'PATCH',body:JSON.stringify({delta})});}}
-  status('All product colours, images, sizes, stock and details updated.');
+  status(`Product details, images, options and stock updated (${productOptionModeLabel(values.optionMode)}).`);
 }
 async function reasonFor(title){const values=await formDialog(title,[{name:'reason',label:'Reason',type:'textarea',required:true,maxLength:1000}],'Continue');return values?.reason||null;}
 async function codCollectionMethodFor(){
@@ -357,7 +393,7 @@ async function loadTab(tab) {
       return renderShopProducts(currentShopProducts,shopProductStores);
     }
     if(tab==='shop-product-requests') return renderShopProductRequests((await api('/api/admin/shop-product-requests')).requests);
-    if(tab==='inventory') return renderInventory((await api(`/api/admin/inventory?low=${adminFilters.inventory.stock==='low'?'1':'0'}&q=${query}`)).inventory);
+    if(tab==='inventory') return renderInventory((await api(`/api/admin/inventory?low=0&q=${query}`)).inventory);
     if(tab==='customers') return renderCustomers((await api(`/api/admin/customers?q=${query}`)).customers);
     if(tab==='payment-alerts') return renderPaymentAlerts((await api('/api/admin/payment-alerts')).alerts);
     if(tab==='system') return renderSystem((await api('/api/admin/system')).system);
@@ -440,9 +476,13 @@ function renderShopProductRequests(items){
 }
 function renderInventory(items){
   const all=Array.isArray(items)?items:[]; const f=adminFilters.inventory;
-  const filtered=all.filter(item=>matchesAdminSearch(item,['productName','size','colour','variantId'])&&(f.stock==='all'||Number(item.stock)<=5));
-  const controls=[`<label>Stock<select data-admin-filter="stock"><option value="low"${f.stock==='low'?' selected':''}>Low stock (5 or fewer)</option><option value="all"${f.stock==='all'?' selected':''}>All stock</option></select></label>`];
-  byId('content').innerHTML=`<h2>Inventory</h2>${adminFilterBar('Inventory filters',controls,filtered.length,all.length)}<table><thead><tr><th>Product</th><th>Variant</th><th>Stock</th><th>Action</th></tr></thead><tbody>${filtered.map(item=>`<tr><td>${escapeText(item.productName)}</td><td>${escapeText(item.size)} / ${escapeText(item.colour)}<br><small>${escapeText(item.variantId)}</small></td><td><strong>${escapeText(item.stock)}</strong></td><td><button data-action="inventory" data-id="${escapeText(item.variantId)}">Adjust</button></td></tr>`).join('')}</tbody></table>${filtered.length?'':'<p>No inventory matches the current search and filters.</p>'}`;
+  const stockMatch=item=>{const stock=Number(item.stock);return f.stock==='all'||(f.stock==='attention'&&stock<=5)||(f.stock==='out'&&stock===0)||(f.stock==='low'&&stock>0&&stock<=5)||(f.stock==='healthy'&&stock>5);};
+  const filtered=all.filter(item=>matchesAdminSearch(item,['productName','size','colour','variantId','productId','brand','category','department','storeName'])&&stockMatch(item)&&(f.category==='all'||item.category===f.category)&&(f.department==='all'||item.department===f.department)&&(f.shop==='all'||item.storeName===f.shop)&&(f.brand==='all'||item.brand===f.brand));
+  const controls=[
+    `<label>Stock<select data-admin-filter="stock"><option value="attention"${f.stock==='attention'?' selected':''}>Needs attention (5 or fewer)</option><option value="out"${f.stock==='out'?' selected':''}>Out of stock</option><option value="low"${f.stock==='low'?' selected':''}>Low stock (1-5)</option><option value="healthy"${f.stock==='healthy'?' selected':''}>Healthy stock (6+)</option><option value="all"${f.stock==='all'?' selected':''}>All stock</option></select></label>`,
+    adminSelect('Category','category',all.map(item=>item.category),f.category),adminSelect('Department','department',all.map(item=>item.department),f.department),adminSelect('Shop','shop',all.map(item=>item.storeName),f.shop),adminSelect('Brand','brand',all.map(item=>item.brand),f.brand),
+  ];
+  byId('content').innerHTML=`<h2>Inventory</h2>${adminFilterBar('Inventory filters',controls,filtered.length,all.length)}<table><thead><tr><th>Product</th><th>Shop / category</th><th>Variant</th><th>Stock</th><th>Action</th></tr></thead><tbody>${filtered.map(item=>{const variant=[item.size&&item.size!==DEFAULT_VARIANT_SIZE?item.size:'',item.colour&&item.colour!==DEFAULT_VARIANT_COLOUR?item.colour:''].filter(Boolean).join(' / ')||'Single stock';return `<tr><td><strong>${escapeText(item.productName)}</strong><br><small>${escapeText(item.brand||'-')}</small></td><td>${escapeText(item.storeName||'-')}<br><small>${escapeText([item.category,item.department].filter(Boolean).join(' ? '))}</small></td><td>${escapeText(variant)}<br><small>${escapeText(item.variantId)}</small></td><td><strong>${escapeText(item.stock)}</strong></td><td><button data-action="inventory" data-id="${escapeText(item.variantId)}">Adjust</button></td></tr>`;}).join('')}</tbody></table>${filtered.length?'':'<p>No inventory matches the current search and filters.</p>'}`;
 }
 function renderCustomers(items){
   const all=Array.isArray(items)?items:[]; const f=adminFilters.customers;

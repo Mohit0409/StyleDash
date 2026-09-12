@@ -593,8 +593,14 @@ class AdminApplication:
                         "productId": product["id"], "productName": product["name"],
                         "variantId": variant["id"], "size": variant.get("size"),
                         "colour": variant.get("colourName") or variant.get("colour"), "stock": stock,
+                        "brand": product.get("brand"), "category": product.get("category"),
+                        "department": product.get("department"), "storeName": product.get("storeName"),
+                        "storeId": product.get("vendorId"), "optionMode": product.get("optionMode"),
                     }
-                    searchable = f"{record['productId']} {record['productName']} {record['variantId']}".casefold()
+                    searchable = " ".join(str(record.get(key) or "") for key in (
+                        "productId", "productName", "variantId", "size", "colour",
+                        "brand", "category", "department", "storeName",
+                    )).casefold()
                     if needle and needle not in searchable:
                         continue
                     if low_only and stock > 5:
