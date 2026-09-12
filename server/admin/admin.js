@@ -205,8 +205,16 @@ async function createLocalStore(){
   const payload={ownerUserId:values.ownerUserId,shopName:values.shopName,ownerName:values.ownerName,category:values.category,description:values.description,address:values.address,city:values.city,state:values.state,pincode:values.pincode,businessInformation:values.businessInformation||undefined};
   if(values.bannerUpload instanceof File&&values.bannerUpload.size){payload.bannerImage=(await uploadAdminProductImages([values.bannerUpload]))[0];}
   if(values.logoUpload instanceof File&&values.logoUpload.size){payload.logoImage=(await uploadAdminProductImages([values.logoUpload]))[0];}
-  await api('/api/admin/vendors',{method:'POST',body:JSON.stringify(payload)});
-  status(`${values.shopName} created and activated.`);
+  const result=await api('/api/admin/vendors',{method:'POST',body:JSON.stringify(payload)});
+  const created=result?.application;
+  if(!created?.id||created.status!=='ACTIVE'||created.submittedByUserId!==values.ownerUserId){
+    throw new Error('The store response could not be verified. Refresh Shop Applications before trying again.');
+  }
+  const persisted=(await api('/api/admin/vendors')).applications.find(item=>item.id===created.id&&item.submittedByUserId===values.ownerUserId&&item.status==='ACTIVE');
+  if(!persisted){
+    throw new Error(`Store ${created.id} was created but could not be verified in Shop Applications. Refresh before retrying.`);
+  }
+  status(`${persisted.shopName} created and verified ACTIVE ? ${persisted.id}`);
 }
 async function editStore(button){
   const item=currentVendors.find(store=>store.id===button.dataset.id); if(!item)throw new Error('Store details are no longer available. Refresh and try again.');

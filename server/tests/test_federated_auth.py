@@ -205,6 +205,28 @@ class FederatedAuthTests(unittest.TestCase):
                     ("cai_duplicate", first["id"], "phone", "phone-other", "+919876543210", "x", "x"),
                 )
 
+    def test_google_customer_with_saved_phone_can_complete_otp_login(self):
+        google_token = self.google("google-phone-owner", "owner@example.test")
+        owner, _raw, _csrf, created = self.store.federated_session("google", {"idToken": google_token})
+        self.assertTrue(created)
+        self.store.update_profile(owner["id"], {"phone": "+91 9876543210"})
+
+        phone_token = self.phone("phone-owner", "+919876543210")
+        returning, _raw2, _csrf2, created_again = self.store.federated_session(
+            "phone", {"idToken": phone_token}
+        )
+
+        self.assertFalse(created_again)
+        self.assertEqual(returning["id"], owner["id"])
+        with self.store.connect() as db:
+            identities = db.execute(
+                "SELECT provider,verified_email,verified_phone FROM customer_auth_identities "
+                "WHERE user_id=? ORDER BY provider",
+                (owner["id"],),
+            ).fetchall()
+        self.assertEqual([row["provider"] for row in identities], ["google", "phone"])
+        self.assertEqual(identities[1]["verified_phone"], "+919876543210")
+
     def test_malformed_nested_firebase_claim_fails_closed(self):
         token = self.add_claim("malformed-firebase", uid="malformed-firebase", firebase="phone")
         with self.assertRaises(SECURITY.SecurityError) as caught:
