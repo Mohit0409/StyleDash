@@ -366,7 +366,8 @@ class DeploymentAndTaxTests(unittest.TestCase):
         )
         self.assertIn('watchdog_marker="$HOME/bin/styledash-health"', text)
         self.assertIn('admin_marker="$HOME/admin/serve.py --bind 127.0.0.1 --port 8081"', text)
-        self.assertIn('styledash_stop_matching_processes "StyleDash health watchdog"', text)
+        self.assertIn('styledash_watchdog_stop "$watchdog_marker"', text)
+        self.assertIn('styledash_watchdog_start "$watchdog_marker"', text)
         self.assertIn('styledash_stop_matching_processes "StyleDash public service"', text)
         self.assertIn('styledash_stop_matching_processes "StyleDash administrator service"', text)
         self.assertIn('styledash_stop_matching_processes "StyleDash Cloudflare tunnel"', text)
@@ -374,8 +375,11 @@ class DeploymentAndTaxTests(unittest.TestCase):
         self.assertIn('styledash_wait_for_port_release 8081', text)
         self.assertIn('styledash_patch_canary=auth_required', text)
         self.assertIn('account-state PATCH returned HTTP 405', text)
-        self.assertIn('styledash_watchdog_process_count=1', text)
-        self.assertLess(text.index('styledash_stop_matching_processes "StyleDash health watchdog"'), text.index('if [ -d "$HOME/server/assets" ]'))
+        process_lib = (ROOT / "scripts/termux/styledash-process-lib").read_text(encoding="utf-8")
+        self.assertIn('styledash_watchdog_process_count=1', process_lib)
+        self.assertIn('styledash_watchdog_stable_checks', process_lib)
+        self.assertIn('[ "$styledash_watchdog_stable_checks" -ge 4 ]', process_lib)
+        self.assertLess(text.index('styledash_watchdog_stop "$watchdog_marker"'), text.index('if [ -d "$HOME/server/assets" ]'))
         self.assertLess(text.index('styledash_stop_matching_processes "StyleDash public service"'), text.index('install -m 755 "$STAGE/scripts/termux-spa-server.py"'))
         self.assertIn(
             'install -m 600 "$STAGE/scripts/audit_identity_duplicates.py" "$HOME/server/audit_identity_duplicates.py"',
@@ -451,7 +455,8 @@ class DeploymentAndTaxTests(unittest.TestCase):
         self.assertIn('styledash_cloudflare_process_count=1', cloudflare)
         self.assertIn('{"127.0.0.1:8080", "localhost:8080"}', public_server)
         self.assertIn('{"127.0.0.1:8081", "localhost:8081"}', admin_server)
-        self.assertIn('styledash_stop_matching_processes "StyleDash health watchdog"', rollback)
+        self.assertIn('styledash_watchdog_stop "$watchdog_marker"', rollback)
+        self.assertIn('styledash_watchdog_start "$watchdog_marker"', rollback)
         self.assertIn('styledash_wait_for_port_release 8080', rollback)
         self.assertIn('styledash_wait_for_port_release 8081', rollback)
 

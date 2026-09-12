@@ -109,7 +109,8 @@ class ProductionReliabilityTests(unittest.TestCase):
         self.assertNotIn("styledash.db", script)
         self.assertNotIn("orders.json", script)
         self.assertIn('PROCESS_LIB="$HOME/bin/styledash-process-lib"', script)
-        self.assertIn('styledash_stop_matching_processes "StyleDash health watchdog"', script)
+        self.assertIn('styledash_watchdog_stop "$watchdog_marker"', script)
+        self.assertIn('styledash_watchdog_start "$watchdog_marker"', script)
         self.assertIn('styledash_stop_matching_processes "StyleDash public service"', script)
         self.assertIn('styledash_stop_matching_processes "StyleDash administrator service"', script)
         self.assertIn('styledash_stop_matching_processes "StyleDash Cloudflare tunnel"', script)
@@ -149,12 +150,18 @@ class ProductionReliabilityTests(unittest.TestCase):
 
     def test_deploy_stops_watchdog_before_runtime_mutation_and_uses_patch_canary(self) -> None:
         script = self.read("scripts/termux/deploy-payment-release")
-        watchdog_stop = script.index('styledash_stop_matching_processes "StyleDash health watchdog"')
+        watchdog_stop = script.index('styledash_watchdog_stop "$watchdog_marker"')
         public_copy = script.index('install -m 755 "$STAGE/scripts/termux-spa-server.py"')
         self.assertLess(watchdog_stop, public_copy)
         self.assertIn('styledash_patch_canary=auth_required', script)
         self.assertIn('account-state PATCH returned HTTP 405', script)
-        self.assertIn('styledash_watchdog_process_count=1', script)
+        process_lib = self.read("scripts/termux/styledash-process-lib")
+        self.assertIn('styledash_watchdog_process_count=1', process_lib)
+        self.assertIn('styledash_watchdog_stable_checks', process_lib)
+        self.assertIn('[ "$styledash_watchdog_stable_checks" -ge 4 ]', process_lib)
+        self.assertIn('sv down "$styledash_watchdog_dir"', process_lib)
+        self.assertIn('sv up "$styledash_watchdog_dir"', process_lib)
+        self.assertIn('StyleDash watchdog is supervised by runit but sv is unavailable', process_lib)
         self.assertIn('install -m 755 "$STAGE/scripts/termux/styledash-process-lib" "$HOME/bin/styledash-process-lib"', script)
 
     def test_repository_production_branch_is_main(self) -> None:
