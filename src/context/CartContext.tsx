@@ -55,10 +55,23 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const ownerRef = useRef('guest');
   const hydratedRef = useRef(false);
   const hydrationPromiseRef = useRef<Promise<void>>(Promise.resolve());
+  const hydrationResolveRef = useRef<(() => void) | null>(null);
+  const lastHydrationUserRef = useRef<string | null>(null);
   const saveQueueRef = useRef<Promise<void>>(Promise.resolve());
   const serverCartSignatureRef = useRef('');
   const itemsRef = useRef<CartItem[]>(items);
   const expressCart = cartExpressEligibility(items.map(item => item.product));
+
+  // Synchronously gate hydrationPromiseRef when userId transitions to an
+  // authenticated value before the hydration effect has had a chance to run.
+  // Without this, addItem can resolve the stale Promise.resolve() and see
+  // hydratedRef === false, silently returning false (Cart stays at 0).
+  if (!authLoading && userId !== 'guest' && lastHydrationUserRef.current !== userId) {
+    lastHydrationUserRef.current = userId;
+    let resolve: () => void;
+    hydrationPromiseRef.current = new Promise<void>(r => { resolve = r; });
+    hydrationResolveRef.current = resolve!;
+  }
 
   useEffect(() => {
     itemsRef.current = items;
@@ -83,16 +96,19 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
     serverCartSignatureRef.current = '';
 
     if (userId === 'guest') {
+      lastHydrationUserRef.current = null;
       const guestItems = readGuestCart();
       itemsRef.current = guestItems;
       setItems(guestItems);
       ownerRef.current = 'guest';
       hydratedRef.current = true;
+      if (hydrationResolveRef.current) { hydrationResolveRef.current(); hydrationResolveRef.current = null; }
       hydrationPromiseRef.current = Promise.resolve();
       return;
     }
 
     setItems([]);
+    const pendingResolve = hydrationResolveRef.current;
     const hydrate = accountCartRepository.loadAndMigrate()
       .then(nextItems => {
         if (cancelled) return;
@@ -108,10 +124,14 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
         hydratedRef.current = false;
         itemsRef.current = [];
         setItems([]);
+      })
+      .finally(() => {
+        if (pendingResolve) pendingResolve();
+        hydrationResolveRef.current = null;
       });
     hydrationPromiseRef.current = hydrate.then(() => undefined);
 
-    return () => { cancelled = true; };
+    return () => { cancelled = true; if (pendingResolve) pendingResolve(); };
   }, [authLoading, userId]);
 
   useEffect(() => {
