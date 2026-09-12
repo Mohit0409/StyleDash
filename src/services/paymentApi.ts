@@ -4,6 +4,8 @@ export interface CheckoutItemInput {
   productId: string;
   variantId: string;
   quantity: number;
+  tryAtHomeVariantIds?: string[];
+  tryAtHomeTermsAccepted?: boolean;
 }
 
 export interface CheckoutAddressInput {
@@ -53,6 +55,7 @@ export interface ServerOrder {
   walletAmount: number; // Retained for historical persisted-order compatibility.
   deliveryFee: number;
   taxes: number;
+  tryAtHomeFee?: number;
   grandTotal: number;
   deliveryMethod: 'express' | 'standard' | 'none';
   estimatedDelivery: string;
@@ -89,6 +92,7 @@ export interface CreatePaymentOrderResponse {
     discount: number;
     deliveryFee: number;
     taxes: number;
+    tryAtHomeFee?: number;
     grandTotal: number;
   };
 }

@@ -10,6 +10,7 @@ import { useAuth } from './AuthContext';
 interface CartContextType {
   items: CartItem[];
   addItem: (product: Product, variantId: string, quantity?: number) => Promise<boolean>;
+  addTryAtHomeItem: (product: Product, variantIds: string[], termsAccepted: boolean) => Promise<boolean>;
   removeItem: (lineId: string) => void;
   updateQuantity: (lineId: string, quantity: number) => Promise<void>;
   clearCart: () => void;
@@ -21,6 +22,7 @@ interface CartContextType {
   couponDiscount: number;
   deliveryFee: number;
   taxes: number;
+  tryAtHomeFee: number;
   grandTotal: number;
   totalItemsCount: number;
   deliveryMethod: 'express' | 'standard';
@@ -240,6 +242,23 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return true;
   };
 
+  const addTryAtHomeItem = async (product: Product, variantIds: string[], termsAccepted: boolean): Promise<boolean> => {
+    if (!product.tryAtHomeAvailable || !termsAccepted || variantIds.length !== 2 || new Set(variantIds).size !== 2) return false;
+    const variants = variantIds.map(id => product.variants.find(variant => variant.id === id));
+    if (variants.some(variant => !variant)) return false;
+    const available = await Promise.all(variantIds.map(variantId => canAddVariantToCart(variantId)));
+    if (!available.every(Boolean)) return false;
+    const primary = variants[0]!;
+    const lineId = `${product.id}:try:${[...variantIds].sort().join(':')}`;
+    setItems(previous => previous.some(item => item.lineId === lineId) ? previous : [...previous, {
+      lineId, productId: product.id, product, variantId: primary.id,
+      selectedSize: variants.map(variant => variant!.size).join(' & '), selectedColour: primary.colourName,
+      sku: primary.sku, quantity: 1, unitPrice: primary.price ?? product.price,
+      tryAtHomeVariantIds: variantIds, tryAtHomeTermsAccepted: true,
+    }]);
+    return true;
+  };
+
   const removeItem = (lineId: string) => {
     setItems(prev => {
       const item = prev.find(candidate => candidate.lineId === lineId);
@@ -284,7 +303,8 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const subtotal = items.reduce((acc, item) => acc + item.unitPrice * item.quantity, 0);
   const totalItemsCount = items.reduce((acc, item) => acc + item.quantity, 0);
-  const { couponDiscount, discountTotal, deliveryFee, taxes, grandTotal } = calculateCartTotals({
+  const tryAtHomeFee = items.filter(item => item.tryAtHomeVariantIds?.length === 2).length * 50;
+  const { couponDiscount, discountTotal, deliveryFee, taxes, grandTotal: calculatedGrandTotal } = calculateCartTotals({
     subtotal,
     appliedCoupon,
     deliveryMethod,
@@ -294,6 +314,7 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
     <CartContext.Provider value={{
       items,
       addItem,
+      addTryAtHomeItem,
       removeItem,
       updateQuantity,
       clearCart,
@@ -305,7 +326,8 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
       couponDiscount,
       deliveryFee,
       taxes,
-      grandTotal,
+      tryAtHomeFee,
+      grandTotal: calculatedGrandTotal + tryAtHomeFee,
       totalItemsCount,
       deliveryMethod,
       setDeliveryMethod,

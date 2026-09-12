@@ -67,6 +67,8 @@ export interface Product {
   estimatedDeliveryMinutes?: number;
   returnWindowDays: number;
   exchangeAvailable: boolean;
+  /** Opt-in store-controlled offer; pricing/eligibility are always verified by the server. */
+  tryAtHomeAvailable?: boolean;
 
   // Multi-Store & Vendor Fields
   vendorId: string;
@@ -114,6 +116,8 @@ export interface CartItem {
   sku: string;
   quantity: number;
   unitPrice: number;
+  tryAtHomeVariantIds?: string[];
+  tryAtHomeTermsAccepted?: boolean;
 }
 
 export interface Address {

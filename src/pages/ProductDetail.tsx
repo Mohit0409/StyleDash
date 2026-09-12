@@ -16,7 +16,7 @@ import { CONFIG } from '../config';
 export const ProductDetail: React.FC = () => {
   const { slug } = useParams<{ slug: string }>();
   const navigate = useNavigate();
-  const { addItem } = useCart();
+  const { addItem, addTryAtHomeItem } = useCart();
   const { isInWishlist, toggleWishlist } = useWishlist();
   const { showToast } = useToast();
 
@@ -28,6 +28,8 @@ export const ProductDetail: React.FC = () => {
   const [quantity, setQuantity] = useState(1);
   const [sizeGuideOpen, setSizeGuideOpen] = useState(false);
   const [relatedProducts, setRelatedProducts] = useState<Product[]>([]);
+  const [tryAtHomeSizeIds, setTryAtHomeSizeIds] = useState<string[]>([]);
+  const [tryAtHomeTermsAccepted, setTryAtHomeTermsAccepted] = useState(false);
 
   const handleReviewSummaryChange = useCallback((rating: number, reviewCount: number) => {
     setProduct(current => current ? { ...current, rating, reviewCount } : current);
@@ -83,6 +85,16 @@ export const ProductDetail: React.FC = () => {
   const isWishlisted = isInWishlist(product.id);
 
   const handleAddToCart = async () => {
+    if (tryAtHomeSizeIds.length > 0) {
+      if (tryAtHomeSizeIds.length !== 2 || !tryAtHomeTermsAccepted) {
+        showToast('Select two sizes and accept the Try at Home terms.', 'error');
+        return false;
+      }
+      const success = await addTryAtHomeItem(product, tryAtHomeSizeIds, tryAtHomeTermsAccepted);
+      if (success) showToast(`Two sizes of ${product.name} are reserved for Try at Home.`, 'success');
+      else showToast('One of the selected sizes is out of stock.', 'error');
+      return success;
+    }
     if (!selectedVariant) {
       showToast('Please select a valid size and colour', 'error');
       return false;
@@ -225,6 +237,20 @@ export const ProductDetail: React.FC = () => {
             }}
             onOpenSizeGuide={() => setSizeGuideOpen(true)}
           />
+
+          {product.tryAtHomeAvailable && product.variants.filter(variant => variant.available === true).length >= 2 && (
+            <section className="rounded-2xl border border-lime-300 bg-lime-50 p-4 text-xs text-neutral-700 dark:border-lime-800 dark:bg-lime-950/30 dark:text-neutral-200" aria-labelledby="try-at-home-heading">
+              <h2 id="try-at-home-heading" className="font-black text-sm">Try two sizes at home</h2>
+              <p className="mt-1">Choose exactly two sizes. A ₹50 Try at Home fee is added securely at checkout. You have 15 minutes to decide; extra time costs ₹50.</p>
+              <div className="mt-3 flex flex-wrap gap-2">
+                {product.variants.filter(variant => variant.available === true).map(variant => {
+                  const selected = tryAtHomeSizeIds.includes(variant.id);
+                  return <button key={variant.id} type="button" onClick={() => setTryAtHomeSizeIds(current => selected ? current.filter(id => id !== variant.id) : current.length < 2 ? [...current, variant.id] : current)} className={`rounded-lg border px-3 py-2 font-bold ${selected ? 'border-lime-600 bg-lime-400 text-neutral-950' : 'border-neutral-300 bg-white dark:border-neutral-700 dark:bg-neutral-900'}`}>{variant.size}</button>;
+                })}
+              </div>
+              <label className="mt-3 flex gap-2 leading-relaxed"><input type="checkbox" checked={tryAtHomeTermsAccepted} onChange={event => setTryAtHomeTermsAccepted(event.target.checked)} className="mt-0.5 accent-lime-600" /> I agree to return the unselected size to the delivery partner within 15 minutes and understand the ₹50 late-selection charge.</label>
+            </section>
+          )}
 
           {/* Stock Status Badge */}
           {selectedVariant && (

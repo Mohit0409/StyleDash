@@ -157,6 +157,7 @@ export interface SellerProductDraft {
   colourHex?: string;
   imageUrls: string[];
   attributes: Record<string, string>;
+  tryAtHomeEnabled?: boolean;
 }
 
 export interface SellerProduct extends Omit<SellerProductDraft, 'variants' | 'inventory' | 'size'> {
@@ -172,6 +173,10 @@ export interface SellerProduct extends Omit<SellerProductDraft, 'variants' | 'in
   updatedAt: string;
   submittedAt?: string | null;
   publishedAt?: string | null;
+  tryAtHomeEnabled?: boolean;
+  /** Private-admin-only fields. Seller endpoints never return these. */
+  commissionPaise?: number;
+  customerPricePaise?: number;
 }
 
 export type SellerProductChangeDraft = Omit<SellerProductDraft, 'inventory' | 'size' | 'variants'> & {
