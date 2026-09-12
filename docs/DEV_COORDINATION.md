@@ -138,3 +138,19 @@ DEV2 may use these fields for receipt/tracking display only. DEV2 must not infer
 - **RESULT:** Developer PASS only. No production deployment or Goutam Shoes product publication performed.
 - **MANUAL ACTION REQUIRED:** independent Tester must test exact implementation commit; Security must review admin auth/CSRF/media/network-boundary behavior; Manager decides release only after both PASS.
 - **NEXT ROLE:** Tester.
+
+## Login + Store Creation Reliability candidate — 2026-09-12
+- **Scope:** returning customer OTP login reliability + private-admin store creation persistence verification.
+- **Branch:** `agent/login-store-fixes` based on live `main` `7b739e008d863d9230921153d551a1d7af8e02d4`.
+- **Candidate HEAD:** `c855c31a78cb39c02cea7db122a6e62044495732` before this coordination-only commit.
+- **Functional commits:** `1dd9fc3` (`fix: allow verified OTP login for saved Google mobile`) and `c855c31` (`fix: verify admin store creation persistence`).
+- **Files changed vs live main:** `scripts/styledash_security.py`, `server/admin/admin.js`, `server/tests/test_federated_auth.py` only.
+- **Conflict resolution:** retained current admin logo/cover upload workflow and added post-create ACTIVE response + persistence verification.
+- **Targeted tests:** 46/46 PASS; admin JavaScript syntax PASS; `git diff --check` PASS.
+- **Frontend:** typecheck PASS, lint PASS, unit 97/97 PASS.
+- **Backend:** portable suite 239/239 PASS with 1 expected skip; all 4 Termux runtime process-control tests PASS on the actual production phone using an isolated staging copy.
+- **Security/dependency gate:** `npm audit --omit=dev` = 0 vulnerabilities.
+- **Browser regression:** full Playwright desktop + mobile PASS: 150 passed, 2 expected skips (152 total cases), using supported Python 3.12 test runtime.
+- **Validation-host note:** default Windows Store Python 3.7 cannot import project dependencies; this was an environment issue only and was corrected with `STYLEDASH_E2E_PYTHON` / `STYLEDASH_VERIFY_PYTHON` pointing to Python 3.12.
+- **Production:** NOT DEPLOYED. Live remains on `7b739e0` (Cart race fix release).
+- **Release gate:** developer regression PASS. Next required steps are PR/required GitHub checks, merge approval, then protected production deployment + live login/store smoke verification.
