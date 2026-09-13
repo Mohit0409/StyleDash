@@ -1,0 +1,7 @@
+{
+  "type": "FeatureCollection",
+  "version": 1,
+  "enforcementMode": "pincode",
+  "description": "Vibe4You Neemuch delivery zones. Polygon enforcement stays disabled until the owner-approved boundary is captured as precise coordinates.",
+  "features": []
+}
