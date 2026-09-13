@@ -865,6 +865,7 @@ class AdminStoreTests(unittest.TestCase):
         self.assertIn("Changed field", admin_ui)
         self.assertNotIn("JSON.stringify(item.proposedProduct", admin_ui)
         self.assertIn("bulkTransition", admin_ui)
+        self.assertIn("cancellationRequest?.status==='requested'", admin_ui)
         self.assertIn("mark-cancellation-fee-paid", admin_ui)
         self.assertIn("mark-exchange-fee-paid", admin_ui)
         self.assertIn("matchesAdminSearch", admin_ui)

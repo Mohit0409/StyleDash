@@ -437,6 +437,7 @@ function orderActionLabel(value){return ({placed:'Confirm Stock',confirmed:'Conf
 function orderActions(order){
   const transitions={payment_pending:['cancelled'],payment_review_required:['placed','cancelled'],placed:['confirmed','cancelled'],confirmed:['preparing','packed','cancelled'],preparing:['out_for_delivery','cancelled'],packed:['out_for_delivery','cancelled'],out_for_delivery:['delivered','cancelled']};
   const actions=transitions[order.status]||[];
+  if(order.cancellationRequest?.status==='requested')return actions.filter(status=>status==='cancelled');
   if(order.status==='payment_pending'&&order.paymentStatus!=='refunded') return [];
   return order.paymentStatus==='refunded'
     ? actions.filter(status=>status==='cancelled')

@@ -507,6 +507,17 @@ class AdminApplication:
             current = order.get("status", "placed")
             if requested not in transitions.get(current, set()):
                 raise SecurityError(409, "Invalid order status transition.", "invalid_transition")
+            cancellation_request = order.get("cancellationRequest")
+            if (
+                isinstance(cancellation_request, dict)
+                and cancellation_request.get("status") == "requested"
+                and requested != "cancelled"
+            ):
+                raise SecurityError(
+                    409,
+                    "A customer cancellation request is pending. Resolve the cancellation before continuing fulfillment.",
+                    "cancellation_pending",
+                )
             cancellation_reason = None
             if requested == "cancelled":
                 if not isinstance(reason, str) or not 3 <= len(reason.strip()) <= 500:
@@ -551,7 +562,6 @@ class AdminApplication:
                 self._resolve_order_alerts(state, order, {"inventory_shortfall_after_capture"}, now)
 
             elif requested == "cancelled":
-                cancellation_request = order.get("cancellationRequest")
                 if (
                     current == "out_for_delivery"
                     and isinstance(cancellation_request, dict)
