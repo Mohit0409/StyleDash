@@ -7,6 +7,7 @@ import threading
 import unittest
 import urllib.error
 import urllib.request
+from datetime import datetime
 from http.cookiejar import CookieJar
 from unittest.mock import patch
 from pathlib import Path
@@ -150,6 +151,41 @@ class AdminStoreTests(unittest.TestCase):
         metadata = json.loads(audit["metadata_json"])
         self.assertEqual(metadata["collectionMethod"], "cash")
         self.assertEqual(metadata["paymentCollectedAt"], paid["paymentCollectedAt"])
+
+    def test_try_at_home_delivery_timer_and_late_fee_collection_are_admin_controlled(self):
+        app = ADMIN_SERVER.AdminApplication(
+            self.database, self.key, ROOT / "server/payment-data/catalog.json",
+            ROOT / "server/payment-data/settings.json", self.root / "data-try-home",
+        )
+        with app.payments.store.lock:
+            app.payments.store.state["orders"]["TRY-HOME-ADMIN"] = {
+                "id": "TRY-HOME-ADMIN", "userId": "customer-try-home", "paymentMethod": "cod",
+                "paymentStatus": "paid", "status": "out_for_delivery", "fulfillmentRequired": True,
+                "createdAt": "2026-09-13T09:00:00+00:00", "updatedAt": "2026-09-13T09:00:00+00:00",
+                "statusHistory": [], "items": [{"productId": "sd-prod-001", "variantId": "sd-prod-001-var-1",
+                "quantity": 1, "tryAtHome": {"status": "reserved", "tryMinutes": 15}}],
+            }
+            app.payments.store.save()
+        delivered = app.update_order_status(self.admin["id"], "TRY-HOME-ADMIN", "delivered")
+        trial = delivered["items"][0]["tryAtHome"]
+        self.assertEqual(trial["status"], "active")
+        self.assertTrue(trial["startedAt"].endswith("+00:00"))
+        start = datetime.fromisoformat(trial["startedAt"])
+        deadline = datetime.fromisoformat(trial["deadlineAt"])
+        self.assertEqual(int((deadline - start).total_seconds()), 15 * 60)
+        with app.payments.store.lock:
+            order = app.payments.store.state["orders"]["TRY-HOME-ADMIN"]
+            order["tryAtHomeLateFeeDue"] = 50
+            order["tryAtHomeLateFeePaid"] = False
+            app.payments.store.save()
+        paid = app.mark_try_at_home_late_fee_paid(self.admin["id"], "TRY-HOME-ADMIN", "upi_at_delivery")
+        self.assertTrue(paid["tryAtHomeLateFeePaid"])
+        self.assertEqual(paid["tryAtHomeLateFeeCollectionMethod"], "upi_at_delivery")
+        self.assert_error("late_fee_already_paid", lambda: app.mark_try_at_home_late_fee_paid(self.admin["id"], "TRY-HOME-ADMIN", "cash"))
+        audit = next(row for row in self.store.audit() if row["action"] == "try_at_home_late_fee_paid")
+        metadata = json.loads(audit["metadata_json"])
+        self.assertEqual(metadata["amount"], 50)
+        self.assertEqual(metadata["collectionMethod"], "upi_at_delivery")
 
     def test_private_admin_owner_mobile_required_email_optional_and_otp_binds(self):
         owner = self.store.create_customer_account(self.admin["id"], {

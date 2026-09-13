@@ -165,6 +165,57 @@ class PaymentServiceTests(unittest.TestCase):
             callback()
         self.assertEqual(caught.exception.code, code)
 
+    def test_try_at_home_reserves_two_sizes_and_releases_rejected_size(self) -> None:
+        product = self.service._static_products["sd-prod-001"]
+        original = dict(product)
+        self.service._static_products["sd-prod-001"] = {**product, "tryAtHomeAvailable": True}
+        try:
+            payload = self.payload(
+                paymentMethod="cod",
+                items=[{
+                    "productId": "sd-prod-001",
+                    "variantId": "sd-prod-001-var-1",
+                    "quantity": 1,
+                    "tryAtHomeVariantIds": ["sd-prod-001-var-1", "sd-prod-001-var-2"],
+                    "tryAtHomeTermsAccepted": True,
+                }],
+            )
+            quote = self.service.calculate_order(payload)
+            self.assertEqual((quote["subtotal"], quote["tryAtHomeFee"], quote["grandTotal"]), (473, 50, 523))
+            self.assertEqual(quote["items"][0]["reservedVariantIds"], ["sd-prod-001-var-1", "sd-prod-001-var-2"])
+            cross_colour = self.payload(paymentMethod="cod", items=[{
+                "productId": "sd-prod-001", "variantId": "sd-prod-001-var-1", "quantity": 1,
+                "tryAtHomeVariantIds": ["sd-prod-001-var-1", "sd-prod-001-var-7"],
+                "tryAtHomeTermsAccepted": True,
+            }])
+            self.assert_api_error("invalid_try_at_home_sizes", lambda: self.service.calculate_order(cross_colour))
+            placed = self.service.place_cod_order(payload, "try-home-cod-001")["order"]
+            self.assertEqual(self.service.store.state["inventory"]["sd-prod-001-var-1"], 14)
+            self.assertEqual(self.service.store.state["inventory"]["sd-prod-001-var-2"], 14)
+            with self.service.store.lock:
+                stored = self.service.store.state["orders"][placed["id"]]
+                stored["status"] = "delivered"
+                stored["items"][0]["tryAtHome"].update({
+                    "status": "active",
+                    "startedAt": "2026-09-13T10:00:00+00:00",
+                    "deadlineAt": "2026-09-13T10:15:00+00:00",
+                })
+                self.service.store.save()
+            selected = self.service.finalize_try_at_home(
+                placed["id"], "test-user", 0, "sd-prod-001-var-1",
+                now=SERVER.datetime(2026, 9, 13, 10, 16, tzinfo=SERVER.timezone.utc),
+            )
+            self.assertEqual(selected["tryAtHomeLateFeeDue"], 50)
+            self.assertFalse(selected["tryAtHomeLateFeePaid"])
+            self.assertEqual(selected["items"][0]["tryAtHome"]["keptSize"], "S")
+            self.assertEqual(self.service.store.state["inventory"]["sd-prod-001-var-1"], 14)
+            self.assertEqual(self.service.store.state["inventory"]["sd-prod-001-var-2"], 15)
+            repeated = self.service.finalize_try_at_home(placed["id"], "test-user", 0, "sd-prod-001-var-1")
+            self.assertEqual(repeated["tryAtHomeLateFeeDue"], 50)
+            self.assertEqual(self.service.store.state["inventory"]["sd-prod-001-var-2"], 15)
+        finally:
+            self.service._static_products["sd-prod-001"] = original
+
     def test_catalog_refresh_does_not_take_payment_state_file_lock(self) -> None:
         class ForbiddenStateLock:
             def __enter__(self):
@@ -2596,7 +2647,7 @@ class HttpApiTests(unittest.TestCase):
         status, live_while_pending, _headers = self.get_json("/api/shop-products/published")
         self.assertEqual(
             (live_while_pending["products"][0]["name"], live_while_pending["products"][0]["price"]),
-            ("HTTP Published Kurta", 1599),
+            ("HTTP Published Kurta", 1694.94),
         )
         self.service.shops.admin_transition_product_change_request(
             "http-admin", change_id, "UNDER_REVIEW"
@@ -2607,7 +2658,7 @@ class HttpApiTests(unittest.TestCase):
         status, live_after_approval, _headers = self.get_json("/api/shop-products/published")
         self.assertEqual(
             (live_after_approval["products"][0]["name"], live_after_approval["products"][0]["price"]),
-            ("HTTP Reviewed Kurta", 1499),
+            ("HTTP Reviewed Kurta", 1588.94),
         )
         status, seller_products_after, _headers = self.get_json(
             "/api/shop-products", {"Cookie": session_headers["Cookie"]}

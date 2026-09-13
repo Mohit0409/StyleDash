@@ -9,6 +9,13 @@ export const orderApi = {
   async one(id: string): Promise<ServerOrder> {
     return (await apiFetch<{ success: true; order: ServerOrder }>(`/api/orders/${encodeURIComponent(id)}`)).order;
   },
+  async finalizeTryAtHome(id: string, itemIndex: number, keptVariantId: string): Promise<ServerOrder> {
+    return (await apiJson<{ success: true; order: ServerOrder }>(
+      `/api/orders/${encodeURIComponent(id)}/try-at-home`,
+      'POST',
+      { itemIndex, keptVariantId },
+    )).order;
+  },
   async receipt(id: string): Promise<{ blob: Blob; filename: string }> {
     const response = await fetch(`/api/orders/${encodeURIComponent(id)}/receipt`, { credentials: 'include' });
     if (!response.ok) {

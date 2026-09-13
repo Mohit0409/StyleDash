@@ -246,6 +246,8 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (!product.tryAtHomeAvailable || !termsAccepted || variantIds.length !== 2 || new Set(variantIds).size !== 2) return false;
     const variants = variantIds.map(id => product.variants.find(variant => variant.id === id));
     if (variants.some(variant => !variant)) return false;
+    const [first, second] = variants;
+    if (!first || !second || first.size === second.size || first.colourName !== second.colourName) return false;
     const available = await Promise.all(variantIds.map(variantId => canAddVariantToCart(variantId)));
     if (!available.every(Boolean)) return false;
     const primary = variants[0]!;

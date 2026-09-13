@@ -81,6 +81,11 @@ export const ProductDetail: React.FC = () => {
     v => v.size === selectedSize && v.colourName === selectedColour
   ) || null;
   const selectedColourImages = product.variants.find(v => v.colourName === selectedColour)?.images || product.images;
+  const tryAtHomeVariants = product.variants.filter(
+    variant => variant.available === true && variant.colourName === selectedColour,
+  );
+  const tryAtHomeEligible = product.tryAtHomeAvailable === true
+    && new Set(tryAtHomeVariants.map(variant => variant.size)).size >= 2;
 
   const isWishlisted = isInWishlist(product.id);
 
@@ -231,6 +236,8 @@ export const ProductDetail: React.FC = () => {
             selectedColour={selectedColour}
             onSelectColour={(c) => {
               setSelectedColour(c);
+              setTryAtHomeSizeIds([]);
+              setTryAtHomeTermsAccepted(false);
               const firstSize = product.variants.find(variant => variant.colourName === c && variant.available === true)
                 || product.variants.find(variant => variant.colourName === c);
               setSelectedSize(firstSize?.size || null);
@@ -238,12 +245,12 @@ export const ProductDetail: React.FC = () => {
             onOpenSizeGuide={() => setSizeGuideOpen(true)}
           />
 
-          {product.tryAtHomeAvailable && product.variants.filter(variant => variant.available === true).length >= 2 && (
+          {tryAtHomeEligible && (
             <section className="rounded-2xl border border-lime-300 bg-lime-50 p-4 text-xs text-neutral-700 dark:border-lime-800 dark:bg-lime-950/30 dark:text-neutral-200" aria-labelledby="try-at-home-heading">
               <h2 id="try-at-home-heading" className="font-black text-sm">Try two sizes at home</h2>
-              <p className="mt-1">Choose exactly two sizes. A ₹50 Try at Home fee is added securely at checkout. You have 15 minutes to decide; extra time costs ₹50.</p>
+              <p className="mt-1">Choose exactly two sizes of the selected colour. A ₹50 Try at Home fee is added securely at checkout. You have 15 minutes to decide; extra time costs ₹50.</p>
               <div className="mt-3 flex flex-wrap gap-2">
-                {product.variants.filter(variant => variant.available === true).map(variant => {
+                {tryAtHomeVariants.map(variant => {
                   const selected = tryAtHomeSizeIds.includes(variant.id);
                   return <button key={variant.id} type="button" onClick={() => setTryAtHomeSizeIds(current => selected ? current.filter(id => id !== variant.id) : current.length < 2 ? [...current, variant.id] : current)} className={`rounded-lg border px-3 py-2 font-bold ${selected ? 'border-lime-600 bg-lime-400 text-neutral-950' : 'border-neutral-300 bg-white dark:border-neutral-700 dark:bg-neutral-900'}`}>{variant.size}</button>;
                 })}

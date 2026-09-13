@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { clearCsrfToken, setCsrfToken } from '../services/apiClient';
-import { publicStoreApi, shopProductApi, vendorApplicationApi } from '../services/businessApi';
+import { orderApi, publicStoreApi, shopProductApi, vendorApplicationApi } from '../services/businessApi';
 
 const application = {
   id: 'shop-1',
@@ -30,6 +30,26 @@ describe('public store API', () => {
     const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(jsonResponse({ success: true, stores: [store] }));
     await expect(publicStoreApi.active()).resolves.toEqual([store]);
     expect(fetchSpy).toHaveBeenCalledWith('/api/stores/active', expect.objectContaining({ credentials: 'include' }));
+  });
+});
+
+describe('Try at Home order API', () => {
+  afterEach(() => {
+    clearCsrfToken();
+    vi.restoreAllMocks();
+  });
+
+  it('posts the kept size through an authenticated CSRF-protected order endpoint', async () => {
+    setCsrfToken('csrf-try-home');
+    const order = { id: 'ORDER-TRY-1', items: [] };
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(jsonResponse({ success: true, order }));
+    await expect(orderApi.finalizeTryAtHome('ORDER-TRY-1', 0, 'variant-large')).resolves.toEqual(order);
+    const [endpoint, init] = fetchSpy.mock.calls[0] as [RequestInfo | URL, RequestInit];
+    expect(endpoint).toBe('/api/orders/ORDER-TRY-1/try-at-home');
+    expect(init.method).toBe('POST');
+    expect(init.credentials).toBe('include');
+    expect(new Headers(init.headers).get('X-CSRF-Token')).toBe('csrf-try-home');
+    expect(JSON.parse(String(init.body))).toEqual({ itemIndex: 0, keptVariantId: 'variant-large' });
   });
 });
 

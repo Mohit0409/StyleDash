@@ -480,8 +480,9 @@ class AdminFullProductEditTests(unittest.TestCase):
     def test_admin_full_product_edit_exposes_catalog_fields_and_safe_live_stock_sync(self):
         source = (ROOT / "server" / "admin" / "admin.js").read_text(encoding="utf-8")
         for label in (
-            "Brand (optional)", "Department", "Category", "Colours & Variants",
-            "Sizes & stock", "Colour name", "Colour hex (optional)",
+            "Brand (optional)", "Department", "Category", "Product options",
+            "Images, options & stock", "Colour / shade name", "Colour hex (optional)",
+            "Sizes / volumes & stock", "Try at Home offer",
             "HTTPS image URLs (optional fallback)",
         ):
             self.assertIn(label, source)
@@ -490,4 +491,4 @@ class AdminFullProductEditTests(unittest.TestCase):
         self.assertIn("JSON.stringify({status:'PUBLISHED'})", source)
         self.assertIn("/api/admin/inventory?low=0&q=", source)
         self.assertIn("record.variantId===variant.id", source)
-        self.assertIn("All product colours, images, sizes, stock and details updated.", source)
+        self.assertIn("Product details, images, options and stock updated", source)

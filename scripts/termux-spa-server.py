@@ -75,6 +75,9 @@ PRODUCT_IMAGE_MAX_BYTES = 500 * 1024
 PRODUCT_IMAGE_REQUEST_MAX_BYTES = 700 * 1024
 PRODUCT_IMAGE_ROUTE_PATTERN = re.compile(r"^/media/product-images/([0-9a-f]{32}\.(?:webp|jpg|png))$")
 API_PREFIX = "/api/"
+TRY_AT_HOME_FEE_RUPEES = 50
+TRY_AT_HOME_LATE_FEE_RUPEES = 50
+TRY_AT_HOME_MINUTES = 15
 
 
 
@@ -974,6 +977,7 @@ class PaymentService:
         address = self._validate_address(payload)
         trusted_items: list[dict[str, Any]] = []
         subtotal = Decimal("0")
+        try_at_home_fee = Decimal("0")
         seen_variants: set[str] = set()
         max_quantity = int(self.settings["maxQuantityPerItem"])
 
@@ -1006,14 +1010,33 @@ class PaymentService:
                     raise ApiError(HTTPStatus.UNPROCESSABLE_ENTITY, "Invalid item quantity.", "invalid_quantity")
                 if variant_id in seen_variants:
                     raise ApiError(HTTPStatus.UNPROCESSABLE_ENTITY, "Duplicate cart item.", "invalid_cart")
-                seen_variants.add(variant_id)
-                available = self._inventory(state, variant)
-                if available < quantity:
-                    raise ApiError(
-                        HTTPStatus.CONFLICT,
-                        f"Only {available} unit(s) remain for {product['name']}.",
-                        "insufficient_stock",
-                    )
+                try_variant_ids = item.get("tryAtHomeVariantIds")
+                is_try_at_home = try_variant_ids is not None
+                reserved_variant_ids = [variant_id]
+                selected_variants = [variant]
+                if is_try_at_home:
+                    if product.get("tryAtHomeAvailable") is not True:
+                        raise ApiError(HTTPStatus.UNPROCESSABLE_ENTITY, "Try at Home is not available for this product.", "try_at_home_unavailable")
+                    if quantity != 1 or item.get("tryAtHomeTermsAccepted") is not True:
+                        raise ApiError(HTTPStatus.UNPROCESSABLE_ENTITY, "Accept the Try at Home terms and select two sizes.", "try_at_home_terms_required")
+                    if not isinstance(try_variant_ids, list) or len(try_variant_ids) != 2 or any(not isinstance(value, str) for value in try_variant_ids):
+                        raise ApiError(HTTPStatus.UNPROCESSABLE_ENTITY, "Choose exactly two distinct sizes for Try at Home.", "invalid_try_at_home_sizes")
+                    if variant_id not in try_variant_ids or len(set(try_variant_ids)) != 2:
+                        raise ApiError(HTTPStatus.UNPROCESSABLE_ENTITY, "Choose exactly two distinct sizes for Try at Home.", "invalid_try_at_home_sizes")
+                    selected_variants = [next((entry for entry in product["variants"] if entry["id"] == candidate_id and entry.get("active") is not False), None) for candidate_id in try_variant_ids]
+                    if any(candidate is None for candidate in selected_variants):
+                        raise ApiError(HTTPStatus.UNPROCESSABLE_ENTITY, "A selected Try at Home size is unavailable.", "invalid_try_at_home_sizes")
+                    if selected_variants[0]["size"] == selected_variants[1]["size"] or selected_variants[0].get("colourName") != selected_variants[1].get("colourName"):
+                        raise ApiError(HTTPStatus.UNPROCESSABLE_ENTITY, "Choose two different sizes of the same colour.", "invalid_try_at_home_sizes")
+                    if any(_money(candidate.get("price", product["price"]), "price") != _money(variant.get("price", product["price"]), "price") for candidate in selected_variants):
+                        raise ApiError(HTTPStatus.UNPROCESSABLE_ENTITY, "Try at Home requires both sizes to have the same final price.", "try_at_home_price_mismatch")
+                    reserved_variant_ids = list(try_variant_ids)
+                    try_at_home_fee += Decimal(TRY_AT_HOME_FEE_RUPEES)
+                if any(candidate_id in seen_variants for candidate_id in reserved_variant_ids):
+                    raise ApiError(HTTPStatus.UNPROCESSABLE_ENTITY, "A size can be reserved only once per order.", "invalid_cart")
+                seen_variants.update(reserved_variant_ids)
+                if any(self._inventory(state, candidate) < quantity for candidate in selected_variants):
+                    raise ApiError(HTTPStatus.CONFLICT, f"A selected size of {product['name']} is no longer available.", "insufficient_stock")
                 unit_price = _money(variant.get("price", product["price"]), "price")
                 line_total = unit_price * quantity
                 subtotal += line_total
@@ -1028,6 +1051,18 @@ class PaymentService:
                         "quantity": quantity,
                         "unitPrice": _rounded_rupees(unit_price),
                         "lineTotal": _rounded_rupees(line_total),
+                        "reservedVariantIds": reserved_variant_ids,
+                    }
+                if is_try_at_home:
+                    trusted_item["tryAtHome"] = {
+                        "originalVariantIds": list(reserved_variant_ids),
+                        "selectedSizes": [candidate["size"] for candidate in selected_variants],
+                        "selectedColour": selected_variants[0].get("colourName"),
+                        "fee": TRY_AT_HOME_FEE_RUPEES,
+                        "tryMinutes": TRY_AT_HOME_MINUTES,
+                        "lateFee": TRY_AT_HOME_LATE_FEE_RUPEES,
+                        "termsAccepted": True,
+                        "status": "reserved",
                     }
                 for key, value in (
                     ("storeId", product.get("vendorId")),
@@ -1074,7 +1109,7 @@ class PaymentService:
                 taxable_merchandise_total * tax_rate / (Decimal("1") + tax_rate)
             )
         )
-        grand_total = taxable_merchandise_total + delivery_fee
+        grand_total = taxable_merchandise_total + delivery_fee + try_at_home_fee
         amount_paise = _rounded_rupees(grand_total * Decimal("100"))
         if amount_paise < 100:
             raise ApiError(HTTPStatus.UNPROCESSABLE_ENTITY, "Order total is below the minimum amount.", "invalid_amount")
@@ -1090,6 +1125,7 @@ class PaymentService:
             "walletAmount": 0,
             "deliveryFee": _rounded_rupees(delivery_fee),
             "taxes": _rounded_rupees(taxes),
+            "tryAtHomeFee": _rounded_rupees(try_at_home_fee),
             "grandTotal": _rounded_rupees(grand_total),
             "amount": amount_paise,
             "currency": self.settings["currency"],
@@ -1111,13 +1147,14 @@ class PaymentService:
         display_order = self.order_for_display(order)
         allowed = (
             "id", "userId", "items", "address", "paymentMethod", "paymentStatus",
-            "subtotal", "discount", "walletAmount", "deliveryFee", "taxes", "grandTotal",
+            "subtotal", "discount", "walletAmount", "deliveryFee", "taxes", "tryAtHomeFee", "grandTotal",
             "deliveryMethod", "estimatedDelivery", "status", "statusHistory", "createdAt",
             "updatedAt", "razorpayOrderId", "razorpayPaymentId", "paymentVerifiedAt",
             "paymentCollectionMethod", "paymentCollectedAt",
             "isPaymentTestOrder", "fulfillmentRequired", "adminLabels", "inventoryCommitted",
             "inventoryReleasedAt", "refundId", "refundAmount", "refundCurrency", "refundProcessedAt",
-            "cancellationReason", "cancelledAt",
+            "cancellationReason", "cancelledAt", "tryAtHomeLateFeeDue", "tryAtHomeLateFeePaid",
+            "tryAtHomeLateFeeCollectionMethod", "tryAtHomeLateFeeCollectedAt",
         )
         return {key: display_order[key] for key in allowed if key in display_order}
 
@@ -1135,6 +1172,7 @@ class PaymentService:
                 "discount": order["discount"],
                 "deliveryFee": order["deliveryFee"],
                 "taxes": order["taxes"],
+                **({"tryAtHomeFee": order["tryAtHomeFee"]} if order.get("tryAtHomeFee", 0) else {}),
                 "grandTotal": order["grandTotal"],
             },
         }
@@ -1367,6 +1405,14 @@ class PaymentService:
             "remaining": after,
         }
 
+    @staticmethod
+    def _reserved_variant_ids(item: dict[str, Any]) -> list[str]:
+        raw = item.get("reservedVariantIds")
+        if isinstance(raw, list) and raw and all(isinstance(value, str) and value for value in raw):
+            return list(dict.fromkeys(raw))
+        variant_id = item.get("variantId")
+        return [variant_id] if isinstance(variant_id, str) and variant_id else []
+
     def _try_decrement_inventory(
         self,
         state: dict[str, Any],
@@ -1374,72 +1420,43 @@ class PaymentService:
         *,
         inventory_alerts: list[dict[str, Any]] | None = None,
     ) -> bool:
-        """Commit all requested inventory or none of it."""
-
+        """Commit all normal and Try-at-Home reserved inventory or none of it."""
         products = self.product_snapshot()
-        checked: list[
-            tuple[
-                dict[str, Any],
-                dict[str, Any],
-                int,
-                int,
-            ]
-        ] = []
-
+        checked: list[tuple[dict[str, Any], dict[str, Any], int, int]] = []
+        requested: set[str] = set()
         for item in items:
             if not isinstance(item, dict):
                 return False
-
             product = products.get(item.get("productId"))
-
             if not isinstance(product, dict):
                 return False
-
-            variant = next(
-                (
-                    entry
-                    for entry in product.get("variants", [])
-                    if entry.get("id") == item.get("variantId")
-                ),
-                None,
-            )
-
-            if not isinstance(variant, dict):
-                return False
-
             try:
-                remaining = self._inventory(state, variant)
                 quantity = int(item.get("quantity", 0))
-            except (KeyError, TypeError, ValueError):
+            except (TypeError, ValueError):
                 return False
-
-            if quantity <= 0 or remaining < quantity:
+            if quantity <= 0:
                 return False
-
-            checked.append(
-                (
-                    product,
-                    variant,
-                    remaining,
-                    quantity,
-                )
-            )
-
+            variant_ids = self._reserved_variant_ids(item)
+            if not variant_ids:
+                return False
+            for variant_id in variant_ids:
+                if variant_id in requested:
+                    return False
+                requested.add(variant_id)
+                variant = next((entry for entry in product.get("variants", []) if entry.get("id") == variant_id), None)
+                if not isinstance(variant, dict):
+                    return False
+                remaining = self._inventory(state, variant)
+                if remaining < quantity:
+                    return False
+                checked.append((product, variant, remaining, quantity))
         for product, variant, remaining, quantity in checked:
             after = remaining - quantity
             state["inventory"][variant["id"]] = after
-
             if inventory_alerts is not None:
-                alert = self._inventory_alert_for_change(
-                    product,
-                    variant,
-                    remaining,
-                    after,
-                )
-
+                alert = self._inventory_alert_for_change(product, variant, remaining, after)
                 if alert is not None:
                     inventory_alerts.append(alert)
-
         return True
 
     def _decrement_inventory(
@@ -1465,36 +1482,95 @@ class PaymentService:
         state: dict[str, Any],
         order: dict[str, Any],
     ) -> bool:
-        """Release committed inventory exactly once."""
+        """Release committed inventory exactly once, including Try-at-Home reservations."""
         committed = order.get("inventoryCommitted")
         if committed is None:
-            # Historical COD orders always decremented stock at placement.
-            # Do not infer committed inventory for online orders: a signed
-            # refund can arrive even when this server missed the capture event.
             committed = order.get("paymentMethod") == "cod"
         if committed is not True:
             return False
-
         products = self.product_snapshot()
         restored: list[tuple[str, int, int]] = []
+        seen: set[str] = set()
         for item in order.get("items", []):
             product = products.get(item.get("productId"))
             if not isinstance(product, dict):
                 raise ApiError(HTTPStatus.CONFLICT, "Inventory could not be released safely.", "inventory_release_failed")
-            variant = next(
-                (entry for entry in product.get("variants", []) if entry.get("id") == item.get("variantId")),
-                None,
-            )
-            quantity = int(item.get("quantity", 0))
-            if variant is None or quantity <= 0:
+            try:
+                quantity = int(item.get("quantity", 0))
+            except (TypeError, ValueError):
+                quantity = 0
+            if quantity <= 0:
                 raise ApiError(HTTPStatus.CONFLICT, "Inventory could not be released safely.", "inventory_release_failed")
-            restored.append((variant["id"], self._inventory(state, variant), quantity))
-
+            for variant_id in self._reserved_variant_ids(item):
+                if variant_id in seen:
+                    raise ApiError(HTTPStatus.CONFLICT, "Inventory could not be released safely.", "inventory_release_failed")
+                seen.add(variant_id)
+                variant = next((entry for entry in product.get("variants", []) if entry.get("id") == variant_id), None)
+                if variant is None:
+                    raise ApiError(HTTPStatus.CONFLICT, "Inventory could not be released safely.", "inventory_release_failed")
+                restored.append((variant_id, self._inventory(state, variant), quantity))
         for variant_id, current, quantity in restored:
             state["inventory"][variant_id] = current + quantity
         order["inventoryCommitted"] = False
         order["inventoryReleasedAt"] = datetime.now(timezone.utc).isoformat()
         return True
+
+    def finalize_try_at_home(self, order_id: str, user_id: str, item_index: int, kept_variant_id: str, now: datetime | None = None) -> dict[str, Any]:
+        if isinstance(item_index, bool) or not isinstance(item_index, int) or item_index < 0:
+            raise ApiError(HTTPStatus.BAD_REQUEST, "Choose a valid Try at Home item.", "invalid_try_at_home_item")
+        if not isinstance(kept_variant_id, str) or not kept_variant_id:
+            raise ApiError(HTTPStatus.BAD_REQUEST, "Choose the size you want to keep.", "invalid_try_at_home_size")
+        current_time = now or datetime.now(timezone.utc)
+        with self.store.lock:
+            order = self.store.state["orders"].get(order_id)
+            if order is None or order.get("userId") != user_id:
+                raise ApiError(HTTPStatus.NOT_FOUND, "Order not found.", "order_not_found")
+            if order.get("status") != "delivered":
+                raise ApiError(HTTPStatus.CONFLICT, "Try at Home selection starts after delivery.", "try_at_home_not_started")
+            items = order.get("items")
+            if not isinstance(items, list) or item_index >= len(items):
+                raise ApiError(HTTPStatus.BAD_REQUEST, "Choose a valid Try at Home item.", "invalid_try_at_home_item")
+            item = items[item_index]
+            trial = item.get("tryAtHome") if isinstance(item, dict) else None
+            if not isinstance(trial, dict):
+                raise ApiError(HTTPStatus.BAD_REQUEST, "This item does not use Try at Home.", "invalid_try_at_home_item")
+            if trial.get("status") == "selected":
+                if trial.get("keptVariantId") == kept_variant_id:
+                    return self._public_order(order)
+                raise ApiError(HTTPStatus.CONFLICT, "The kept size has already been confirmed.", "try_at_home_already_selected")
+            reserved = self._reserved_variant_ids(item)
+            if len(reserved) != 2 or kept_variant_id not in reserved:
+                raise ApiError(HTTPStatus.BAD_REQUEST, "Choose one of the two delivered sizes.", "invalid_try_at_home_size")
+            deadline_raw = trial.get("deadlineAt")
+            if not isinstance(deadline_raw, str):
+                raise ApiError(HTTPStatus.CONFLICT, "The Try at Home timer has not started.", "try_at_home_not_started")
+            deadline = datetime.fromisoformat(deadline_raw.replace("Z", "+00:00"))
+            product = self.product_snapshot().get(item.get("productId"))
+            if not isinstance(product, dict):
+                raise ApiError(HTTPStatus.CONFLICT, "Product data is unavailable for Try at Home.", "try_at_home_product_unavailable")
+            kept = next((v for v in product.get("variants", []) if v.get("id") == kept_variant_id), None)
+            rejected_id = next((value for value in reserved if value != kept_variant_id), None)
+            rejected = next((v for v in product.get("variants", []) if v.get("id") == rejected_id), None)
+            if kept is None or rejected is None or order.get("inventoryCommitted") is not True:
+                raise ApiError(HTTPStatus.CONFLICT, "Reserved inventory is unavailable.", "try_at_home_inventory_unavailable")
+            quantity = int(item.get("quantity", 0))
+            if quantity <= 0:
+                raise ApiError(HTTPStatus.CONFLICT, "Reserved inventory is invalid.", "try_at_home_inventory_unavailable")
+            self.store.state["inventory"][rejected_id] = self._inventory(self.store.state, rejected) + quantity
+            selected_at = current_time.isoformat()
+            late = current_time > deadline
+            item.update({"variantId": kept["id"], "sku": kept["sku"], "size": kept["size"], "colourName": kept["colourName"], "reservedVariantIds": [kept_variant_id]})
+            trial.update({"status": "selected", "keptVariantId": kept_variant_id, "keptSize": kept["size"], "rejectedVariantId": rejected_id, "rejectedSize": rejected["size"], "selectedAt": selected_at, "lateFeeApplied": late})
+            if late:
+                order["tryAtHomeLateFeeDue"] = int(order.get("tryAtHomeLateFeeDue", 0) or 0) + TRY_AT_HOME_LATE_FEE_RUPEES
+                order["tryAtHomeLateFeePaid"] = False
+            order["updatedAt"] = selected_at
+            note = f"Try at Home size confirmed: {kept['size']} kept; {rejected['size']} returned"
+            if late:
+                note += f"; â‚¹{TRY_AT_HOME_LATE_FEE_RUPEES} late fee due"
+            order.setdefault("statusHistory", []).append({"status": "try_at_home_selected", "timestamp": selected_at, "note": note})
+            self.store.save()
+            return self._public_order(order)
 
     def _find_order_by_razorpay_id(self, razorpay_order_id: str) -> dict[str, Any] | None:
         return next(
@@ -2839,6 +2915,17 @@ class StyleDashRequestHandler(SimpleHTTPRequestHandler):
                     )
 
                 self._json_response(HTTPStatus.CREATED, result)
+                return
+            if path.startswith("/api/orders/") and path.endswith("/try-at-home"):
+                self._rate_limit("/api/orders/try-at-home", 20)
+                user, _session = self._current_user()
+                self._csrf()
+                order_id = unquote(path.removeprefix("/api/orders/").removesuffix("/try-at-home"))
+                if not order_id or "/" in order_id:
+                    raise SecurityError(404, "Order not found.", "order_not_found")
+                payload = self._read_json()
+                order = self.payment_service.finalize_try_at_home(order_id, user["id"], payload.get("itemIndex"), payload.get("keptVariantId"))
+                self._json_response(HTTPStatus.OK, {"success": True, "order": order})
                 return
             if path == "/api/reviews":
                 self._rate_limit("reviews:create", 10)

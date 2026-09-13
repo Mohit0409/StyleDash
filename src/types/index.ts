@@ -74,7 +74,6 @@ export interface Product {
   vendorId: string;
   storeName?: string;
   storeSlug?: string;
-  commissionPercent?: number;
   sponsored?: boolean;
 
   active: boolean;
@@ -96,7 +95,6 @@ export interface VendorStore {
   rating?: number;
   reviewCount?: number;
   deliveryMinutes: number;
-  commissionPercent?: number;
   bannerImage?: string;
   logoImage?: string;
   description: string;

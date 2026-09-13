@@ -39,6 +39,25 @@ export interface TrustedOrderItem {
   storeName?: string;
   storeSlug?: string;
   imageUrl?: string;
+  reservedVariantIds?: string[];
+  tryAtHome?: {
+    originalVariantIds: string[];
+    selectedSizes: string[];
+    selectedColour?: string;
+    fee: number;
+    tryMinutes: number;
+    lateFee: number;
+    termsAccepted: boolean;
+    status: 'reserved' | 'active' | 'selected';
+    startedAt?: string;
+    deadlineAt?: string;
+    keptVariantId?: string;
+    keptSize?: string;
+    rejectedVariantId?: string;
+    rejectedSize?: string;
+    selectedAt?: string;
+    lateFeeApplied?: boolean;
+  };
 }
 
 export interface ServerOrder {
@@ -56,6 +75,10 @@ export interface ServerOrder {
   deliveryFee: number;
   taxes: number;
   tryAtHomeFee?: number;
+  tryAtHomeLateFeeDue?: number;
+  tryAtHomeLateFeePaid?: boolean;
+  tryAtHomeLateFeeCollectionMethod?: 'cash' | 'upi_at_delivery';
+  tryAtHomeLateFeeCollectedAt?: string;
   grandTotal: number;
   deliveryMethod: 'express' | 'standard' | 'none';
   estimatedDelivery: string;

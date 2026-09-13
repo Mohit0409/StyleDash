@@ -11,6 +11,7 @@ import json
 import math
 import os
 import sqlite3
+from datetime import timedelta
 from http import HTTPStatus
 from http.cookies import SimpleCookie
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -336,6 +337,30 @@ class AdminApplication:
         })
         return self.payments.order_for_display(result)
 
+    def mark_try_at_home_late_fee_paid(self, admin_id: str, order_id: str, collection_method: Any) -> dict[str, Any]:
+        methods = {"cash": "cash", "upi_at_delivery": "upi_at_delivery"}
+        if not isinstance(collection_method, str) or collection_method not in methods:
+            raise SecurityError(400, "Choose Cash or UPI for the late fee.", "invalid_late_fee_collection_method")
+        with self.payments.store.lock:
+            order = self.payments.store.state["orders"].get(order_id)
+            if order is None:
+                raise SecurityError(404, "Order not found.", "order_not_found")
+            due = int(order.get("tryAtHomeLateFeeDue", 0) or 0)
+            if due <= 0:
+                raise SecurityError(409, "No Try at Home late fee is due.", "late_fee_not_due")
+            if order.get("tryAtHomeLateFeePaid") is True:
+                raise SecurityError(409, "The Try at Home late fee is already paid.", "late_fee_already_paid")
+            now = iso(utc_now())
+            order["tryAtHomeLateFeePaid"] = True
+            order["tryAtHomeLateFeeCollectionMethod"] = methods[collection_method]
+            order["tryAtHomeLateFeeCollectedAt"] = now
+            order["updatedAt"] = now
+            order.setdefault("statusHistory", []).append({"status": "try_at_home_late_fee_paid", "timestamp": now, "note": f"Rs {due} Try at Home late fee collected by {methods[collection_method]}"})
+            self.payments.store.save()
+            result = dict(order)
+        self.identity.record_action(admin_id, "try_at_home_late_fee_paid", "order", order_id, "success", {"amount": due, "collectionMethod": methods[collection_method]})
+        return self.payments.order_for_display(result)
+
     def update_order_status(
         self, admin_id: str, order_id: str, requested: Any, reason: Any = None
     ) -> dict[str, Any]:
@@ -378,7 +403,8 @@ class AdminApplication:
                         "cancellation_reason_required",
                     )
                 cancellation_reason = " ".join(reason.strip().split())
-            now = iso(utc_now())
+            current_time = utc_now()
+            now = iso(current_time)
             inventory_released = False
 
             if (
@@ -448,7 +474,20 @@ class AdminApplication:
             else:
                 order["status"] = requested
                 order["updatedAt"] = now
-                order.setdefault("statusHistory", []).append({"status": requested, "timestamp": now, "note": "Updated by local administrator"})
+                note = "Updated by local administrator"
+                if requested == "delivered":
+                    started = 0
+                    for item in order.get("items", []) or []:
+                        trial = item.get("tryAtHome") if isinstance(item, dict) else None
+                        if isinstance(trial, dict) and trial.get("status") == "reserved":
+                            minutes = int(trial.get("tryMinutes", 15) or 15)
+                            trial["status"] = "active"
+                            trial["startedAt"] = now
+                            trial["deadlineAt"] = iso(current_time + timedelta(minutes=minutes))
+                            started += 1
+                    if started:
+                        note = f"Delivered; Try at Home 15-minute selection window started for {started} item(s)"
+                order.setdefault("statusHistory", []).append({"status": requested, "timestamp": now, "note": note})
 
             self.payments.store.save()
             result = dict(order)
@@ -956,6 +995,10 @@ class AdminHandler(BaseHTTPRequestHandler):
                 result = self.application.update_order_status(
                     admin["id"], order_id, payload.get("status"), payload.get("reason")
                 )
+                self._json(200, {"success": True, "order": result}); return
+            if path.startswith("/api/admin/orders/") and path.endswith("/try-at-home-late-fee"):
+                order_id = unquote(path.removeprefix("/api/admin/orders/").removesuffix("/try-at-home-late-fee"))
+                result = self.application.mark_try_at_home_late_fee_paid(admin["id"], order_id, payload.get("collectionMethod"))
                 self._json(200, {"success": True, "order": result}); return
             if path.startswith("/api/admin/vendors/") and path.endswith("/details"):
                 application_id = unquote(path.removeprefix("/api/admin/vendors/").removesuffix("/details"))

@@ -13,4 +13,12 @@ describe('catalog trust signals', () => {
     expect(PRODUCTS.some(product => product.brand.trim().toLowerCase() === 'wrong')).toBe(false);
   });
 
+  it('does not ship commission metadata in the customer product bundle', () => {
+    for (const product of PRODUCTS) {
+      expect('commissionPercent' in product).toBe(false);
+      expect('commissionPaise' in product).toBe(false);
+      expect('customerPricePaise' in product).toBe(false);
+    }
+  });
+
 });
