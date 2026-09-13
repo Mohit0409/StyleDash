@@ -646,7 +646,7 @@ class PaymentService:
         self.ordering_enabled = (
             ordering_enabled
             if ordering_enabled is not None
-            else os.environ.get('STYLEDASH_ORDERING_ENABLED', 'true').strip().casefold() == 'true'
+            else os.environ.get('STYLEDASH_ORDERING_ENABLED', 'false').strip().casefold() == 'true'
         )
         self.mode = (mode or os.environ.get("RAZORPAY_MODE", "test")).strip().lower()
         if self.mode not in ("test", "live"):

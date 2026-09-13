@@ -41,6 +41,7 @@ class ReleasePaymentTests(unittest.TestCase):
             webhook_secret="webhook_secret_placeholder",
             mode="test",
             gateway=FakeGateway(),
+            ordering_enabled=True,
         )
     def tearDown(self): self.temp.cleanup()
     def payload(self):

@@ -62,6 +62,7 @@ for (const name of Object.keys(env)) {
       'STYLEDASH_SUPPORTED_PINCODES',
       'STYLEDASH_ENABLE_TEST_PRODUCT',
       'STYLEDASH_TEST_PRODUCT_ALLOWED_EMAILS',
+      'STYLEDASH_ORDERING_ENABLED',
     ].includes(name)
   ) {
     delete env[name];
@@ -78,6 +79,7 @@ Object.assign(env, {
   STYLEDASH_SUPPORTED_PINCODES: '458441',
   STYLEDASH_PUBLIC_ORIGIN: 'http://127.0.0.1:4173',
   STYLEDASH_TRUST_LOOPBACK_PROXY: '1',
+  STYLEDASH_ORDERING_ENABLED: 'true',
 
   // Enable the feature so authorization—not merely the flag—is exercised.
   STYLEDASH_ENABLE_TEST_PRODUCT: 'true',

@@ -59,6 +59,7 @@ class PaymentServiceTests(unittest.TestCase):
             webhook_secret="webhook_secret_placeholder",
             mode="test",
             gateway=self.gateway,
+            ordering_enabled=True,
         )
 
     def tearDown(self) -> None:
@@ -180,6 +181,28 @@ class PaymentServiceTests(unittest.TestCase):
 
         self.assertEqual(self.service.store.state, state_before)
         self.assertEqual(self.gateway.calls, [])
+
+    def test_ordering_defaults_to_disabled_when_environment_flag_is_absent(self) -> None:
+        previous = os.environ.pop("STYLEDASH_ORDERING_ENABLED", None)
+        try:
+            service = SERVER.PaymentService(
+                ROOT / "server" / "payment-data" / "catalog.json",
+                ROOT / "server" / "payment-data" / "settings.json",
+                self.data_directory / "fail-closed-default",
+                key_id="rzp_test_placeholder",
+                key_secret="test_secret_placeholder",
+                webhook_secret="webhook_secret_placeholder",
+                mode="test",
+                gateway=FakeGateway(),
+            )
+        finally:
+            if previous is not None:
+                os.environ["STYLEDASH_ORDERING_ENABLED"] = previous
+        self.assertFalse(service.ordering_enabled)
+        self.assert_api_error(
+            "ordering_temporarily_disabled",
+            lambda: service.place_cod_order(self.payload(paymentMethod="cod"), "default-lock-cod"),
+        )
 
     def test_try_at_home_reserves_two_sizes_and_releases_rejected_size(self) -> None:
         product = self.service._static_products["sd-prod-001"]
@@ -1312,6 +1335,7 @@ class PaymentServiceTests(unittest.TestCase):
                 webhook_secret="webhook_secret_placeholder",
                 mode="test",
                 gateway=self.gateway,
+                ordering_enabled=True,
             )
         finally:
             if previous is None:
@@ -1598,6 +1622,7 @@ class PaymentServiceTests(unittest.TestCase):
             webhook_secret="webhook_secret_placeholder",
             mode="test",
             gateway=self.gateway,
+            ordering_enabled=True,
         )
         signature = hmac.new(b"webhook_secret_placeholder", body, hashlib.sha256).hexdigest()
         self.assertTrue(restarted.process_webhook(body, signature)["duplicate"])
@@ -1626,6 +1651,7 @@ class PaymentTestProductTests(unittest.TestCase):
             gateway=self.gateway,
             payment_test_enabled=True,
             payment_test_allowed_emails={"owner.payment.test@example.test"},
+            ordering_enabled=True,
         )
 
     def tearDown(self) -> None:
@@ -1710,6 +1736,7 @@ class PaymentTestProductTests(unittest.TestCase):
             webhook_secret="live_webhook_placeholder", mode="live", gateway=FakeGateway(),
             payment_test_enabled=False,
             payment_test_allowed_emails={"owner.payment.test@example.test"},
+            ordering_enabled=True,
         )
         self.assert_api_error("not_found", lambda: disabled.payment_test_product(self.allowed_user))
 
@@ -1724,6 +1751,7 @@ class PaymentTestProductTests(unittest.TestCase):
                 self.data_directory / "configured",
                 key_id="rzp_live_placeholder", key_secret="live_secret_placeholder",
                 webhook_secret="live_webhook_placeholder", mode="live", gateway=FakeGateway(),
+                ordering_enabled=True,
             )
         self.assertTrue(configured.can_access_payment_test_product({
             "email": "FIRST.OWNER@example.test", "emailVerified": True,
@@ -1883,6 +1911,7 @@ class PaymentTestProductTests(unittest.TestCase):
             webhook_secret="live_webhook_placeholder", mode="live", gateway=self.gateway,
             payment_test_enabled=False,
             payment_test_allowed_emails={"owner.payment.test@example.test"},
+            ordering_enabled=True,
         )
         self.assertTrue(self.deliver(body, restarted)["duplicate"])
         restarted_order = restarted.store.state["orders"][created["styleDashOrderId"]]
@@ -1924,6 +1953,7 @@ class HttpApiTests(unittest.TestCase):
             security_store=security_store,
             payment_test_enabled=True,
             payment_test_allowed_emails={"http-payment-owner@example.test"},
+            ordering_enabled=True,
         )
         self.previous_origin = os.environ.get("STYLEDASH_PUBLIC_ORIGIN")
         self.previous_trust_loopback_proxy = os.environ.get("STYLEDASH_TRUST_LOOPBACK_PROXY")
