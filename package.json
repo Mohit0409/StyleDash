@@ -12,7 +12,7 @@
     "typecheck": "tsc -b",
     "test": "vitest run --dir src/tests",
     "test:e2e": "npm run build:e2e && playwright test",
-    "build:e2e": "tsc -b && vite build",
+    "build:e2e": "tsc -b && vite build --mode e2e",
     "test:e2e:desktop": "npm run build:e2e && playwright test --project=desktop-chromium",
     "test:e2e:mobile": "npm run build:e2e && playwright test --project=mobile-chromium",
     "test:payment-api": "vitest run src/tests/paymentApi.test.ts",

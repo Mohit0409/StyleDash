@@ -65,6 +65,12 @@ export const Checkout: React.FC = () => {
 
   const handlePlaceOrder = async (event: React.FormEvent) => {
     event.preventDefault();
+    if (!CONFIG.ORDERING_ENABLED) {
+      const message = 'Ordering is temporarily disabled while Vibe4You prepares for launch.';
+      setCheckoutError(message);
+      showToast(message, 'info');
+      return;
+    }
     setPlacing(true);
     setCheckoutError('');
 
@@ -140,6 +146,11 @@ export const Checkout: React.FC = () => {
     <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
       <SEO title="Checkout - Vibe4You" noIndex />
       <h1 className="text-2xl sm:text-3xl font-black text-neutral-900 dark:text-white">Secure Checkout</h1>
+      {!CONFIG.ORDERING_ENABLED && (
+        <p role="status" className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-bold text-red-700 dark:border-red-900 dark:bg-red-950/30 dark:text-red-200">
+          🚀 {CONFIG.LAUNCH_MESSAGE} Ordering and payments are temporarily disabled.
+        </p>
+      )}
 
       <form onSubmit={handlePlaceOrder} className="grid md:grid-cols-3 gap-8">
         <div className="md:col-span-2 space-y-6">
@@ -241,8 +252,8 @@ export const Checkout: React.FC = () => {
             <p className="text-[10px] leading-relaxed text-neutral-500">Product prices include GST. Inventory, coupon eligibility and the final payable amount are recalculated securely by the server.</p>
           </div>
           {checkoutError && <p role="alert" className="text-xs font-semibold text-red-600 dark:text-red-400">{checkoutError}</p>}
-          <button type="submit" disabled={placing} className="w-full py-4 bg-neutral-950 dark:bg-lime-400 text-white dark:text-neutral-950 font-black text-sm rounded-xl shadow-xl hover:bg-neutral-800 dark:hover:bg-lime-300 transition-all flex items-center justify-center gap-2 disabled:cursor-not-allowed disabled:opacity-60">
-            <span>{placing ? 'Processing securely...' : paymentMethod === 'cod' ? 'Place COD Order' : `Pay ₹${grandTotal}`}</span>
+          <button type="submit" disabled={placing || !CONFIG.ORDERING_ENABLED} className="w-full py-4 bg-neutral-950 dark:bg-lime-400 text-white dark:text-neutral-950 font-black text-sm rounded-xl shadow-xl hover:bg-neutral-800 dark:hover:bg-lime-300 transition-all flex items-center justify-center gap-2 disabled:cursor-not-allowed disabled:opacity-60">
+            <span>{!CONFIG.ORDERING_ENABLED ? 'Ordering Opens at Launch' : placing ? 'Processing securely...' : paymentMethod === 'cod' ? 'Place COD Order' : `Pay ₹${grandTotal}`}</span>
             <ArrowRight className="w-4 h-4" />
           </button>
         </div>

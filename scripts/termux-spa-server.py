@@ -634,6 +634,7 @@ class PaymentService:
         security_store: SecurityStore | None = None,
         shop_workflow: ShopWorkflow | None = None,
         payment_test_enabled: bool | None = None,
+        ordering_enabled: bool | None = None,
         payment_test_allowed_emails: set[str] | None = None,
     ) -> None:
         catalog = json.loads(catalog_path.read_text(encoding="utf-8"))
@@ -642,6 +643,11 @@ class PaymentService:
         self._static_products = {item["id"]: item for item in catalog}
         self.products = dict(self._static_products)
         self.settings = settings
+        self.ordering_enabled = (
+            ordering_enabled
+            if ordering_enabled is not None
+            else os.environ.get('STYLEDASH_ORDERING_ENABLED', 'true').strip().casefold() == 'true'
+        )
         self.mode = (mode or os.environ.get("RAZORPAY_MODE", "test")).strip().lower()
         if self.mode not in ("test", "live"):
             raise RuntimeError("RAZORPAY_MODE must be test or live")
@@ -1177,7 +1183,16 @@ class PaymentService:
             },
         }
 
+    def _require_ordering_enabled(self) -> None:
+        if not self.ordering_enabled:
+            raise ApiError(
+                HTTPStatus.SERVICE_UNAVAILABLE,
+                'Ordering is temporarily disabled while Vibe4You prepares for launch.',
+                'ordering_temporarily_disabled',
+            )
+
     def create_razorpay_order(self, payload: dict[str, Any], idempotency_value: str | None) -> dict[str, Any]:
+        self._require_ordering_enabled()
         if not self.key_id or not self.key_secret or self.gateway is None:
             raise ApiError(
                 HTTPStatus.SERVICE_UNAVAILABLE,
@@ -2203,6 +2218,7 @@ class PaymentService:
         return response
 
     def place_cod_order(self, payload: dict[str, Any], idempotency_value: str | None) -> dict[str, Any]:
+        self._require_ordering_enabled()
         idempotency_key = self._idempotency_key(idempotency_value)
         inventory_alerts: list[dict[str, Any]] = []
 
