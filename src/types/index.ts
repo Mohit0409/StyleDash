@@ -67,12 +67,13 @@ export interface Product {
   estimatedDeliveryMinutes?: number;
   returnWindowDays: number;
   exchangeAvailable: boolean;
+  /** Opt-in store-controlled offer; pricing/eligibility are always verified by the server. */
+  tryAtHomeAvailable?: boolean;
 
   // Multi-Store & Vendor Fields
   vendorId: string;
   storeName?: string;
   storeSlug?: string;
-  commissionPercent?: number;
   sponsored?: boolean;
 
   active: boolean;
@@ -94,7 +95,6 @@ export interface VendorStore {
   rating?: number;
   reviewCount?: number;
   deliveryMinutes: number;
-  commissionPercent?: number;
   bannerImage?: string;
   logoImage?: string;
   description: string;
@@ -114,6 +114,8 @@ export interface CartItem {
   sku: string;
   quantity: number;
   unitPrice: number;
+  tryAtHomeVariantIds?: string[];
+  tryAtHomeTermsAccepted?: boolean;
 }
 
 export interface Address {

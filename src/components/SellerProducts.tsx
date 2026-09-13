@@ -41,12 +41,13 @@ interface ProductFormState {
   imageUrls: string;
   uploadedImageUrls: string[];
   material: string;
+  tryAtHomeEnabled: boolean;
 }
 
 const EMPTY_FORM: ProductFormState = {
   name: '', description: '', brand: '', department: 'unisex', category: CATEGORIES[0], subcategory: '', deliveryType: 'normal',
   price: '', originalPrice: '', variants: [{ size: '', inventory: '0' }], colourName: '', colourHex: '',
-  imageMode: 'links', imageUrls: '', uploadedImageUrls: [], material: '',
+  imageMode: 'links', imageUrls: '', uploadedImageUrls: [], material: '', tryAtHomeEnabled: false,
 };
 
 const toForm = (product: SellerProduct): ProductFormState => {
@@ -72,6 +73,7 @@ const toForm = (product: SellerProduct): ProductFormState => {
     imageUrls: linkedImages.join('\n'),
     uploadedImageUrls: imageMode === 'upload' ? uploadedImages : [],
     material: product.attributes.material || '',
+    tryAtHomeEnabled: product.tryAtHomeEnabled === true,
   };
 };
 
@@ -132,6 +134,7 @@ const toPayload = (form: ProductFormState): SellerProductDraft => {
     colourHex: form.colourHex.trim() || undefined,
     imageUrls,
     attributes: form.material.trim() ? { material: form.material.trim() } : {},
+    tryAtHomeEnabled: form.tryAtHomeEnabled,
   };
 };
 
@@ -485,6 +488,7 @@ export const SellerProducts: React.FC = () => {
             <label className="font-bold">Colour name<input required minLength={1} maxLength={80} value={form.colourName} onChange={event => updateForm('colourName', event.target.value)} className="mt-1 w-full rounded-xl border p-3 dark:bg-neutral-800" /></label>
             <label className="font-bold">Colour hex <span className="font-normal text-neutral-500">(optional)</span><input pattern="#[0-9A-Fa-f]{6}" placeholder="#000000" value={form.colourHex} onChange={event => updateForm('colourHex', event.target.value)} className="mt-1 w-full rounded-xl border p-3 dark:bg-neutral-800" /></label>
             <label className="font-bold">Material <span className="font-normal text-neutral-500">(optional)</span><input maxLength={200} value={form.material} onChange={event => updateForm('material', event.target.value)} className="mt-1 w-full rounded-xl border p-3 dark:bg-neutral-800" /></label>
+            <label className="sm:col-span-2 flex gap-2 rounded-xl border border-lime-200 bg-lime-50 p-3 font-bold text-neutral-800 dark:border-lime-900 dark:bg-lime-950/20 dark:text-neutral-100"><input type="checkbox" checked={form.tryAtHomeEnabled} onChange={event => setForm(current => ({ ...current, tryAtHomeEnabled: event.target.checked }))} className="mt-0.5 accent-lime-600" /> Offer Try at Home: customer may receive two sizes, has 15 minutes to choose, pays ₹50 service fee and ₹50 more if late.</label>
             <label className="font-bold sm:col-span-2">Description<textarea required minLength={10} maxLength={2000} rows={3} value={form.description} onChange={event => updateForm('description', event.target.value)} className="mt-1 w-full rounded-xl border p-3 dark:bg-neutral-800" /></label>
             <fieldset className="sm:col-span-2 space-y-3 rounded-xl border border-neutral-200 p-3 dark:border-neutral-700">
               <legend className="px-1 font-bold">Product images</legend>
@@ -549,6 +553,7 @@ export const SellerProducts: React.FC = () => {
                   <p className="text-xs font-black uppercase tracking-wider text-neutral-500">{productStateLabel(product)}</p>
                   <h3 className="font-black">{product.name}</h3>
                   <p className="text-xs text-neutral-500">₹{(product.pricePaise / 100).toFixed(2)} · {product.colourName} · Total stock: {product.inventory}</p>
+                  {product.tryAtHomeEnabled && <p className="mt-1 text-xs font-bold text-lime-700">Try at Home enabled</p>}
                   <div className="mt-2 flex flex-wrap gap-1.5">{product.variants.map(variant => <span key={variant.id} className="rounded-lg bg-neutral-100 px-2 py-1 text-[11px] font-bold dark:bg-neutral-800">{variant.size}: {variant.inventory}</span>)}</div>
                   {product.status === 'REJECTED' && product.rejectionReason && <p className="mt-2 flex gap-2 text-xs text-amber-700"><AlertTriangle className="w-4 shrink-0" />{product.rejectionReason}</p>}
                   {product.status === 'PUBLISHED' && <p className="mt-2 text-xs font-bold text-emerald-700">Published publicly by the private administrator.</p>}

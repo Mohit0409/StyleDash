@@ -9,6 +9,13 @@ export const orderApi = {
   async one(id: string): Promise<ServerOrder> {
     return (await apiFetch<{ success: true; order: ServerOrder }>(`/api/orders/${encodeURIComponent(id)}`)).order;
   },
+  async finalizeTryAtHome(id: string, itemIndex: number, keptVariantId: string): Promise<ServerOrder> {
+    return (await apiJson<{ success: true; order: ServerOrder }>(
+      `/api/orders/${encodeURIComponent(id)}/try-at-home`,
+      'POST',
+      { itemIndex, keptVariantId },
+    )).order;
+  },
   async receipt(id: string): Promise<{ blob: Blob; filename: string }> {
     const response = await fetch(`/api/orders/${encodeURIComponent(id)}/receipt`, { credentials: 'include' });
     if (!response.ok) {
@@ -157,6 +164,7 @@ export interface SellerProductDraft {
   colourHex?: string;
   imageUrls: string[];
   attributes: Record<string, string>;
+  tryAtHomeEnabled?: boolean;
 }
 
 export interface SellerProduct extends Omit<SellerProductDraft, 'variants' | 'inventory' | 'size'> {
@@ -172,6 +180,10 @@ export interface SellerProduct extends Omit<SellerProductDraft, 'variants' | 'in
   updatedAt: string;
   submittedAt?: string | null;
   publishedAt?: string | null;
+  tryAtHomeEnabled?: boolean;
+  /** Private-admin-only fields. Seller endpoints never return these. */
+  commissionPaise?: number;
+  customerPricePaise?: number;
 }
 
 export type SellerProductChangeDraft = Omit<SellerProductDraft, 'inventory' | 'size' | 'variants'> & {

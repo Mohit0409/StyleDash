@@ -109,6 +109,7 @@ export const CartDrawer: React.FC<{ isOpen: boolean; onClose: () => void }> = ({
                       <span className="text-[10px] font-bold px-2 py-0.5 bg-white dark:bg-neutral-700 text-neutral-800 dark:text-neutral-200 rounded border border-neutral-200 dark:border-neutral-600">
                         {item.selectedColour}
                       </span>
+                      {item.tryAtHomeVariantIds && <span className="text-[10px] font-bold px-2 py-0.5 bg-lime-100 text-lime-900 rounded border border-lime-300 dark:bg-lime-950/40 dark:text-lime-200">Try at Home · 15 min</span>}
                     </div>
                   </div>
 
@@ -118,7 +119,7 @@ export const CartDrawer: React.FC<{ isOpen: boolean; onClose: () => void }> = ({
                     </span>
 
                     {/* Quantity Controls */}
-                    <div className="flex items-center gap-2 bg-white dark:bg-neutral-700 border border-neutral-300 dark:border-neutral-600 rounded-lg px-2 py-1">
+                    {!item.tryAtHomeVariantIds && <div className="flex items-center gap-2 bg-white dark:bg-neutral-700 border border-neutral-300 dark:border-neutral-600 rounded-lg px-2 py-1">
                       <button aria-label={`Decrease ${item.product.name} quantity`} onClick={() => updateQuantity(item.lineId, item.quantity - 1)} className="p-0.5 text-neutral-600 dark:text-neutral-200">
                         <Minus className="w-3 h-3" />
                       </button>
@@ -127,6 +128,7 @@ export const CartDrawer: React.FC<{ isOpen: boolean; onClose: () => void }> = ({
                         <Plus className="w-3 h-3" />
                       </button>
                     </div>
+                    }
                   </div>
                 </div>
               </div>

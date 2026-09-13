@@ -107,11 +107,26 @@ PRODUCT_PAYLOAD_FIELDS = {
     "colourHex",
     "variants",
     "colourVariants",
+    "tryAtHomeEnabled",
 }
 PRODUCT_CHANGE_PAYLOAD_FIELDS = PRODUCT_PAYLOAD_FIELDS - {"inventory", "size"}
 DEPARTMENTS = CANONICAL_DEPARTMENTS
 COLOUR_HEX_PATTERN = re.compile(r"^#[0-9A-Fa-f]{6}$")
 PRODUCT_MEDIA_PATH_PATTERN = re.compile(r"^/media/product-images/[0-9a-f]{32}\.(?:webp|jpg|png)$")
+
+
+def _commission_rate_basis_points(price_paise: int) -> int:
+    """Customer-paid commission; this rate must never be exposed publicly."""
+    if price_paise < 50_000:
+        return 1_000
+    if price_paise <= 100_000:
+        return 800
+    return 600
+
+
+def _customer_price_paise(price_paise: int) -> int:
+    rate = _commission_rate_basis_points(price_paise)
+    return price_paise + ((price_paise * rate + 5_000) // 10_000)
 
 
 def _optional_text(value: Any, label: str, maximum: int) -> str | None:
@@ -269,6 +284,7 @@ class ShopWorkflow:
             self._migrate_product_variants(db)
             self._migrate_store_branding(db)
             self._migrate_colour_variant_metadata(db)
+            self._migrate_product_try_at_home(db)
             integrity = [row[0] for row in db.execute("PRAGMA integrity_check").fetchall()]
             if integrity != ["ok"]:
                 raise RuntimeError("Shop migration failed SQLite integrity validation")
@@ -607,6 +623,28 @@ class ShopWorkflow:
                     db.execute("UPDATE shop_product_submissions SET variants_json=? WHERE id=?", (encoded, row["id"]))
             if db.execute("SELECT 1 FROM shop_schema_migrations WHERE version=6").fetchone() is None:
                 db.execute("INSERT INTO shop_schema_migrations(version,applied_at) VALUES(6,?)", (now,))
+            db.commit()
+        except Exception:
+            db.rollback()
+            raise
+
+    @staticmethod
+    def _migrate_product_try_at_home(db: sqlite3.Connection) -> None:
+        """Add product-level Try at Home opt-in without changing existing listings."""
+        now = iso(utc_now())
+        db.execute("BEGIN IMMEDIATE")
+        try:
+            columns = {row["name"] for row in db.execute(
+                "PRAGMA table_info(shop_product_submissions)"
+            ).fetchall()}
+            if "try_at_home_enabled" not in columns:
+                db.execute(
+                    "ALTER TABLE shop_product_submissions "
+                    "ADD COLUMN try_at_home_enabled INTEGER NOT NULL DEFAULT 0 "
+                    "CHECK(try_at_home_enabled IN (0,1))"
+                )
+            if db.execute("SELECT 1 FROM shop_schema_migrations WHERE version=7").fetchone() is None:
+                db.execute("INSERT INTO shop_schema_migrations(version,applied_at) VALUES(7,?)", (now,))
             db.commit()
         except Exception:
             db.rollback()
@@ -1340,6 +1378,25 @@ class ShopWorkflow:
         delivery_value = payload.get("deliveryType", clean_attributes.get("deliveryType", "normal"))
         clean_attributes["deliveryType"] = normalize_delivery_type(delivery_value)
 
+        try_at_home = (
+            payload["tryAtHomeEnabled"] if "tryAtHomeEnabled" in payload
+            else (bool(current["try_at_home_enabled"]) if current is not None and "try_at_home_enabled" in current.keys() else False)
+        )
+        if isinstance(try_at_home, int) and try_at_home in (0, 1):
+            try_at_home = bool(try_at_home)
+        if not isinstance(try_at_home, bool):
+            raise SecurityError(400, "Choose whether Try at Home is available.", "invalid_product")
+        if try_at_home:
+            sizes_by_colour: dict[str, set[str]] = {}
+            for variant in active_variants:
+                size = str(variant.get("size") or "").strip()
+                if not size or size.casefold() == "one size":
+                    continue
+                colour = str(variant.get("colourName") or "Default").strip().casefold()
+                sizes_by_colour.setdefault(colour, set()).add(size.casefold())
+            if not any(len(sizes) >= 2 for sizes in sizes_by_colour.values()):
+                raise SecurityError(400, "Try at Home requires at least two different sizes for the same colour.", "invalid_try_at_home_product")
+
         return {
             "name": name,
             "description": description,
@@ -1355,6 +1412,7 @@ class ShopWorkflow:
             "colour_hex": colour_hex,
             "image_urls_json": json.dumps(clean_images, separators=(",", ":")),
             "attributes_json": json.dumps(clean_attributes, separators=(",", ":"), sort_keys=True),
+            "try_at_home_enabled": int(try_at_home),
         }
 
     @staticmethod
@@ -1406,6 +1464,7 @@ class ShopWorkflow:
             "colourHex": row["colour_hex"],
             "imageUrls": json.loads(row["image_urls_json"]),
             "attributes": attributes,
+            "tryAtHomeEnabled": bool(row["try_at_home_enabled"]) if "try_at_home_enabled" in row.keys() else False,
             "status": row["status"],
             "rejectionReason": row["rejection_reason"] if row["status"] == "REJECTED" else None,
             "createdAt": row["created_at"],
@@ -1414,10 +1473,13 @@ class ShopWorkflow:
             "publishedAt": row["published_at"],
         }
         if admin:
+            customer_price_paise = _customer_price_paise(row["price_paise"])
             result.update({
                 "submittedByUserId": row["submitted_by_user_id"],
                 "reviewedBy": row["reviewed_by"],
                 "reviewedAt": row["reviewed_at"],
+                "commissionPaise": customer_price_paise - row["price_paise"],
+                "customerPricePaise": customer_price_paise,
             })
         return result
 
@@ -1447,6 +1509,7 @@ class ShopWorkflow:
             "colourHex": values["colour_hex"],
             "imageUrls": json.loads(values["image_urls_json"]),
             "attributes": attributes,
+            "tryAtHomeEnabled": bool(values.get("try_at_home_enabled", 0)),
         }
 
     @staticmethod
@@ -1563,6 +1626,7 @@ class ShopWorkflow:
                     now,
                 ),
             )
+            db.execute("UPDATE shop_product_submissions SET try_at_home_enabled=? WHERE id=?", (values["try_at_home_enabled"], product_id))
             db.commit()
             row = db.execute(
                 "SELECT * FROM shop_product_submissions WHERE id=?", (product_id,)
@@ -1620,6 +1684,7 @@ class ShopWorkflow:
                     user_id,
                 ),
             )
+            db.execute("UPDATE shop_product_submissions SET try_at_home_enabled=? WHERE id=?", (values["try_at_home_enabled"], product_id))
             db.commit()
             row = db.execute(
                 "SELECT * FROM shop_product_submissions WHERE id=?", (product_id,)
@@ -1708,6 +1773,7 @@ class ShopWorkflow:
                     values["attributes_json"], admin_id, now, now, now, now, now,
                 ),
             )
+            db.execute("UPDATE shop_product_submissions SET try_at_home_enabled=? WHERE id=?", (values["try_at_home_enabled"], product_id))
             self._audit_if_available(
                 db, admin_id, "shop_product_admin_created", "shop_product", product_id,
                 {"applicationId": application_id, "status": "PUBLISHED"},
@@ -1780,6 +1846,7 @@ class ShopWorkflow:
                     ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,'PUBLISHED',?,?,?,?,?,?)""",
                     (product_id,slug,application_id,application["submitted_by_user_id"],values["name"],values["description"],values["brand"],values["department"],values["category"],values["price_paise"],values["original_price_paise"],values["inventory"],values["size"],variants_json,values["colour_name"],values["colour_hex"],values["image_urls_json"],values["attributes_json"],admin_id,now,now,now,now,now),
                 )
+                db.execute("UPDATE shop_product_submissions SET try_at_home_enabled=? WHERE id=?", (values["try_at_home_enabled"], product_id))
                 created_ids.append(product_id)
                 self._audit_if_available(db,admin_id,"shop_product_admin_bulk_created","shop_product",product_id,{"applicationId":application_id,"status":"PUBLISHED"})
             db.commit()
@@ -1936,6 +2003,7 @@ class ShopWorkflow:
                     admin_id, now, now, product_id,
                 ),
             )
+            db.execute("UPDATE shop_product_submissions SET try_at_home_enabled=? WHERE id=?", (values["try_at_home_enabled"], product_id))
             self._audit_if_available(
                 db, admin_id, "shop_product_admin_updated", "shop_product", product_id,
                 {"status": current["status"]},
@@ -2411,6 +2479,7 @@ class ShopWorkflow:
                             current["id"],
                         ),
                     )
+                    db.execute("UPDATE shop_product_submissions SET try_at_home_enabled=? WHERE id=?", (values["try_at_home_enabled"], current["id"]))
                 elif request["action"] == "UNPUBLISH":
                     db.execute(
                         """
@@ -2517,8 +2586,8 @@ class ShopWorkflow:
     def _public_product(row: sqlite3.Row) -> dict[str, Any]:
         images = json.loads(row["image_urls_json"])
         attributes = json.loads(row["attributes_json"])
-        price = row["price_paise"] / 100
-        original_price = row["original_price_paise"] / 100
+        price = _customer_price_paise(row["price_paise"]) / 100
+        original_price = _customer_price_paise(row["original_price_paise"]) / 100
         discount = (
             round((original_price - price) * 100 / original_price)
             if original_price > price
@@ -2531,14 +2600,14 @@ class ShopWorkflow:
                 "id": item["id"],
                 "sku": f"SD-SHOP-{row['id'][-12:].upper()}" if index == 0 else f"SD-SHOP-{row['id'][-12:].upper()}-{index + 1}",
                 "size": item["size"],
-                "colourName": row["colour_name"],
+                "colourName": item["colourName"],
                 "stock": item["inventory"],
                 "available": False,
                 "price": price,
-                "images": images,
+                "images": item.get("imageUrls") or images,
             }
-            if row["colour_hex"]:
-                variant["colourHex"] = row["colour_hex"]
+            if item.get("colourHex"):
+                variant["colourHex"] = item["colourHex"]
             variants.append(variant)
         return {
             "id": row["id"],
@@ -2549,6 +2618,7 @@ class ShopWorkflow:
             "category": row["category"],
             "subcategory": attributes.get("subcategory"),
             "deliveryType": attributes.get("deliveryType", "normal"),
+            "optionMode": attributes.get("optionMode"),
             "shortDescription": row["description"][:180],
             "description": row["description"],
             "material": attributes.get("material", "Not specified"),
@@ -2569,6 +2639,7 @@ class ShopWorkflow:
             "expressDelivery": attributes.get("deliveryType", "normal") in {"express", "both"},
             "returnWindowDays": 0,
             "exchangeAvailable": False,
+            "tryAtHomeAvailable": bool(row["try_at_home_enabled"]) if "try_at_home_enabled" in row.keys() else False,
             "vendorId": row["application_id"],
             "storeName": row["shop_name"],
             "storeSlug": store_slug,
@@ -2601,7 +2672,7 @@ class ShopWorkflow:
             ).fetchall()
         products = []
         for row in rows:
-            price = row["price_paise"] / 100
+            price = _customer_price_paise(row["price_paise"]) / 100
             images = json.loads(row["image_urls_json"]) if row["image_urls_json"] else []
             attributes = json.loads(row["attributes_json"]) if row["attributes_json"] else {}
             delivery_type = attributes.get("deliveryType", "normal")
@@ -2616,21 +2687,27 @@ class ShopWorkflow:
                     "vendorId": row["application_id"],
                     "storeName": row["shop_name"],
                     "storeSlug": store_slug,
+                    "brand": row["brand"] or row["shop_name"],
+                    "department": row["department"],
+                    "category": row["category"],
+                    "optionMode": attributes.get("optionMode"),
                     "deliveryType": delivery_type,
                     "expressDelivery": delivery_type in {"express", "both"},
                     "images": images,
                     "thumbnail": images[0] if images else None,
                     "active": row["status"] == "PUBLISHED" and row["shop_status"] == "ACTIVE",
                     "price": price,
+                    "tryAtHomeAvailable": bool(row["try_at_home_enabled"]) if "try_at_home_enabled" in row.keys() else False,
                     "variants": [
                         {
                             "id": item["id"],
                             "sku": f"SD-SHOP-{row['id'][-12:].upper()}" if index == 0 else f"SD-SHOP-{row['id'][-12:].upper()}-{index + 1}",
                             "size": item["size"],
-                            "colourName": row["colour_name"],
+                            "colourName": item["colourName"],
+                            "colourHex": item.get("colourHex"),
                             "stock": item["inventory"],
                             "price": price,
-                            "images": images,
+                            "images": item.get("imageUrls") or images,
                             "active": item.get("active", True),
                         }
                         for index, item in enumerate(_row_variants(row))

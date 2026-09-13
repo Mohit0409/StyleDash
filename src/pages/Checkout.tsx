@@ -26,6 +26,7 @@ export const Checkout: React.FC = () => {
     subtotal,
     deliveryFee,
     grandTotal,
+    tryAtHomeFee,
     clearCart,
     deliveryMethod,
     setDeliveryMethod,
@@ -73,6 +74,10 @@ export const Checkout: React.FC = () => {
         productId: item.productId,
         variantId: item.variantId,
         quantity: item.quantity,
+        ...(item.tryAtHomeVariantIds?.length === 2 ? {
+          tryAtHomeVariantIds: item.tryAtHomeVariantIds,
+          tryAtHomeTermsAccepted: item.tryAtHomeTermsAccepted === true,
+        } : {}),
       })),
       address: { name, phone, street, city, pincode },
       deliveryMethod,
@@ -229,6 +234,7 @@ export const Checkout: React.FC = () => {
             <div className="flex justify-between"><span>Subtotal</span><span>₹{subtotal}</span></div>
             <div className="flex justify-between"><span>{deliveryMethod === 'express' ? 'Express Delivery' : 'Same Day Delivery'}</span><span>{deliveryFee === 0 ? 'FREE' : `₹${deliveryFee}`}</span></div>
             <div className="flex justify-between"><span>Delivery ETA</span><span>{deliveryMethod === 'express' ? 'About 60 minutes' : 'Same day'}</span></div>
+            {tryAtHomeFee > 0 && <div className="flex justify-between"><span>Try at Home fee</span><span>₹{tryAtHomeFee}</span></div>}
             <div className="flex justify-between pt-2 border-t border-neutral-200 dark:border-neutral-800 text-sm font-black text-neutral-900 dark:text-white">
               <span>Estimated Total</span><span className="text-lime-600 dark:text-lime-400">₹{grandTotal}</span>
             </div>

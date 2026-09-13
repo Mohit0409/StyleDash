@@ -173,7 +173,7 @@ class ShopWorkflowTests(unittest.TestCase):
                 [row[0] for row in db.execute(
                     "SELECT version FROM shop_schema_migrations ORDER BY version"
                 )],
-                [1, 2, 3, 4, 5, 6],
+                [1, 2, 3, 4, 5, 6, 7],
             )
             self.assertEqual(db.execute("PRAGMA integrity_check").fetchone()[0], "ok")
             self.assertEqual(db.execute("PRAGMA foreign_key_check").fetchall(), [])
@@ -277,7 +277,7 @@ class ShopWorkflowTests(unittest.TestCase):
         db = sqlite3.connect(concurrent_path)
         self.assertEqual(
             db.execute("SELECT version,COUNT(*) FROM shop_schema_migrations GROUP BY version").fetchall(),
-            [(1, 1), (2, 1), (3, 1), (4, 1), (5, 1), (6, 1)],
+            [(1, 1), (2, 1), (3, 1), (4, 1), (5, 1), (6, 1), (7, 1)],
         )
         self.assertEqual(db.execute("PRAGMA integrity_check").fetchone()[0], "ok")
         self.assertEqual(db.execute("PRAGMA foreign_key_check").fetchall(), [])
@@ -632,7 +632,7 @@ class ShopWorkflowTests(unittest.TestCase):
             product = self.store.admin_transition_product("admin-a", product["id"], target)
 
         original_public = self.store.list_published_products()[0]
-        self.assertEqual((original_public["name"], original_public["price"]), ("Original Live Kurta", 1599))
+        self.assertEqual((original_public["name"], original_public["price"]), ("Original Live Kurta", 1694.94))
         self.assert_error(
             "product_not_found",
             lambda: self.store.create_product_edit_request(
@@ -654,7 +654,7 @@ class ShopWorkflowTests(unittest.TestCase):
         )
         self.assertEqual((first["action"], first["status"]), ("EDIT", "SUBMITTED"))
         still_live = self.store.list_published_products()[0]
-        self.assertEqual((still_live["name"], still_live["price"]), ("Original Live Kurta", 1599))
+        self.assertEqual((still_live["name"], still_live["price"]), ("Original Live Kurta", 1694.94))
         self.assert_error(
             "product_change_pending",
             lambda: self.store.create_product_unpublish_request("user-a", product["id"]),
@@ -738,7 +738,7 @@ class ShopWorkflowTests(unittest.TestCase):
         self.store.admin_transition_product_change_request("admin-a", second["id"], "UNDER_REVIEW")
         self.store.admin_transition_product_change_request("admin-a", second["id"], "APPROVED")
         changed_public = self.store.list_published_products()[0]
-        self.assertEqual((changed_public["name"], changed_public["price"]), ("Approved Live Kurta", 1499))
+        self.assertEqual((changed_public["name"], changed_public["price"]), ("Approved Live Kurta", 1588.94))
 
         unpublish = self.store.create_product_unpublish_request("user-a", product["id"])
         self.store.admin_transition_product_change_request("admin-a", unpublish["id"], "UNDER_REVIEW")
@@ -879,6 +879,47 @@ class ShopWorkflowTests(unittest.TestCase):
         self.assertEqual(retired["inventory"], 3)
         self.assertEqual(retired["colourName"], "Black")
         self.assertEqual(len({item["id"] for item in raw}), len(raw))
+
+
+    def test_try_at_home_requires_two_sizes_same_colour_and_defaults_off(self) -> None:
+        self.create_active_shop("user-a", "Try Home Shop")
+        payload = self.complete_product("Try Home Shirt")
+        payload.pop("inventory")
+        payload.pop("size")
+        payload["variants"] = [{"size": "M", "inventory": 4}, {"size": "L", "inventory": 3}]
+        payload["tryAtHomeEnabled"] = True
+        created = self.store.create_product_draft("user-a", payload)
+        self.assertTrue(created["tryAtHomeEnabled"])
+        invalid = self.complete_product("Invalid Try Home Shirt")
+        invalid["tryAtHomeEnabled"] = True
+        self.assert_error("invalid_try_at_home_product", lambda: self.store.create_product_draft("user-a", invalid))
+        regular = self.store.create_product_draft("user-a", self.complete_product("Regular Shirt"))
+        self.assertFalse(regular["tryAtHomeEnabled"])
+
+
+
+    def test_customer_commission_boundaries_are_hidden_outside_private_admin(self) -> None:
+        self.create_active_shop("user-a", "Commission Shop")
+        cases = [(49900, 54890), (50000, 54000), (100000, 108000), (100100, 106106)]
+        for index, (base_price, customer_price) in enumerate(cases, start=1):
+            payload = self.complete_product(f"Commission Product {index}")
+            payload["pricePaise"] = base_price
+            payload["originalPricePaise"] = max(base_price, 120000)
+            product = self.store.create_product_draft("user-a", payload)
+            product = self.store.submit_product("user-a", product["id"])
+            for target in ("UNDER_REVIEW", "APPROVED", "PUBLISHED"):
+                product = self.store.admin_transition_product("admin-a", product["id"], target)
+            seller = next(item for item in self.store.list_products("user-a") if item["id"] == product["id"])
+            admin = next(item for item in self.store.admin_list_products("admin-a") if item["id"] == product["id"])
+            public = next(item for item in self.store.list_published_products() if item["id"] == product["id"])
+            self.assertNotIn("commissionPaise", seller)
+            self.assertNotIn("customerPricePaise", seller)
+            self.assertEqual(admin["customerPricePaise"], customer_price)
+            self.assertEqual(admin["commissionPaise"], customer_price - base_price)
+            self.assertNotIn("commissionPaise", public)
+            self.assertNotIn("customerPricePaise", public)
+            self.assertEqual(public["price"], customer_price / 100)
+
 
 if __name__ == "__main__":
     unittest.main()

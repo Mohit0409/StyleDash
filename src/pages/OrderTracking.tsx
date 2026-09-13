@@ -21,6 +21,12 @@ const TRACKING_STEPS = ['placed', 'confirmed', 'preparing', 'packed', 'out_for_d
 const money = (value: number) => `₹${Number(value || 0).toFixed(0)}`;
 const dateTime = (value?: string) => value ? new Date(value).toLocaleString() : '—';
 const label = (status: string) => STATUS_LABELS[status] || status.split('_').join(' ');
+const remaining = (deadline: string | undefined, now: number) => {
+  if (!deadline) return null;
+  const milliseconds = new Date(deadline).getTime() - now;
+  const seconds = Math.max(0, Math.ceil(milliseconds / 1000));
+  return { seconds, text: `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}` };
+};
 
 export const OrderTracking: React.FC = () => {
   const { orderId = '' } = useParams();
@@ -28,6 +34,8 @@ export const OrderTracking: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [receiptLoading, setReceiptLoading] = useState(false);
+  const [finalizingTryAtHome, setFinalizingTryAtHome] = useState<string | null>(null);
+  const [clock, setClock] = useState(() => Date.now());
   const [error, setError] = useState('');
   const loadOrder = useCallback(async (quiet = false) => {
     if (!quiet) setLoading(true);
@@ -44,6 +52,10 @@ export const OrderTracking: React.FC = () => {
   }, [orderId]);
 
   useEffect(() => { void loadOrder(); }, [loadOrder]);
+  useEffect(() => {
+    const timer = window.setInterval(() => setClock(Date.now()), 1000);
+    return () => window.clearInterval(timer);
+  }, []);
 
   const progress = useMemo(() => {
     if (!order || order.status === 'cancelled') return 0;
@@ -70,6 +82,20 @@ export const OrderTracking: React.FC = () => {
       setError(cause instanceof Error ? cause.message : 'Receipt download failed.');
     } finally {
       setReceiptLoading(false);
+    }
+  };
+
+  const confirmTryAtHome = async (itemIndex: number, keptVariantId: string) => {
+    if (!order) return;
+    const key = `${itemIndex}:${keptVariantId}`;
+    setFinalizingTryAtHome(key);
+    setError('');
+    try {
+      setOrder(await orderApi.finalizeTryAtHome(order.id, itemIndex, keptVariantId));
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Try at Home selection could not be saved.');
+    } finally {
+      setFinalizingTryAtHome(null);
     }
   };
 
@@ -108,6 +134,20 @@ export const OrderTracking: React.FC = () => {
         {!cancelled && <div className="mt-6"><div className="h-2 rounded-full bg-neutral-200 dark:bg-neutral-800 overflow-hidden"><div className="h-full bg-lime-500 transition-all" style={{ width: `${progress}%` }} /></div><div className="mt-2 flex justify-between text-[11px] font-bold text-neutral-500"><span>Placed</span><span>Delivered</span></div></div>}
         {cancelled && <div className="mt-5 rounded-2xl border border-red-300 bg-white/70 dark:bg-neutral-950/40 p-4"><p className="text-xs font-black uppercase tracking-wide text-red-700 dark:text-red-300">Cancellation reason</p><p className="mt-1 font-semibold">{order.cancellationReason || 'No cancellation reason was recorded.'}</p>{order.cancelledAt && <p className="text-xs text-neutral-500 mt-2">Cancelled {dateTime(order.cancelledAt)}</p>}</div>}
       </section>
+
+      {(order.items || []).some(item => item.tryAtHome) && <section className="rounded-3xl border border-lime-300 bg-lime-50 dark:border-lime-800 dark:bg-lime-950/20 p-5 md:p-6 space-y-4">
+        <div><h2 className="text-lg font-black">Try at Home</h2><p className="text-sm text-neutral-600 dark:text-neutral-300">Try both delivered sizes and confirm the one you keep. The initial ₹50 service fee is already included in the order total.</p></div>
+        {(order.items || []).map((item, itemIndex) => {
+          const trial = item.tryAtHome;
+          if (!trial) return null;
+          const countdown = remaining(trial.deadlineAt, clock);
+          const selected = trial.status === 'selected';
+          return <article key={`${item.variantId}-${itemIndex}`} className="rounded-2xl border border-lime-200 bg-white dark:border-lime-900 dark:bg-neutral-900 p-4">
+            <div className="flex flex-wrap items-start justify-between gap-3"><div><strong>{item.productName}</strong><p className="text-xs text-neutral-500 mt-1">Colour: {trial.selectedColour || item.colourName}</p></div>{trial.status === 'active' && countdown && <span className={`rounded-full px-3 py-1 text-xs font-black ${countdown.seconds > 0 ? 'bg-lime-200 text-lime-950' : 'bg-amber-200 text-amber-950'}`}>{countdown.seconds > 0 ? `${countdown.text} left` : '15 minutes exceeded'}</span>}</div>
+            {selected ? <div className="mt-3 text-sm"><p><strong>Kept size:</strong> {trial.keptSize}</p><p><strong>Returned size:</strong> {trial.rejectedSize}</p>{trial.lateFeeApplied && <p className="mt-2 font-bold text-amber-700 dark:text-amber-300">₹50 late-selection fee applies{order.tryAtHomeLateFeePaid ? ' · paid' : ' · payment due'}.</p>}</div> : trial.status === 'active' ? <div className="mt-4 space-y-3"><p className="text-xs font-semibold">Which size are you keeping?</p><div className="flex flex-wrap gap-2">{trial.originalVariantIds.map((variantId, optionIndex) => <button key={variantId} type="button" disabled={finalizingTryAtHome !== null} onClick={() => void confirmTryAtHome(itemIndex, variantId)} className="rounded-xl bg-neutral-950 px-4 py-2.5 text-sm font-black text-white disabled:opacity-50 dark:bg-lime-400 dark:text-neutral-950">{finalizingTryAtHome === `${itemIndex}:${variantId}` ? 'Saving…' : `Keep size ${trial.selectedSizes[optionIndex] || 'selected'}`}</button>)}</div><p className="text-[11px] text-neutral-500">The other size is returned to inventory. Selecting after the deadline adds a ₹50 late fee.</p></div> : <p className="mt-3 text-sm text-neutral-500">The 15-minute timer starts when this order is marked delivered.</p>}
+          </article>;
+        })}
+      </section>}
 
       <section className="rounded-3xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 p-5 md:p-6 space-y-4">
         <div className="flex items-center gap-2"><Package className="w-5 h-5" /><h2 className="text-lg font-black">Order items</h2></div>

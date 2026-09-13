@@ -154,3 +154,28 @@ DEV2 may use these fields for receipt/tracking display only. DEV2 must not infer
 - **Validation-host note:** default Windows Store Python 3.7 cannot import project dependencies; this was an environment issue only and was corrected with `STYLEDASH_E2E_PYTHON` / `STYLEDASH_VERIFY_PYTHON` pointing to Python 3.12.
 - **Production:** NOT DEPLOYED. Live remains on `7b739e0` (Cart race fix release).
 - **Release gate:** developer regression PASS. Next required steps are PR/required GitHub checks, merge approval, then protected production deployment + live login/store smoke verification.
+
+## Try at Home + Hidden Customer Commission — Final Developer Candidate — 2026-09-13
+- **SUPERSEDES** the earlier shared/dirty-checkout attempt based on stale `571837d`.
+- **Branch:** `agent/admin-inventory-product-options`; base `origin/main` `dae03dcf6bef37d9d6588e3533292b9ce02bfd0c`.
+- **Exact implementation SHA:** `466a972658da4e5f7cffb9e01f9b63b068509435`.
+- Scope: richer Admin inventory filters; flexible product option modes; Admin + seller Try-at-Home opt-in; hidden customer-paid commission.
+- Try at Home requires two distinct in-stock sizes of the same colour, explicit terms acceptance, quantity one, atomic dual reservation and Rs 50 initial fee.
+- Delivered starts the persisted 15-minute server timer. Customer selects the kept size in Order Tracking; rejected size is restored once. Late selection records Rs 50 due.
+- No automatic post-delivery Razorpay charge. Private Admin records actual Cash/UPI late-fee collection; invalid or duplicate collection fails closed and is audited.
+- Commission: < Rs 500 = 10%; Rs 500–1,000 = 8%; > Rs 1,000 = 6%. Customer receives only final inclusive price; seller receives base/store price; commission breakdown is private-Admin-only.
+- Removed 125 legacy client-side `commissionPercent` entries and public Product/Vendor commission fields. Customer-bundle privacy is regression-tested.
+- Schema migration v7 adds `try_at_home_enabled` default OFF for existing products.
+- Gates: `verify:fast` PASS; typecheck PASS; lint PASS; frontend 99/99 PASS; backend/security discovery 247 PASS + 1 expected skip.
+- Full Playwright exact-final tree: 150 PASS + 2 expected skips across desktop/mobile.
+- Production build PASS; runtime audit 0 vulnerabilities; changed-diff secret scan 0 findings; `git diff --check` PASS.
+- Built `dist` scan found no commission metadata/helper identifiers.
+- No real payment/refund/order, production mutation, or deployment performed.
+- **Status:** Developer PASS; push/PR next. Protected merge/deployment remains separate.
+
+### Candidate publication — 2026-09-13
+- Branch `agent/admin-inventory-product-options` pushed successfully.
+- Protected PR: **#56** — `feat: add Try at Home, flexible product options, and hidden customer commission`.
+- URL: `https://github.com/Mohit0409/StyleDash/pull/56`.
+- Implementation SHA remains `466a972658da4e5f7cffb9e01f9b63b068509435`.
+- Developer implementation/regression PASS; no production deployment performed.
