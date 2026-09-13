@@ -69,6 +69,12 @@ export const Terms = () => (
         </Link>
         , which forms part of these terms.
       </p>
+      <p className="text-sm text-neutral-600">
+        Size exchange is available only when the product is marked eligible, must be requested within the stated exchange window, depends on replacement stock, and costs INR 50. Cancellation remains available before delivery; when the order is already out for delivery, a customer-requested cancellation costs INR 50. Fees are recorded against the order and are marked paid only after actual Cash or UPI-at-delivery collection. Online refunds remain subject to verified payment processing.
+      </p>
+      <p className="text-sm text-neutral-600">
+        For an eligible Try at Home product, the offer costs INR 50 and includes two selected sizes. The customer has 15 minutes after delivery to choose one size and return the other in its original condition. An additional INR 50 late fee applies after that time.
+      </p>
     </section>
 
     <section className="space-y-2">

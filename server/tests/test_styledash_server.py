@@ -255,6 +255,49 @@ class PaymentServiceTests(unittest.TestCase):
         finally:
             self.service._static_products["sd-prod-001"] = original
 
+    def test_customer_cancellation_and_exchange_requests_are_owned_idempotent_and_stock_checked(self) -> None:
+        product = self.service._static_products["sd-prod-001"]
+        original = dict(product)
+        self.service._static_products["sd-prod-001"] = {**product, "exchangeAvailable": True}
+        try:
+            placed = self.service.place_cod_order(
+                self.payload(paymentMethod="cod", items=[{"productId": "sd-prod-001", "variantId": "sd-prod-001-var-1", "quantity": 1}]),
+                "exchange-order-001",
+            )["order"]
+            cancellation = self.service.request_customer_cancellation(placed["id"], "test-user")
+            self.assertEqual(cancellation["order"]["cancellationRequest"]["feeDue"], 0)
+            self.assertTrue(self.service.request_customer_cancellation(placed["id"], "test-user")["idempotent"])
+            self.assert_api_error("order_not_found", lambda: self.service.request_customer_cancellation(placed["id"], "another-user"))
+
+            with self.service.store.lock:
+                stored = self.service.store.state["orders"][placed["id"]]
+                stored.pop("cancellationRequest", None)
+                stored["status"] = "delivered"
+                stored["updatedAt"] = "2026-09-13T10:00:00+00:00"
+                stored.setdefault("statusHistory", []).append({"status": "delivered", "timestamp": "2026-09-13T10:00:00+00:00"})
+                self.service.store.save()
+            requested = self.service.request_exchange(
+                placed["id"], "test-user", 0, "sd-prod-001-var-2",
+                now=SERVER.datetime(2026, 9, 14, 10, 0, tzinfo=SERVER.timezone.utc),
+            )
+            self.assertEqual((requested["exchange"]["sourceSize"], requested["exchange"]["targetSize"]), ("S", "M"))
+            self.assertEqual(requested["exchange"]["feeDue"], 50)
+            repeated = self.service.request_exchange(
+                placed["id"], "test-user", 0, "sd-prod-001-var-2",
+                now=SERVER.datetime(2026, 9, 14, 10, 1, tzinfo=SERVER.timezone.utc),
+            )
+            self.assertTrue(repeated["idempotent"])
+            with self.service.store.lock:
+                stored_exchange = self.service.store.state["orders"][placed["id"]]["exchangeRequests"][0]
+                stored_exchange.update({"reviewedBy": "private-admin-id", "targetReserved": True, "inventoryAdjusted": False})
+                public_exchange = self.service._public_order(self.service.store.state["orders"][placed["id"]])["exchangeRequests"][0]
+            self.assertNotIn("reviewedBy", public_exchange)
+            self.assertNotIn("targetReserved", public_exchange)
+            self.assertNotIn("inventoryAdjusted", public_exchange)
+            self.assert_api_error("order_not_found", lambda: self.service.request_exchange(placed["id"], "another-user", 0, "sd-prod-001-var-2"))
+        finally:
+            self.service._static_products["sd-prod-001"] = original
+
     def test_catalog_refresh_does_not_take_payment_state_file_lock(self) -> None:
         class ForbiddenStateLock:
             def __enter__(self):
@@ -2222,7 +2265,7 @@ class HttpApiTests(unittest.TestCase):
         if include_terms and path in {
             "/api/auth/register", "/api/auth/login", "/api/auth/federated/google", "/api/auth/federated/phone",
         }:
-            payload = {"termsAccepted": True, "termsVersion": "2026-08-14", **payload}
+            payload = {"termsAccepted": True, "termsVersion": "2026-09-13", **payload}
         request = urllib.request.Request(
             f"{self.base_url}{path}", data=json.dumps(payload).encode(),
             headers={"Content-Type": "application/json", **(headers or {})}, method="POST",
@@ -2260,7 +2303,7 @@ class HttpApiTests(unittest.TestCase):
                 "SELECT terms_version,authentication_method,accepted_at FROM customer_terms_acceptances WHERE user_id=?",
                 (customer_id,),
             ).fetchone()
-        self.assertEqual(tuple(acceptance[:2]), ("2026-08-14", "password"))
+        self.assertEqual(tuple(acceptance[:2]), ("2026-09-13", "password"))
         self.assertIsNotNone(acceptance[2])
 
         status, rejected_login, _headers = self.post_json(
@@ -2358,6 +2401,51 @@ class HttpApiTests(unittest.TestCase):
             "/api/account-state/cart", {"items": [], "userId": users[1]["id"]}, headers_a
         )
         self.assertEqual((status, injected["code"]), (400, "invalid_cart_state"))
+
+    def test_order_service_request_routes_require_csrf_and_session_ownership(self) -> None:
+        sessions = []
+        for suffix, phone in (("owner", "9876543290"), ("other", "9876543291")):
+            status, body, headers = self.post_json("/api/auth/register", {
+                "name": f"Service {suffix}", "email": f"service-{suffix}@example.test",
+                "password": "long service password 123", "phone": phone,
+            })
+            self.assertEqual(status, 201)
+            sessions.append({
+                "id": body["user"]["id"], "cookie": headers["Set-Cookie"].split(";", 1)[0],
+                "csrf": body["csrfToken"],
+            })
+        product = self.service._static_products["sd-prod-001"]
+        self.service._static_products["sd-prod-001"] = {**product, "exchangeAvailable": True}
+        with self.service.store.lock:
+            self.service.store.state["orders"]["HTTP-CANCEL"] = {
+                "id": "HTTP-CANCEL", "userId": sessions[0]["id"], "status": "placed",
+                "paymentMethod": "cod", "paymentStatus": "pending", "fulfillmentRequired": True,
+                "items": [], "createdAt": "2026-09-13T10:00:00+00:00", "updatedAt": "2026-09-13T10:00:00+00:00", "statusHistory": [],
+            }
+            self.service.store.state["orders"]["HTTP-EXCHANGE"] = {
+                "id": "HTTP-EXCHANGE", "userId": sessions[0]["id"], "status": "delivered",
+                "paymentMethod": "cod", "paymentStatus": "paid", "fulfillmentRequired": True,
+                "items": [{"productId": "sd-prod-001", "variantId": "sd-prod-001-var-1", "quantity": 1, "exchangeEligible": True}],
+                "createdAt": "2026-09-13T10:00:00+00:00", "updatedAt": SERVER.datetime.now(SERVER.timezone.utc).isoformat(),
+                "statusHistory": [{"status": "delivered", "timestamp": SERVER.datetime.now(SERVER.timezone.utc).isoformat()}],
+            }
+            self.service.store.save()
+        cookie_only = {"Cookie": sessions[0]["cookie"], "Origin": "https://styledash.test"}
+        status, missing_csrf, _headers = self.post_json("/api/orders/HTTP-CANCEL/cancel-request", {}, cookie_only)
+        self.assertEqual((status, missing_csrf["code"]), (403, "csrf_failed"))
+        other_headers = {"Cookie": sessions[1]["cookie"], "X-CSRF-Token": sessions[1]["csrf"], "Origin": "https://styledash.test"}
+        status, hidden, _headers = self.post_json("/api/orders/HTTP-CANCEL/cancel-request", {}, other_headers)
+        self.assertEqual((status, hidden["code"]), (404, "order_not_found"))
+        owner_headers = {"Cookie": sessions[0]["cookie"], "X-CSRF-Token": sessions[0]["csrf"], "Origin": "https://styledash.test"}
+        status, cancelled, _headers = self.post_json("/api/orders/HTTP-CANCEL/cancel-request", {}, owner_headers)
+        self.assertEqual((status, cancelled["order"]["cancellationRequest"]["status"]), (200, "requested"))
+        status, exchanged, _headers = self.post_json(
+            "/api/orders/HTTP-EXCHANGE/exchange-requests",
+            {"itemIndex": 0, "targetVariantId": "sd-prod-001-var-2"}, owner_headers,
+        )
+        self.assertEqual((status, exchanged["order"]["exchangeRequests"][0]["status"]), (201, "requested"))
+        self.assertNotIn("exchange", exchanged)
+        self.service._static_products["sd-prod-001"] = product
 
     def test_saved_profile_is_returned_after_logout_and_password_login(self) -> None:
         user, _raw, _csrf = self.service.security.register({

@@ -187,6 +187,65 @@ class AdminStoreTests(unittest.TestCase):
         self.assertEqual(metadata["amount"], 50)
         self.assertEqual(metadata["collectionMethod"], "upi_at_delivery")
 
+    def test_cancellation_and_exchange_fees_are_collected_and_inventory_moves_exactly_once(self):
+        app = ADMIN_SERVER.AdminApplication(
+            self.database, self.key, ROOT / "server/payment-data/catalog.json",
+            ROOT / "server/payment-data/settings.json", self.root / "data-service-fees",
+        )
+        product = app.payments.product_snapshot()["sd-prod-001"]
+        source, target = product["variants"][0], product["variants"][1]
+        exchange_id = "exch_admin_test"
+        with app.payments.store.lock:
+            state = app.payments.store.state
+            state["inventory"][source["id"]] = 9
+            state["inventory"][target["id"]] = 4
+            state["orders"]["EXCHANGE-ADMIN"] = {
+                "id": "EXCHANGE-ADMIN", "userId": "customer-a", "paymentMethod": "cod",
+                "paymentStatus": "paid", "status": "delivered", "fulfillmentRequired": True,
+                "createdAt": "2026-09-13T09:00:00+00:00", "updatedAt": "2026-09-13T10:00:00+00:00",
+                "statusHistory": [], "items": [{"productId": product["id"], "variantId": source["id"], "quantity": 1}],
+                "exchangeRequests": [{"id": exchange_id, "productId": product["id"], "itemIndex": 0,
+                    "sourceVariantId": source["id"], "sourceSize": source["size"], "targetVariantId": target["id"],
+                    "targetSize": target["size"], "quantity": 1, "status": "requested", "feeDue": 50,
+                    "feePaid": False, "inventoryAdjusted": False}],
+            }
+            state["orders"]["CANCEL-ADMIN"] = {
+                "id": "CANCEL-ADMIN", "paymentMethod": "cod", "paymentStatus": "pending",
+                "status": "out_for_delivery", "fulfillmentRequired": True, "inventoryCommitted": False,
+                "createdAt": "2026-09-13T09:00:00+00:00", "updatedAt": "2026-09-13T10:00:00+00:00",
+                "statusHistory": [], "items": [],
+                "cancellationRequest": {"status": "requested", "feeDue": 50, "feePaid": False},
+            }
+            state["orders"]["EXCHANGE-REJECT-ADMIN"] = {
+                "id": "EXCHANGE-REJECT-ADMIN", "status": "delivered", "items": [],
+                "exchangeRequests": [{"id": "exch_reject", "productId": "retired-product",
+                    "status": "requested", "quantity": "invalid", "sourceSize": "S", "targetSize": "M"}],
+            }
+            app.payments.store.save()
+
+        self.assert_error("exchange_fee_not_ready", lambda: app.mark_exchange_fee_paid(self.admin["id"], "EXCHANGE-ADMIN", exchange_id, "cash"))
+        approved = app.update_exchange_status(self.admin["id"], "EXCHANGE-ADMIN", exchange_id, "approved")
+        self.assertEqual(approved["exchangeRequests"][0]["status"], "approved")
+        self.assertEqual(app.payments.store.state["inventory"][target["id"]], 3)
+        paid = app.mark_exchange_fee_paid(self.admin["id"], "EXCHANGE-ADMIN", exchange_id, "cash")
+        self.assertTrue(paid["exchangeRequests"][0]["feePaid"])
+        completed = app.update_exchange_status(self.admin["id"], "EXCHANGE-ADMIN", exchange_id, "completed")
+        self.assertEqual(completed["exchangeRequests"][0]["status"], "completed")
+        self.assertEqual(app.payments.store.state["inventory"][source["id"]], 10)
+        self.assertEqual(app.payments.store.state["inventory"][target["id"]], 3)
+        self.assert_error("invalid_exchange_transition", lambda: app.update_exchange_status(self.admin["id"], "EXCHANGE-ADMIN", exchange_id, "completed"))
+        self.assertEqual((app.payments.store.state["inventory"][source["id"]], app.payments.store.state["inventory"][target["id"]]), (10, 3))
+        rejected = app.update_exchange_status(self.admin["id"], "EXCHANGE-REJECT-ADMIN", "exch_reject", "rejected")
+        self.assertEqual(rejected["exchangeRequests"][0]["status"], "rejected")
+
+        self.assert_error("cancellation_fee_required", lambda: app.update_order_status(self.admin["id"], "CANCEL-ADMIN", "cancelled", "Customer requested cancellation"))
+        fee_paid = app.mark_cancellation_fee_paid(self.admin["id"], "CANCEL-ADMIN", "upi_at_delivery")
+        self.assertTrue(fee_paid["cancellationRequest"]["feePaid"])
+        cancelled = app.update_order_status(self.admin["id"], "CANCEL-ADMIN", "cancelled", "Customer requested cancellation")
+        self.assertEqual(cancelled["cancellationRequest"]["status"], "completed")
+        actions = {row["action"] for row in self.store.audit()}
+        self.assertTrue({"exchange_approved", "exchange_fee_paid", "exchange_completed", "cancellation_fee_paid"}.issubset(actions))
+
     def test_private_admin_owner_mobile_required_email_optional_and_otp_binds(self):
         owner = self.store.create_customer_account(self.admin["id"], {
             "name": "Phone First Owner", "phone": "9876501234", "password": "TempPass8!",
@@ -803,6 +862,11 @@ class AdminStoreTests(unittest.TestCase):
         self.assertIn("Customer filters", admin_ui)
         self.assertIn("Payment alert filters", admin_ui)
         self.assertIn("Audit filters", admin_ui)
+        self.assertIn("Changed field", admin_ui)
+        self.assertNotIn("JSON.stringify(item.proposedProduct", admin_ui)
+        self.assertIn("bulkTransition", admin_ui)
+        self.assertIn("mark-cancellation-fee-paid", admin_ui)
+        self.assertIn("mark-exchange-fee-paid", admin_ui)
         self.assertIn("matchesAdminSearch", admin_ui)
         self.assertIn('All Shops', admin_ui)
         self.assertIn('No products match the current search and filters.', admin_ui)

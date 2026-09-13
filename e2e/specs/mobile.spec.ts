@@ -57,7 +57,7 @@ test('mobile same account cart and wishlist sync across isolated browser context
   const password = 'E2E-mobile-account-sync-2026!';
   const registered = await request.post('/api/auth/register', { data: {
     name: 'E2E Mobile Sync Customer', email, phone: '9876543499', password,
-    termsAccepted: true, termsVersion: '2026-08-14',
+    termsAccepted: true, termsVersion: '2026-09-13',
   }});
   expect(registered.status()).toBe(201);
 

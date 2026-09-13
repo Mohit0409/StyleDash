@@ -314,7 +314,7 @@ export const ProductDetail: React.FC = () => {
             <p><strong>Material:</strong> {product.material}</p>
             {product.fit && <p><strong>Fit:</strong> {product.fit}</p>}
             <p><strong>Care Instructions:</strong> {product.careInstructions.join(', ')}</p>
-            <p><strong>Exchange:</strong> {product.returnWindowDays}-Day Size Exchange on eligible items; conditions and pickup charges may apply.</p>
+            <p><strong>Exchange:</strong> {product.exchangeAvailable ? `Eligible for size exchange within ${product.returnWindowDays} days for ₹50; replacement stock and conditions apply.` : 'Not available for this product.'}</p>
           </div>
         </div>
       </div>

@@ -108,11 +108,13 @@ PRODUCT_PAYLOAD_FIELDS = {
     "variants",
     "colourVariants",
     "tryAtHomeEnabled",
+    "exchangeAvailable",
 }
 PRODUCT_CHANGE_PAYLOAD_FIELDS = PRODUCT_PAYLOAD_FIELDS - {"inventory", "size"}
 DEPARTMENTS = CANONICAL_DEPARTMENTS
 COLOUR_HEX_PATTERN = re.compile(r"^#[0-9A-Fa-f]{6}$")
 PRODUCT_MEDIA_PATH_PATTERN = re.compile(r"^/media/product-images/[0-9a-f]{32}\.(?:webp|jpg|png)$")
+EXCHANGE_WINDOW_DAYS = 7
 
 
 def _commission_rate_basis_points(price_paise: int) -> int:
@@ -285,6 +287,8 @@ class ShopWorkflow:
             self._migrate_store_branding(db)
             self._migrate_colour_variant_metadata(db)
             self._migrate_product_try_at_home(db)
+            self._migrate_product_exchange(db)
+            self._migrate_product_change_summaries(db)
             integrity = [row[0] for row in db.execute("PRAGMA integrity_check").fetchall()]
             if integrity != ["ok"]:
                 raise RuntimeError("Shop migration failed SQLite integrity validation")
@@ -645,6 +649,46 @@ class ShopWorkflow:
                 )
             if db.execute("SELECT 1 FROM shop_schema_migrations WHERE version=7").fetchone() is None:
                 db.execute("INSERT INTO shop_schema_migrations(version,applied_at) VALUES(7,?)", (now,))
+            db.commit()
+        except Exception:
+            db.rollback()
+            raise
+
+    @staticmethod
+    def _migrate_product_exchange(db: sqlite3.Connection) -> None:
+        """Add product-level exchange eligibility; existing products remain ineligible."""
+        now = iso(utc_now())
+        db.execute("BEGIN IMMEDIATE")
+        try:
+            columns = {row["name"] for row in db.execute(
+                "PRAGMA table_info(shop_product_submissions)"
+            ).fetchall()}
+            if "exchange_available" not in columns:
+                db.execute(
+                    "ALTER TABLE shop_product_submissions "
+                    "ADD COLUMN exchange_available INTEGER NOT NULL DEFAULT 0 "
+                    "CHECK(exchange_available IN (0,1))"
+                )
+            if db.execute("SELECT 1 FROM shop_schema_migrations WHERE version=8").fetchone() is None:
+                db.execute("INSERT INTO shop_schema_migrations(version,applied_at) VALUES(8,?)", (now,))
+            db.commit()
+        except Exception:
+            db.rollback()
+            raise
+
+    @staticmethod
+    def _migrate_product_change_summaries(db: sqlite3.Connection) -> None:
+        """Persist the exact before/after review snapshot for readable Admin approval."""
+        now = iso(utc_now())
+        db.execute("BEGIN IMMEDIATE")
+        try:
+            columns = {row["name"] for row in db.execute(
+                "PRAGMA table_info(shop_product_change_requests)"
+            ).fetchall()}
+            if "change_summary_json" not in columns:
+                db.execute("ALTER TABLE shop_product_change_requests ADD COLUMN change_summary_json TEXT")
+            if db.execute("SELECT 1 FROM shop_schema_migrations WHERE version=9").fetchone() is None:
+                db.execute("INSERT INTO shop_schema_migrations(version,applied_at) VALUES(9,?)", (now,))
             db.commit()
         except Exception:
             db.rollback()
@@ -1386,16 +1430,27 @@ class ShopWorkflow:
             try_at_home = bool(try_at_home)
         if not isinstance(try_at_home, bool):
             raise SecurityError(400, "Choose whether Try at Home is available.", "invalid_product")
+        sizes_by_colour: dict[str, set[str]] = {}
+        for variant in active_variants:
+            size = str(variant.get("size") or "").strip()
+            if not size or size.casefold() == "one size":
+                continue
+            colour = str(variant.get("colourName") or "Default").strip().casefold()
+            sizes_by_colour.setdefault(colour, set()).add(size.casefold())
         if try_at_home:
-            sizes_by_colour: dict[str, set[str]] = {}
-            for variant in active_variants:
-                size = str(variant.get("size") or "").strip()
-                if not size or size.casefold() == "one size":
-                    continue
-                colour = str(variant.get("colourName") or "Default").strip().casefold()
-                sizes_by_colour.setdefault(colour, set()).add(size.casefold())
             if not any(len(sizes) >= 2 for sizes in sizes_by_colour.values()):
                 raise SecurityError(400, "Try at Home requires at least two different sizes for the same colour.", "invalid_try_at_home_product")
+
+        exchange_available = (
+            payload["exchangeAvailable"] if "exchangeAvailable" in payload
+            else (bool(current["exchange_available"]) if current is not None and "exchange_available" in current.keys() else False)
+        )
+        if isinstance(exchange_available, int) and exchange_available in (0, 1):
+            exchange_available = bool(exchange_available)
+        if not isinstance(exchange_available, bool):
+            raise SecurityError(400, "Choose whether size exchange is available.", "invalid_product")
+        if exchange_available and not any(len(sizes) >= 2 for sizes in sizes_by_colour.values()):
+            raise SecurityError(400, "Size exchange requires at least two different sizes for the same colour.", "invalid_exchange_product")
 
         return {
             "name": name,
@@ -1413,6 +1468,7 @@ class ShopWorkflow:
             "image_urls_json": json.dumps(clean_images, separators=(",", ":")),
             "attributes_json": json.dumps(clean_attributes, separators=(",", ":"), sort_keys=True),
             "try_at_home_enabled": int(try_at_home),
+            "exchange_available": int(exchange_available),
         }
 
     @staticmethod
@@ -1465,6 +1521,7 @@ class ShopWorkflow:
             "imageUrls": json.loads(row["image_urls_json"]),
             "attributes": attributes,
             "tryAtHomeEnabled": bool(row["try_at_home_enabled"]) if "try_at_home_enabled" in row.keys() else False,
+            "exchangeAvailable": bool(row["exchange_available"]) if "exchange_available" in row.keys() else False,
             "status": row["status"],
             "rejectionReason": row["rejection_reason"] if row["status"] == "REJECTED" else None,
             "createdAt": row["created_at"],
@@ -1510,7 +1567,43 @@ class ShopWorkflow:
             "imageUrls": json.loads(values["image_urls_json"]),
             "attributes": attributes,
             "tryAtHomeEnabled": bool(values.get("try_at_home_enabled", 0)),
+            "exchangeAvailable": bool(values.get("exchange_available", 0)),
         }
+
+    @staticmethod
+    def _product_change_summary(current: dict[str, Any], proposed: dict[str, Any]) -> list[dict[str, str]]:
+        labels = {
+            "name": "Product name", "description": "Description", "brand": "Brand",
+            "department": "Department", "category": "Category", "subcategory": "Subcategory",
+            "deliveryType": "Delivery type", "pricePaise": "Store price",
+            "originalPricePaise": "Original price", "variants": "Options and stock",
+            "colourName": "Colour name", "colourHex": "Colour", "imageUrls": "Images",
+            "attributes": "Attributes", "tryAtHomeEnabled": "Try at Home",
+            "exchangeAvailable": "Size exchange",
+        }
+
+        def display(key: str, value: Any) -> str:
+            if key in {"pricePaise", "originalPricePaise"}:
+                return f"Rs {int(value or 0) / 100:.2f}"
+            if key in {"tryAtHomeEnabled", "exchangeAvailable"}:
+                return "Enabled" if value else "Disabled"
+            if key == "variants" and isinstance(value, list):
+                return ", ".join(
+                    f"{item.get('size')} ({item.get('inventory')} in stock)"
+                    + (" [removed]" if item.get("active") is False else "")
+                    for item in value if isinstance(item, dict)
+                ) or "None"
+            if key == "imageUrls" and isinstance(value, list):
+                return f"{len(value)} image(s)"
+            if key == "attributes" and isinstance(value, dict):
+                return ", ".join(f"{name}: {text}" for name, text in sorted(value.items())) or "None"
+            return str(value) if value not in (None, "") else "Not set"
+
+        return [
+            {"field": label, "before": display(key, current.get(key)), "after": display(key, proposed.get(key))}
+            for key, label in labels.items()
+            if current.get(key) != proposed.get(key)
+        ]
 
     @staticmethod
     def _serialize_change_request(
@@ -1524,6 +1617,10 @@ class ShopWorkflow:
             "status": row["status"],
             "proposedProduct": (
                 json.loads(row["payload_json"]) if row["payload_json"] else None
+            ),
+            "changeSummary": (
+                json.loads(row["change_summary_json"] or "[]")
+                if "change_summary_json" in row.keys() else []
             ),
             "rejectionReason": (
                 row["rejection_reason"] if row["status"] == "REJECTED" else None
@@ -1626,7 +1723,7 @@ class ShopWorkflow:
                     now,
                 ),
             )
-            db.execute("UPDATE shop_product_submissions SET try_at_home_enabled=? WHERE id=?", (values["try_at_home_enabled"], product_id))
+            db.execute("UPDATE shop_product_submissions SET try_at_home_enabled=?,exchange_available=? WHERE id=?", (values["try_at_home_enabled"], values["exchange_available"], product_id))
             db.commit()
             row = db.execute(
                 "SELECT * FROM shop_product_submissions WHERE id=?", (product_id,)
@@ -1684,7 +1781,7 @@ class ShopWorkflow:
                     user_id,
                 ),
             )
-            db.execute("UPDATE shop_product_submissions SET try_at_home_enabled=? WHERE id=?", (values["try_at_home_enabled"], product_id))
+            db.execute("UPDATE shop_product_submissions SET try_at_home_enabled=?,exchange_available=? WHERE id=?", (values["try_at_home_enabled"], values["exchange_available"], product_id))
             db.commit()
             row = db.execute(
                 "SELECT * FROM shop_product_submissions WHERE id=?", (product_id,)
@@ -1773,7 +1870,7 @@ class ShopWorkflow:
                     values["attributes_json"], admin_id, now, now, now, now, now,
                 ),
             )
-            db.execute("UPDATE shop_product_submissions SET try_at_home_enabled=? WHERE id=?", (values["try_at_home_enabled"], product_id))
+            db.execute("UPDATE shop_product_submissions SET try_at_home_enabled=?,exchange_available=? WHERE id=?", (values["try_at_home_enabled"], values["exchange_available"], product_id))
             self._audit_if_available(
                 db, admin_id, "shop_product_admin_created", "shop_product", product_id,
                 {"applicationId": application_id, "status": "PUBLISHED"},
@@ -1846,7 +1943,7 @@ class ShopWorkflow:
                     ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,'PUBLISHED',?,?,?,?,?,?)""",
                     (product_id,slug,application_id,application["submitted_by_user_id"],values["name"],values["description"],values["brand"],values["department"],values["category"],values["price_paise"],values["original_price_paise"],values["inventory"],values["size"],variants_json,values["colour_name"],values["colour_hex"],values["image_urls_json"],values["attributes_json"],admin_id,now,now,now,now,now),
                 )
-                db.execute("UPDATE shop_product_submissions SET try_at_home_enabled=? WHERE id=?", (values["try_at_home_enabled"], product_id))
+                db.execute("UPDATE shop_product_submissions SET try_at_home_enabled=?,exchange_available=? WHERE id=?", (values["try_at_home_enabled"], values["exchange_available"], product_id))
                 created_ids.append(product_id)
                 self._audit_if_available(db,admin_id,"shop_product_admin_bulk_created","shop_product",product_id,{"applicationId":application_id,"status":"PUBLISHED"})
             db.commit()
@@ -2003,7 +2100,7 @@ class ShopWorkflow:
                     admin_id, now, now, product_id,
                 ),
             )
-            db.execute("UPDATE shop_product_submissions SET try_at_home_enabled=? WHERE id=?", (values["try_at_home_enabled"], product_id))
+            db.execute("UPDATE shop_product_submissions SET try_at_home_enabled=?,exchange_available=? WHERE id=?", (values["try_at_home_enabled"], values["exchange_available"], product_id))
             self._audit_if_available(
                 db, admin_id, "shop_product_admin_updated", "shop_product", product_id,
                 {"status": current["status"]},
@@ -2145,6 +2242,7 @@ class ShopWorkflow:
     ) -> dict[str, Any]:
         now = iso(utc_now())
         request_id = "shopchg_" + secrets.token_hex(12)
+        change_summary: list[dict[str, str]] = []
         with self.connect() as db:
             db.execute("BEGIN IMMEDIATE")
             current = self._seller_published_product(db, user_id, product_id)
@@ -2259,6 +2357,7 @@ class ShopWorkflow:
                         "No catalogue changes were provided.",
                         "no_product_changes",
                     )
+                change_summary = self._product_change_summary(current_values, proposed)
                 payload_json = json.dumps(
                     proposed, separators=(",", ":"), sort_keys=True
                 )
@@ -2271,6 +2370,7 @@ class ShopWorkflow:
                         "invalid_product_change",
                     )
                 payload_json = None
+                change_summary = [{"field": "Listing", "before": "Published", "after": "Unpublish requested"}]
             else:
                 db.rollback()
                 raise SecurityError(
@@ -2281,8 +2381,8 @@ class ShopWorkflow:
                 """
                 INSERT INTO shop_product_change_requests(
                   id,product_id,application_id,submitted_by_user_id,action,
-                  payload_json,status,created_at,updated_at,submitted_at
-                ) VALUES(?,?,?,?,?,?,'SUBMITTED',?,?,?)
+                  payload_json,change_summary_json,status,created_at,updated_at,submitted_at
+                ) VALUES(?,?,?,?,?,?,?,'SUBMITTED',?,?,?)
                 """,
                 (
                     request_id,
@@ -2291,6 +2391,7 @@ class ShopWorkflow:
                     user_id,
                     action,
                     payload_json,
+                    json.dumps(change_summary, separators=(",", ":")),
                     now,
                     now,
                     now,
@@ -2479,7 +2580,7 @@ class ShopWorkflow:
                             current["id"],
                         ),
                     )
-                    db.execute("UPDATE shop_product_submissions SET try_at_home_enabled=? WHERE id=?", (values["try_at_home_enabled"], current["id"]))
+                    db.execute("UPDATE shop_product_submissions SET try_at_home_enabled=?,exchange_available=? WHERE id=?", (values["try_at_home_enabled"], values["exchange_available"], current["id"]))
                 elif request["action"] == "UNPUBLISH":
                     db.execute(
                         """
@@ -2637,8 +2738,8 @@ class ShopWorkflow:
             "trending": False,
             "featured": False,
             "expressDelivery": attributes.get("deliveryType", "normal") in {"express", "both"},
-            "returnWindowDays": 0,
-            "exchangeAvailable": False,
+            "returnWindowDays": EXCHANGE_WINDOW_DAYS if bool(row["exchange_available"]) else 0,
+            "exchangeAvailable": bool(row["exchange_available"]) if "exchange_available" in row.keys() else False,
             "tryAtHomeAvailable": bool(row["try_at_home_enabled"]) if "try_at_home_enabled" in row.keys() else False,
             "vendorId": row["application_id"],
             "storeName": row["shop_name"],
@@ -2698,6 +2799,7 @@ class ShopWorkflow:
                     "active": row["status"] == "PUBLISHED" and row["shop_status"] == "ACTIVE",
                     "price": price,
                     "tryAtHomeAvailable": bool(row["try_at_home_enabled"]) if "try_at_home_enabled" in row.keys() else False,
+                    "exchangeAvailable": bool(row["exchange_available"]) if "exchange_available" in row.keys() else False,
                     "variants": [
                         {
                             "id": item["id"],

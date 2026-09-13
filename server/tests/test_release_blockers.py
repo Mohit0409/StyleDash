@@ -274,11 +274,14 @@ class AdminCancellationTests(unittest.TestCase):
             15,
         )
 
-    def test_packed_cannot_cancel(self):
+    def test_packed_can_cancel_before_after_dispatch_fee_applies(self):
         o = self.order("SD-PACKED", "cod", "pending", "packed")
         self.seed(o)
-        with self.assertRaises(ADMIN.SecurityError) as caught: self.app.update_order_status("adm_test", o["id"], "cancelled")
-        self.assertEqual(caught.exception.code, "invalid_transition")
+        cancelled = self.app.update_order_status(
+            "adm_test", o["id"], "cancelled", "Customer requested cancellation before dispatch"
+        )
+        self.assertEqual(cancelled["status"], "cancelled")
+        self.assertEqual(self.app.payments.store.state["inventory"]["sd-prod-001-var-2"], 15)
 
     def test_stock_review_can_place_after_restock(self):
         o = self.order("SD-REVIEW", "upi", "paid", "payment_review_required", False)

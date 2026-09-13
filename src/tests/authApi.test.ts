@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import viteConfig from '../../vite.config';
 import { authApi } from '../services/authApi';
 
-const terms = { termsAccepted: true as const, termsVersion: '2026-08-14' };
+const terms = { termsAccepted: true as const, termsVersion: '2026-09-13' };
 
 describe('federated auth API', () => {
   afterEach(() => {
