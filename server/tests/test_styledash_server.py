@@ -165,6 +165,22 @@ class PaymentServiceTests(unittest.TestCase):
             callback()
         self.assertEqual(caught.exception.code, code)
 
+    def test_prelaunch_order_lock_blocks_cod_and_razorpay_without_mutation(self) -> None:
+        self.service.ordering_enabled = False
+        state_before = json.loads(json.dumps(self.service.store.state))
+
+        self.assert_api_error(
+            "ordering_temporarily_disabled",
+            lambda: self.service.place_cod_order(self.payload(paymentMethod="cod"), "prelaunch-cod"),
+        )
+        self.assert_api_error(
+            "ordering_temporarily_disabled",
+            lambda: self.service.create_razorpay_order(self.payload(), "prelaunch-online"),
+        )
+
+        self.assertEqual(self.service.store.state, state_before)
+        self.assertEqual(self.gateway.calls, [])
+
     def test_try_at_home_reserves_two_sizes_and_releases_rejected_size(self) -> None:
         product = self.service._static_products["sd-prod-001"]
         original = dict(product)
