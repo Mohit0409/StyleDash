@@ -65,6 +65,7 @@ byId('content').addEventListener('change', event => {
 function status(message) { byId('app-status').textContent = message || ''; }
 const DEFAULT_VARIANT_SIZE='One Size';
 const DEFAULT_VARIANT_COLOUR='Default';
+const STORE_CATEGORIES=['Clothing & Fashion','Footwear','Accessories','Beauty & Personal Care','Electronics','Home & Living','General Store'];
 const PRODUCT_OPTION_MODE_VALUES=new Set(['single','size','colour','both']);
 function defaultProductOptionMode(category){return ['Clothing & Fashion','Footwear'].includes(category)?'both':'single';}
 function inferProductOptionMode(item){
@@ -140,7 +141,9 @@ function formDialog(title, fields, submitLabel='Continue') {
         colourVariantsGetter=()=>{const mode=currentMode(),usesColour=mode==='colour'||mode==='both',usesSize=mode==='size'||mode==='both';const source=usesColour?colours:colours.slice(0,1);const normalized=source.map(colour=>({cardKey:colour.cardKey,colourName:usesColour?String(colour.colourName||'').trim():DEFAULT_VARIANT_COLOUR,colourHex:usesColour?(String(colour.colourHex||'').trim()||undefined):undefined,imageUrls:colour.imageUrls.map(value=>String(value).trim()).filter(Boolean),httpsDraft:colour.httpsDraft,pendingFiles:[...colour.pendingFiles],sizes:(usesSize?colour.sizes:colour.sizes.slice(0,1)).map(size=>({...(size.id?{id:size.id}:{}),size:usesSize?String(size.size||'').trim():DEFAULT_VARIANT_SIZE,inventory:Number(size.inventory)}))}));if(!normalized.length||normalized.some(colour=>!colour.colourName||!colour.sizes.length||colour.sizes.some(size=>!size.size||!Number.isInteger(size.inventory)||size.inventory<0)))throw new Error(usesColour||usesSize?'Complete the selected product options and enter valid stock.':'Enter a valid stock quantity.');return normalized;};
         render();fieldsRoot.appendChild(section);continue;
       }
-      const label=document.createElement('label'); label.textContent=field.label;
+      const label=document.createElement('label'); label.className='dialog-field'; label.textContent=field.label;
+      if(field.required===true){const required=document.createElement('span');required.className='field-required';required.textContent='Required';label.appendChild(required);}
+      if(field.type==='textarea'||field.type==='file'||field.fullWidth===true)label.classList.add('dialog-field-wide');
       const control=field.type==='textarea'?document.createElement('textarea'):field.type==='select'?document.createElement('select'):document.createElement('input');
       control.name=field.name; control.required=field.required===true; controlsByName.set(field.name,control);
       if(field.type==='select'){for(const option of field.options||[]){const node=document.createElement('option');node.value=option.value;node.textContent=option.label;control.appendChild(node);}}
@@ -223,7 +226,7 @@ async function createLocalStore(){
     {name:'ownerUserId',label:'Owner customer ID',required:true,maxLength:128},
     {name:'shopName',label:'Store name',required:true,maxLength:100},
     {name:'ownerName',label:'Owner name',required:true,maxLength:80},
-    {name:'category',label:'Category',required:true,value:'Clothing & Fashion',maxLength:80},
+    {name:'category',label:'Category',type:'select',required:true,value:STORE_CATEGORIES[0],options:STORE_CATEGORIES.map(value=>({value,label:value}))},
     {name:'description',label:'Store description',type:'textarea',required:true,maxLength:1000},
     {name:'address',label:'Store address',type:'textarea',required:true,maxLength:250},
     {name:'city',label:'City',required:true,value:'Neemuch',maxLength:80},
@@ -249,11 +252,10 @@ async function createLocalStore(){
 }
 async function editStore(button){
   const item=currentVendors.find(store=>store.id===button.dataset.id); if(!item)throw new Error('Store details are no longer available. Refresh and try again.');
-  const categories=['Clothing & Fashion','Footwear','Electronics','Home & Living','General Store'];
   const values=await formDialog(`Edit ${item.shopName}`,[
     {name:'shopName',label:'Store name',required:true,value:item.shopName||'',maxLength:100},
     {name:'ownerName',label:'Owner / contact name',required:true,value:item.ownerName||'',maxLength:80},
-    {name:'category',label:'Category',type:'select',required:true,value:item.category||categories[0],options:categories.map(value=>({value,label:value}))},
+    {name:'category',label:'Category',type:'select',required:true,value:STORE_CATEGORIES.includes(item.category)?item.category:STORE_CATEGORIES[0],options:STORE_CATEGORIES.map(value=>({value,label:value}))},
     {name:'description',label:'Store description',type:'textarea',required:true,value:item.description||'',maxLength:1000},
     {name:'address',label:'Store address',type:'textarea',required:true,value:item.address||'',maxLength:250},
     {name:'city',label:'City',required:true,value:item.city||'Neemuch',maxLength:80},
