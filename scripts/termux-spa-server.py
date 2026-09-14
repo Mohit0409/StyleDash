@@ -9,6 +9,7 @@ import binascii
 import hashlib
 import hmac
 import json
+import math
 import os
 import posixpath
 import re
@@ -43,6 +44,13 @@ try:
     from styledash_shops import ShopWorkflow
 except ModuleNotFoundError:  # Repository test import path.
     from scripts.styledash_shops import ShopWorkflow
+
+try:
+    from scripts.styledash_delivery_zone import DeliveryZoneConfigError, DeliveryZoneIndex
+    from scripts.styledash_delivery_zone_store import DeliveryZoneStore
+except ModuleNotFoundError:  # Standalone deployed import path.
+    from styledash_delivery_zone import DeliveryZoneConfigError, DeliveryZoneIndex
+    from styledash_delivery_zone_store import DeliveryZoneStore
 
 try:
     from styledash_reviews import ReviewWorkflow
@@ -639,6 +647,7 @@ class PaymentService:
         payment_test_enabled: bool | None = None,
         ordering_enabled: bool | None = None,
         payment_test_allowed_emails: set[str] | None = None,
+        delivery_zone_store: DeliveryZoneStore | None = None,
     ) -> None:
         catalog = json.loads(catalog_path.read_text(encoding="utf-8"))
         settings = json.loads(settings_path.read_text(encoding="utf-8"))
@@ -679,6 +688,19 @@ class PaymentService:
             }
         else:
             self.supported_pincodes = set(settings["supportedPincodes"])
+
+        self.delivery_zone_store = delivery_zone_store
+        if self.delivery_zone_store is None and security_store is not None:
+            self.delivery_zone_store = DeliveryZoneStore(security_store.path)
+        delivery_zone_path = settings_path.parent / "delivery-zones.geojson"
+        try:
+            self.delivery_zone_fallback = (
+                DeliveryZoneIndex.load(delivery_zone_path)
+                if delivery_zone_path.exists()
+                else DeliveryZoneIndex()
+            )
+        except DeliveryZoneConfigError as exc:
+            raise RuntimeError("Invalid delivery-zone configuration.") from exc
 
         self.payment_test_enabled = (
             payment_test_enabled
@@ -794,21 +816,80 @@ class PaymentService:
     def is_serviceable_pincode(self, pincode: str) -> bool:
         return _is_six_ascii_digits(pincode) and pincode in self.supported_pincodes
 
-    def check_serviceability(self, pincode: Any, now: datetime | None = None) -> dict[str, Any]:
+    def _delivery_zone_policy(self) -> DeliveryZoneIndex:
+        if self.delivery_zone_store is not None:
+            return self.delivery_zone_store.policy()
+        return self.delivery_zone_fallback
+
+    @staticmethod
+    def _validate_coordinates(latitude: Any, longitude: Any) -> tuple[float | None, float | None]:
+        if latitude is None and longitude is None:
+            return None, None
+        if latitude is None or longitude is None:
+            raise ApiError(HTTPStatus.BAD_REQUEST, "Both latitude and longitude are required.", "invalid_location")
+        if (
+            isinstance(latitude, bool) or not isinstance(latitude, (int, float))
+            or isinstance(longitude, bool) or not isinstance(longitude, (int, float))
+            or not math.isfinite(float(latitude)) or not math.isfinite(float(longitude))
+            or not -90 <= float(latitude) <= 90
+            or not -180 <= float(longitude) <= 180
+        ):
+            raise ApiError(HTTPStatus.BAD_REQUEST, "Valid delivery coordinates are required.", "invalid_location")
+        return float(latitude), float(longitude)
+
+    def check_serviceability(
+        self,
+        pincode: Any,
+        now: datetime | None = None,
+        *,
+        latitude: Any = None,
+        longitude: Any = None,
+    ) -> dict[str, Any]:
         if not _is_six_ascii_digits(pincode):
             raise ApiError(HTTPStatus.BAD_REQUEST, "A valid 6-digit pincode is required.", "invalid_pincode")
-        if not self.is_serviceable_pincode(pincode):
-            return {"success": True, "pincode": pincode, "serviceable": False}
-        express_available = self.express_delivery_available(now)
-        return {
+        latitude, longitude = self._validate_coordinates(latitude, longitude)
+        policy = self._delivery_zone_policy()
+        decision = policy.check(
+            pincode, self.supported_pincodes, latitude=latitude, longitude=longitude
+        )
+        serviceable = decision.get("serviceable") is True
+        if policy.mode == "pincode":
+            if not serviceable:
+                return {"success": True, "pincode": pincode, "serviceable": False}
+            express_available = self.express_delivery_available(now)
+            return {
+                "success": True,
+                "pincode": pincode,
+                "serviceable": True,
+                "city": "Neemuch",
+                "state": "Madhya Pradesh",
+                "expressAvailable": express_available,
+                "estimatedDeliveryMinutes": 60 if express_available else None,
+            }
+
+        response: dict[str, Any] = {
             "success": True,
             "pincode": pincode,
-            "serviceable": True,
+            "serviceable": serviceable,
+            "enforcementMode": "polygon",
+            "locationRequired": decision.get("requiresLocation") is True,
+        }
+        if decision.get("reason"):
+            response["reason"] = decision["reason"]
+        if decision.get("zoneId"):
+            response["zoneId"] = decision["zoneId"]
+        if decision.get("zoneName"):
+            response["zoneName"] = decision["zoneName"]
+        if not serviceable:
+            return response
+        express_available = self.express_delivery_available(now)
+        response.update({
             "city": "Neemuch",
             "state": "Madhya Pradesh",
             "expressAvailable": express_available,
             "estimatedDeliveryMinutes": 60 if express_available else None,
-        }
+        })
+        return response
 
     def can_access_payment_test_product(self, user: Any) -> bool:
         if (
@@ -951,21 +1032,32 @@ class PaymentService:
             "stock": stock,
         }
 
-    def _validate_address(self, payload: dict[str, Any]) -> dict[str, str]:
+    def _validate_address(self, payload: dict[str, Any]) -> dict[str, Any]:
         address = payload.get("address")
         if not isinstance(address, dict):
             raise ApiError(HTTPStatus.UNPROCESSABLE_ENTITY, "Delivery address is required.", "invalid_customer")
         pincode = address.get("pincode")
-        if not _is_six_ascii_digits(pincode) or not self.is_serviceable_pincode(pincode):
-            raise ApiError(
-                HTTPStatus.UNPROCESSABLE_ENTITY,
-                "Delivery is not available for this pincode.",
-                "unsupported_pincode",
+        if not _is_six_ascii_digits(pincode):
+            raise ApiError(HTTPStatus.UNPROCESSABLE_ENTITY, "Delivery is not available for this pincode.", "unsupported_pincode")
+        try:
+            serviceability = self.check_serviceability(
+                pincode, latitude=address.get("latitude"), longitude=address.get("longitude")
             )
+        except ApiError as exc:
+            if exc.code == "invalid_location":
+                raise ApiError(HTTPStatus.UNPROCESSABLE_ENTITY, exc.message, exc.code) from None
+            raise
+        if not serviceability["serviceable"]:
+            reason = serviceability.get("reason")
+            if reason == "location_required":
+                raise ApiError(HTTPStatus.UNPROCESSABLE_ENTITY, "Confirm your delivery location before placing the order.", "delivery_location_required")
+            if reason == "outside_delivery_zone":
+                raise ApiError(HTTPStatus.UNPROCESSABLE_ENTITY, "Delivery is not available at this location yet.", "outside_delivery_zone")
+            raise ApiError(HTTPStatus.UNPROCESSABLE_ENTITY, "Delivery is not available for this pincode.", "unsupported_pincode")
         phone = _clean_string(address.get("phone"), "phone number", 10, 16)
         if not all(character.isdigit() or character in "+ -" for character in phone):
             raise ApiError(HTTPStatus.UNPROCESSABLE_ENTITY, "Invalid phone number.", "invalid_customer")
-        return {
+        trusted: dict[str, Any] = {
             "id": "addr-checkout",
             "name": _clean_string(address.get("name"), "name", 2, 80),
             "phone": phone,
@@ -974,6 +1066,15 @@ class PaymentService:
             "state": "Madhya Pradesh",
             "pincode": pincode,
         }
+        if serviceability.get("enforcementMode") == "polygon":
+            latitude, longitude = self._validate_coordinates(address.get("latitude"), address.get("longitude"))
+            trusted.update({
+                "latitude": latitude,
+                "longitude": longitude,
+                "deliveryZoneId": serviceability.get("zoneId"),
+                "deliveryZoneName": serviceability.get("zoneName"),
+            })
+        return trusted
 
     def calculate_order(self, payload: dict[str, Any], now: datetime | None = None) -> dict[str, Any]:
         self.refresh_shop_products()
@@ -2459,7 +2560,7 @@ class StyleDashRequestHandler(SimpleHTTPRequestHandler):
         self.send_header("Referrer-Policy", "strict-origin-when-cross-origin")
         self.send_header("X-Frame-Options", "SAMEORIGIN")
         self.send_header("Content-Security-Policy", SECURITY_POLICY)
-        self.send_header("Permissions-Policy", "camera=(), microphone=(), geolocation=()")
+        self.send_header("Permissions-Policy", "camera=(), microphone=(), geolocation=(self)")
         # Local launch/deploy probes use this to prove which process owns 8080.
         # Never expose the runtime PID through the public hostname.
         if (self.headers.get("Host") or "").lower() in {"127.0.0.1:8080", "localhost:8080"}:
@@ -2806,7 +2907,29 @@ class StyleDashRequestHandler(SimpleHTTPRequestHandler):
                 query = parse_qs(parsed.query, keep_blank_values=True)
                 pincode_values = query.get("pincode", [])
                 pincode = pincode_values[0] if len(pincode_values) == 1 else None
-                self._json_response(HTTPStatus.OK, self.payment_service.check_serviceability(pincode))
+
+                def optional_coordinate(name: str) -> float | None:
+                    values = query.get(name, [])
+                    if not values:
+                        return None
+                    if len(values) != 1:
+                        raise ApiError(HTTPStatus.BAD_REQUEST, "Invalid delivery coordinates.", "invalid_location")
+                    try:
+                        value = float(values[0])
+                    except (TypeError, ValueError):
+                        raise ApiError(HTTPStatus.BAD_REQUEST, "Invalid delivery coordinates.", "invalid_location") from None
+                    if not math.isfinite(value):
+                        raise ApiError(HTTPStatus.BAD_REQUEST, "Invalid delivery coordinates.", "invalid_location")
+                    return value
+
+                latitude = optional_coordinate("latitude")
+                longitude = optional_coordinate("longitude")
+                self._json_response(
+                    HTTPStatus.OK,
+                    self.payment_service.check_serviceability(
+                        pincode, latitude=latitude, longitude=longitude
+                    ),
+                )
                 return
             if path == "/api/inventory/availability":
                 self._rate_limit(path, 60)

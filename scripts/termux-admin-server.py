@@ -38,6 +38,13 @@ try:
 except ModuleNotFoundError:
     from scripts.styledash_notify import owner_notifier
 
+try:
+    from scripts.styledash_delivery_zone import DeliveryZoneConfigError
+    from scripts.styledash_delivery_zone_store import DeliveryZoneStore
+except ModuleNotFoundError:
+    from styledash_delivery_zone import DeliveryZoneConfigError
+    from styledash_delivery_zone_store import DeliveryZoneStore
+
 
 MAX_BODY_BYTES = 64 * 1024
 PRODUCT_IMAGE_REQUEST_MAX_BYTES = 700 * 1024
@@ -242,6 +249,7 @@ class AdminApplication:
     def __init__(self, database: Path, encryption_key: str, catalog: Path, settings: Path, data_dir: Path) -> None:
         public = load_public_module()
         self.identity = AdminStore(database, encryption_key)
+        self.delivery_zones = DeliveryZoneStore(database)
         probe = sqlite3.connect(database)
         try:
             has_customers = probe.execute(
@@ -251,6 +259,7 @@ class AdminApplication:
             probe.close()
         self.shops = ShopWorkflow(database) if has_customers else None
         self._store_product_image_payload = public.store_product_image_payload
+        self._public_security_error = public.SecurityError
         self.product_image_directory = database.parent / "product-images"
         self.payments = public.PaymentService(
             catalog, settings, data_dir, key_id="", key_secret="", webhook_secret="",
@@ -259,7 +268,32 @@ class AdminApplication:
         )
 
     def store_product_image(self, payload: dict[str, Any]) -> dict[str, Any]:
-        return self._store_product_image_payload(self.product_image_directory, payload)
+        try:
+            return self._store_product_image_payload(self.product_image_directory, payload)
+        except self._public_security_error as exc:
+            if isinstance(exc, SecurityError):
+                raise
+            raise SecurityError(exc.status, exc.message, exc.code) from None
+
+    def delivery_zone_configuration(self) -> dict[str, Any]:
+        config = self.delivery_zones.configuration()
+        policy = self.delivery_zones.policy()
+        return {"configuration": config, "activeZoneCount": len(policy.zones)}
+
+    def replace_delivery_zone_configuration(self, admin_id: str, payload: Any) -> dict[str, Any]:
+        if not isinstance(payload, dict):
+            raise SecurityError(400, "Delivery-zone configuration must be an object.", "invalid_delivery_zone")
+        try:
+            self.delivery_zones.replace_configuration(payload, updated_by=admin_id)
+            result = self.delivery_zone_configuration()
+        except DeliveryZoneConfigError as exc:
+            raise SecurityError(400, str(exc), "invalid_delivery_zone") from None
+        config = result["configuration"]
+        self.identity.record_action(admin_id, "delivery_zone_updated", "delivery_zone", "primary", "success", {
+            "enforcementMode": config.get("enforcementMode"),
+            "activeZoneCount": result["activeZoneCount"],
+        })
+        return result
 
     def list_orders(self, query: str = "") -> list[dict[str, Any]]:
         needle = query.strip().casefold()[:100]
@@ -1030,6 +1064,9 @@ class AdminHandler(BaseHTTPRequestHandler):
                 self._admin(); self._json(200, {"success": True, "audit": self.application.identity.audit()}); return
             if path == "/api/admin/system":
                 self._admin(); self._json(200, {"success": True, "system": self.application.system_health(self.backup_root)}); return
+            if path == "/api/admin/delivery-zone":
+                self._admin(); result = self.application.delivery_zone_configuration()
+                self._json(200, {"success": True, **result}); return
             if path.startswith("/media/product-images/"):
                 self._admin()
                 if not PRODUCT_MEDIA_PATH_PATTERN.fullmatch(path):
@@ -1119,6 +1156,9 @@ class AdminHandler(BaseHTTPRequestHandler):
         path = urlsplit(self.path).path
         try:
             admin, _session = self._admin(); self._csrf(); payload = self._body()
+            if path == "/api/admin/delivery-zone":
+                result = self.application.replace_delivery_zone_configuration(admin["id"], payload)
+                self._json(200, {"success": True, **result}); return
             if path.startswith("/api/admin/orders/") and path.endswith("/payment"):
                 order_id = unquote(path.removeprefix("/api/admin/orders/").removesuffix("/payment"))
                 result = self.application.mark_cod_paid(admin["id"], order_id, payload.get("collectionMethod"))

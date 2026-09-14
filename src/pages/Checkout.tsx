@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ArrowRight, ShieldCheck, Truck, Zap } from 'lucide-react';
+import { DeliveryLocationCheck } from '../components/DeliveryLocationCheck';
 import { SEO } from '../components/SEO';
 import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
@@ -14,6 +15,8 @@ import {
   verifyPayment,
 } from '../services/paymentApi';
 import { CONFIG } from '../config';
+import { serviceAreaRepository } from '../repositories/serviceAreaRepository';
+import type { DeliveryCoordinates, ServiceArea } from '../types';
 import { cartExpressEligibility, isExpressDeliveryAvailable } from '../utils/delivery';
 
 const makeIdempotencyKey = () =>
@@ -50,6 +53,18 @@ export const Checkout: React.FC = () => {
   const [paymentMethod, setPaymentMethod] = useState<'cod' | 'upi' | 'card'>('cod');
   const [placing, setPlacing] = useState(false);
   const [checkoutError, setCheckoutError] = useState('');
+  const [deliveryCoordinates, setDeliveryCoordinates] = useState<DeliveryCoordinates | null>(null);
+  const [serviceArea, setServiceArea] = useState<ServiceArea | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    serviceAreaRepository.checkPincode(pincode)
+      .then(result => { if (!cancelled) setServiceArea(result); })
+      .catch(() => { if (!cancelled) setServiceArea(null); });
+    return () => { cancelled = true; };
+  }, [pincode]);
+
+  const polygonDeliveryRequired = serviceArea?.enforcementMode === 'polygon';
 
   if (items.length === 0) {
     return (
@@ -71,6 +86,12 @@ export const Checkout: React.FC = () => {
       showToast(message, 'info');
       return;
     }
+    if (polygonDeliveryRequired && (!deliveryCoordinates || serviceArea?.serviceable !== true)) {
+      const message = 'Confirm that your delivery pin is inside the Vibe4You delivery area before placing the order.';
+      setCheckoutError(message);
+      showToast(message, 'info');
+      return;
+    }
     setPlacing(true);
     setCheckoutError('');
 
@@ -85,7 +106,10 @@ export const Checkout: React.FC = () => {
           tryAtHomeTermsAccepted: item.tryAtHomeTermsAccepted === true,
         } : {}),
       })),
-      address: { name, phone, street, city, pincode },
+      address: {
+        name, phone, street, city, pincode,
+        ...(polygonDeliveryRequired && deliveryCoordinates ? deliveryCoordinates : {}),
+      },
       deliveryMethod,
       couponCode: appliedCoupon?.code || null,
       paymentMethod,
@@ -179,6 +203,14 @@ export const Checkout: React.FC = () => {
                 <input id="checkout-pincode" readOnly type="text" value={pincode} className="w-full p-2.5 rounded-xl border border-neutral-200 dark:border-neutral-800 bg-neutral-100 dark:bg-neutral-900 font-bold text-neutral-500" />
               </div>
             </div>
+            {polygonDeliveryRequired && (
+              <DeliveryLocationCheck
+                pincode={pincode}
+                coordinates={deliveryCoordinates}
+                onCoordinates={setDeliveryCoordinates}
+                onResult={setServiceArea}
+              />
+            )}
           </div>
 
           <div className="bg-white dark:bg-neutral-900 p-6 rounded-3xl border border-neutral-200 dark:border-neutral-800 space-y-4 shadow-sm">

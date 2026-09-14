@@ -209,6 +209,13 @@ export interface UserProfile {
   hasPassword?: boolean;
 }
 
+export type DeliveryZoneEnforcementMode = 'pincode' | 'polygon';
+
+export interface DeliveryCoordinates {
+  latitude: number;
+  longitude: number;
+}
+
 export interface ServiceArea {
   pincode: string;
   city?: string;
@@ -216,6 +223,11 @@ export interface ServiceArea {
   serviceable: boolean;
   expressAvailable?: boolean;
   estimatedDeliveryMinutes?: number;
+  enforcementMode?: DeliveryZoneEnforcementMode;
+  locationRequired?: boolean;
+  zoneId?: string;
+  zoneName?: string;
+  reason?: 'unsupported_pincode' | 'location_required' | 'outside_delivery_zone';
 }
 
 export interface ServiceabilityApiResponse extends ServiceArea {

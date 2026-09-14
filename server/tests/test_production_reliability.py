@@ -146,6 +146,10 @@ class ProductionReliabilityTests(unittest.TestCase):
         self.assertIn('install -m 600 "$STAGE/scripts/catalog_normalization.py" "$HOME/server/catalog_normalization.py"', script)
         self.assertIn('install -m 600 "$STAGE/scripts/catalog_normalization.py" "$HOME/admin/catalog_normalization.py"', script)
         self.assertIn("catalog_normalization.py styledash_mail.py", script)
+        self.assertIn('install -m 600 "$STAGE/scripts/styledash_delivery_zone.py" "$HOME/server/styledash_delivery_zone.py"', script)
+        self.assertIn('install -m 600 "$STAGE/scripts/styledash_delivery_zone_store.py" "$HOME/admin/styledash_delivery_zone_store.py"', script)
+        self.assertIn('install -m 644 "$STAGE/server/payment-data/delivery-zones.geojson" "$HOME/.local/share/styledash/delivery-zones.geojson"', script)
+        self.assertIn("styledash_delivery_zone.py styledash_delivery_zone_store.py", script)
         self.assertNotIn("razorpay-script-missing", script)
 
     def test_deploy_stops_watchdog_before_runtime_mutation_and_uses_patch_canary(self) -> None:

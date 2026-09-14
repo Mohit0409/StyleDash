@@ -96,3 +96,55 @@ describe('service area repository', () => {
     });
   });
 });
+
+
+describe('delivery-zone coordinate checks', () => {
+  it('sends exact coordinates to the authoritative serviceability API', async () => {
+    const fetcher = vi.fn<typeof fetch>(async () => jsonResponse({
+      success: true,
+      pincode: '458441',
+      serviceable: true,
+      enforcementMode: 'polygon',
+      zoneId: 'neemuch-core',
+      zoneName: 'Neemuch Core',
+    }));
+
+    await expect(serviceAreaRepository.checkLocation(
+      '458441',
+      { latitude: 24.4762, longitude: 74.8624 },
+      fetcher,
+    )).resolves.toMatchObject({ serviceable: true, zoneId: 'neemuch-core' });
+
+    expect(fetcher).toHaveBeenCalledWith(
+      '/api/serviceability?pincode=458441&latitude=24.4762&longitude=74.8624',
+      expect.objectContaining({ credentials: 'include' }),
+    );
+  });
+  it('rejects invalid coordinates locally without a network call', async () => {
+    const fetcher = vi.fn<typeof fetch>();
+
+    await expect(serviceAreaRepository.checkLocation(
+      '458441',
+      { latitude: 120, longitude: 74.86 },
+      fetcher,
+    )).resolves.toEqual({ pincode: '458441', serviceable: false });
+
+    expect(fetcher).not.toHaveBeenCalled();
+  });
+
+  it('preserves an outside-zone rejection from the server', async () => {
+    const fetcher = vi.fn<typeof fetch>(async () => jsonResponse({
+      success: true,
+      pincode: '458441',
+      serviceable: false,
+      enforcementMode: 'polygon',
+      locationRequired: false,
+    }));
+
+    await expect(serviceAreaRepository.checkLocation(
+      '458441',
+      { latitude: 24.50, longitude: 74.90 },
+      fetcher,
+    )).resolves.toMatchObject({ serviceable: false, enforcementMode: 'polygon' });
+  });
+});
