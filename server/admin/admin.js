@@ -380,6 +380,72 @@ async function bulkTransition(resource){
   for(const id of ids){try{const payload=resource==='customers'?{active:target==='enable'}:resource==='inventory'?{delta:Number(target)}:{status:target,...(reason?{reason}:{})};await api(route(id),{method:'PATCH',body:JSON.stringify(payload)});succeeded+=1;bulkSelection.delete(`${resource}:${id}`);}catch(cause){failures.push(`${id}: ${cause.message}`);}}
   status(`${succeeded} of ${ids.length} selected record(s) updated.`);if(failures.length)error(`Some records were unchanged: ${failures.slice(0,3).join(' | ')}`);
 }
+const DELIVERY_ZONE_ID_PATTERN=/^[a-z0-9][a-z0-9_-]{0,79}$/;
+let deliveryZoneConfiguration=null;
+
+function deliveryZoneFeature(configuration){
+  return (configuration?.features||[]).find(feature=>feature?.properties?.active===true&&feature?.geometry?.type==='Polygon')||null;
+}
+function deliveryZoneBoundaryText(configuration){
+  const ring=deliveryZoneFeature(configuration)?.geometry?.coordinates?.[0];
+  if(!Array.isArray(ring))return '';
+  const points=ring.length>1?ring.slice(0,-1):ring;
+  return points.map(point=>Array.isArray(point)?`${point[1]}, ${point[0]}`:'').filter(Boolean).join('\n');
+}
+function parseDeliveryZoneBoundary(text){
+  const lines=String(text||'').split(/\r?\n/).map(line=>line.trim()).filter(Boolean);
+  if(!lines.length)throw new Error('Enter at least three boundary points.');
+  const points=lines.map((line,index)=>{
+    const match=/^([^,]+),([^,]+)$/.exec(line);
+    if(!match)throw new Error(`Boundary line ${index+1} must be latitude, longitude.`);
+    const latitude=Number(match[1].trim()),longitude=Number(match[2].trim());
+    if(!Number.isFinite(latitude)||latitude < -90||latitude > 90)throw new Error(`Boundary line ${index+1} has an invalid latitude.`);
+    if(!Number.isFinite(longitude)||longitude < -180||longitude > 180)throw new Error(`Boundary line ${index+1} has an invalid longitude.`);
+    return [longitude,latitude];
+  });
+  const unique=new Set(points.map(([longitude,latitude])=>`${longitude},${latitude}`));
+  if(unique.size!==points.length)throw new Error('Boundary points must be distinct; do not repeat the first point.');
+  if(points.length<3)throw new Error('A delivery boundary needs at least three distinct points.');
+  return [...points,[...points[0]]];
+}
+function deliveryZonePayload(mode){
+  const id=String(byId('delivery-zone-id')?.value||'').trim();
+  const name=String(byId('delivery-zone-name')?.value||'').trim();
+  if(!DELIVERY_ZONE_ID_PATTERN.test(id))throw new Error('Zone ID must use lowercase letters, numbers, hyphens, or underscores.');
+  if(name.length<2||name.length>100)throw new Error('Zone name must be between 2 and 100 characters.');
+  return {type:'FeatureCollection',enforcementMode:mode,features:[{type:'Feature',properties:{id,name,active:true},geometry:{type:'Polygon',coordinates:[parseDeliveryZoneBoundary(byId('delivery-zone-boundary')?.value)]}}]};
+}
+async function saveDeliveryZoneDraft(){
+  const result=await api('/api/admin/delivery-zone',{method:'PATCH',body:JSON.stringify(deliveryZonePayload('pincode'))});
+  renderDeliveryZone(result.configuration);status('Boundary draft saved. Customer delivery remains pincode-only.');
+}
+async function activateDeliveryZone(){
+  const feature=deliveryZoneFeature(deliveryZoneConfiguration);
+  if(!feature)throw new Error('Save a valid boundary draft before activating polygon delivery.');
+  const confirmation=await formDialog('Activate polygon delivery',[{name:'confirmation',label:'Type ACTIVATE to block customers outside this approved boundary',required:true,maxLength:8,help:'This changes checkout requirements immediately. Customers must confirm a location inside the polygon.'}],'Activate Polygon Delivery');
+  if(!confirmation)return;
+  if(confirmation.confirmation!=='ACTIVATE')throw new Error('Type ACTIVATE exactly to enable polygon delivery.');
+  const result=await api('/api/admin/delivery-zone',{method:'PATCH',body:JSON.stringify({...deliveryZoneConfiguration,enforcementMode:'polygon'})});
+  renderDeliveryZone(result.configuration);status('Polygon delivery is active. Customers outside the approved boundary are blocked.');
+}
+async function usePincodeOnly(){
+  const confirmation=await formDialog('Use pincode-only delivery',[{name:'confirmation',label:'Type PINCODE to disable polygon enforcement',required:true,maxLength:7,help:'The saved boundary draft will be retained for future activation.'}],'Use Pincode Only');
+  if(!confirmation)return;
+  if(confirmation.confirmation!=='PINCODE')throw new Error('Type PINCODE exactly to switch delivery mode.');
+  const result=await api('/api/admin/delivery-zone',{method:'PATCH',body:JSON.stringify({...deliveryZoneConfiguration,enforcementMode:'pincode'})});
+  renderDeliveryZone(result.configuration);status('Pincode-only delivery is active. The boundary draft was retained.');
+}
+function renderDeliveryZone(configuration){
+  deliveryZoneConfiguration=configuration&&typeof configuration==='object'?configuration:{type:'FeatureCollection',enforcementMode:'pincode',features:[]};
+  const feature=deliveryZoneFeature(deliveryZoneConfiguration),properties=feature?.properties||{},ring=feature?.geometry?.coordinates?.[0];
+  const mode=deliveryZoneConfiguration.enforcementMode==='polygon'?'polygon':'pincode';
+  const points=Array.isArray(ring)?Math.max(0,ring.length-1):0;
+  const warning=mode==='polygon'
+    ? '<p class="delivery-zone-warning delivery-zone-warning-active"><strong>Polygon delivery is active.</strong> Customers must confirm a location inside this saved boundary.</p>'
+    : '<p class="delivery-zone-warning"><strong>Pincode-only delivery is active.</strong> Saving a boundary draft does not change customer delivery until you explicitly activate it.</p>';
+  byId('content').innerHTML=`<section class="panel delivery-zone-panel"><h2>Delivery Zones</h2>${warning}<div class="facts"><div class="fact"><small>Enforcement mode</small><strong>${mode==='polygon'?'Polygon':'Pincode only'}</strong></div><div class="fact"><small>Zone name</small><strong>${escapeText(properties.name||'No saved boundary')}</strong></div><div class="fact"><small>Zone ID</small><strong>${escapeText(properties.id||'—')}</strong></div><div class="fact"><small>Active state</small><strong>${feature?'Saved draft':'No boundary'}</strong></div><div class="fact"><small>Boundary points</small><strong>${points}</strong></div></div><div class="delivery-zone-editor"><label>Zone ID<input id="delivery-zone-id" maxlength="80" value="${escapeText(properties.id||'neemuch-delivery-zone')}"><small class="field-help">Lowercase identifier for this boundary. It is shown only to private administration.</small></label><label>Zone name<input id="delivery-zone-name" maxlength="100" value="${escapeText(properties.name||'Neemuch delivery zone')}"></label><label class="delivery-zone-boundary">Boundary coordinates<textarea id="delivery-zone-boundary" rows="9" placeholder="24.123456, 74.123456">${escapeText(deliveryZoneBoundaryText(deliveryZoneConfiguration))}</textarea><small class="field-help">One point per line in latitude, longitude order. At least three distinct points are required. The app closes the GeoJSON ring automatically when saving.</small></label></div><div class="actions"><button data-action="save-delivery-zone-draft">Save Boundary Draft</button><button class="success" data-action="activate-delivery-zone"${feature?'':' disabled'}>Activate Polygon Delivery</button><button class="secondary" data-action="use-pincode-only">Use Pincode Only</button></div></section>`;
+}
+
 byId('content').addEventListener('click', async event => {
   const button=event.target.closest('[data-action]'); if(!button)return;
   button.disabled=true; error(''); status('');
@@ -387,6 +453,9 @@ byId('content').addEventListener('click', async event => {
     const action=button.dataset.action;
     if(action==='clear-order-filters'){orderFilters={status:'all',payment:'all',fulfillment:'all'};renderOrdersView();return;}
     if(action==='create-owner') await createOwnerAccount();
+    if(action==='save-delivery-zone-draft') await saveDeliveryZoneDraft();
+    if(action==='activate-delivery-zone') await activateDeliveryZone();
+    if(action==='use-pincode-only') await usePincodeOnly();
     if(action==='reset-customer-password') await resetCustomerPassword(button.dataset.id);
     if(action==='create-store') await createLocalStore();
     if(action==='edit-store') await editStore(button);
@@ -428,6 +497,7 @@ async function loadTab(tab) {
     if(tab==='inventory'){renderInventory((await api(`/api/admin/inventory?low=0&q=${query}`)).inventory);addBulkControls('inventory',['1','5','-1','-5'],'tbody tr');return;}
     if(tab==='customers'){renderCustomers((await api(`/api/admin/customers?q=${query}`)).customers);addBulkControls('customers',['enable','disable'],'tbody tr');return;}
     if(tab==='payment-alerts') return renderPaymentAlerts((await api('/api/admin/payment-alerts')).alerts);
+    if(tab==='delivery-zone') return renderDeliveryZone((await api('/api/admin/delivery-zone')).configuration);
     if(tab==='system') return renderSystem((await api('/api/admin/system')).system);
     if(tab==='audit') return renderAudit((await api('/api/admin/audit')).audit);
   } catch(cause) { byId('content').innerHTML=''; error(cause.message); if(cause.message.includes('authentication')) showLogin(); }

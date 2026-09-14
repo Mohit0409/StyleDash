@@ -7,7 +7,10 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Iterator
 
-from styledash_delivery_zone import DeliveryZoneIndex
+try:
+    from styledash_delivery_zone import DeliveryZoneIndex
+except ModuleNotFoundError:
+    from scripts.styledash_delivery_zone import DeliveryZoneIndex
 
 
 DEFAULT_CONFIGURATION: dict[str, Any] = {

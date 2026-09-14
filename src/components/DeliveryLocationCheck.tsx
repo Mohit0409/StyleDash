@@ -41,7 +41,7 @@ export const DeliveryLocationCheck: React.FC<DeliveryLocationCheckProps> = ({
         return;
       }
       setState('unserviceable');
-      setMessage('This location is outside Vibe4You\'s current delivery area.');
+      setMessage('Sorry, Vibe4You is not delivering to this location yet.');
     } catch {
       setState('error');
       setMessage('We could not verify this location right now. Please try again.');
@@ -51,7 +51,7 @@ export const DeliveryLocationCheck: React.FC<DeliveryLocationCheckProps> = ({
   const useCurrentLocation = () => {
     if (!navigator.geolocation) {
       setState('error');
-      setMessage('Location access is not available in this browser.');
+      setMessage('This browser cannot access GPS. Enable location access, then try again.');
       return;
     }
     setState('locating');
@@ -67,7 +67,7 @@ export const DeliveryLocationCheck: React.FC<DeliveryLocationCheckProps> = ({
       },
       () => {
         setState('error');
-        setMessage('Location permission is needed to confirm delivery availability.');
+        setMessage('We need your location to confirm delivery availability. Enable location access and try again.');
       },
       GEOLOCATION_OPTIONS,
     );
@@ -87,7 +87,7 @@ export const DeliveryLocationCheck: React.FC<DeliveryLocationCheckProps> = ({
         <div className="min-w-0 flex-1">
           <h3 className="font-black text-neutral-950 dark:text-white">Confirm delivery location</h3>
           <p className="mt-1 text-sm text-neutral-600 dark:text-neutral-300">
-            Vibe4You delivers only inside selected parts of Neemuch. Your location is used only to check delivery availability.
+            We currently deliver only to selected areas of Neemuch. Your location is used only to check delivery availability.
           </p>
           {message && (
             <p className="mt-2 text-sm font-semibold text-neutral-800 dark:text-neutral-100" role="status">

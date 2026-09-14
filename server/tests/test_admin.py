@@ -1001,6 +1001,53 @@ class AdminHttpTests(unittest.TestCase):
         status, body, _headers = self.request("/api/admin/logout", {}, headers={"X-CSRF-Token": csrf}, method="POST")
         self.assertEqual(status, 200)
 
+    def test_delivery_zone_admin_is_private_csrf_protected_and_fail_closed(self):
+        status, body, _ = self.request("/api/admin/delivery-zone")
+        self.assertEqual((status, body["code"]), (401, "admin_authentication_required"))
+        self.request("/api/admin/login", {"username":"local-owner","password":'long administrator password 123'}, method="POST")
+        status, auth, _ = self.request("/api/admin/totp", {"code":pyotp.TOTP(self.secret).now()}, method="POST")
+        self.assertEqual(status, 200); csrf = auth["csrfToken"]
+        status, body, _ = self.request("/api/admin/delivery-zone")
+        self.assertEqual(status, 200)
+        self.assertEqual(body["configuration"]["enforcementMode"], "pincode")
+        self.assertEqual(body["activeZoneCount"], 0)
+        zone = {"type":"FeatureCollection","enforcementMode":"pincode","features":[{"type":"Feature","properties":{"id":"neemuch-core","name":"Neemuch Core","active":True},"geometry":{"type":"Polygon","coordinates":[[[74.84,24.45],[74.89,24.45],[74.89,24.50],[74.84,24.50],[74.84,24.45]]]}}]}
+        status, body, _ = self.request("/api/admin/delivery-zone", zone, method="PATCH")
+        self.assertEqual((status, body["code"]), (403, "admin_csrf_failed"))
+        status, body, _ = self.request("/api/admin/delivery-zone", zone, headers={"X-CSRF-Token":csrf}, method="PATCH")
+        self.assertEqual(status, 200)
+        self.assertEqual(body["configuration"]["enforcementMode"], "pincode")
+        self.assertEqual(body["activeZoneCount"], 1)
+        invalid = {"type":"FeatureCollection","enforcementMode":"polygon","features":[]}
+        status, body, _ = self.request("/api/admin/delivery-zone", invalid, headers={"X-CSRF-Token":csrf}, method="PATCH")
+        self.assertEqual((status, body["code"]), (400, "invalid_delivery_zone"))
+        status, body, _ = self.request("/api/admin/delivery-zone")
+        self.assertEqual(body["configuration"]["enforcementMode"], "pincode")
+        zone["enforcementMode"] = "polygon"
+        status, body, _ = self.request("/api/admin/delivery-zone", zone, headers={"X-CSRF-Token":csrf}, method="PATCH")
+        self.assertEqual(status, 200)
+        self.assertEqual(body["configuration"]["enforcementMode"], "polygon")
+        status, audit, _ = self.request("/api/admin/audit")
+        self.assertEqual(status, 200)
+        self.assertTrue(any(item.get("action") == "delivery_zone_updated" for item in audit["audit"]))
+
+    def test_delivery_zone_admin_ui_uses_explicit_safe_actions_and_coordinate_conversion(self):
+        admin_ui = (ROOT / "server/admin/admin.js").read_text(encoding="utf-8")
+        admin_index = (ROOT / "server/admin/index.html").read_text(encoding="utf-8")
+        self.assertIn('data-tab="delivery-zone"', admin_index)
+        self.assertIn("Delivery Zones", admin_index)
+        self.assertIn("Save Boundary Draft", admin_ui)
+        self.assertIn("Activate Polygon Delivery", admin_ui)
+        self.assertIn("Use Pincode Only", admin_ui)
+        self.assertIn("Type ACTIVATE", admin_ui)
+        self.assertIn("Type PINCODE", admin_ui)
+        self.assertIn("function parseDeliveryZoneBoundary", admin_ui)
+        self.assertIn("return [longitude,latitude]", admin_ui)
+        self.assertIn("return [...points,[...points[0]]]", admin_ui)
+        self.assertNotIn("prompt(", admin_ui)
+        self.assertNotIn("alert(", admin_ui)
+        self.assertNotIn("confirm(", admin_ui)
+
     def test_cod_mark_paid_http_is_private_csrf_protected_and_cod_only(self):
         app = self.server.RequestHandlerClass.application
         with app.payments.store.lock:

@@ -14,6 +14,10 @@ export interface CheckoutAddressInput {
   street: string;
   city: string;
   pincode: string;
+  latitude?: number;
+  longitude?: number;
+  deliveryZoneId?: string;
+  deliveryZoneName?: string;
 }
 
 export interface CheckoutIntent {

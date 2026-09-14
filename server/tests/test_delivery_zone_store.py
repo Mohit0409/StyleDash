@@ -73,6 +73,13 @@ class DeliveryZoneStoreTests(unittest.TestCase):
             self.store.set_enforcement_mode("polygon")
         self.assertEqual(self.store.configuration()["enforcementMode"], "pincode")
 
+    def test_switching_back_to_pincode_retains_the_saved_polygon_draft(self):
+        self.store.replace_configuration(polygon_payload())
+        saved = self.store.set_enforcement_mode("pincode", updated_by="admin-1")
+        self.assertEqual(saved["enforcementMode"], "pincode")
+        self.assertEqual(saved["features"], polygon_payload()["features"])
+        self.assertEqual(self.store.policy().mode, "pincode")
+
     def test_public_configuration_does_not_expose_admin_metadata(self):
         self.store.replace_configuration(polygon_payload(), updated_by="private-admin")
         public = self.store.public_configuration()

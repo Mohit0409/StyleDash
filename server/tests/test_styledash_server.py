@@ -2070,6 +2070,10 @@ class HttpApiTests(unittest.TestCase):
             self.assertNotIn("paymentMode", payload)
             self.assertEqual(response.headers["X-Content-Type-Options"], "nosniff")
             self.assertEqual(response.headers["Referrer-Policy"], "strict-origin-when-cross-origin")
+            self.assertEqual(
+                response.headers["Permissions-Policy"],
+                "camera=(), microphone=(), geolocation=(self)",
+            )
             policy = response.headers["Content-Security-Policy"]
             self.assertIn("checkout.razorpay.com", policy)
             self.assertIn("https://static.cloudflareinsights.com", policy)

@@ -227,6 +227,7 @@ export interface ServiceArea {
   locationRequired?: boolean;
   zoneId?: string;
   zoneName?: string;
+  reason?: 'unsupported_pincode' | 'location_required' | 'outside_delivery_zone';
 }
 
 export interface ServiceabilityApiResponse extends ServiceArea {
