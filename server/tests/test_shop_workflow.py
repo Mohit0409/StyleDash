@@ -910,7 +910,7 @@ class ShopWorkflowTests(unittest.TestCase):
             product = self.store.admin_transition_product("admin-a", product["id"], target)
         public = next(item for item in self.store.list_published_products() if item["id"] == product["id"])
         self.assertTrue(public["exchangeAvailable"])
-        self.assertEqual(public["returnWindowDays"], 7)
+        self.assertEqual(public["returnWindowDays"], 2)
         request = self.store.create_product_edit_request("user-a", product["id"], {"exchangeAvailable": False})
         summary = {item["field"]: item for item in request["changeSummary"]}
         self.assertEqual(summary["Size exchange"], {"field": "Size exchange", "before": "Enabled", "after": "Disabled"})

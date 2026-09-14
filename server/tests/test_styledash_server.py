@@ -298,6 +298,41 @@ class PaymentServiceTests(unittest.TestCase):
         finally:
             self.service._static_products["sd-prod-001"] = original
 
+    def test_exchange_window_is_two_days_from_delivery(self) -> None:
+        product = self.service._static_products["sd-prod-001"]
+        original = dict(product)
+        self.service._static_products["sd-prod-001"] = {**product, "exchangeAvailable": True}
+        try:
+            def delivered_order(key: str):
+                order = self.service.place_cod_order(
+                    self.payload(paymentMethod="cod", items=[{"productId": "sd-prod-001", "variantId": "sd-prod-001-var-1", "quantity": 1}]),
+                    key,
+                )["order"]
+                with self.service.store.lock:
+                    stored = self.service.store.state["orders"][order["id"]]
+                    stored["status"] = "delivered"
+                    stored["updatedAt"] = "2026-09-13T10:00:00+00:00"
+                    stored.setdefault("statusHistory", []).append({"status": "delivered", "timestamp": "2026-09-13T10:00:00+00:00"})
+                    self.service.store.save()
+                return order
+
+            allowed = delivered_order("exchange-window-allowed")
+            self.service.request_exchange(
+                allowed["id"], "test-user", 0, "sd-prod-001-var-2",
+                now=SERVER.datetime(2026, 9, 15, 10, 0, tzinfo=SERVER.timezone.utc),
+            )
+
+            expired = delivered_order("exchange-window-expired")
+            self.assert_api_error(
+                "exchange_window_closed",
+                lambda: self.service.request_exchange(
+                    expired["id"], "test-user", 0, "sd-prod-001-var-2",
+                    now=SERVER.datetime(2026, 9, 15, 10, 0, 1, tzinfo=SERVER.timezone.utc),
+                ),
+            )
+        finally:
+            self.service._static_products["sd-prod-001"] = original
+
     def test_catalog_refresh_does_not_take_payment_state_file_lock(self) -> None:
         class ForbiddenStateLock:
             def __enter__(self):
