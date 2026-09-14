@@ -54,7 +54,7 @@ ALLOWED_HOSTS = {"127.0.0.1:8081", "localhost:8081"}
 ALLOWED_ORIGINS = {"http://127.0.0.1:8081", "http://localhost:8081", PUBLIC_ADMIN_ORIGIN}
 SECURITY_POLICY = (
     "default-src 'self'; base-uri 'none'; object-src 'none'; frame-ancestors 'none'; "
-    "form-action 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; "
+    "form-action 'self'; script-src 'self'; style-src 'self'; img-src 'self' data: https://tile.openstreetmap.org; "
     "connect-src 'self'"
 )
 
@@ -1030,10 +1030,16 @@ class AdminHandler(BaseHTTPRequestHandler):
                 self._serve_asset("index.html", "text/html; charset=utf-8"); return
             if path == "/admin.css":
                 self._serve_asset("admin.css", "text/css; charset=utf-8"); return
+            if path == "/leaflet.css":
+                self._serve_asset("leaflet.css", "text/css; charset=utf-8"); return
             if path == "/admin-variants.css":
                 self._serve_asset("admin-variants.css", "text/css; charset=utf-8"); return
+            if path == "/leaflet.js":
+                self._serve_asset("leaflet.js", "text/javascript; charset=utf-8"); return
             if path == "/admin.js":
                 self._serve_asset("admin.js", "text/javascript; charset=utf-8"); return
+            if path == "/delivery-zone-map.js":
+                self._serve_asset("delivery-zone-map.js", "text/javascript; charset=utf-8"); return
             if path == "/api/admin/me":
                 admin, _session = self._admin()
                 self._json(200, {"success": True, "admin": admin, "csrfToken": self.application.identity.csrf_token(self._cookie(ADMIN_COOKIE) or "")}); return

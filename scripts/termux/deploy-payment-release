@@ -22,6 +22,12 @@ for required_ops_script in styledash-health styledash-notify rollback-payment-re
     exit 1
   fi
 done
+for required_admin_asset in index.html admin.css admin-variants.css admin.js leaflet.css leaflet.js delivery-zone-map.js leaflet.LICENSE; do
+  if [ ! -f "$STAGE/server/admin/$required_admin_asset" ]; then
+    echo "release is missing admin asset $required_admin_asset; deployment aborted" >&2
+    exit 1
+  fi
+done
 PRIVATE_CONFIG_DIR="$HOME/.config/styledash"
 SECRETS_FILE="$PRIVATE_CONFIG_DIR/secrets.env"
 
@@ -230,9 +236,21 @@ install -m 600 "$STAGE/scripts/catalog_normalization.py" "$HOME/admin/catalog_no
 install -m 600 "$STAGE/scripts/styledash_shops.py" "$HOME/admin/styledash_shops.py"
 install -m 600 "$STAGE/server/admin/index.html" "$HOME/admin/admin/index.html"
 install -m 600 "$STAGE/server/admin/admin.css" "$HOME/admin/admin/admin.css"
+install -m 600 "$STAGE/server/admin/admin-variants.css" "$HOME/admin/admin/admin-variants.css"
 install -m 600 "$STAGE/server/admin/admin.js" "$HOME/admin/admin/admin.js"
+install -m 600 "$STAGE/server/admin/leaflet.css" "$HOME/admin/admin/leaflet.css"
+install -m 600 "$STAGE/server/admin/leaflet.js" "$HOME/admin/admin/leaflet.js"
+install -m 600 "$STAGE/server/admin/delivery-zone-map.js" "$HOME/admin/admin/delivery-zone-map.js"
+install -m 600 "$STAGE/server/admin/leaflet.LICENSE" "$HOME/admin/admin/leaflet.LICENSE"
 install -m 700 "$STAGE/server/tools/create_admin.py" "$HOME/admin/tools/create_admin.py"
 rm -f -- "$HOME/server/tools/set_admin.py" "$HOME/server/tools/setup_admin_totp.py"
+
+for admin_asset in index.html admin.css admin-variants.css admin.js leaflet.css leaflet.js delivery-zone-map.js leaflet.LICENSE; do
+  if [ ! -f "$HOME/admin/admin/$admin_asset" ]; then
+    echo "deployed admin is missing $admin_asset; deployment aborted" >&2
+    exit 1
+  fi
+done
 
 for runtime_module in styledash_security.py catalog_normalization.py styledash_mail.py styledash_notify.py styledash_shops.py styledash_reviews.py styledash_delivery_zone.py styledash_delivery_zone_store.py; do
   if [ ! -f "$HOME/server/$runtime_module" ] || [ ! -f "$HOME/admin/$runtime_module" ]; then
