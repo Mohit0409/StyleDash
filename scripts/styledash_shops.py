@@ -2667,20 +2667,21 @@ class ShopWorkflow:
             })
         return stores
 
-    def _published_rows(self, limit: int) -> list[sqlite3.Row]:
-        safe_limit = max(1, min(limit, 200))
-        with self.connect() as db:
-            rows = db.execute(
-                """
+    def _published_rows(self, limit: int | None = None) -> list[sqlite3.Row]:
+        query = """
                 SELECT p.*,a.shop_name
                   FROM shop_product_submissions p
                   JOIN vendor_applications a ON a.id=p.application_id
                  WHERE p.status='PUBLISHED' AND a.status='ACTIVE'
                  ORDER BY p.published_at DESC
-                 LIMIT ?
-                """,
-                (safe_limit,),
-            ).fetchall()
+                """
+        params: tuple[Any, ...] = ()
+        if limit is not None:
+            safe_limit = max(1, min(limit, 10_000))
+            query += " LIMIT ?"
+            params = (safe_limit,)
+        with self.connect() as db:
+            rows = db.execute(query, params).fetchall()
         return rows
 
     @staticmethod
@@ -2749,8 +2750,8 @@ class ShopWorkflow:
             "updatedAt": row["updated_at"],
         }
 
-    def list_published_products(self, limit: int = 100) -> list[dict[str, Any]]:
-        """Return customer-safe Product DTOs, never review/contact metadata."""
+    def list_published_products(self, limit: int | None = None) -> list[dict[str, Any]]:
+        """Return all customer-safe published Product DTOs unless a limit is explicitly requested."""
         return [self._public_product(row) for row in self._published_rows(limit)]
 
     def payment_catalog_products(self, limit: int = 5000) -> list[dict[str, Any]]:
