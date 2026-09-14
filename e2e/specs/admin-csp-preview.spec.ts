@@ -76,7 +76,7 @@ test('selected image preview works under the real private-admin CSP', async ({ p
   const response = await page.goto('http://127.0.0.1:8081/');
   expect(response?.status()).toBe(200);
   const policy = response?.headers()['content-security-policy'] || '';
-  expect(policy).toContain("img-src 'self' data:");
+  expect(policy).toContain("img-src 'self' data: https://tile.openstreetmap.org");
   expect(policy).not.toContain('blob:');
 
   await page.evaluate(() => {
@@ -95,4 +95,32 @@ test('selected image preview works under the real private-admin CSP', async ({ p
   await expect(image).toBeVisible();
   await expect(image).toHaveAttribute('src', /^data:image\/png;base64,/);
   expect(cspErrors).toEqual([]);
+});
+
+
+test('delivery-zone map draws points and keeps coordinates synchronized', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'desktop-chromium', 'One Chromium map-editor probe is sufficient.');
+  await page.goto('http://127.0.0.1:8081/');
+  await page.waitForLoadState('networkidle');
+  await page.evaluate(() => {
+    document.getElementById('login-view')!.hidden = true;
+    document.getElementById('app-view')!.hidden = false;
+    (window as any).renderDeliveryZone({type:'FeatureCollection', enforcementMode:'pincode', features:[]});
+  });
+  const map = page.locator('#delivery-zone-map');
+  await expect(map).toBeVisible();
+  const box = await map.boundingBox();
+  expect(box).not.toBeNull();
+  const b = box!;
+  for (const [x, y] of [[.25,.25],[.75,.25],[.75,.72],[.28,.7]]) {
+    await map.click({position:{x:b.width * x, y:b.height * y}});
+  }
+  await expect(page.locator('.delivery-zone-map-marker')).toHaveCount(4);
+  await expect(page.locator('#delivery-zone-boundary')).toHaveValue(/^-?\d+\.\d{6}, -?\d+\.\d{6}/);
+  expect((await page.locator('#delivery-zone-boundary').inputValue()).trim().split(/\r?\n/)).toHaveLength(4);
+  await page.locator('#delivery-zone-map-undo').click();
+  await expect(page.locator('.delivery-zone-map-marker')).toHaveCount(3);
+  await page.locator('#delivery-zone-map-clear').click();
+  await expect(page.locator('.delivery-zone-map-marker')).toHaveCount(0);
+  await expect(page.locator('#delivery-zone-boundary')).toHaveValue('');
 });

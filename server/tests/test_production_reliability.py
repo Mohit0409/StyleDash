@@ -150,6 +150,13 @@ class ProductionReliabilityTests(unittest.TestCase):
         self.assertIn('install -m 600 "$STAGE/scripts/styledash_delivery_zone_store.py" "$HOME/admin/styledash_delivery_zone_store.py"', script)
         self.assertIn('install -m 644 "$STAGE/server/payment-data/delivery-zones.geojson" "$HOME/.local/share/styledash/delivery-zones.geojson"', script)
         self.assertIn("styledash_delivery_zone.py styledash_delivery_zone_store.py", script)
+        self.assertIn('install -m 600 "$STAGE/server/admin/admin-variants.css" "$HOME/admin/admin/admin-variants.css"', script)
+        self.assertIn('install -m 600 "$STAGE/server/admin/leaflet.css" "$HOME/admin/admin/leaflet.css"', script)
+        self.assertIn('install -m 600 "$STAGE/server/admin/leaflet.js" "$HOME/admin/admin/leaflet.js"', script)
+        self.assertIn('install -m 600 "$STAGE/server/admin/delivery-zone-map.js" "$HOME/admin/admin/delivery-zone-map.js"', script)
+        self.assertIn('for required_admin_asset in index.html admin.css admin-variants.css admin.js leaflet.css leaflet.js delivery-zone-map.js leaflet.LICENSE; do', script)
+        self.assertIn('release is missing admin asset $required_admin_asset; deployment aborted', script)
+        self.assertIn('for admin_asset in index.html admin.css admin-variants.css admin.js leaflet.css leaflet.js delivery-zone-map.js leaflet.LICENSE; do', script)
         self.assertNotIn("razorpay-script-missing", script)
 
     def test_deploy_stops_watchdog_before_runtime_mutation_and_uses_patch_canary(self) -> None:
