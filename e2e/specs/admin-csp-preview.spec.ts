@@ -6,6 +6,7 @@ import os from 'node:os';
 import path from 'node:path';
 
 const root = process.cwd();
+const onePixelPng = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=', 'base64');
 let adminProcess: ChildProcess | undefined;
 let runtimeDirectory = '';
 
@@ -89,8 +90,7 @@ test('selected image preview works under the real private-admin CSP', async ({ p
     (window as any).attachImagePreview(input, preview);
   });
 
-  const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=', 'base64');
-  await page.locator('#csp-preview-input').setInputFiles({ name: 'preview.png', mimeType: 'image/png', buffer: png });
+  await page.locator('#csp-preview-input').setInputFiles({ name: 'preview.png', mimeType: 'image/png', buffer: onePixelPng });
   const image = page.locator('#csp-preview-root img');
   await expect(image).toBeVisible();
   await expect(image).toHaveAttribute('src', /^data:image\/png;base64,/);
@@ -100,7 +100,13 @@ test('selected image preview works under the real private-admin CSP', async ({ p
 
 test('delivery-zone map draws points and keeps coordinates synchronized', async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== 'desktop-chromium', 'One Chromium map-editor probe is sufficient.');
-  await page.goto('http://127.0.0.1:8081/');
+  const tileReferers: string[] = [];
+  await page.route('https://tile.openstreetmap.org/**', async route => {
+    tileReferers.push(route.request().headers()['referer'] || '');
+    await route.fulfill({ status: 200, contentType: 'image/png', body: onePixelPng });
+  });
+  const response = await page.goto('http://127.0.0.1:8081/');
+  expect(response?.headers()['referrer-policy']).toBe('strict-origin-when-cross-origin');
   await page.waitForLoadState('networkidle');
   await page.evaluate(() => {
     document.getElementById('login-view')!.hidden = true;
@@ -109,6 +115,8 @@ test('delivery-zone map draws points and keeps coordinates synchronized', async 
   });
   const map = page.locator('#delivery-zone-map');
   await expect(map).toBeVisible();
+  await expect.poll(() => tileReferers.length).toBeGreaterThan(0);
+  expect(tileReferers.every(referer => referer === 'http://127.0.0.1:8081/')).toBe(true);
   const box = await map.boundingBox();
   expect(box).not.toBeNull();
   const b = box!;
