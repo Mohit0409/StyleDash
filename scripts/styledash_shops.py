@@ -114,7 +114,7 @@ PRODUCT_CHANGE_PAYLOAD_FIELDS = PRODUCT_PAYLOAD_FIELDS - {"inventory", "size"}
 DEPARTMENTS = CANONICAL_DEPARTMENTS
 COLOUR_HEX_PATTERN = re.compile(r"^#[0-9A-Fa-f]{6}$")
 PRODUCT_MEDIA_PATH_PATTERN = re.compile(r"^/media/product-images/[0-9a-f]{32}\.(?:webp|jpg|png)$")
-EXCHANGE_WINDOW_DAYS = 7
+EXCHANGE_WINDOW_DAYS = 2
 
 
 def _commission_rate_basis_points(price_paise: int) -> int:

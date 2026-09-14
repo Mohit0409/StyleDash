@@ -73,7 +73,7 @@ test('customer policy pages publish launch contacts without pre-live warnings', 
   await expect(page.locator('main')).toContainText('Grievance officer: Mohit Jangde');
 
   await page.goto('/returns');
-  await expect(page.locator('main')).toContainText('7-day size exchange');
+  await expect(page.locator('main')).toContainText('2-day size exchange');
   await expect(page.locator('main')).toContainText('INR 50');
 
   await page.goto('/privacy');

@@ -91,7 +91,7 @@ export const SizeGuideModal: React.FC<{ isOpen: boolean; onClose: () => void; de
 
         <div className="mt-6 p-4 bg-neutral-50 dark:bg-neutral-800 rounded-2xl text-xs text-neutral-600 dark:text-neutral-400 space-y-1">
           <p className="font-bold text-neutral-900 dark:text-white">Need a size swap after delivery?</p>
-          <p>Eligible items may be requested for a size exchange within 7 days. Stock availability, conditions, and pickup/exchange charges may apply.</p>
+          <p>Eligible items may be requested for a size exchange within 2 days. Stock availability, conditions, and pickup/exchange charges may apply.</p>
         </div>
       </div>
     </div>
