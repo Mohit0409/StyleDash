@@ -1037,6 +1037,13 @@ class AdminHttpTests(unittest.TestCase):
         self.assertEqual(status, 200)
         self.assertTrue(any(item.get("action") == "delivery_zone_updated" for item in audit["audit"]))
 
+    def test_admin_map_headers_allow_osm_referer_without_leaking_full_path(self):
+        status, _body, headers = self.request("/leaflet.js")
+        self.assertEqual(status, 200)
+        self.assertEqual(headers["Referrer-Policy"], "strict-origin-when-cross-origin")
+        self.assertIn("https://tile.openstreetmap.org", headers["Content-Security-Policy"])
+        self.assertEqual(headers["Permissions-Policy"], "camera=(), microphone=(), geolocation=()")
+
     def test_delivery_zone_admin_ui_uses_explicit_safe_actions_and_coordinate_conversion(self):
         admin_ui = (ROOT / "server/admin/admin.js").read_text(encoding="utf-8")
         admin_index = (ROOT / "server/admin/index.html").read_text(encoding="utf-8")

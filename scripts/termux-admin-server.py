@@ -940,7 +940,7 @@ class AdminHandler(BaseHTTPRequestHandler):
         self.send_header("Cache-Control", "no-store")
         self.send_header("Content-Security-Policy", SECURITY_POLICY)
         self.send_header("X-Content-Type-Options", "nosniff")
-        self.send_header("Referrer-Policy", "no-referrer")
+        self.send_header("Referrer-Policy", "strict-origin-when-cross-origin")
         self.send_header("Permissions-Policy", "camera=(), microphone=(), geolocation=()")
         self.send_header("X-Frame-Options", "DENY")
         # Local launch/deploy probes use this to prove which process owns 8081.
