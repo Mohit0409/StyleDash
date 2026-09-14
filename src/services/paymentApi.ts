@@ -40,6 +40,8 @@ export interface TrustedOrderItem {
   storeSlug?: string;
   imageUrl?: string;
   reservedVariantIds?: string[];
+  exchangeEligible?: boolean;
+  exchangeOptions?: Array<{ variantId: string; size: string; colourName?: string }>;
   tryAtHome?: {
     originalVariantIds: string[];
     selectedSizes: string[];
@@ -100,6 +102,17 @@ export interface ServerOrder {
   refundProcessedAt?: string;
   cancellationReason?: string;
   cancelledAt?: string;
+  cancellationRequest?: {
+    status: 'requested' | 'completed'; requestedAt: string; feeDue: number; feePaid: boolean;
+    feeCollectionMethod?: 'cash' | 'upi_at_delivery'; feeCollectedAt?: string; completedAt?: string;
+  };
+  exchangeRequests?: Array<{
+    id: string; itemIndex: number; productId: string; sourceVariantId: string; sourceSize: string;
+    targetVariantId: string; targetSize: string; colourName?: string; quantity: number;
+    status: 'requested' | 'approved' | 'rejected' | 'completed'; feeDue: number; feePaid: boolean;
+    requestedAt: string; approvedAt?: string; completedAt?: string;
+    feeCollectionMethod?: 'cash' | 'upi_at_delivery'; feeCollectedAt?: string;
+  }>;
 }
 
 export interface CreatePaymentOrderResponse {

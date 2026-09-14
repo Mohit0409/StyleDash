@@ -62,7 +62,7 @@ test.beforeAll(async ({ browserName }, testInfo) => {
           phone: user.phone,
           password: user.password,
           termsAccepted: true,
-          termsVersion: '2026-08-14',
+          termsVersion: '2026-09-13',
         },
       });
 
@@ -71,7 +71,7 @@ test.beforeAll(async ({ browserName }, testInfo) => {
       // restart-safe and compliant with the server-authoritative consent gate.
       if (response.status() === 409) {
         const login = await api.post('/api/auth/login', {
-          data: { email: user.email, password: user.password, termsAccepted: true, termsVersion: '2026-08-14' },
+          data: { email: user.email, password: user.password, termsAccepted: true, termsVersion: '2026-09-13' },
         });
         expect(login.status()).toBe(200);
       } else {
@@ -735,7 +735,7 @@ test('guest cart and wishlist migrate into the signed-in account', async ({ page
   };
   const registered = await request.post('/api/auth/register', { data: {
     name: user.name, email: user.email, phone: user.phone, password: user.password,
-    termsAccepted: true, termsVersion: '2026-08-14',
+    termsAccepted: true, termsVersion: '2026-09-13',
   }});
   expect(registered.status()).toBe(201);
 

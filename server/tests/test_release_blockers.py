@@ -274,11 +274,45 @@ class AdminCancellationTests(unittest.TestCase):
             15,
         )
 
-    def test_packed_cannot_cancel(self):
+    def test_packed_can_cancel_before_after_dispatch_fee_applies(self):
         o = self.order("SD-PACKED", "cod", "pending", "packed")
         self.seed(o)
-        with self.assertRaises(ADMIN.SecurityError) as caught: self.app.update_order_status("adm_test", o["id"], "cancelled")
-        self.assertEqual(caught.exception.code, "invalid_transition")
+        cancelled = self.app.update_order_status(
+            "adm_test", o["id"], "cancelled", "Customer requested cancellation before dispatch"
+        )
+        self.assertEqual(cancelled["status"], "cancelled")
+        self.assertEqual(self.app.payments.store.state["inventory"]["sd-prod-001-var-2"], 15)
+
+    def test_pending_customer_cancellation_holds_fulfillment_until_resolved(self):
+        def assert_held(order, attempted_status):
+            with self.assertRaises(ADMIN.SecurityError) as caught:
+                self.app.update_order_status("adm_test", order["id"], attempted_status)
+            self.assertEqual(caught.exception.code, "cancellation_pending")
+            self.assertEqual(
+                self.app.payments.store.state["orders"][order["id"]]["status"], order["status"]
+            )
+
+        o = self.order("SD-CANCELLATION-HOLD-CONFIRMED", "cod", "pending", "confirmed")
+        o["cancellationRequest"] = {"status": "requested", "feeDue": 0, "feePaid": True}
+        self.seed(o)
+        assert_held(o, "preparing")
+        assert_held(o, "packed")
+
+        preparing = self.order("SD-CANCELLATION-HOLD-PREPARING", "cod", "pending", "preparing")
+        preparing["cancellationRequest"] = {"status": "requested", "feeDue": 0, "feePaid": True}
+        self.seed(preparing)
+        assert_held(preparing, "out_for_delivery")
+
+        out_for_delivery = self.order("SD-CANCELLATION-HOLD-OUT", "cod", "pending", "out_for_delivery")
+        out_for_delivery["cancellationRequest"] = {"status": "requested", "feeDue": 50, "feePaid": True}
+        self.seed(out_for_delivery)
+        assert_held(out_for_delivery, "delivered")
+
+        cancelled = self.app.update_order_status(
+            "adm_test", o["id"], "cancelled", "Customer requested cancellation"
+        )
+        self.assertEqual(cancelled["status"], "cancelled")
+        self.assertEqual(cancelled["cancellationRequest"]["status"], "completed")
 
     def test_stock_review_can_place_after_restock(self):
         o = self.order("SD-REVIEW", "upi", "paid", "payment_review_required", False)

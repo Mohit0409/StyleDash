@@ -21,7 +21,9 @@ export const Returns = () => (
       <p className="text-sm text-neutral-600">
         Eligible items may be requested for a size exchange within{' '}
         {CONFIG.LEGAL.EXCHANGE_WINDOW_DAYS} calendar days after delivery.
-        Exchanges depend on replacement-stock availability.
+        Exchanges depend on replacement-stock availability and are offered only
+        when the product listing states that size exchange is available. An
+        eligible size exchange costs INR {CONFIG.LEGAL.EXCHANGE_PICKUP_FEE}.
       </p>
     </section>
 
@@ -78,9 +80,20 @@ export const Returns = () => (
     <section className="space-y-2">
       <h2 className="font-black">Cancellation</h2>
       <p className="text-sm text-neutral-600">
-        An order may be cancelled while it has not yet been packed. Once the
-        order is packed or dispatched, cancellation is not available; the
-        applicable return/exchange process must be used instead.
+        A customer may submit a cancellation request before delivery. If the
+        order is already out for delivery, the cancellation costs INR 50. Any
+        required fee collection and online refund must be reconciled before the
+        order is finally marked cancelled.
+      </p>
+    </section>
+
+    <section className="space-y-2">
+      <h2 className="font-black">Try at Home</h2>
+      <p className="text-sm text-neutral-600">
+        Products marked Try at Home allow two selected sizes for an INR 50
+        service fee. The customer must choose one size within 15 minutes after
+        delivery and return the other in its original condition. An additional
+        INR 50 late fee applies after the 15-minute window.
       </p>
     </section>
 

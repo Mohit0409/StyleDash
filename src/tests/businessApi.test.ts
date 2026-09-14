@@ -51,6 +51,24 @@ describe('Try at Home order API', () => {
     expect(new Headers(init.headers).get('X-CSRF-Token')).toBe('csrf-try-home');
     expect(JSON.parse(String(init.body))).toEqual({ itemIndex: 0, keptVariantId: 'variant-large' });
   });
+
+  it('submits cancellation and selected-size exchange through CSRF-protected endpoints', async () => {
+    setCsrfToken('csrf-service-request');
+    const order = { id: 'ORDER-SERVICE-1', items: [] };
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(async () => jsonResponse({ success: true, order }));
+    await orderApi.requestCancellation('ORDER-SERVICE-1');
+    await orderApi.requestExchange('ORDER-SERVICE-1', 2, 'variant-xl');
+    expect(fetchSpy.mock.calls.map(([endpoint]) => endpoint)).toEqual([
+      '/api/orders/ORDER-SERVICE-1/cancel-request',
+      '/api/orders/ORDER-SERVICE-1/exchange-requests',
+    ]);
+    for (const [, init] of fetchSpy.mock.calls as Array<[RequestInfo | URL, RequestInit]>) {
+      expect(init.method).toBe('POST');
+      expect(init.credentials).toBe('include');
+      expect(new Headers(init.headers).get('X-CSRF-Token')).toBe('csrf-service-request');
+    }
+    expect(JSON.parse(String((fetchSpy.mock.calls[1][1] as RequestInit).body))).toEqual({ itemIndex: 2, targetVariantId: 'variant-xl' });
+  });
 });
 
 describe('seller product submission API', () => {

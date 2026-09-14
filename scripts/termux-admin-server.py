@@ -10,6 +10,7 @@ import importlib.util
 import json
 import math
 import os
+import re
 import sqlite3
 from datetime import timedelta
 from http import HTTPStatus
@@ -361,6 +362,118 @@ class AdminApplication:
         self.identity.record_action(admin_id, "try_at_home_late_fee_paid", "order", order_id, "success", {"amount": due, "collectionMethod": methods[collection_method]})
         return self.payments.order_for_display(result)
 
+    def mark_cancellation_fee_paid(self, admin_id: str, order_id: str, collection_method: Any) -> dict[str, Any]:
+        methods = {"cash": "cash", "upi_at_delivery": "upi_at_delivery"}
+        if not isinstance(collection_method, str) or collection_method not in methods:
+            raise SecurityError(400, "Choose Cash or UPI for the cancellation fee.", "invalid_cancellation_fee_collection_method")
+        with self.payments.store.lock:
+            order = self.payments.store.state["orders"].get(order_id)
+            if order is None:
+                raise SecurityError(404, "Order not found.", "order_not_found")
+            request = order.get("cancellationRequest")
+            if not isinstance(request, dict) or int(request.get("feeDue", 0) or 0) <= 0:
+                raise SecurityError(409, "No cancellation fee is due.", "cancellation_fee_not_due")
+            if request.get("status") != "requested":
+                raise SecurityError(409, "This cancellation request is no longer active.", "cancellation_unavailable")
+            if request.get("feePaid") is True:
+                raise SecurityError(409, "The cancellation fee is already paid.", "cancellation_fee_already_paid")
+            now = iso(utc_now())
+            request.update({"feePaid": True, "feeCollectionMethod": methods[collection_method], "feeCollectedAt": now})
+            order["updatedAt"] = now
+            order.setdefault("statusHistory", []).append({"status": "cancellation_fee_paid", "timestamp": now, "note": f"Rs {request['feeDue']} cancellation fee collected by {methods[collection_method]}"})
+            self.payments.store.save()
+            result = dict(order)
+        self.identity.record_action(admin_id, "cancellation_fee_paid", "order", order_id, "success", {"amount": request["feeDue"], "collectionMethod": methods[collection_method]})
+        return self.payments.order_for_display(result)
+
+    def mark_exchange_fee_paid(self, admin_id: str, order_id: str, exchange_id: str, collection_method: Any) -> dict[str, Any]:
+        methods = {"cash": "cash", "upi_at_delivery": "upi_at_delivery"}
+        if not isinstance(collection_method, str) or collection_method not in methods:
+            raise SecurityError(400, "Choose Cash or UPI for the exchange fee.", "invalid_exchange_fee_collection_method")
+        with self.payments.store.lock:
+            order = self.payments.store.state["orders"].get(order_id)
+            if order is None:
+                raise SecurityError(404, "Order not found.", "order_not_found")
+            exchange = next((entry for entry in order.get("exchangeRequests", []) if entry.get("id") == exchange_id), None)
+            if not isinstance(exchange, dict):
+                raise SecurityError(404, "Exchange request not found.", "exchange_not_found")
+            if exchange.get("status") != "approved":
+                raise SecurityError(409, "Approve and reserve the replacement size before collecting the exchange fee.", "exchange_fee_not_ready")
+            if exchange.get("feePaid") is True:
+                raise SecurityError(409, "The exchange fee is already paid.", "exchange_fee_already_paid")
+            now = iso(utc_now())
+            exchange.update({"feePaid": True, "feeCollectionMethod": methods[collection_method], "feeCollectedAt": now})
+            order["updatedAt"] = now
+            order.setdefault("statusHistory", []).append({"status": "exchange_fee_paid", "timestamp": now, "note": f"Rs {exchange['feeDue']} exchange fee collected by {methods[collection_method]}"})
+            self.payments.store.save()
+            result = dict(order)
+        self.identity.record_action(admin_id, "exchange_fee_paid", "exchange_request", exchange_id, "success", {"orderId": order_id, "amount": exchange["feeDue"], "collectionMethod": methods[collection_method]})
+        return self.payments.order_for_display(result)
+
+    def update_exchange_status(self, admin_id: str, order_id: str, exchange_id: str, requested: Any) -> dict[str, Any]:
+        transitions = {"requested": {"approved", "rejected"}, "approved": {"completed", "rejected"}}
+        if not isinstance(requested, str):
+            raise SecurityError(400, "Invalid exchange status.", "invalid_exchange_status")
+        target = requested.strip().lower()
+        self.payments.refresh_shop_products()
+        products = self.payments.product_snapshot()
+        inventory_alerts: list[dict[str, Any]] = []
+        with self.payments.store.lock:
+            state = self.payments.store.state
+            order = state["orders"].get(order_id)
+            if order is None:
+                raise SecurityError(404, "Order not found.", "order_not_found")
+            exchange = next((entry for entry in order.get("exchangeRequests", []) if entry.get("id") == exchange_id), None)
+            if not isinstance(exchange, dict):
+                raise SecurityError(404, "Exchange request not found.", "exchange_not_found")
+            current = str(exchange.get("status") or "")
+            if target not in transitions.get(current, set()):
+                raise SecurityError(409, "Exchange transition is not allowed.", "invalid_exchange_transition")
+            product = products.get(exchange.get("productId"))
+            try:
+                quantity = int(exchange.get("quantity", 0) or 0)
+            except (TypeError, ValueError):
+                quantity = 0
+            variants = product.get("variants", []) if isinstance(product, dict) else []
+            source = next((entry for entry in variants if entry.get("id") == exchange.get("sourceVariantId")), None)
+            replacement = next((entry for entry in variants if entry.get("id") == exchange.get("targetVariantId")), None)
+            now = iso(utc_now())
+            if target == "approved":
+                if source is None or replacement is None or quantity <= 0:
+                    raise SecurityError(409, "Exchange inventory cannot be reconciled safely.", "exchange_inventory_unavailable")
+                before = self.payments._inventory(state, replacement)
+                if replacement.get("active") is False or before < quantity:
+                    raise SecurityError(409, "The replacement size is no longer available.", "exchange_stock_changed")
+                after = before - quantity
+                state["inventory"][replacement["id"]] = after
+                exchange.update({"targetReserved": True, "approvedAt": now})
+                alert = self.payments._inventory_alert_for_change(product, replacement, before, after)
+                if alert is not None:
+                    inventory_alerts.append(alert)
+            elif target == "rejected" and exchange.get("targetReserved") is True and exchange.get("inventoryAdjusted") is not True:
+                if replacement is None or quantity <= 0:
+                    raise SecurityError(409, "Reserved replacement stock cannot be reconciled safely.", "exchange_inventory_unavailable")
+                state["inventory"][replacement["id"]] = self.payments._inventory(state, replacement) + quantity
+                exchange["targetReserved"] = False
+            elif target == "completed":
+                if exchange.get("feePaid") is not True or exchange.get("targetReserved") is not True:
+                    raise SecurityError(409, "Collect the exchange fee and reserve replacement stock before completion.", "exchange_not_ready")
+                if source is None or quantity <= 0:
+                    raise SecurityError(409, "Returned stock cannot be reconciled safely.", "exchange_inventory_unavailable")
+                state["inventory"][source["id"]] = self.payments._inventory(state, source) + quantity
+                exchange.update({"inventoryAdjusted": True, "completedAt": now})
+            exchange["status"] = target
+            exchange["reviewedBy"] = admin_id
+            exchange["updatedAt"] = now
+            order["updatedAt"] = now
+            order.setdefault("statusHistory", []).append({"status": f"exchange_{target}", "timestamp": now, "note": f"Exchange {target}: {exchange.get('sourceSize')} to {exchange.get('targetSize')}"})
+            self.payments.store.save()
+            result = dict(order)
+        self.identity.record_action(admin_id, f"exchange_{target}", "exchange_request", exchange_id, "success", {"orderId": order_id, "inventoryAdjusted": exchange.get("inventoryAdjusted") is True})
+        if inventory_alerts:
+            _notify_inventory_alerts(inventory_alerts)
+        return self.payments.order_for_display(result)
+
     def update_order_status(
         self, admin_id: str, order_id: str, requested: Any, reason: Any = None
     ) -> dict[str, Any]:
@@ -370,8 +483,8 @@ class AdminApplication:
             "placed": {"confirmed", "cancelled"},
             "confirmed": {"preparing", "packed", "cancelled"},
             "preparing": {"out_for_delivery", "cancelled"},
-            "packed": {"out_for_delivery"},
-            "out_for_delivery": {"delivered"},
+            "packed": {"out_for_delivery", "cancelled"},
+            "out_for_delivery": {"delivered", "cancelled"},
             "delivered": set(),
             "cancelled": set(),
         }
@@ -394,6 +507,17 @@ class AdminApplication:
             current = order.get("status", "placed")
             if requested not in transitions.get(current, set()):
                 raise SecurityError(409, "Invalid order status transition.", "invalid_transition")
+            cancellation_request = order.get("cancellationRequest")
+            if (
+                isinstance(cancellation_request, dict)
+                and cancellation_request.get("status") == "requested"
+                and requested != "cancelled"
+            ):
+                raise SecurityError(
+                    409,
+                    "A customer cancellation request is pending. Resolve the cancellation before continuing fulfillment.",
+                    "cancellation_pending",
+                )
             cancellation_reason = None
             if requested == "cancelled":
                 if not isinstance(reason, str) or not 3 <= len(reason.strip()) <= 500:
@@ -438,6 +562,13 @@ class AdminApplication:
                 self._resolve_order_alerts(state, order, {"inventory_shortfall_after_capture"}, now)
 
             elif requested == "cancelled":
+                if (
+                    current == "out_for_delivery"
+                    and isinstance(cancellation_request, dict)
+                    and int(cancellation_request.get("feeDue", 0) or 0) > 0
+                    and cancellation_request.get("feePaid") is not True
+                ):
+                    raise SecurityError(409, "Collect the Rs 50 after-dispatch cancellation fee before cancelling.", "cancellation_fee_required")
                 online = order.get("paymentMethod") in ("upi", "card")
                 if online and order.get("paymentStatus") != "refunded":
                     raise SecurityError(
@@ -455,6 +586,8 @@ class AdminApplication:
                 order["updatedAt"] = now
                 order["cancelledAt"] = now
                 order["cancellationReason"] = cancellation_reason
+                if isinstance(cancellation_request, dict):
+                    cancellation_request.update({"status": "completed", "completedAt": now})
                 base_note = "Cancelled after verified Razorpay refund" if online else "Cash on Delivery order cancelled"
                 order.setdefault("statusHistory", []).append({
                     "status": "cancelled",
@@ -989,6 +1122,18 @@ class AdminHandler(BaseHTTPRequestHandler):
             if path.startswith("/api/admin/orders/") and path.endswith("/payment"):
                 order_id = unquote(path.removeprefix("/api/admin/orders/").removesuffix("/payment"))
                 result = self.application.mark_cod_paid(admin["id"], order_id, payload.get("collectionMethod"))
+                self._json(200, {"success": True, "order": result}); return
+            if path.startswith("/api/admin/orders/") and path.endswith("/cancellation-fee"):
+                order_id = unquote(path.removeprefix("/api/admin/orders/").removesuffix("/cancellation-fee"))
+                result = self.application.mark_cancellation_fee_paid(admin["id"], order_id, payload.get("collectionMethod"))
+                self._json(200, {"success": True, "order": result}); return
+            exchange_match = re.fullmatch(r"/api/admin/orders/([^/]+)/exchanges/([^/]+)/(fee|status)", path)
+            if exchange_match:
+                order_id, exchange_id, action = (unquote(value) for value in exchange_match.groups())
+                if action == "fee":
+                    result = self.application.mark_exchange_fee_paid(admin["id"], order_id, exchange_id, payload.get("collectionMethod"))
+                else:
+                    result = self.application.update_exchange_status(admin["id"], order_id, exchange_id, payload.get("status"))
                 self._json(200, {"success": True, "order": result}); return
             if path.startswith("/api/admin/orders/") and path.endswith("/status"):
                 order_id = unquote(path.removeprefix("/api/admin/orders/").removesuffix("/status"))

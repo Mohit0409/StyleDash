@@ -25,7 +25,7 @@ PASSWORD_MAX = 256
 CUSTOMER_ABSOLUTE_HOURS = 24 * 7
 CUSTOMER_IDLE_HOURS = 24
 PASSWORD_RESET_MINUTES = 30
-TERMS_VERSION = "2026-08-14"
+TERMS_VERSION = "2026-09-13"
 PasswordResetDispatcher = Callable[[str, str, Callable[[], None]], None]
 
 

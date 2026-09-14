@@ -16,6 +16,16 @@ export const orderApi = {
       { itemIndex, keptVariantId },
     )).order;
   },
+  async requestCancellation(id: string): Promise<ServerOrder> {
+    return (await apiJson<{ success: true; order: ServerOrder }>(
+      `/api/orders/${encodeURIComponent(id)}/cancel-request`, 'POST', {},
+    )).order;
+  },
+  async requestExchange(id: string, itemIndex: number, targetVariantId: string): Promise<ServerOrder> {
+    return (await apiJson<{ success: true; order: ServerOrder }>(
+      `/api/orders/${encodeURIComponent(id)}/exchange-requests`, 'POST', { itemIndex, targetVariantId },
+    )).order;
+  },
   async receipt(id: string): Promise<{ blob: Blob; filename: string }> {
     const response = await fetch(`/api/orders/${encodeURIComponent(id)}/receipt`, { credentials: 'include' });
     if (!response.ok) {
@@ -165,6 +175,7 @@ export interface SellerProductDraft {
   imageUrls: string[];
   attributes: Record<string, string>;
   tryAtHomeEnabled?: boolean;
+  exchangeAvailable?: boolean;
 }
 
 export interface SellerProduct extends Omit<SellerProductDraft, 'variants' | 'inventory' | 'size'> {
@@ -181,6 +192,7 @@ export interface SellerProduct extends Omit<SellerProductDraft, 'variants' | 'in
   submittedAt?: string | null;
   publishedAt?: string | null;
   tryAtHomeEnabled?: boolean;
+  exchangeAvailable?: boolean;
   /** Private-admin-only fields. Seller endpoints never return these. */
   commissionPaise?: number;
   customerPricePaise?: number;
@@ -200,6 +212,7 @@ export interface SellerProductChangeRequest {
   action: SellerProductChangeAction;
   status: SellerProductChangeStatus;
   proposedProduct?: SellerProductChangeDraft | null;
+  changeSummary?: Array<{ field: string; before: string; after: string }>;
   rejectionReason?: string | null;
   createdAt: string;
   updatedAt: string;

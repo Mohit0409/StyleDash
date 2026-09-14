@@ -78,6 +78,9 @@ API_PREFIX = "/api/"
 TRY_AT_HOME_FEE_RUPEES = 50
 TRY_AT_HOME_LATE_FEE_RUPEES = 50
 TRY_AT_HOME_MINUTES = 15
+EXCHANGE_FEE_RUPEES = 50
+EXCHANGE_WINDOW_DAYS = 7
+CANCELLATION_AFTER_DISPATCH_FEE_RUPEES = 50
 
 
 
@@ -740,6 +743,26 @@ class PaymentService:
                 image_url = item.get("imageUrl") or product.get("thumbnail") or (images[0] if images else None)
                 if image_url:
                     item["imageUrl"] = image_url
+                if item.get("exchangeEligible") is True:
+                    source_variant_id = item.get("variantId")
+                    trial = item.get("tryAtHome")
+                    if isinstance(trial, dict) and trial.get("status") == "selected":
+                        source_variant_id = trial.get("keptVariantId") or source_variant_id
+                    source_variant = next((candidate for candidate in product.get("variants", []) if candidate.get("id") == source_variant_id), None)
+                    source_colour = (source_variant or {}).get("colourName") or item.get("colourName")
+                    with self.store.lock:
+                        available_variant_ids = {
+                            candidate["id"] for candidate in product.get("variants", [])
+                            if candidate.get("id") and self._inventory(self.store.state, candidate) > 0
+                        }
+                    item["exchangeOptions"] = [
+                        {"variantId": candidate["id"], "size": candidate.get("size"), "colourName": candidate.get("colourName")}
+                        for candidate in product.get("variants", [])
+                        if candidate.get("active") is not False
+                        and candidate.get("id") != source_variant_id
+                        and candidate.get("colourName") == source_colour
+                        and candidate.get("id") in available_variant_ids
+                    ]
             display_items.append(item)
         result["items"] = display_items
         return result
@@ -1058,6 +1081,7 @@ class PaymentService:
                         "unitPrice": _rounded_rupees(unit_price),
                         "lineTotal": _rounded_rupees(line_total),
                         "reservedVariantIds": reserved_variant_ids,
+                        "exchangeEligible": product.get("exchangeAvailable") is True,
                     }
                 if is_try_at_home:
                     trusted_item["tryAtHome"] = {
@@ -1162,7 +1186,29 @@ class PaymentService:
             "cancellationReason", "cancelledAt", "tryAtHomeLateFeeDue", "tryAtHomeLateFeePaid",
             "tryAtHomeLateFeeCollectionMethod", "tryAtHomeLateFeeCollectedAt",
         )
-        return {key: display_order[key] for key in allowed if key in display_order}
+        public_order = {key: display_order[key] for key in allowed if key in display_order}
+        cancellation = display_order.get("cancellationRequest")
+        if isinstance(cancellation, dict):
+            cancellation_allowed = (
+                "status", "requestedAt", "feeDue", "feePaid", "feeCollectionMethod",
+                "feeCollectedAt", "completedAt",
+            )
+            public_order["cancellationRequest"] = {
+                key: cancellation[key] for key in cancellation_allowed if key in cancellation
+            }
+        exchanges = display_order.get("exchangeRequests")
+        if isinstance(exchanges, list):
+            exchange_allowed = (
+                "id", "itemIndex", "productId", "sourceVariantId", "sourceSize",
+                "targetVariantId", "targetSize", "colourName", "quantity", "status",
+                "feeDue", "feePaid", "requestedAt", "approvedAt", "completedAt",
+                "feeCollectionMethod", "feeCollectedAt", "updatedAt",
+            )
+            public_order["exchangeRequests"] = [
+                {key: request[key] for key in exchange_allowed if key in request}
+                for request in exchanges if isinstance(request, dict)
+            ]
+        return public_order
 
     def _create_response(self, order: dict[str, Any]) -> dict[str, Any]:
         return {
@@ -1586,6 +1632,103 @@ class PaymentService:
             order.setdefault("statusHistory", []).append({"status": "try_at_home_selected", "timestamp": selected_at, "note": note})
             self.store.save()
             return self._public_order(order)
+
+    def request_customer_cancellation(self, order_id: str, user_id: str) -> dict[str, Any]:
+        """Persist an owned cancellation request; Admin retains refund and inventory control."""
+        allowed = {"payment_pending", "payment_review_required", "placed", "confirmed", "preparing", "packed", "out_for_delivery"}
+        with self.store.lock:
+            order = self.store.state["orders"].get(order_id)
+            if not isinstance(order, dict) or order.get("userId") != user_id:
+                raise ApiError(HTTPStatus.NOT_FOUND, "Order not found.", "order_not_found")
+            if order.get("fulfillmentRequired") is False or order.get("status") not in allowed:
+                raise ApiError(HTTPStatus.CONFLICT, "This order can no longer be cancelled.", "cancellation_unavailable")
+            existing = order.get("cancellationRequest")
+            if isinstance(existing, dict):
+                return {"idempotent": True, "order": self._public_order(order)}
+            now = datetime.now(timezone.utc).isoformat()
+            fee_due = CANCELLATION_AFTER_DISPATCH_FEE_RUPEES if order.get("status") == "out_for_delivery" else 0
+            order["cancellationRequest"] = {
+                "status": "requested", "requestedAt": now, "feeDue": fee_due,
+                "feePaid": fee_due == 0,
+            }
+            order["updatedAt"] = now
+            note = "Customer cancellation requested"
+            if fee_due:
+                note += f"; Rs {fee_due} after-dispatch fee due"
+            order.setdefault("statusHistory", []).append({"status": order.get("status"), "timestamp": now, "note": note})
+            self.store.save()
+            return {"idempotent": False, "order": self._public_order(order)}
+
+    def request_exchange(
+        self, order_id: str, user_id: str, item_index: Any, target_variant_id: Any,
+        now: datetime | None = None,
+    ) -> dict[str, Any]:
+        if isinstance(item_index, bool) or not isinstance(item_index, int) or item_index < 0:
+            raise ApiError(HTTPStatus.BAD_REQUEST, "Choose a valid order item.", "invalid_exchange_item")
+        if not isinstance(target_variant_id, str) or not target_variant_id or len(target_variant_id) > 128:
+            raise ApiError(HTTPStatus.BAD_REQUEST, "Choose a replacement size.", "invalid_exchange_size")
+        current_time = now or datetime.now(timezone.utc)
+        self.refresh_shop_products()
+        products = self.product_snapshot()
+        with self.store.lock:
+            order = self.store.state["orders"].get(order_id)
+            if not isinstance(order, dict) or order.get("userId") != user_id:
+                raise ApiError(HTTPStatus.NOT_FOUND, "Order not found.", "order_not_found")
+            if order.get("status") != "delivered":
+                raise ApiError(HTTPStatus.CONFLICT, "An exchange can be requested only after delivery.", "exchange_unavailable")
+            delivered_at = next((entry.get("timestamp") for entry in reversed(order.get("statusHistory", [])) if entry.get("status") == "delivered"), order.get("updatedAt"))
+            try:
+                delivered_time = datetime.fromisoformat(str(delivered_at).replace("Z", "+00:00"))
+            except (TypeError, ValueError):
+                raise ApiError(HTTPStatus.CONFLICT, "Delivery time is unavailable. Contact support.", "exchange_unavailable") from None
+            if current_time > delivered_time + timedelta(days=EXCHANGE_WINDOW_DAYS):
+                raise ApiError(HTTPStatus.CONFLICT, "The exchange window has ended.", "exchange_window_closed")
+            items = order.get("items")
+            if not isinstance(items, list) or item_index >= len(items):
+                raise ApiError(HTTPStatus.BAD_REQUEST, "Choose a valid order item.", "invalid_exchange_item")
+            item = items[item_index]
+            if not isinstance(item, dict) or item.get("exchangeEligible") is not True:
+                raise ApiError(HTTPStatus.CONFLICT, "This product is not eligible for exchange.", "exchange_unavailable")
+            trial = item.get("tryAtHome")
+            if isinstance(trial, dict) and trial.get("status") != "selected":
+                raise ApiError(HTTPStatus.CONFLICT, "Choose the kept Try at Home size before requesting an exchange.", "exchange_unavailable")
+            source_variant_id = trial.get("keptVariantId") if isinstance(trial, dict) else item.get("variantId")
+            product = products.get(item.get("productId"))
+            if not isinstance(product, dict):
+                raise ApiError(HTTPStatus.CONFLICT, "Product data is unavailable for exchange.", "exchange_unavailable")
+            source = next((variant for variant in product.get("variants", []) if variant.get("id") == source_variant_id), None)
+            target = next((variant for variant in product.get("variants", []) if variant.get("id") == target_variant_id and variant.get("active") is not False), None)
+            if source is None or target is None or target_variant_id == source_variant_id or target.get("colourName") != source.get("colourName"):
+                raise ApiError(HTTPStatus.BAD_REQUEST, "Choose another available size in the same colour.", "invalid_exchange_size")
+            quantity = int(item.get("quantity", 0) or 0)
+            if quantity <= 0:
+                raise ApiError(HTTPStatus.CONFLICT, "The order item cannot be exchanged safely.", "exchange_unavailable")
+            if self._inventory(self.store.state, target) < quantity:
+                raise ApiError(HTTPStatus.CONFLICT, "The replacement size is no longer available.", "exchange_stock_changed")
+            requests = order.setdefault("exchangeRequests", [])
+            existing = next((entry for entry in requests if entry.get("itemIndex") == item_index and entry.get("status") in {"requested", "approved"}), None)
+            if existing:
+                if existing.get("targetVariantId") == target_variant_id:
+                    return {"idempotent": True, "exchange": dict(existing), "order": self._public_order(order)}
+                raise ApiError(HTTPStatus.CONFLICT, "An exchange request is already active for this item.", "exchange_already_requested")
+            requested_at = current_time.isoformat()
+            exchange = {
+                "id": "exch_" + secrets.token_hex(10), "itemIndex": item_index,
+                "productId": item.get("productId"), "sourceVariantId": source_variant_id,
+                "sourceSize": source.get("size"), "targetVariantId": target_variant_id,
+                "targetSize": target.get("size"), "colourName": target.get("colourName"),
+                "quantity": quantity, "status": "requested",
+                "feeDue": EXCHANGE_FEE_RUPEES, "feePaid": False,
+                "requestedAt": requested_at, "inventoryAdjusted": False,
+            }
+            requests.append(exchange)
+            order["updatedAt"] = requested_at
+            order.setdefault("statusHistory", []).append({
+                "status": "exchange_requested", "timestamp": requested_at,
+                "note": f"Size exchange requested: {source.get('size')} to {target.get('size')}; Rs {EXCHANGE_FEE_RUPEES} fee due",
+            })
+            self.store.save()
+            return {"idempotent": False, "exchange": dict(exchange), "order": self._public_order(order)}
 
     def _find_order_by_razorpay_id(self, razorpay_order_id: str) -> dict[str, Any] | None:
         return next(
@@ -2942,6 +3085,33 @@ class StyleDashRequestHandler(SimpleHTTPRequestHandler):
                 payload = self._read_json()
                 order = self.payment_service.finalize_try_at_home(order_id, user["id"], payload.get("itemIndex"), payload.get("keptVariantId"))
                 self._json_response(HTTPStatus.OK, {"success": True, "order": order})
+                return
+            if path.startswith("/api/orders/") and path.endswith("/cancel-request"):
+                self._rate_limit("/api/orders/cancel-request", 10)
+                user, _session = self._current_user()
+                self._csrf()
+                order_id = unquote(path.removeprefix("/api/orders/").removesuffix("/cancel-request"))
+                if not order_id or "/" in order_id:
+                    raise SecurityError(404, "Order not found.", "order_not_found")
+                self._read_json()
+                result = self.payment_service.request_customer_cancellation(order_id, user["id"])
+                self._json_response(HTTPStatus.OK, {"success": True, **result})
+                return
+            if path.startswith("/api/orders/") and path.endswith("/exchange-requests"):
+                self._rate_limit("/api/orders/exchange-requests", 10)
+                user, _session = self._current_user()
+                self._csrf()
+                order_id = unquote(path.removeprefix("/api/orders/").removesuffix("/exchange-requests"))
+                if not order_id or "/" in order_id:
+                    raise SecurityError(404, "Order not found.", "order_not_found")
+                payload = self._read_json()
+                result = self.payment_service.request_exchange(
+                    order_id, user["id"], payload.get("itemIndex"), payload.get("targetVariantId")
+                )
+                self._json_response(
+                    HTTPStatus.CREATED if not result["idempotent"] else HTTPStatus.OK,
+                    {"success": True, "idempotent": result["idempotent"], "order": result["order"]},
+                )
                 return
             if path == "/api/reviews":
                 self._rate_limit("reviews:create", 10)

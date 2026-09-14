@@ -173,7 +173,7 @@ class ShopWorkflowTests(unittest.TestCase):
                 [row[0] for row in db.execute(
                     "SELECT version FROM shop_schema_migrations ORDER BY version"
                 )],
-                [1, 2, 3, 4, 5, 6, 7],
+                [1, 2, 3, 4, 5, 6, 7, 8, 9],
             )
             self.assertEqual(db.execute("PRAGMA integrity_check").fetchone()[0], "ok")
             self.assertEqual(db.execute("PRAGMA foreign_key_check").fetchall(), [])
@@ -277,7 +277,7 @@ class ShopWorkflowTests(unittest.TestCase):
         db = sqlite3.connect(concurrent_path)
         self.assertEqual(
             db.execute("SELECT version,COUNT(*) FROM shop_schema_migrations GROUP BY version").fetchall(),
-            [(1, 1), (2, 1), (3, 1), (4, 1), (5, 1), (6, 1), (7, 1)],
+            [(1, 1), (2, 1), (3, 1), (4, 1), (5, 1), (6, 1), (7, 1), (8, 1), (9, 1)],
         )
         self.assertEqual(db.execute("PRAGMA integrity_check").fetchone()[0], "ok")
         self.assertEqual(db.execute("PRAGMA foreign_key_check").fetchall(), [])
@@ -895,6 +895,34 @@ class ShopWorkflowTests(unittest.TestCase):
         self.assert_error("invalid_try_at_home_product", lambda: self.store.create_product_draft("user-a", invalid))
         regular = self.store.create_product_draft("user-a", self.complete_product("Regular Shirt"))
         self.assertFalse(regular["tryAtHomeEnabled"])
+
+    def test_exchange_opt_in_and_readable_change_summary_are_persisted(self) -> None:
+        self.create_active_shop("user-a", "Exchange Shop")
+        payload = self.complete_product("Exchange Shirt")
+        payload.pop("inventory")
+        payload.pop("size")
+        payload["variants"] = [{"size": "M", "inventory": 4}, {"size": "L", "inventory": 3}]
+        payload["exchangeAvailable"] = True
+        product = self.store.create_product_draft("user-a", payload)
+        self.assertTrue(product["exchangeAvailable"])
+        product = self.store.submit_product("user-a", product["id"])
+        for target in ("UNDER_REVIEW", "APPROVED", "PUBLISHED"):
+            product = self.store.admin_transition_product("admin-a", product["id"], target)
+        public = next(item for item in self.store.list_published_products() if item["id"] == product["id"])
+        self.assertTrue(public["exchangeAvailable"])
+        self.assertEqual(public["returnWindowDays"], 7)
+        request = self.store.create_product_edit_request("user-a", product["id"], {"exchangeAvailable": False})
+        summary = {item["field"]: item for item in request["changeSummary"]}
+        self.assertEqual(summary["Size exchange"], {"field": "Size exchange", "before": "Enabled", "after": "Disabled"})
+        admin_request = next(item for item in self.store.admin_list_product_change_requests("admin-a") if item["id"] == request["id"])
+        self.assertEqual(admin_request["changeSummary"], request["changeSummary"])
+        with self.store.connect() as db:
+            versions = {row[0] for row in db.execute("SELECT version FROM shop_schema_migrations")}
+            product_columns = {row[1] for row in db.execute("PRAGMA table_info(shop_product_submissions)")}
+            request_columns = {row[1] for row in db.execute("PRAGMA table_info(shop_product_change_requests)")}
+        self.assertTrue({8, 9}.issubset(versions))
+        self.assertIn("exchange_available", product_columns)
+        self.assertIn("change_summary_json", request_columns)
 
 
 
