@@ -906,6 +906,11 @@ class AdminStoreTests(unittest.TestCase):
         self.assertIn(".status-badge{", admin_css)
         self.assertIn(".tone-green{", admin_css)
         self.assertIn(".tone-red{", admin_css)
+        self.assertIn("STORE_CATEGORIES", admin_ui)
+        self.assertIn("{name:'category',label:'Category',type:'select',required:true,value:STORE_CATEGORIES[0]", admin_ui)
+        self.assertIn("field-required", admin_ui)
+        self.assertIn(".dialog-field-wide{", admin_css)
+        self.assertIn("#admin-dialog-form>.actions{", admin_css)
 
 
 class AdminHttpTests(unittest.TestCase):

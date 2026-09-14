@@ -2,6 +2,16 @@
 
 Canonical cross-chat coordination file: `C:\movieXsuggestion\MyProject\VIBE4YOU_DEV_COORDINATION.md`
 
+## Admin store category + popup form UX ? 2026-09-14
+
+- Branch: `agent/admin-store-modal-ux`, based on `87f4fc4302ba659a5d27e391323a3d158cc4532f`.
+- Fixes Create Local Store category to use the same dropdown source as Edit Store.
+- Shared store categories now cover Clothing & Fashion, Footwear, Accessories, Beauty & Personal Care, Electronics, Home & Living, and General Store.
+- Shared admin dialogs now use consistent field cards, required markers, full-width textarea/file fields, sticky actions, and responsive 2-column desktop / 1-column mobile layout.
+- Validation: Node syntax PASS; Admin + release-blocker backend suite 48/48 PASS; headless desktop/mobile dialog rendering PASS.
+- Deployment: not yet performed; requires PR CI and guarded release.
+
+
 ## DEV1 handoff — COD payment status + profile persistence — 2026-09-04
 
 ### Ownership
