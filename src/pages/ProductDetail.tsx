@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { Star, Zap, Heart, ShieldCheck, RefreshCw, ShoppingBag, CheckCircle, ArrowRight } from 'lucide-react';
+import { Star, Zap, Heart, ShieldCheck, RefreshCw, ShoppingBag, CheckCircle, ArrowRight, Share2 } from 'lucide-react';
 import { SEO } from '../components/SEO';
 import { VariantSelector } from '../components/VariantSelector';
 import { SizeGuideModal } from '../components/SizeGuideModal';
@@ -116,6 +116,40 @@ export const ProductDetail: React.FC = () => {
 
   const handleBuyNow = async () => {
     if (await handleAddToCart()) navigate('/checkout');
+  };
+
+  const handleShareProduct = async () => {
+    const url = new URL(`/product/${product.slug}`, window.location.origin).href;
+    const shareData = {
+      title: `${product.name} | Vibe4You`,
+      text: `Check out ${product.name} on Vibe4You`,
+      url,
+    };
+
+    try {
+      if (typeof navigator.share === 'function') {
+        await navigator.share(shareData);
+        return;
+      }
+
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(url);
+      } else {
+        const input = document.createElement('textarea');
+        input.value = url;
+        input.setAttribute('readonly', '');
+        input.style.position = 'fixed';
+        input.style.opacity = '0';
+        document.body.appendChild(input);
+        input.select();
+        document.execCommand('copy');
+        input.remove();
+      }
+      showToast('Product link copied. Share it anywhere!', 'success');
+    } catch (error) {
+      if (error instanceof DOMException && error.name === 'AbortError') return;
+      showToast('Could not share this product. Please try again.', 'error');
+    }
   };
 
   return (
@@ -288,6 +322,16 @@ export const ProductDetail: React.FC = () => {
               className="px-8 py-4 bg-lime-400 text-neutral-950 font-black text-sm rounded-2xl shadow-xl hover:bg-lime-300 transition-all disabled:opacity-50"
             >
               Buy Now
+            </button>
+
+            <button
+              type="button"
+              onClick={handleShareProduct}
+              aria-label={`Share ${product.name}`}
+              title="Share product"
+              className="p-4 rounded-2xl border border-neutral-300 dark:border-neutral-700 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors"
+            >
+              <Share2 className="w-5 h-5" />
             </button>
 
             <button
