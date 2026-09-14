@@ -61,7 +61,7 @@ test('customer policy pages publish launch contacts without pre-live warnings', 
     await page.goto(route);
 
     const main = page.locator('main');
-    await expect(main).toContainText('styledashsupport@gmail.com');
+    await expect(main).toContainText('vibe4yousupport@gmail.com');
 
     for (const warning of warningPhrases) {
       await expect(main).not.toContainText(warning);
