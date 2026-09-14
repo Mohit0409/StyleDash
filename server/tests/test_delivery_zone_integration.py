@@ -9,10 +9,15 @@ from pathlib import Path
 from scripts.styledash_delivery_zone_store import DeliveryZoneStore
 
 ROOT = Path(__file__).resolve().parents[2]
-TESTS = str(Path(__file__).resolve().parent)
-if TESTS not in sys.path:
-    sys.path.insert(0, TESTS)
-from test_styledash_server import SERVER, FakeGateway
+try:
+    from test_styledash_server import SERVER, FakeGateway
+except ModuleNotFoundError:
+    tests_path = str(Path(__file__).resolve().parent)
+    sys.path.insert(0, tests_path)
+    try:
+        from test_styledash_server import SERVER, FakeGateway
+    finally:
+        sys.path.remove(tests_path)
 
 def polygon_configuration() -> dict:
     return {

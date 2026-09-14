@@ -46,11 +46,11 @@ except ModuleNotFoundError:  # Repository test import path.
     from scripts.styledash_shops import ShopWorkflow
 
 try:
-    from styledash_delivery_zone import DeliveryZoneConfigError, DeliveryZoneIndex
-    from styledash_delivery_zone_store import DeliveryZoneStore
-except ModuleNotFoundError:  # Repository test import path.
     from scripts.styledash_delivery_zone import DeliveryZoneConfigError, DeliveryZoneIndex
     from scripts.styledash_delivery_zone_store import DeliveryZoneStore
+except ModuleNotFoundError:  # Standalone deployed import path.
+    from styledash_delivery_zone import DeliveryZoneConfigError, DeliveryZoneIndex
+    from styledash_delivery_zone_store import DeliveryZoneStore
 
 try:
     from styledash_reviews import ReviewWorkflow

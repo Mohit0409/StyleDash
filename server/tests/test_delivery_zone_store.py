@@ -3,15 +3,9 @@ from __future__ import annotations
 import tempfile
 import unittest
 from pathlib import Path
-import sys
 
-ROOT = Path(__file__).resolve().parents[2]
-SCRIPTS = ROOT / "scripts"
-if str(SCRIPTS) not in sys.path:
-    sys.path.insert(0, str(SCRIPTS))
-
-from styledash_delivery_zone import DeliveryZoneConfigError
-from styledash_delivery_zone_store import DeliveryZoneStore
+from scripts.styledash_delivery_zone import DeliveryZoneConfigError
+from scripts.styledash_delivery_zone_store import DeliveryZoneStore
 
 
 def polygon_payload():
