@@ -18,7 +18,7 @@ export const CONFIG = {
     PROPRIETOR_NAME: 'Mohit Jangde',
     GRIEVANCE_OFFICER: 'Mohit Jangde',
     ADDRESS: 'Alkaloid Colony, Neemuch, Madhya Pradesh 458441, India',
-    SUPPORT_EMAIL: 'styledashsupport@gmail.com',
+    SUPPORT_EMAIL: 'vibe4yousupport@gmail.com',
     SUPPORT_PHONE: '+91 8085810758',
     SUPPORT_HOURS: '9:00 AM-9:00 PM IST',
     RETURN_SUPPORT_HOURS: '9:00 AM-1:00 PM IST',
