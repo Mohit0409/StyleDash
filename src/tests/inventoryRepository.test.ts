@@ -34,9 +34,22 @@ describe('authoritative inventory repository', () => {
 
   it('batches homepage availability by product id without requesting the full inventory payload', async () => {
     vi.spyOn(Date, 'now').mockReturnValue(0);
-    const fetcher = vi.fn<typeof fetch>(async input => String(input) === '/api/shop-products/published'
-      ? productsResponse()
-      : response([]));
+    vi.stubGlobal('window', { location: { hostname: 'vibe4you.in' } });
+    const publishedProduct = {
+      id: 'shopprod_home', slug: 'homepage-local-product', name: 'Homepage Local Product', brand: 'Test Shop',
+      department: 'women', category: 'Fashion', shortDescription: 'Local product', description: 'Local product',
+      material: 'Cotton', careInstructions: [], price: 450, originalPrice: 500, discount: 10,
+      images: ['/media/product-images/home.jpg'], thumbnail: '/media/product-images/home.jpg', rating: 0, reviewCount: 0,
+      variants: [{ id: 'shopprod_home-var-1', sku: 'SHOP-HOME', size: 'M', colourName: 'Black', stock: 1, available: false }],
+      tags: ['local-shop'], badge: 'Local Shop', active: true, newArrival: true, returnWindowDays: 0, exchangeAvailable: false,
+      vendorId: 'shop-home', storeName: 'Test Shop', storeSlug: 'test-shop',
+    };
+    const fetcher = vi.fn<typeof fetch>(async input => {
+      const url = String(input);
+      if (url === '/api/shop-products/published') return productsResponse([publishedProduct]);
+      if (url.startsWith('/api/reviews/summaries?')) return reviewResponse();
+      return response([{ productId: 'shopprod_home', variantId: 'shopprod_home-var-1', available: true }]);
+    });
     vi.stubGlobal('fetch', fetcher);
 
     const products = await productRepository.getHomepageProducts();
