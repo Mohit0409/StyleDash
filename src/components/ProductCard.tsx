@@ -63,6 +63,7 @@ export const ProductCard: React.FC<{ product: Product; onQuickView?: (p: Product
       {/* Image & Hover Action */}
       <Link
         to={`/product/${product.slug}`}
+        data-product-card-image
         className="block relative aspect-[3/4] bg-neutral-100 dark:bg-neutral-800 overflow-hidden"
         onMouseEnter={() => setHoveredImage(true)}
         onMouseLeave={() => setHoveredImage(false)}
@@ -70,7 +71,7 @@ export const ProductCard: React.FC<{ product: Product; onQuickView?: (p: Product
         <img
           src={imageFailed ? PRODUCT_IMAGE_FALLBACK : (hoveredImage ? secondaryImage : primaryImage)}
           alt={product.name}
-          className="w-full h-full object-cover object-center group-hover:scale-105 transition-transform duration-500"
+          className="h-full w-full object-contain object-center p-2 transition-opacity duration-300"
           loading={priority ? 'eager' : 'lazy'}
           fetchPriority={priority ? 'high' : 'auto'}
           decoding="async"
