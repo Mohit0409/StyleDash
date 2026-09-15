@@ -5,6 +5,7 @@ import { SEO } from '../components/SEO';
 import { VariantSelector } from '../components/VariantSelector';
 import { SizeGuideModal } from '../components/SizeGuideModal';
 import { ProductCard } from '../components/ProductCard';
+import { ProductImageLightbox } from '../components/ProductImageLightbox';
 import { ProductReviews } from '../components/ProductReviews';
 import { Product, ProductVariant } from '../types';
 import { productRepository } from '../repositories/productRepository';
@@ -23,6 +24,7 @@ export const ProductDetail: React.FC = () => {
   const [product, setProduct] = useState<Product | null>(null);
   const [loading, setLoading] = useState(true);
   const [selectedImage, setSelectedImage] = useState<string>('');
+  const [imageViewerOpen, setImageViewerOpen] = useState(false);
   const [selectedSize, setSelectedSize] = useState<string | null>(null);
   const [selectedColour, setSelectedColour] = useState<string | null>(null);
   const [quantity, setQuantity] = useState(1);
@@ -56,8 +58,10 @@ export const ProductDetail: React.FC = () => {
 
   useEffect(() => {
     if (!product) return;
-    const colourImages = product.variants.find(variant => variant.colourName === selectedColour)?.images || product.images;
+    const variantImages = product.variants.find(variant => variant.colourName === selectedColour)?.images || [];
+    const colourImages = variantImages.length > 0 ? variantImages : product.images;
     setSelectedImage(colourImages[0] || product.thumbnail);
+    setImageViewerOpen(false);
   }, [product, selectedColour]);
 
   if (loading) {
@@ -80,7 +84,9 @@ export const ProductDetail: React.FC = () => {
   const selectedVariant = product.variants.find(
     v => v.size === selectedSize && v.colourName === selectedColour
   ) || null;
-  const selectedColourImages = product.variants.find(v => v.colourName === selectedColour)?.images || product.images;
+  const variantImages = product.variants.find(v => v.colourName === selectedColour)?.images || [];
+  const selectedColourImages = variantImages.length > 0 ? variantImages : product.images;
+  const galleryImages = selectedColourImages.length > 0 ? selectedColourImages : [product.thumbnail];
   const tryAtHomeVariants = product.variants.filter(
     variant => variant.available === true && variant.colourName === selectedColour,
   );
@@ -197,21 +203,26 @@ export const ProductDetail: React.FC = () => {
         
         {/* Product Gallery */}
         <div className="space-y-4">
-          <div className="aspect-[3/4] bg-neutral-100 dark:bg-neutral-800 rounded-3xl overflow-hidden border border-neutral-200 dark:border-neutral-800 relative">
+          <button
+            type="button"
+            onClick={() => setImageViewerOpen(true)}
+            aria-label={`Open full screen image of ${product.name}`}
+            className="relative block aspect-[3/4] w-full overflow-hidden rounded-3xl border border-neutral-200 bg-neutral-100 text-left focus:outline-none focus:ring-2 focus:ring-lime-500 focus:ring-offset-2 dark:border-neutral-800 dark:bg-neutral-800 dark:focus:ring-offset-neutral-950"
+          >
             <img
               src={selectedImage}
               alt={product.name}
-              className="w-full h-full object-cover object-center"
+              className="h-full w-full object-contain object-center p-3"
             />
             {product.badge && (
               <span className="absolute top-4 left-4 bg-neutral-950 text-white dark:bg-lime-400 dark:text-neutral-950 text-xs font-black px-3 py-1 rounded-full shadow">
                 {product.badge}
               </span>
             )}
-          </div>
+          </button>
 
           <div className="flex gap-3 overflow-x-auto no-scrollbar">
-            {selectedColourImages.map((img, idx) => (
+            {galleryImages.map((img, idx) => (
               <button
                 key={idx}
                 onClick={() => setSelectedImage(img)}
@@ -219,7 +230,7 @@ export const ProductDetail: React.FC = () => {
                   selectedImage === img ? 'border-lime-500 scale-105 shadow-md' : 'border-transparent opacity-70'
                 }`}
               >
-                <img src={img} alt={`${product.name} ${idx}`} className="w-full h-full object-cover" />
+                <img src={img} alt={`${product.name} ${idx + 1}`} className="h-full w-full object-contain object-center p-1" />
               </button>
             ))}
           </div>
@@ -368,6 +379,15 @@ export const ProductDetail: React.FC = () => {
         isOpen={sizeGuideOpen}
         onClose={() => setSizeGuideOpen(false)}
         department={product.department}
+      />
+
+      <ProductImageLightbox
+        imageUrls={galleryImages}
+        selectedImage={selectedImage}
+        productName={product.name}
+        isOpen={imageViewerOpen}
+        onSelectImage={setSelectedImage}
+        onClose={() => setImageViewerOpen(false)}
       />
 
       <ProductReviews productId={product.id} onSummaryChange={handleReviewSummaryChange} />
