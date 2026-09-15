@@ -54,7 +54,7 @@ ALLOWED_HOSTS = {"127.0.0.1:8081", "localhost:8081"}
 ALLOWED_ORIGINS = {"http://127.0.0.1:8081", "http://localhost:8081", PUBLIC_ADMIN_ORIGIN}
 SECURITY_POLICY = (
     "default-src 'self'; base-uri 'none'; object-src 'none'; frame-ancestors 'none'; "
-    "form-action 'self'; script-src 'self'; style-src 'self'; img-src 'self' data: https://tile.openstreetmap.org; "
+    "form-action 'self'; script-src 'self'; style-src 'self'; img-src 'self' data: https:; "
     "connect-src 'self'"
 )
 
@@ -838,6 +838,11 @@ class AdminApplication:
             for product in self.payments.products.values():
                 for variant in product["variants"]:
                     stock = self.payments._inventory(self.payments.store.state, variant)
+                    image_candidates = [variant.get("imageUrl")]
+                    if isinstance(variant.get("images"), list): image_candidates.extend(variant["images"])
+                    image_candidates.extend([product.get("thumbnail"), product.get("imageUrl")])
+                    if isinstance(product.get("images"), list): image_candidates.extend(product["images"])
+                    image_urls = list(dict.fromkeys(value for value in image_candidates if isinstance(value, str) and value.strip()))
                     record = {
                         "productId": product["id"], "productName": product["name"],
                         "variantId": variant["id"], "size": variant.get("size"),
@@ -845,6 +850,7 @@ class AdminApplication:
                         "brand": product.get("brand"), "category": product.get("category"),
                         "department": product.get("department"), "storeName": product.get("storeName"),
                         "storeId": product.get("vendorId"), "optionMode": product.get("optionMode"),
+                        "imageUrl": image_urls[0] if image_urls else None, "imageUrls": image_urls,
                     }
                     searchable = " ".join(str(record.get(key) or "") for key in (
                         "productId", "productName", "variantId", "size", "colour",

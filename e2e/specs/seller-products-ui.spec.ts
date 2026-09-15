@@ -154,8 +154,9 @@ test('published seller can update stock and submit edit or unpublish requests wi
     },
   ];
 
+  const thumbnailPng = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=', 'base64');
   await page.route('**/media/product-images/**', async route => {
-    await route.fulfill({ status: 200, contentType: 'image/webp', body: Buffer.alloc(8) });
+    await route.fulfill({ status: 200, contentType: 'image/png', body: thumbnailPng });
   });
 
   await page.route('**/api/**', async route => {
@@ -217,6 +218,7 @@ test('published seller can update stock and submit edit or unpublish requests wi
   await page.getByLabel('Search your products').fill('');
 
   const editCard = page.getByRole('article').filter({ has: page.getByRole('heading', { name: 'Editable Live Product' }) });
+  await expect(editCard.getByRole('img', { name: 'Editable Live Product' })).toHaveAttribute('src', '/media/product-images/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.webp');
   await editCard.getByRole('button', { name: 'M Stock' }).click();
   await editCard.getByLabel('Stock for size M').fill('0');
   await editCard.getByRole('button', { name: 'Save stock' }).click();

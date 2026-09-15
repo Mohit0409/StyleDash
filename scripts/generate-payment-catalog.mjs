@@ -25,6 +25,7 @@ const catalog = products.map((product) => ({
   slug: product.slug,
   active: product.active === true,
   price: product.price,
+  thumbnail: product.thumbnail || product.images?.[0] || null,
   variants: product.variants.map((variant) => ({
     id: variant.id,
     sku: variant.sku,
