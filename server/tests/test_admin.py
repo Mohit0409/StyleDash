@@ -489,6 +489,27 @@ class AdminStoreTests(unittest.TestCase):
             self.assertEqual(app.payments.store.state["inventory"].get(old_id), 1)
             self.assertEqual(app.payments.store.state["inventory"].get(added["id"]), 4)
 
+    def test_bulk_product_request_approval_advances_submitted_in_one_call(self):
+        app = ADMIN_SERVER.AdminApplication(
+            self.database, self.key, ROOT / "server/payment-data/catalog.json",
+            ROOT / "server/payment-data/settings.json", self.root / "data-bulk-request-approval",
+        )
+        submitted = {"id": "shopchg-one", "status": "SUBMITTED", "action": "EDIT", "productName": "Watch One", "productId": "product-one", "changeSummary": [{"field": "Images"}]}
+        under_review = {**submitted, "status": "UNDER_REVIEW"}
+        approved = {**submitted, "status": "APPROVED"}
+        with patch.object(app.shops, "admin_list_product_change_requests", return_value=[submitted]), patch.object(
+            app.shops, "admin_transition_product_change_request", side_effect=[under_review, approved]
+        ) as transition, patch.object(app.payments, "refresh_shop_products") as refresh:
+            result = app.bulk_transition_shop_product_requests(
+                self.admin["id"], [submitted["id"], "shopchg-missing"], "APPROVED"
+            )
+        self.assertEqual(result["requested"], 2)
+        self.assertEqual(result["updated"], [approved])
+        self.assertEqual(result["failures"][0]["code"], "product_change_not_found")
+        self.assertEqual(transition.call_args_list[0].args[2], "UNDER_REVIEW")
+        self.assertEqual(transition.call_args_list[1].args[2], "APPROVED")
+        refresh.assert_called_once_with()
+
     def test_order_cancellation_sends_owner_notification(self):
         app = ADMIN_SERVER.AdminApplication(
             self.database,
@@ -865,6 +886,7 @@ class AdminStoreTests(unittest.TestCase):
         self.assertIn("Changed field", admin_ui)
         self.assertNotIn("JSON.stringify(item.proposedProduct", admin_ui)
         self.assertIn("bulkTransition", admin_ui)
+        self.assertIn("/api/admin/shop-product-requests/bulk", admin_ui)
         self.assertIn("cancellationRequest?.status==='requested'", admin_ui)
         self.assertIn("mark-cancellation-fee-paid", admin_ui)
         self.assertIn("mark-exchange-fee-paid", admin_ui)
