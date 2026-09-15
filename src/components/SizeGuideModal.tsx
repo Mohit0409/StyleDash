@@ -7,6 +7,7 @@ export const SizeGuideModal: React.FC<{ isOpen: boolean; onClose: () => void; de
   department
 }) => {
   const [tab, setTab] = useState<'apparel' | 'footwear'>('apparel');
+  const [footwearAudience, setFootwearAudience] = useState<'men' | 'women'>('men');
 
   useEffect(() => {
     if (!isOpen) return undefined;
@@ -70,23 +71,36 @@ export const SizeGuideModal: React.FC<{ isOpen: boolean; onClose: () => void; de
             </tbody>
           </table>
         ) : (
-          <table className="w-full text-xs text-left text-neutral-700 dark:text-neutral-300 border-collapse">
-            <thead>
-              <tr className="bg-neutral-100 dark:bg-neutral-800 text-neutral-900 dark:text-white font-extrabold">
-                <th className="p-3 rounded-l-lg">UK / India</th>
-                <th className="p-3">US Size</th>
-                <th className="p-3">EU Size</th>
-                <th className="p-3 rounded-r-lg">Foot Length (cm)</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-neutral-100 dark:divide-neutral-800">
-              <tr><td className="p-3 font-bold">UK 6</td><td className="p-3">7</td><td className="p-3">40</td><td className="p-3">24.5</td></tr>
-              <tr><td className="p-3 font-bold">UK 7</td><td className="p-3">8</td><td className="p-3">41</td><td className="p-3">25.5</td></tr>
-              <tr><td className="p-3 font-bold">UK 8</td><td className="p-3">9</td><td className="p-3">42</td><td className="p-3">26.5</td></tr>
-              <tr><td className="p-3 font-bold">UK 9</td><td className="p-3">10</td><td className="p-3">43</td><td className="p-3">27.5</td></tr>
-              <tr><td className="p-3 font-bold">UK 10</td><td className="p-3">11</td><td className="p-3">44</td><td className="p-3">28.5</td></tr>
-            </tbody>
-          </table>
+          <div>
+            <div className="flex flex-wrap items-center gap-2 mb-4" aria-label="Footwear size guide type">
+              <button type="button" aria-pressed={footwearAudience === 'men'} onClick={() => setFootwearAudience('men')} className={`px-3 py-2 rounded-xl text-xs font-extrabold transition-colors ${footwearAudience === 'men' ? 'bg-neutral-900 text-white dark:bg-white dark:text-neutral-900' : 'bg-neutral-100 text-neutral-600 dark:bg-neutral-800 dark:text-neutral-300'}`}>Men / Unisex</button>
+              <button type="button" aria-pressed={footwearAudience === 'women'} onClick={() => setFootwearAudience('women')} className={`px-3 py-2 rounded-xl text-xs font-extrabold transition-colors ${footwearAudience === 'women' ? 'bg-neutral-900 text-white dark:bg-white dark:text-neutral-900' : 'bg-neutral-100 text-neutral-600 dark:bg-neutral-800 dark:text-neutral-300'}`}>Women</button>
+            </div>
+            <p className="text-[11px] text-neutral-500 mb-3">General conversion guide. Brand and seller-specific sizing can vary; use the product's own size details when provided.</p>
+            <table className="w-full text-xs text-left text-neutral-700 dark:text-neutral-300 border-collapse">
+              <thead>
+                <tr className="bg-neutral-100 dark:bg-neutral-800 text-neutral-900 dark:text-white font-extrabold">
+                  <th className="p-3 rounded-l-lg">UK / India</th><th className="p-3">US Size</th><th className="p-3">EU Size</th><th className="p-3 rounded-r-lg">Foot Length (cm, approx.)</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-neutral-100 dark:divide-neutral-800">
+                {footwearAudience === 'women' ? (<>
+                  <tr><td className="p-3 font-bold">UK 3</td><td className="p-3">5</td><td className="p-3">36</td><td className="p-3">22.5</td></tr>
+                  <tr><td className="p-3 font-bold">UK 4</td><td className="p-3">6</td><td className="p-3">37</td><td className="p-3">23.5</td></tr>
+                  <tr><td className="p-3 font-bold">UK 5</td><td className="p-3">7</td><td className="p-3">38</td><td className="p-3">24.0</td></tr>
+                  <tr><td className="p-3 font-bold">UK 6</td><td className="p-3">8</td><td className="p-3">39</td><td className="p-3">25.0</td></tr>
+                  <tr><td className="p-3 font-bold">UK 7</td><td className="p-3">9</td><td className="p-3">40</td><td className="p-3">25.5</td></tr>
+                  <tr><td className="p-3 font-bold">UK 8</td><td className="p-3">10</td><td className="p-3">41</td><td className="p-3">26.5</td></tr>
+                </>) : (<>
+                  <tr><td className="p-3 font-bold">UK 6</td><td className="p-3">7</td><td className="p-3">40</td><td className="p-3">24.5</td></tr>
+                  <tr><td className="p-3 font-bold">UK 7</td><td className="p-3">8</td><td className="p-3">41</td><td className="p-3">25.5</td></tr>
+                  <tr><td className="p-3 font-bold">UK 8</td><td className="p-3">9</td><td className="p-3">42</td><td className="p-3">26.5</td></tr>
+                  <tr><td className="p-3 font-bold">UK 9</td><td className="p-3">10</td><td className="p-3">43</td><td className="p-3">27.5</td></tr>
+                  <tr><td className="p-3 font-bold">UK 10</td><td className="p-3">11</td><td className="p-3">44</td><td className="p-3">28.5</td></tr>
+                </>)}
+              </tbody>
+            </table>
+          </div>
         )}
 
         <div className="mt-6 p-4 bg-neutral-50 dark:bg-neutral-800 rounded-2xl text-xs text-neutral-600 dark:text-neutral-400 space-y-1">
