@@ -172,7 +172,7 @@ export const Checkout: React.FC = () => {
       <h1 className="text-2xl sm:text-3xl font-black text-neutral-900 dark:text-white">Secure Checkout</h1>
       {!CONFIG.ORDERING_ENABLED && (
         <p role="status" className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-bold text-red-700 dark:border-red-900 dark:bg-red-950/30 dark:text-red-200">
-          🚀 {CONFIG.LAUNCH_MESSAGE} Ordering and payments are temporarily disabled.
+          Ordering and payments are temporarily unavailable. Please try again shortly.
         </p>
       )}
 

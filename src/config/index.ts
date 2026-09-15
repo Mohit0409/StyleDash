@@ -10,7 +10,6 @@ export const CONFIG = {
   EXPRESS_DELIVERY_FEE: 80,
   TAX_RATE: 0.05, // 5% GST
   ORDERING_ENABLED: import.meta.env.VITE_ORDERING_ENABLED === 'true',
-  LAUNCH_MESSAGE: 'Vibe4You is Launching Soon - Stay Tuned!',
 
   // Current operating details for the limited-area launch.
   // Keep these centralized so the proprietor/grievance contacts can be changed once.
