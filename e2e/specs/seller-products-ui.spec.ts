@@ -219,6 +219,10 @@ test('published seller can update stock and submit edit or unpublish requests wi
 
   const editCard = page.getByRole('article').filter({ has: page.getByRole('heading', { name: 'Editable Live Product' }) });
   await expect(editCard.getByRole('img', { name: 'Editable Live Product' })).toHaveAttribute('src', '/media/product-images/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.webp');
+  const compactThumbnail = editCard.getByRole('img', { name: 'Editable Live Product' });
+  await expect(compactThumbnail).toHaveCSS('width', '40px');
+  await expect(compactThumbnail).toHaveCSS('height', '40px');
+  await expect(compactThumbnail).toHaveCSS('object-fit', 'contain');
   await editCard.getByRole('button', { name: 'M Stock' }).click();
   await editCard.getByLabel('Stock for size M').fill('0');
   await editCard.getByRole('button', { name: 'Save stock' }).click();
