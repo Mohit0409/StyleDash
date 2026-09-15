@@ -379,7 +379,16 @@ async function bulkTransition(resource){
   let reason=null;if(target==='cancelled')reason=await cancellationReasonFor();else if(target==='REJECTED'||target==='SUSPENDED')reason=await reasonFor(`Enter the ${target.toLowerCase()} reason`);if((target==='cancelled'||target==='REJECTED'||target==='SUSPENDED')&&!reason)return;
   const route={orders:id=>`/api/admin/orders/${encodeURIComponent(id)}/status`,vendors:id=>`/api/admin/vendors/${encodeURIComponent(id)}`,products:id=>`/api/admin/shop-products/${encodeURIComponent(id)}`,requests:id=>`/api/admin/shop-product-requests/${encodeURIComponent(id)}`,customers:id=>`/api/admin/customers/${encodeURIComponent(id)}`,inventory:id=>`/api/admin/inventory/${encodeURIComponent(id)}`}[resource];
   if(!route)throw new Error('Unsupported bulk action.');let succeeded=0;const failures=[];
-  for(const id of ids){try{const payload=resource==='customers'?{active:target==='enable'}:resource==='inventory'?{delta:Number(target)}:{status:target,...(reason?{reason}:{})};await api(route(id),{method:'PATCH',body:JSON.stringify(payload)});succeeded+=1;bulkSelection.delete(`${resource}:${id}`);}catch(cause){failures.push(`${id}: ${cause.message}`);}}
+  if(resource==='requests'){
+    const result=await api('/api/admin/shop-product-requests/bulk',{method:'PATCH',body:JSON.stringify({ids,status:target,...(reason?{reason}:{})})});
+    const updated=Array.isArray(result.updated)?result.updated:[];
+    const unchanged=Array.isArray(result.failures)?result.failures:[];
+    updated.forEach(item=>bulkSelection.delete(`requests:${item.id}`));
+    succeeded=updated.length;
+    unchanged.forEach(item=>failures.push(`${item.productName||item.id}: ${item.error||'Not updated.'}`));
+  }else{
+    for(const id of ids){try{const payload=resource==='customers'?{active:target==='enable'}:resource==='inventory'?{delta:Number(target)}:{status:target,...(reason?{reason}:{})};await api(route(id),{method:'PATCH',body:JSON.stringify(payload)});succeeded+=1;bulkSelection.delete(`${resource}:${id}`);}catch(cause){failures.push(`${id}: ${cause.message}`);}}
+  }
   status(`${succeeded} of ${ids.length} selected record(s) updated.`);if(failures.length)error(`Some records were unchanged: ${failures.slice(0,3).join(' | ')}`);
 }
 const DELIVERY_ZONE_ID_PATTERN=/^[a-z0-9][a-z0-9_-]{0,79}$/;

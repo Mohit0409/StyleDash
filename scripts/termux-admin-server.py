@@ -787,6 +787,49 @@ class AdminApplication:
                     self.payments.store.save()
             return result
 
+    def bulk_transition_shop_product_requests(
+        self, admin_id: str, request_ids: Any, target_status: Any, reason: Any = None
+    ) -> dict[str, Any]:
+        if not isinstance(request_ids, list) or not request_ids or len(request_ids) > 100:
+            raise SecurityError(400, "Select between 1 and 100 product requests.", "invalid_bulk_product_requests")
+        ids = []
+        for value in request_ids:
+            if not isinstance(value, str) or not value.strip() or len(value) > 200:
+                raise SecurityError(400, "Invalid product request selection.", "invalid_bulk_product_requests")
+            clean = value.strip()
+            if clean not in ids:
+                ids.append(clean)
+        if not isinstance(target_status, str):
+            raise SecurityError(400, "Invalid product change status.", "invalid_product_change_status")
+        target = target_status.strip().upper()
+        if target not in {"UNDER_REVIEW", "APPROVED", "REJECTED"}:
+            raise SecurityError(400, "Invalid bulk product change status.", "invalid_product_change_status")
+        current = {item["id"]: item for item in self.shops.admin_list_product_change_requests(admin_id)}
+        updated, failures = [], []
+        catalog_changed = False
+        for request_id in ids:
+            item = current.get(request_id)
+            if item is None:
+                failures.append({"id": request_id, "error": "Product change request not found.", "code": "product_change_not_found"})
+                continue
+            try:
+                if item.get("status") == "SUBMITTED" and target in {"APPROVED", "REJECTED"}:
+                    self.shops.admin_transition_product_change_request(admin_id, request_id, "UNDER_REVIEW")
+                changed_fields = {str(change.get("field") or "") for change in item.get("changeSummary", []) if isinstance(change, dict)}
+                needs_inventory_revalidation = target == "APPROVED" and item.get("action") == "EDIT" and "Options and stock" in changed_fields
+                if needs_inventory_revalidation:
+                    result = self.transition_shop_product_request(admin_id, request_id, target, reason)
+                else:
+                    result = self.shops.admin_transition_product_change_request(admin_id, request_id, target, reason)
+                    if target == "APPROVED":
+                        catalog_changed = True
+                updated.append(result)
+            except SecurityError as error:
+                failures.append({"id": request_id, "productName": item.get("productName") or item.get("productId"), "error": error.message, "code": error.code})
+        if catalog_changed:
+            self.payments.refresh_shop_products()
+        return {"updated": updated, "failures": failures, "requested": len(ids)}
+
     def inventory(self, query: str = "", low_only: bool = False) -> list[dict[str, Any]]:
         self.payments.refresh_shop_products()
         needle = query.strip().casefold()[:100]
@@ -1209,6 +1252,11 @@ class AdminHandler(BaseHTTPRequestHandler):
                     admin["id"], application_id, payload.get("status"), payload.get("reason")
                 )
                 self._json(200, {"success": True, "application": result}); return
+            if path == "/api/admin/shop-product-requests/bulk":
+                result = self.application.bulk_transition_shop_product_requests(
+                    admin["id"], payload.get("ids"), payload.get("status"), payload.get("reason")
+                )
+                self._json(200, {"success": True, **result}); return
             if path.startswith("/api/admin/shop-product-requests/"):
                 request_id = unquote(path.removeprefix("/api/admin/shop-product-requests/"))
                 result = self.application.transition_shop_product_request(
