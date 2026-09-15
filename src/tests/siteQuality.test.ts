@@ -38,6 +38,14 @@ describe('site quality guardrails', () => {
     expect(sizeGuide).toContain('pickup/exchange charges may apply');
   });
 
+  it('keeps separate women and men/unisex footwear guidance visible', () => {
+    const sizeGuide = readText('../components/SizeGuideModal.tsx');
+    expect(sizeGuide).toContain('Men / Unisex');
+    expect(sizeGuide).toContain('>Women</button>');
+    expect(sizeGuide).toContain("footwearAudience === 'women'");
+    expect(sizeGuide).toContain('Brand and seller-specific sizing can vary');
+  });
+
   it('does not make an unsupported size-exchange promise in the homepage trust strip', () => {
     const home = readText('../pages/Home.tsx');
     expect(home).not.toContain('Easy Size Exchange');
