@@ -107,6 +107,9 @@ class AdminStoreTests(unittest.TestCase):
         order = app.update_order_status(self.admin["id"], "ORDER-ADMIN", "confirmed")
         self.assertEqual(order["status"], "confirmed")
         self.assert_error("invalid_transition", lambda: app.update_order_status(self.admin["id"], "ORDER-ADMIN", "delivered"))
+        inventory_row = next(item for item in app.inventory() if item["variantId"] == "sd-prod-001-var-2")
+        self.assertEqual(inventory_row["imageUrl"], app.payments.products["sd-prod-001"]["thumbnail"])
+        self.assertTrue(str(inventory_row["imageUrl"]).startswith("https://"))
         inventory = app.adjust_inventory(self.admin["id"], "sd-prod-001-var-2", 3)
         self.assertEqual(inventory["after"], inventory["before"] + 3)
         reviewed = self.store.review_vendor(self.admin["id"], vendor["id"], "approved")
@@ -1063,7 +1066,7 @@ class AdminHttpTests(unittest.TestCase):
         status, _body, headers = self.request("/leaflet.js")
         self.assertEqual(status, 200)
         self.assertEqual(headers["Referrer-Policy"], "strict-origin-when-cross-origin")
-        self.assertIn("https://tile.openstreetmap.org", headers["Content-Security-Policy"])
+        self.assertIn("img-src 'self' data: https:", headers["Content-Security-Policy"])
         self.assertEqual(headers["Permissions-Policy"], "camera=(), microphone=(), geolocation=()")
 
     def test_delivery_zone_admin_ui_uses_explicit_safe_actions_and_coordinate_conversion(self):

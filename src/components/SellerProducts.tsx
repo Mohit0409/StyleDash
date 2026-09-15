@@ -24,6 +24,16 @@ const validExternalImageLink = (value: string) => {
 const validImageReference = (value: string) =>
   INTERNAL_PRODUCT_IMAGE.test(value) || validExternalImageLink(value);
 
+const ProductThumbnail: React.FC<{ imageUrls: string[]; name: string }> = ({ imageUrls, name }) => {
+  const candidates = imageUrls.filter(validImageReference);
+  const [imageIndex, setImageIndex] = useState(0);
+  const source = candidates[imageIndex];
+  if (!source) {
+    return <div role="img" aria-label={`${name} image unavailable`} className="flex h-16 w-16 shrink-0 items-center justify-center rounded-xl border bg-neutral-50 p-1 text-center text-[10px] font-bold text-neutral-500 dark:border-neutral-700 dark:bg-neutral-800">No image</div>;
+  }
+  return <img src={source} alt={name} onError={() => setImageIndex(index => index + 1)} className="h-16 w-16 shrink-0 rounded-xl border object-cover dark:border-neutral-700" loading="lazy" referrerPolicy="no-referrer" />;
+};
+
 interface ProductFormState {
   name: string;
   description: string;
@@ -555,8 +565,10 @@ export const SellerProducts: React.FC = () => {
             const pendingRequest = latestRequest && ['SUBMITTED', 'UNDER_REVIEW'].includes(latestRequest.status) ? latestRequest : null;
             return <article key={product.id} className="rounded-2xl border p-4 dark:border-neutral-700">
               <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                <div>
-                  <p className="text-xs font-black uppercase tracking-wider text-neutral-500">{productStateLabel(product)}</p>
+                <div className="flex min-w-0 gap-3">
+                  <ProductThumbnail imageUrls={product.imageUrls} name={product.name} />
+                  <div className="min-w-0">
+                    <p className="text-xs font-black uppercase tracking-wider text-neutral-500">{productStateLabel(product)}</p>
                   <h3 className="font-black">{product.name}</h3>
                   <p className="text-xs text-neutral-500">₹{(product.pricePaise / 100).toFixed(2)} · {product.colourName} · Total stock: {product.inventory}</p>
                   {product.tryAtHomeEnabled && <p className="mt-1 text-xs font-bold text-lime-700">Try at Home enabled</p>}
@@ -565,7 +577,8 @@ export const SellerProducts: React.FC = () => {
                   {product.status === 'REJECTED' && product.rejectionReason && <p className="mt-2 flex gap-2 text-xs text-amber-700"><AlertTriangle className="w-4 shrink-0" />{product.rejectionReason}</p>}
                   {product.status === 'PUBLISHED' && <p className="mt-2 text-xs font-bold text-emerald-700">Published publicly by the private administrator.</p>}
                   {pendingRequest && <p className="mt-2 rounded-lg bg-amber-50 p-2 text-xs font-bold text-amber-800">{pendingRequest.action.replace('_', ' ')} request {pendingRequest.status.replace('_', ' ').toLowerCase()}. The current listing stays live until approval.</p>}
-                  {!pendingRequest && latestRequest?.status === 'REJECTED' && <p className="mt-2 flex gap-2 text-xs text-amber-700"><AlertTriangle className="w-4 shrink-0" />Last {latestRequest.action.toLowerCase()} request rejected: {latestRequest.rejectionReason || 'No reason provided.'}</p>}
+                    {!pendingRequest && latestRequest?.status === 'REJECTED' && <p className="mt-2 flex gap-2 text-xs text-amber-700"><AlertTriangle className="w-4 shrink-0" />Last {latestRequest.action.toLowerCase()} request rejected: {latestRequest.rejectionReason || 'No reason provided.'}</p>}
+                  </div>
                 </div>
                 <div className="flex flex-wrap gap-2">
                   {editable && <button type="button" disabled={busy} onClick={() => openEdit(product)} className="flex items-center gap-1 rounded-lg border px-3 py-2 text-xs font-bold"><Edit3 className="w-3.5" /> Edit</button>}

@@ -19,6 +19,24 @@ let adminFilters = {
 
 const byId = id => document.getElementById(id);
 const escapeText = value => String(value ?? '').replace(/[&<>"']/g, character => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[character]));
+const inventoryImageUrl = value => {
+  if (typeof value !== 'string' || !value.trim()) return null;
+  try {
+    const url = new URL(value, location.origin);
+    if (url.protocol === 'https:' && !/\.html?$/i.test(url.pathname)) return url.href;
+    if (url.origin === location.origin && url.pathname.startsWith('/media/product-images/')) return url.href;
+    return null;
+  } catch { return null; }
+};
+const inventoryThumbnail = item => {
+  const candidates = [...new Set([...(Array.isArray(item.imageUrls)?item.imageUrls:[]), item.imageUrl].map(inventoryImageUrl).filter(Boolean))];
+  const source = candidates[0];
+  const name = escapeText(item.productName || 'Product');
+  const encodedSources = escapeText(encodeURIComponent(JSON.stringify(candidates)));
+  return source
+    ? `<img class="inventory-thumbnail" data-sources="${encodedSources}" data-index="0" src="${escapeText(source)}" alt="${name}" loading="lazy" referrerpolicy="no-referrer" style="width:44px;height:44px;flex:0 0 44px;border:1px solid #dedfd9;border-radius:10px;background:#f5f6f2;object-fit:cover">`
+    : '<span class="inventory-thumbnail-fallback" role="img" aria-label="Product image unavailable" style="display:grid;place-items:center;width:44px;height:44px;flex:0 0 44px;border:1px solid #dedfd9;border-radius:10px;background:#f5f6f2;padding:4px;color:#687064;font-size:9px;font-weight:700;line-height:1;text-align:center">No image</span>';
+};
 
 async function api(path, options = {}) {
   const headers = new Headers(options.headers || {});
@@ -51,6 +69,7 @@ byId('totp-form').addEventListener('submit', async event => {
 byId('logout').addEventListener('click', async () => { try { await api('/api/admin/logout',{method:'POST',body:'{}'}); } finally { location.reload(); } });
 byId('tabs').addEventListener('click', event => { const button=event.target.closest('[data-tab]'); if(!button)return; activeTab=button.dataset.tab; document.querySelectorAll('[data-tab]').forEach(item=>item.classList.toggle('active',item===button)); loadTab(activeTab); });
 byId('search-form').addEventListener('submit', event => { event.preventDefault(); loadTab(activeTab); });
+byId('content').addEventListener('error', event => { const image=event.target.closest?.('.inventory-thumbnail'); if(!image)return; let sources=[]; try{sources=JSON.parse(decodeURIComponent(image.dataset.sources||''));}catch{} const next=Number(image.dataset.index||0)+1; if(next<sources.length){image.dataset.index=String(next);image.src=sources[next];return;} const fallback=document.createElement('span'); fallback.className='inventory-thumbnail-fallback'; fallback.setAttribute('role','img'); fallback.setAttribute('aria-label','Product image unavailable'); fallback.style.cssText='display:grid;place-items:center;width:44px;height:44px;flex:0 0 44px;border:1px solid #dedfd9;border-radius:10px;background:#f5f6f2;padding:4px;color:#687064;font-size:9px;font-weight:700;line-height:1;text-align:center'; fallback.textContent='No image'; image.replaceWith(fallback); }, true);
 byId('content').addEventListener('change', event => {
   const orderControl=event.target.closest('[data-order-filter]');
   if(orderControl){orderFilters[orderControl.dataset.orderFilter]=orderControl.value;renderOrdersView();return;}
@@ -603,7 +622,7 @@ function renderInventory(items){
     `<label>Stock<select data-admin-filter="stock"><option value="attention"${f.stock==='attention'?' selected':''}>Needs attention (5 or fewer)</option><option value="out"${f.stock==='out'?' selected':''}>Out of stock</option><option value="low"${f.stock==='low'?' selected':''}>Low stock (1-5)</option><option value="healthy"${f.stock==='healthy'?' selected':''}>Healthy stock (6+)</option><option value="all"${f.stock==='all'?' selected':''}>All stock</option></select></label>`,
     adminSelect('Category','category',all.map(item=>item.category),f.category),adminSelect('Department','department',all.map(item=>item.department),f.department),adminSelect('Shop','shop',all.map(item=>item.storeName),f.shop),adminSelect('Brand','brand',all.map(item=>item.brand),f.brand),
   ];
-  byId('content').innerHTML=`<h2>Inventory</h2>${adminFilterBar('Inventory filters',controls,filtered.length,all.length)}<table><thead><tr><th>Product</th><th>Shop / category</th><th>Variant</th><th>Stock</th><th>Action</th></tr></thead><tbody>${filtered.map(item=>{const variant=[item.size&&item.size!==DEFAULT_VARIANT_SIZE?item.size:'',item.colour&&item.colour!==DEFAULT_VARIANT_COLOUR?item.colour:''].filter(Boolean).join(' / ')||'Single stock';return `<tr><td><strong>${escapeText(item.productName)}</strong><br><small>${escapeText(item.brand||'-')}</small></td><td>${escapeText(item.storeName||'-')}<br><small>${escapeText([item.category,item.department].filter(Boolean).join(' / '))}</small></td><td>${escapeText(variant)}<br><small>${escapeText(item.variantId)}</small></td><td><strong>${escapeText(item.stock)}</strong></td><td><button data-action="inventory" data-id="${escapeText(item.variantId)}">Adjust</button></td></tr>`;}).join('')}</tbody></table>${filtered.length?'':'<p>No inventory matches the current search and filters.</p>'}`;
+  byId('content').innerHTML=`<h2>Inventory</h2>${adminFilterBar('Inventory filters',controls,filtered.length,all.length)}<table><thead><tr><th>Product</th><th>Shop / category</th><th>Variant</th><th>Stock</th><th>Action</th></tr></thead><tbody>${filtered.map(item=>{const variant=[item.size&&item.size!==DEFAULT_VARIANT_SIZE?item.size:'',item.colour&&item.colour!==DEFAULT_VARIANT_COLOUR?item.colour:''].filter(Boolean).join(' / ')||'Single stock';return `<tr><td><div style="display:flex;align-items:center;gap:10px;min-width:210px">${inventoryThumbnail(item)}<span><strong>${escapeText(item.productName)}</strong><br><small>${escapeText(item.brand||'-')}</small></span></div></td><td>${escapeText(item.storeName||'-')}<br><small>${escapeText([item.category,item.department].filter(Boolean).join(' / '))}</small></td><td>${escapeText(variant)}<br><small>${escapeText(item.variantId)}</small></td><td><strong>${escapeText(item.stock)}</strong></td><td><button data-action="inventory" data-id="${escapeText(item.variantId)}">Adjust</button></td></tr>`;}).join('')}</tbody></table>${filtered.length?'':'<p>No inventory matches the current search and filters.</p>'}`;
 }
 function renderCustomers(items){
   const all=Array.isArray(items)?items:[]; const f=adminFilters.customers;

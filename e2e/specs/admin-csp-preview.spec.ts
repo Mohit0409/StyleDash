@@ -77,7 +77,7 @@ test('selected image preview works under the real private-admin CSP', async ({ p
   const response = await page.goto('http://127.0.0.1:8081/');
   expect(response?.status()).toBe(200);
   const policy = response?.headers()['content-security-policy'] || '';
-  expect(policy).toContain("img-src 'self' data: https://tile.openstreetmap.org");
+  expect(policy).toContain("img-src 'self' data: https:");
   expect(policy).not.toContain('blob:');
 
   await page.evaluate(() => {
