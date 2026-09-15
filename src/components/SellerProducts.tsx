@@ -29,9 +29,9 @@ const ProductThumbnail: React.FC<{ imageUrls: string[]; name: string }> = ({ ima
   const [imageIndex, setImageIndex] = useState(0);
   const source = candidates[imageIndex];
   if (!source) {
-    return <div role="img" aria-label={`${name} image unavailable`} className="flex h-16 w-16 shrink-0 items-center justify-center rounded-xl border bg-neutral-50 p-1 text-center text-[10px] font-bold text-neutral-500 dark:border-neutral-700 dark:bg-neutral-800">No image</div>;
+    return <div role="img" aria-label={`${name} image unavailable`} className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-lg border bg-neutral-50 p-0.5 text-center text-[8px] font-bold leading-none text-neutral-500 dark:border-neutral-700 dark:bg-neutral-800">No image</div>;
   }
-  return <img src={source} alt={name} onError={() => setImageIndex(index => index + 1)} className="h-16 w-16 shrink-0 rounded-xl border object-cover dark:border-neutral-700" loading="lazy" referrerPolicy="no-referrer" />;
+  return <img src={source} alt={name} onError={() => setImageIndex(index => index + 1)} className="h-10 w-10 shrink-0 rounded-lg border bg-neutral-50 object-contain object-center p-0.5 dark:border-neutral-700 dark:bg-neutral-800" loading="lazy" referrerPolicy="no-referrer" />;
 };
 
 interface ProductFormState {
@@ -565,7 +565,7 @@ export const SellerProducts: React.FC = () => {
             const pendingRequest = latestRequest && ['SUBMITTED', 'UNDER_REVIEW'].includes(latestRequest.status) ? latestRequest : null;
             return <article key={product.id} className="rounded-2xl border p-4 dark:border-neutral-700">
               <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                <div className="flex min-w-0 gap-3">
+                <div className="flex min-w-0 items-start gap-2">
                   <ProductThumbnail imageUrls={product.imageUrls} name={product.name} />
                   <div className="min-w-0">
                     <p className="text-xs font-black uppercase tracking-wider text-neutral-500">{productStateLabel(product)}</p>
