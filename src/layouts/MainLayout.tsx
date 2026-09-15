@@ -4,7 +4,6 @@ import { Header } from '../components/Header';
 import { Footer } from '../components/Footer';
 import { NavigationScrollPolicy } from '../components/NavigationScrollPolicy';
 import { useToast } from '../context/ToastContext';
-import { CONFIG } from '../config';
 
 const CartDrawer = lazy(() => import('../components/CartDrawer').then(m => ({ default: m.CartDrawer })));
 
@@ -89,11 +88,6 @@ export const MainLayout: React.FC = () => {
     <div className="min-h-screen flex flex-col bg-neutral-50 dark:bg-neutral-950 text-neutral-900 dark:text-neutral-100 transition-colors">
       <NavigationScrollPolicy />
       <a href="#main-content" className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-[100] focus:rounded-lg focus:bg-white focus:px-4 focus:py-2 focus:font-bold focus:text-neutral-950 focus:shadow-xl">Skip to main content</a>
-      {!CONFIG.ORDERING_ENABLED && (
-        <div role="status" aria-label="Launch announcement" className="bg-red-600 px-3 py-2 text-center text-sm font-bold text-white">
-          🚀 {CONFIG.LAUNCH_MESSAGE}
-        </div>
-      )}
       <Header onOpenCart={openCart} />
 
       <main id="main-content" tabIndex={-1} className="flex-1">
