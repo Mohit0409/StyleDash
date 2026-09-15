@@ -269,7 +269,7 @@ test('product can enter cart only after authoritative inventory succeeds', async
   ).toBeVisible();
 });
 
-test('product UI fails closed when inventory API is unavailable', async ({
+test('product UI stays purchase-safe while inventory availability is unresolved', async ({
   page,
 }) => {
   await page.route(
@@ -284,7 +284,7 @@ test('product UI fails closed when inventory API is unavailable', async ({
   ).toBeVisible();
 
   await expect(
-    page.getByText('Out of Stock for this variant'),
+    page.getByText('Checking live availability…'),
   ).toBeVisible();
 
   await expect(

@@ -84,6 +84,8 @@ export const ProductDetail: React.FC = () => {
   const selectedVariant = product.variants.find(
     v => v.size === selectedSize && v.colourName === selectedColour
   ) || null;
+  const availabilityResolved = product.variants.length === 0
+    || product.variants.every(variant => typeof variant.available === 'boolean');
   const variantImages = product.variants.find(v => v.colourName === selectedColour)?.images || [];
   const selectedColourImages = variantImages.length > 0 ? variantImages : product.images;
   const galleryImages = selectedColourImages.length > 0 ? selectedColourImages : [product.thumbnail];
@@ -177,9 +179,11 @@ export const ProductDetail: React.FC = () => {
             '@type': 'Offer',
             priceCurrency: 'INR',
             price: product.price,
-            availability: product.variants.some(variant => variant.available === true)
-              ? 'https://schema.org/InStock'
-              : 'https://schema.org/OutOfStock',
+            availability: availabilityResolved
+              ? (product.variants.some(variant => variant.available === true)
+                ? 'https://schema.org/InStock'
+                : 'https://schema.org/OutOfStock')
+              : undefined,
           },
           aggregateRating: product.reviewCount > 0 ? {
             '@type': 'AggregateRating',
@@ -311,8 +315,10 @@ export const ProductDetail: React.FC = () => {
                 <span className="text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
                   <CheckCircle className="w-4 h-4" /> In stock in Neemuch
                 </span>
-              ) : (
+              ) : selectedVariant.available === false ? (
                 <span className="text-rose-600 dark:text-rose-400">Out of Stock for this variant</span>
+              ) : (
+                <span className="text-neutral-500">Checking live availability…</span>
               )}
             </div>
           )}
