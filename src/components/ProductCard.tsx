@@ -22,6 +22,8 @@ export const ProductCard: React.FC<{ product: Product; onQuickView?: (p: Product
 
   const availableSizes = Array.from(new Set(product.variants.filter(v => v.available === true).map(v => v.size)));
   const isAvailable = product.variants.some(v => v.available === true);
+  const availabilityResolved = product.variants.length === 0
+    || product.variants.every(v => typeof v.available === 'boolean');
   const availableColours = Array.from(new Set(product.variants.map(v => ({ name: v.colourName, hex: v.colourHex }))));
 
   return (
@@ -126,7 +128,8 @@ export const ProductCard: React.FC<{ product: Product; onQuickView?: (p: Product
             {availableSizes.length > 4 && (
               <span className="text-[10px] text-neutral-400">+{availableSizes.length - 4}</span>
             )}
-            {!isAvailable && <span className="text-[10px] font-bold text-rose-600">Currently unavailable</span>}
+            {availabilityResolved && !isAvailable && <span className="text-[10px] font-bold text-rose-600">Currently unavailable</span>}
+            {!availabilityResolved && <span className="text-[10px] font-semibold text-neutral-500">Checking availability…</span>}
           </div>
         </div>
 

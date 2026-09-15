@@ -99,7 +99,7 @@ describe('authoritative inventory repository', () => {
     expect(second?.variants.find(variant => variant.id === 'sd-prod-001-var-2')?.available).toBe(false);
   });
 
-  it('merges public shop products and applies authoritative variant availability', async () => {
+  it('merges public shop products and retries a transient authoritative availability failure', async () => {
     const now = Date.now();
     vi.spyOn(Date, 'now').mockReturnValue(now + 20_000);
     const publishedProduct = {
@@ -111,9 +111,15 @@ describe('authoritative inventory repository', () => {
       tags: ['local-shop'], badge: 'Local Shop', active: true, returnWindowDays: 0, exchangeAvailable: false,
       vendorId: 'shop-1', storeName: 'Test Shop', storeSlug: 'test-shop',
     };
-    const fetcher = vi.fn<typeof fetch>(async input => String(input) === '/api/shop-products/published'
-      ? productsResponse([publishedProduct])
-      : response([{ productId: 'shopprod_1', variantId: 'shopprod_1-var-1', available: true }]));
+    let inventoryCalls = 0;
+    const fetcher = vi.fn<typeof fetch>(async input => {
+      const url = String(input);
+      if (url === '/api/shop-products/published') return productsResponse([publishedProduct]);
+      if (url.startsWith('/api/reviews/summaries?')) return reviewResponse();
+      inventoryCalls += 1;
+      if (inventoryCalls === 1) throw new TypeError('temporary inventory outage');
+      return response([{ productId: 'shopprod_1', variantId: 'shopprod_1-var-1', available: true }]);
+    });
     vi.stubGlobal('fetch', fetcher);
 
     const product = await productRepository.getProductBySlug('active-local-shop-product');
@@ -123,6 +129,7 @@ describe('authoritative inventory repository', () => {
     expect(product?.thumbnail).toBe('/product-placeholder.svg');
     expect(product?.variants[0].images).toBeUndefined();
     expect(product?.variants[0].available).toBe(true);
+    expect(inventoryCalls).toBe(2);
     expect(fetcher).toHaveBeenCalledWith('/api/shop-products/published', expect.objectContaining({ credentials: 'include' }));
   });
 
@@ -151,12 +158,13 @@ describe('authoritative inventory repository', () => {
 
     expect(products.map(product => product.id)).toEqual(['shopprod_live']);
     expect(products.some(product => product.id.startsWith('sd-prod-'))).toBe(false);
+    expect(products[0].variants[0].available).toBeUndefined();
   });
 
-  it('fails closed when the availability server cannot be reached', async () => {
+  it('keeps display availability unresolved when the availability server cannot be reached', async () => {
     vi.stubGlobal('fetch', vi.fn<typeof fetch>().mockRejectedValue(new TypeError('offline')));
     const product = await productRepository.getProductBySlug('sd-prod-001');
-    expect(product?.variants.every(variant => variant.available === false)).toBe(true);
+    expect(product?.variants.every(variant => variant.available === undefined)).toBe(true);
   });
 
   it('prevents new cart lines for unavailable variants or an unavailable server', async () => {
