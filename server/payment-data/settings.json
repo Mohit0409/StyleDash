@@ -1,6 +1,6 @@
 {
   "currency": "INR",
-  "taxRate": 0.05,
+  "taxRate": 0,
   "freeDeliveryThreshold": 999,
   "deliveryFees": {
     "express": 80,
@@ -49,6 +49,7 @@
     "stateCode": "23",
     "state": "Madhya Pradesh",
     "principalPlace": "H-5, Alkaloid Colony, Industrial Area Jhanjharwada, Neemuch, Madhya Pradesh 458441",
+    "productGstEnabled": false,
     "tcsRate": 0.005
   }
 }

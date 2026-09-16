@@ -1,4 +1,4 @@
-﻿# Vibe4You GST / marketplace compliance
+# Vibe4You GST / marketplace compliance
 
 Registration source: Form GST REG-06 issued 16 September 2026.
 
@@ -8,26 +8,23 @@ Registration source: Form GST REG-06 issued 16 September 2026.
 - Registration: Regular, effective 2026-09-16
 - Principal place: H-5, Alkaloid Colony, Industrial Area Jhanjharwada, Neemuch, Madhya Pradesh 458441
 
-## Product tax data
-Private Admin product create/edit supports `HSN code` and `GST rate %`. These are product-specific compliance fields. Do not guess either value. Confirm the HSN and current rate for the exact product before production use.
+## Current rollout state
+The owner has explicitly instructed that GST must **not be applied to any product yet**.
 
-Checkout remains tax-inclusive. The server snapshots HSN, GST rate, taxable value and included GST on each order line. Existing products without product-specific tax metadata retain the pre-existing 5% fallback until their tax classification is reviewed; this fallback is compatibility behavior, not a legal classification.
+The current GST rollout is therefore limited to displaying the Vibe4You GSTIN in customer billing/checkout information and marketplace receipt identity. Product GST calculation, product GST rates, HSN billing data and GST amounts are disabled for customer billing until separately authorized.
+
+The payment settings use `taxRate: 0`. Checkout does not add GST to the payable amount, and the receipt does not show a product-GST amount.
 
 ## Marketplace receipt
-The customer PDF is explicitly a **Marketplace Receipt**, identifies Vibe4You/Manorama and the GSTIN, and states that goods are supplied by the named stores. It does not misrepresent Vibe4You as the supplier tax invoice issuer for third-party goods.
+The customer PDF is explicitly a **Marketplace Receipt** and identifies Vibe4You/Manorama and GSTIN 23JVZPM8734E1ZT. Goods remain identified by their store/supplier. Product GST is not calculated or charged on the current marketplace receipt.
 
-## TCS reconciliation
-Section 52 TCS is tracked separately from customer GST. Effective 10 July 2024 the total TCS rate is 0.5% (0.25% CGST + 0.25% SGST for intra-state supplies; 0.5% IGST for inter-state supplies). Vibe4You currently serves Neemuch and the report exposes the intra-state split.
+## Deferred work
+HSN/rate classification and product-level GST implementation are intentionally deferred. Do not enable them merely because metadata or historical code exists; owner authorization is required first.
 
-Generate a read-only monthly reconciliation:
+The monthly TCS reconciliation utility is deferred while product GST/HSN billing is disabled; it emits no filing rows and does not alter customer totals or product pricing.
 
-`python scripts/gst_tcs_report.py --state /path/to/orders.json --month 2026-09 --output /safe/private/path/gst-tcs-2026-09.csv`
-
-The report intentionally flags supplier GSTIN as required rather than inventing it. Supplier registration/tax status must be verified before filing GSTR-8. Returns/refunds and seller settlements must be reconciled against actual books before filing.
-
-## Filing / operational actions outside code
+## Operational actions outside code
 - Display the REG-06 certificate prominently at the registered place of business.
-- Complete/verify GST portal bank details and the registration needed for ECO/TCS obligations with the tax professional/portal.
-- File GSTR-8 and deposit applicable TCS by the statutory deadline.
-- Keep seller GST registration/status, HSN/rates, supplier invoices, returns/refunds and settlement records reconciled.
-- Do not deploy this branch until existing published products have been reviewed for HSN/GST rate and regression/security review is complete.
+- Verify GST portal and marketplace/ECO filing obligations with the tax professional/portal.
+- Maintain seller, order, return/refund and settlement records for later reconciliation.
+- Do not infer that displaying the GSTIN means product GST collection has been enabled.

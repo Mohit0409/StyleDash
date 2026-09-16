@@ -175,7 +175,6 @@ test('checkout enables Express and recalculates totals on a simulated Saturday',
   await expect(sameDay).toBeChecked();
   await expect(express).toBeEnabled();
   await expect(summary.getByText('FREE', { exact: true })).toBeVisible();
-  await expect(summary).toContainText('Product prices include GST.');
   await expect(summary.getByText(/GST Taxes/)).toHaveCount(0);
 
   await express.check();

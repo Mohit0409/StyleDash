@@ -35,6 +35,7 @@ export const OrderSuccess: React.FC = () => {
           : order ? <div className="p-6 text-left bg-white dark:bg-neutral-900 rounded-3xl border dark:border-neutral-800 space-y-3">
             {order.items.map(item => <div key={item.variantId} className="flex justify-between text-sm"><span>{item.productName} ({item.size}, {item.colourName}) × {item.quantity}</span><strong>₹{item.lineTotal}</strong></div>)}
             <div className="border-t pt-3 flex justify-between font-black"><span>Order total</span><span>₹{order.grandTotal}</span></div>
+            <div className="border-t pt-3 text-xs text-neutral-500"><strong className="text-neutral-700 dark:text-neutral-300">Billing details:</strong> Vibe4You | GSTIN: 23JVZPM8734E1ZT</div>
           </div> : <p role="alert">This order is unavailable to the current account.</p>}
       <div className="flex justify-center gap-4">
         <Link to={`/orders/${encodeURIComponent(orderId)}/track`} className="px-6 py-3 bg-neutral-950 text-white dark:bg-lime-400 dark:text-neutral-950 rounded-xl font-bold">Track order</Link>

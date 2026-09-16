@@ -203,7 +203,7 @@ def _draw_marketplace_tax_identity(doc: PdfDocument, page: list[str], y: float) 
     y -= 13
     doc.text(page, MARGIN, y, "H-5, Alkaloid Colony, Industrial Area Jhanjharwada, Neemuch, Madhya Pradesh 458441", size=7.8)
     y -= 13
-    doc.text(page, MARGIN, y, "Goods are supplied by the store(s) named below. This marketplace receipt is not a substitute for a supplier tax invoice.", size=7.2)
+    doc.text(page, MARGIN, y, "Goods are supplied by the store(s) named below. Product GST is not calculated or charged on this marketplace receipt.", size=7.2)
     return y - 18
 
 
@@ -297,7 +297,6 @@ def _draw_totals_and_payment(doc: PdfDocument, page: list[str], order: dict[str,
         ("Subtotal", money(order.get("subtotal", 0))),
         ("Discount", f"- {money(order.get('discount', 0))}" if Decimal(str(order.get("discount") or 0)) > 0 else money(0)),
         ("Delivery", money(order.get("deliveryFee", 0))),
-        ("GST included", money(order.get("taxes", 0))),
     ]
     doc.text(page, right_x, y, "ORDER TOTAL", size=8, bold=True, color=(0.38, 0.38, 0.38))
     y -= 18

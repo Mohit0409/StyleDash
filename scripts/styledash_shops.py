@@ -1421,21 +1421,8 @@ class ShopWorkflow:
             clean_attributes.pop("subcategory", None)
         delivery_value = payload.get("deliveryType", clean_attributes.get("deliveryType", "normal"))
         clean_attributes["deliveryType"] = normalize_delivery_type(delivery_value)
-        hsn_value = payload.get("hsnCode", clean_attributes.get("hsnCode"))
-        if hsn_value not in (None, ""):
-            hsn = str(hsn_value).strip()
-            if not hsn.isdigit() or not 4 <= len(hsn) <= 8:
-                raise SecurityError(400, "HSN code must contain 4 to 8 digits.", "invalid_product_tax")
-            clean_attributes["hsnCode"] = hsn
-        gst_rate_value = payload.get("gstRate", clean_attributes.get("gstRate"))
-        if gst_rate_value not in (None, ""):
-            try:
-                gst_rate = float(gst_rate_value)
-            except (TypeError, ValueError):
-                raise SecurityError(400, "Enter a valid GST rate.", "invalid_product_tax")
-            if gst_rate not in {0.0, 0.25, 1.5, 3.0, 5.0, 6.0, 12.0, 18.0, 28.0, 40.0}:
-                raise SecurityError(400, "Choose a supported GST rate.", "invalid_product_tax")
-            clean_attributes["gstRate"] = str(gst_rate).rstrip("0").rstrip(".")
+        # Product GST/HSN collection is intentionally deferred until explicitly enabled.
+        # Preserve any existing metadata internally, but it is not used for billing or payment calculation.
 
         try_at_home = (
             payload["tryAtHomeEnabled"] if "tryAtHomeEnabled" in payload

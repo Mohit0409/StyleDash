@@ -121,7 +121,7 @@ class PaymentServiceTests(unittest.TestCase):
             )
             self.assertEqual(weekday_normal["deliveryMethod"], "standard")
             self.assertEqual(weekday_normal["deliveryFee"], 0)
-            self.assertEqual(weekday_normal["taxes"], 45)
+            self.assertEqual(weekday_normal["taxes"], 0)
             self.assertEqual(weekday_normal["grandTotal"], 946)
             with self.assertRaises(SERVER.ApiError) as caught:
                 self.service.calculate_order(
@@ -130,6 +130,20 @@ class PaymentServiceTests(unittest.TestCase):
             self.assertEqual(caught.exception.code, "express_delivery_unavailable")
         finally:
             self.service._static_products[product_id] = original
+
+    def test_product_gst_is_disabled_even_if_catalog_has_tax_metadata(self):
+        product = self.service._static_products["sd-prod-001"]
+        original = dict(product)
+        self.service._static_products["sd-prod-001"] = {**product, "hsnCode": "6109", "gstRate": "18"}
+        try:
+            monday = SERVER.datetime(2026, 9, 7, 6, 30, tzinfo=SERVER.timezone.utc)
+            quote = self.service.calculate_order(self.payload(), now=monday)
+            self.assertEqual(quote["taxes"], 0)
+            self.assertNotIn("hsnCode", quote["items"][0])
+            self.assertNotIn("gstRate", quote["items"][0])
+            self.assertNotIn("gstAmount", quote["items"][0])
+        finally:
+            self.service._static_products["sd-prod-001"] = original
 
     def test_express_fee_remains_flat_above_legacy_free_delivery_threshold(self):
         saturday = SERVER.datetime(2026, 9, 5, 6, 30, tzinfo=SERVER.timezone.utc)
@@ -140,7 +154,7 @@ class PaymentServiceTests(unittest.TestCase):
         quote = self.service.calculate_order(payload, now=saturday)
         self.assertEqual(quote["subtotal"], 1419)
         self.assertEqual(quote["deliveryFee"], 80)
-        self.assertEqual(quote["taxes"], 68)
+        self.assertEqual(quote["taxes"], 0)
         self.assertEqual(quote["grandTotal"], 1499)
 
     def payload(self, **overrides):
@@ -1259,7 +1273,7 @@ class PaymentServiceTests(unittest.TestCase):
             "subtotal": 946,
             "discount": 0,
             "deliveryFee": 80,
-            "taxes": 45,
+            "taxes": 0,
             "grandTotal": 1026,
         })
         self.assertEqual(response["amount"], 102600)

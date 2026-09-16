@@ -10,6 +10,10 @@ def money(v): return v.quantize(Decimal('0.01'),rounding=ROUND_HALF_UP)
 def collected_at(o): return o.get('paymentCollectedAt') or o.get('paymentVerifiedAt') or (o.get('updatedAt') if o.get('paymentStatus')=='paid' else None)
 def month_of(v): return str(v or '')[:7]
 def rows(state,month):
+    # Deferred while product GST/HSN billing is disabled. Do not calculate filing values from zero-GST order snapshots.
+    return []
+
+def _rows_when_product_gst_enabled(state,month):
     agg=defaultdict(lambda:{'storeName':'','taxable':Decimal(0),'gst':Decimal(0),'gross':Decimal(0),'missingHsn':0,'orders':set()})
     for o in state.get('orders',{}).values():
         if o.get('isPaymentTestOrder') or month_of(collected_at(o))!=month or o.get('status') in {'cancelled','returned'}: continue

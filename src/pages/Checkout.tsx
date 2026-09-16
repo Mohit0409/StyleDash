@@ -270,7 +270,11 @@ export const Checkout: React.FC = () => {
             <div className="flex justify-between pt-2 border-t border-neutral-200 dark:border-neutral-800 text-sm font-black text-neutral-900 dark:text-white">
               <span>Estimated Total</span><span className="text-lime-600 dark:text-lime-400">₹{grandTotal}</span>
             </div>
-            <p className="text-[10px] leading-relaxed text-neutral-500">Product prices include GST. Inventory, coupon eligibility and the final payable amount are recalculated securely by the server.</p>
+            <div className="rounded-xl border border-neutral-200 dark:border-neutral-800 p-3 text-[10px] leading-relaxed text-neutral-500">
+              <p className="font-bold text-neutral-700 dark:text-neutral-300">Billing details</p>
+              <p>Vibe4You | GSTIN: 23JVZPM8734E1ZT</p>
+            </div>
+            <p className="text-[10px] leading-relaxed text-neutral-500">Inventory, coupon eligibility and the final payable amount are recalculated securely by the server.</p>
           </div>
           {checkoutError && <p role="alert" className="text-xs font-semibold text-red-600 dark:text-red-400">{checkoutError}</p>}
           <button type="submit" disabled={placing} className="w-full py-4 bg-neutral-950 dark:bg-lime-400 text-white dark:text-neutral-950 font-black text-sm rounded-xl shadow-xl hover:bg-neutral-800 dark:hover:bg-lime-300 transition-all flex items-center justify-center gap-2 disabled:cursor-not-allowed disabled:opacity-60">
