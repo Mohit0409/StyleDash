@@ -885,6 +885,8 @@ class AdminStoreTests(unittest.TestCase):
         self.assertIn("Inventory filters", admin_ui)
         self.assertIn("width:32px;height:32px;flex:0 0 32px", admin_ui)
         self.assertIn("object-fit:contain;object-position:center", admin_ui)
+        self.assertIn("item.productName || item.name || 'Product'", admin_ui)
+        self.assertIn("${inventoryThumbnail(item)}<div><h3>${escapeText(item.name)}</h3>", admin_ui)
         self.assertNotIn("width:44px;height:44px;flex:0 0 44px", admin_ui)
         self.assertIn("Customer filters", admin_ui)
         self.assertIn("Payment alert filters", admin_ui)
@@ -927,6 +929,8 @@ class AdminStoreTests(unittest.TestCase):
         admin_index = (ROOT / "server/admin/index.html").read_text(encoding="utf-8")
         map_ui = (ROOT / "server/admin/delivery-zone-map.js").read_text(encoding="utf-8")
         admin_css = (ROOT / "server/admin/admin.css").read_text(encoding="utf-8")
+        self.assertIn('/admin.js?v=thumbnail-20260916-2', admin_index)
+        self.assertIn('/admin.css?v=thumbnail-20260916-2', admin_index)
         self.assertIn('id="admin-dialog"', admin_index)
         self.assertIn('role="status"', admin_index)
         self.assertNotIn("th:nth-child(n+4)", admin_css)
@@ -996,6 +1000,18 @@ class AdminHttpTests(unittest.TestCase):
             method="POST",
         )
         self.assertEqual((status, body["code"]), (403, "admin_request_rejected"))
+
+    def test_versioned_admin_assets_force_fresh_thumbnail_ui(self):
+        status, index, headers = self.request("/")
+        self.assertEqual(status, 200)
+        self.assertEqual(headers.get("Cache-Control"), "no-store")
+        self.assertIn("/admin.js?v=thumbnail-20260916-2", index)
+        status, script, headers = self.request("/admin.js?v=thumbnail-20260916-2")
+        self.assertEqual(status, 200)
+        self.assertEqual(headers.get("Cache-Control"), "no-store")
+        self.assertIn("width:32px;height:32px;flex:0 0 32px", script)
+        self.assertIn("item.productName || item.name || 'Product'", script)
+        self.assertIn("${inventoryThumbnail(item)}<div><h3>${escapeText(item.name)}</h3>", script)
 
     def test_loopback_host_password_totp_and_separate_cookie(self):
         status, html, _headers = self.request("/", headers={"Origin": ""})
@@ -1283,6 +1299,15 @@ class AdminHttpTests(unittest.TestCase):
         self.assertRegex(body["image"]["url"], r"^/media/product-images/[0-9a-f]{32}\.png$")
         stored = self.database.parent / "product-images" / Path(body["image"]["url"]).name
         self.assertEqual(stored.read_bytes(), png)
+        image_request = urllib.request.Request(
+            self.base + body["image"]["url"],
+            headers={"Host": "127.0.0.1:8081", "Origin": "http://127.0.0.1:8081"},
+        )
+        with self.client.open(image_request) as response:
+            self.assertEqual(response.status, 200)
+            self.assertEqual(response.headers.get_content_type(), "image/png")
+            self.assertIn("no-store", ", ".join(response.headers.get_all("Cache-Control") or []))
+            self.assertEqual(response.read(), png)
 
     def test_admin_product_image_upload_security_and_supported_formats(self):
         import base64
