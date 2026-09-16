@@ -145,8 +145,8 @@ def _draw_brand_header(doc: PdfDocument, page: list[str], order: dict[str, Any])
     doc.rect(page, 0, PAGE_HEIGHT - 96, PAGE_WIDTH, 4, fill=(0.52, 0.80, 0.09))
     doc.text(page, MARGIN, PAGE_HEIGHT - 48, "Vibe4You", size=23, bold=True, color=(1, 1, 1))
     doc.text(page, MARGIN, PAGE_HEIGHT - 66, "Your City. Your Shops. Your Style.", size=8.5, color=(0.80, 0.80, 0.80))
-    doc.text(page, 390, PAGE_HEIGHT - 45, "RECEIPT / INVOICE", size=12, bold=True, color=(1, 1, 1))
-    doc.text(page, 390, PAGE_HEIGHT - 63, f"Receipt Ref: V4Y-RCP-{order.get('id', '-')}", size=7.5, color=(0.80, 0.80, 0.80))
+    doc.text(page, 365, PAGE_HEIGHT - 45, "MARKETPLACE RECEIPT", size=10.5, bold=True, color=(1, 1, 1))
+    doc.text(page, 365, PAGE_HEIGHT - 63, f"Receipt Ref: V4Y-RCP-{order.get('id', '-')}", size=7.5, color=(0.80, 0.80, 0.80))
     return PAGE_HEIGHT - 122
 
 
@@ -194,6 +194,17 @@ def _draw_party_blocks(doc: PdfDocument, page: list[str], order: dict[str, Any],
     for line in delivery_lines:
         delivery_y = _draw_wrapped(doc, page, right_x, delivery_y, line, box_width - 24, size=8.6, line_height=11)
     return y - box_height - 24
+
+
+def _draw_marketplace_tax_identity(doc: PdfDocument, page: list[str], y: float) -> float:
+    doc.text(page, MARGIN, y, "MARKETPLACE OPERATOR", size=7.5, bold=True, color=(0.38, 0.38, 0.38))
+    y -= 15
+    doc.text(page, MARGIN, y, "Vibe4You | Legal name: Manorama | GSTIN: 23JVZPM8734E1ZT", size=8.2, bold=True)
+    y -= 13
+    doc.text(page, MARGIN, y, "H-5, Alkaloid Colony, Industrial Area Jhanjharwada, Neemuch, Madhya Pradesh 458441", size=7.8)
+    y -= 13
+    doc.text(page, MARGIN, y, "Goods are supplied by the store(s) named below. This marketplace receipt is not a substitute for a supplier tax invoice.", size=7.2)
+    return y - 18
 
 
 ITEM_COLUMNS = [
@@ -327,6 +338,7 @@ def build_receipt_pdf(order: dict[str, Any]) -> bytes:
     y = _draw_brand_header(doc, page, order)
     y = _draw_order_meta(doc, page, order, y)
     y = _draw_party_blocks(doc, page, order, y)
+    y = _draw_marketplace_tax_identity(doc, page, y)
     doc.text(page, MARGIN, y, "ITEMIZED PURCHASE", size=9, bold=True, color=(0.35, 0.35, 0.35))
     y -= 16
     y = _draw_item_header(doc, page, y)
