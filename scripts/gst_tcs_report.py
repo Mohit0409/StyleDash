@@ -1,4 +1,4 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 import argparse,csv,json
 from collections import defaultdict
 from datetime import datetime
@@ -33,4 +33,3 @@ def main():
         w=csv.DictWriter(f,fieldnames=fields); w.writeheader(); w.writerows(data)
     print(f'gst_tcs_report={args.output} suppliers={len(data)}')
 if __name__=='__main__': main()
-
