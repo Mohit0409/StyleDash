@@ -142,6 +142,8 @@ class PaymentServiceTests(unittest.TestCase):
             self.assertNotIn("hsnCode", quote["items"][0])
             self.assertNotIn("gstRate", quote["items"][0])
             self.assertNotIn("gstAmount", quote["items"][0])
+            self.assertEqual(quote["grandTotal"], quote["subtotal"] - quote["discount"] + quote["deliveryFee"] + quote["tryAtHomeFee"])
+            self.assertEqual(quote["amount"], round(quote["grandTotal"] * 100))
         finally:
             self.service._static_products["sd-prod-001"] = original
 
