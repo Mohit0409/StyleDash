@@ -1334,7 +1334,7 @@ class PaymentService:
         if not self.ordering_enabled:
             raise ApiError(
                 HTTPStatus.SERVICE_UNAVAILABLE,
-                'Ordering is temporarily disabled while Vibe4You prepares for launch.',
+                'Ordering is currently unavailable. Please try again shortly.',
                 'ordering_temporarily_disabled',
             )
 

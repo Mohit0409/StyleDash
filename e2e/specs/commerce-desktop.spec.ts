@@ -150,6 +150,8 @@ async function prepareCheckout(page: Page, label: string) {
   await expect(
     page.getByRole('heading', { name: 'Secure Checkout' }),
   ).toBeVisible();
+  await expect(page.getByText('Ordering and payments are temporarily unavailable.', { exact: false })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Place COD Order' })).toBeEnabled();
 
   await page.getByLabel('Full Name').fill(`E2E ${label} Customer`);
   await page.getByLabel('Phone Number').fill('9876543210');

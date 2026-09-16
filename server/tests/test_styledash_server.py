@@ -166,18 +166,18 @@ class PaymentServiceTests(unittest.TestCase):
             callback()
         self.assertEqual(caught.exception.code, code)
 
-    def test_prelaunch_order_lock_blocks_cod_and_razorpay_without_mutation(self) -> None:
+    def test_ordering_lock_blocks_cod_and_razorpay_without_mutation(self) -> None:
         self.service.ordering_enabled = False
         state_before = json.loads(json.dumps(self.service.store.state))
 
-        self.assert_api_error(
-            "ordering_temporarily_disabled",
-            lambda: self.service.place_cod_order(self.payload(paymentMethod="cod"), "prelaunch-cod"),
-        )
-        self.assert_api_error(
-            "ordering_temporarily_disabled",
-            lambda: self.service.create_razorpay_order(self.payload(), "prelaunch-online"),
-        )
+        for callback in (
+            lambda: self.service.place_cod_order(self.payload(paymentMethod="cod"), "disabled-cod"),
+            lambda: self.service.create_razorpay_order(self.payload(), "disabled-online"),
+        ):
+            with self.assertRaises(SERVER.ApiError) as caught:
+                callback()
+            self.assertEqual(caught.exception.code, "ordering_temporarily_disabled")
+            self.assertEqual(caught.exception.message, "Ordering is currently unavailable. Please try again shortly.")
 
         self.assertEqual(self.service.store.state, state_before)
         self.assertEqual(self.gateway.calls, [])
