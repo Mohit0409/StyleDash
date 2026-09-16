@@ -115,8 +115,8 @@ test('approved shop owner can draft and submit but cannot publish a product', as
 
   const draftCard = page.getByRole('article').filter({ has: page.getByRole('heading', { name: 'Local Product' }) });
   const draftThumbnail = draftCard.getByRole('img', { name: 'Local Product' });
-  await expect(draftThumbnail).toHaveCSS('width', '32px');
-  await expect(draftThumbnail).toHaveCSS('height', '32px');
+  await expect(draftThumbnail).toHaveCSS('width', '48px');
+  await expect(draftThumbnail).toHaveCSS('height', '48px');
   await expect(draftThumbnail).toHaveCSS('object-fit', 'contain');
   await draftCard.getByRole('button', { name: 'Edit', exact: true }).click();
   await expect(page.getByRole('radio', { name: 'Image upload' })).toHaveAttribute('aria-checked', 'true');
@@ -224,10 +224,10 @@ test('published seller can update stock and submit edit or unpublish requests wi
   const editCard = page.getByRole('article').filter({ has: page.getByRole('heading', { name: 'Editable Live Product' }) });
   await expect(editCard.getByRole('img', { name: 'Editable Live Product' })).toHaveAttribute('src', '/media/product-images/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.webp');
   const compactThumbnail = editCard.getByRole('img', { name: 'Editable Live Product' });
-  await expect(compactThumbnail).toHaveCSS('width', '32px');
-  await expect(compactThumbnail).toHaveCSS('height', '32px');
-  await expect(compactThumbnail).toHaveAttribute('width', '32');
-  await expect(compactThumbnail).toHaveAttribute('height', '32');
+  await expect(compactThumbnail).toHaveCSS('width', '48px');
+  await expect(compactThumbnail).toHaveCSS('height', '48px');
+  await expect(compactThumbnail).toHaveAttribute('width', '48');
+  await expect(compactThumbnail).toHaveAttribute('height', '48');
   await expect(compactThumbnail).toHaveCSS('object-fit', 'contain');
   await editCard.getByRole('button', { name: 'M Stock' }).click();
   await editCard.getByLabel('Stock for size M').fill('0');

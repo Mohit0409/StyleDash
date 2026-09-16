@@ -34,7 +34,7 @@ const inventoryThumbnail = item => {
   const name = escapeText(item.productName || item.name || 'Product');
   const encodedSources = escapeText(encodeURIComponent(JSON.stringify(candidates)));
   return source
-    ? `<img class="inventory-thumbnail" data-sources="${encodedSources}" data-index="0" src="${escapeText(source)}" alt="${name}" width="32" height="32" loading="lazy" referrerpolicy="no-referrer">`
+    ? `<img class="inventory-thumbnail" data-sources="${encodedSources}" data-index="0" src="${escapeText(source)}" alt="${name}" width="48" height="48" loading="lazy" referrerpolicy="no-referrer">`
     : '<span class="inventory-thumbnail-fallback" role="img" aria-label="Product image unavailable">No image</span>';
 };
 
@@ -69,7 +69,7 @@ byId('totp-form').addEventListener('submit', async event => {
 byId('logout').addEventListener('click', async () => { try { await api('/api/admin/logout',{method:'POST',body:'{}'}); } finally { location.reload(); } });
 byId('tabs').addEventListener('click', event => { const button=event.target.closest('[data-tab]'); if(!button)return; activeTab=button.dataset.tab; document.querySelectorAll('[data-tab]').forEach(item=>item.classList.toggle('active',item===button)); loadTab(activeTab); });
 byId('search-form').addEventListener('submit', event => { event.preventDefault(); loadTab(activeTab); });
-byId('content').addEventListener('error', event => { const image=event.target.closest?.('.inventory-thumbnail'); if(!image)return; let sources=[]; try{sources=JSON.parse(decodeURIComponent(image.dataset.sources||''));}catch{} const next=Number(image.dataset.index||0)+1; if(next<sources.length){image.dataset.index=String(next);image.src=sources[next];return;} const fallback=document.createElement('span'); fallback.className='inventory-thumbnail-fallback'; fallback.setAttribute('role','img'); fallback.setAttribute('aria-label','Product image unavailable'); fallback.style.cssText='display:grid;place-items:center;width:32px;height:32px;flex:0 0 32px;border:1px solid #dedfd9;border-radius:7px;background:#f5f6f2;padding:2px;color:#687064;font-size:7px;font-weight:700;line-height:1;text-align:center'; fallback.textContent='No image'; image.replaceWith(fallback); }, true);
+byId('content').addEventListener('error', event => { const image=event.target.closest?.('.inventory-thumbnail'); if(!image)return; let sources=[]; try{sources=JSON.parse(decodeURIComponent(image.dataset.sources||''));}catch{} const next=Number(image.dataset.index||0)+1; if(next<sources.length){image.dataset.index=String(next);image.src=sources[next];return;} const fallback=document.createElement('span'); fallback.className='inventory-thumbnail-fallback'; fallback.setAttribute('role','img'); fallback.setAttribute('aria-label','Product image unavailable'); fallback.textContent='No image'; image.replaceWith(fallback); }, true);
 byId('content').addEventListener('change', event => {
   const orderControl=event.target.closest('[data-order-filter]');
   if(orderControl){orderFilters[orderControl.dataset.orderFilter]=orderControl.value;renderOrdersView();return;}
