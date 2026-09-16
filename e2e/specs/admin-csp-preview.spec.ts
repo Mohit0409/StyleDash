@@ -65,7 +65,7 @@ test.afterAll(() => {
   if (runtimeDirectory) rmSync(runtimeDirectory, { recursive: true, force: true });
 });
 
-test('compact inventory thumbnail stays 32x32 under the real private-admin CSP', async ({ page }, testInfo) => {
+test('compact inventory thumbnail stays 48x48 under the real private-admin CSP', async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== 'desktop-chromium', 'One Chromium CSP probe is sufficient.');
   const cspErrors: string[] = [];
   page.on('console', message => {
@@ -80,18 +80,20 @@ test('compact inventory thumbnail stays 32x32 under the real private-admin CSP',
   await page.evaluate(() => {
     const row = document.createElement('div');
     row.className = 'inventory-product-cell';
-    row.innerHTML = '<img class="inventory-thumbnail" width="32" height="32" alt="Test product" src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII="><span>Test product</span>';
+    row.innerHTML = '<img class="inventory-thumbnail" width="48" height="48" alt="Test product" src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII="><span>Test product</span>';
     document.body.appendChild(row);
   });
   const image = page.getByRole('img', { name: 'Test product' });
   await expect(image).toBeVisible();
-  await expect(image).toHaveCSS('width', '32px');
-  await expect(image).toHaveCSS('height', '32px');
+  await expect(image).toHaveCSS('width', '48px');
+  await expect(image).toHaveCSS('height', '48px');
   await expect(image).toHaveCSS('object-fit', 'contain');
   const box = await image.boundingBox();
-  expect(box?.width).toBe(32);
-  expect(box?.height).toBe(32);
+  expect(box?.width).toBe(48);
+  expect(box?.height).toBe(48);
   await expect(page.locator('.inventory-product-cell')).toHaveCSS('display', 'flex');
+  const rowBox = await page.locator('.inventory-product-cell').boundingBox();
+  expect(rowBox?.height).toBeLessThanOrEqual(56);
   expect(cspErrors).toEqual([]);
 });
 

@@ -28,6 +28,6 @@
 /* CSP-safe compact product thumbnails. Keep inventory rows small regardless of source image dimensions. */
 .inventory-product-cell,.inventory-product-heading{display:flex;align-items:center;gap:8px}
 .inventory-product-cell{min-width:190px}
-.inventory-thumbnail,.inventory-thumbnail-fallback{box-sizing:border-box;width:32px!important;height:32px!important;min-width:32px!important;max-width:32px!important;min-height:32px!important;max-height:32px!important;flex:0 0 32px!important;border:1px solid #dedfd9;border-radius:7px;background:#f5f6f2}
+.inventory-thumbnail,.inventory-thumbnail-fallback{box-sizing:border-box;width:48px!important;height:48px!important;min-width:48px!important;max-width:48px!important;min-height:48px!important;max-height:48px!important;flex:0 0 48px!important;border:1px solid #dedfd9;border-radius:7px;background:#f5f6f2}
 img.inventory-thumbnail{display:block;object-fit:contain!important;object-position:center;padding:2px}
-.inventory-thumbnail-fallback{display:grid;place-items:center;padding:2px;color:#687064;font-size:7px;font-weight:700;line-height:1;text-align:center;overflow:hidden}
+.inventory-thumbnail-fallback{display:grid;place-items:center;padding:2px;color:#687064;font-size:9px;font-weight:700;line-height:1;text-align:center;overflow:hidden}

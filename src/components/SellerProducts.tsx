@@ -29,9 +29,9 @@ const ProductThumbnail: React.FC<{ imageUrls: string[]; name: string }> = ({ ima
   const [imageIndex, setImageIndex] = useState(0);
   const source = candidates[imageIndex];
   if (!source) {
-    return <div role="img" aria-label={`${name} image unavailable`} className="flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-md border bg-neutral-50 p-0.5 text-center text-[7px] font-bold leading-none text-neutral-500 dark:border-neutral-700 dark:bg-neutral-800">No image</div>;
+    return <div role="img" aria-label={`${name} image unavailable`} className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-md border bg-neutral-50 p-0.5 text-center text-[7px] font-bold leading-none text-neutral-500 dark:border-neutral-700 dark:bg-neutral-800">No image</div>;
   }
-  return <img src={source} alt={name} width={32} height={32} onError={() => setImageIndex(index => index + 1)} className="h-8 w-8 shrink-0 rounded-md border bg-neutral-50 object-contain object-center p-0.5 dark:border-neutral-700 dark:bg-neutral-800" loading="lazy" referrerPolicy="no-referrer" />;
+  return <img src={source} alt={name} width={48} height={48} onError={() => setImageIndex(index => index + 1)} className="h-12 w-12 shrink-0 rounded-md border bg-neutral-50 object-contain object-center p-0.5 dark:border-neutral-700 dark:bg-neutral-800" loading="lazy" referrerPolicy="no-referrer" />;
 };
 
 interface ProductFormState {
