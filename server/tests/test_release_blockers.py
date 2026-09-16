@@ -497,7 +497,8 @@ class DeploymentAndTaxTests(unittest.TestCase):
 
     def test_tax_inclusive_pricing_and_delivery_fee_policy(self):
         settings = json.loads((ROOT / "server/payment-data/settings.json").read_text(encoding="utf-8"))
-        self.assertEqual(settings["taxRate"], 0.05)
+        self.assertEqual(settings["taxRate"], 0)
+        self.assertFalse(settings["gst"]["productGstEnabled"])
         self.assertEqual(settings["deliveryFees"], {"express": 80, "standard": 0})
         product = (ROOT / "src/pages/ProductDetail.tsx").read_text(encoding="utf-8")
         checkout = (ROOT / "src/pages/Checkout.tsx").read_text(encoding="utf-8")

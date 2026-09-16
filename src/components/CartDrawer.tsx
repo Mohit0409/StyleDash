@@ -182,7 +182,7 @@ export const CartDrawer: React.FC<{ isOpen: boolean; onClose: () => void }> = ({
                   {deliveryFee === 0 ? <strong className="text-emerald-600">FREE</strong> : `₹${deliveryFee}`}
                 </span>
               </div>
-              <p className="text-[10px] text-neutral-500">Product prices include GST.</p>
+
               <div className="flex justify-between pt-2 border-t border-neutral-200 dark:border-neutral-800 text-sm font-black text-neutral-900 dark:text-white">
                 <span>Grand Total</span>
                 <span className="text-lime-600 dark:text-lime-400">₹{grandTotal}</span>

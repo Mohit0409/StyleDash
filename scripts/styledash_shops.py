@@ -109,6 +109,8 @@ PRODUCT_PAYLOAD_FIELDS = {
     "colourVariants",
     "tryAtHomeEnabled",
     "exchangeAvailable",
+    "hsnCode",
+    "gstRate",
 }
 PRODUCT_CHANGE_PAYLOAD_FIELDS = PRODUCT_PAYLOAD_FIELDS - {"inventory", "size"}
 DEPARTMENTS = CANONICAL_DEPARTMENTS
@@ -1413,6 +1415,19 @@ class ShopWorkflow:
                 value, "attribute value", 1, 200
             )
 
+        # Product GST/HSN collection is intentionally deferred until explicitly enabled.
+        if "hsnCode" in payload or "gstRate" in payload:
+            raise SecurityError(400, "Product GST/HSN entry is not enabled yet.", "product_tax_disabled")
+        current_attributes: dict[str, Any] = {}
+        if current is not None:
+            try:
+                current_attributes = json.loads(current["attributes_json"] or "{}")
+            except (TypeError, json.JSONDecodeError):
+                current_attributes = {}
+        for tax_key in ("hsnCode", "gstRate"):
+            if tax_key in clean_attributes and clean_attributes.get(tax_key) != current_attributes.get(tax_key):
+                raise SecurityError(400, "Product GST/HSN entry is not enabled yet.", "product_tax_disabled")
+
         subcategory_value = payload.get("subcategory", clean_attributes.get("subcategory"))
         subcategory = normalize_subcategory(subcategory_value, name=name, category=category)
         if subcategory:
@@ -1421,7 +1436,6 @@ class ShopWorkflow:
             clean_attributes.pop("subcategory", None)
         delivery_value = payload.get("deliveryType", clean_attributes.get("deliveryType", "normal"))
         clean_attributes["deliveryType"] = normalize_delivery_type(delivery_value)
-
         try_at_home = (
             payload["tryAtHomeEnabled"] if "tryAtHomeEnabled" in payload
             else (bool(current["try_at_home_enabled"]) if current is not None and "try_at_home_enabled" in current.keys() else False)
@@ -1487,6 +1501,8 @@ class ShopWorkflow:
     @staticmethod
     def _serialize_product(row: sqlite3.Row, *, admin: bool = False) -> dict[str, Any]:
         attributes = json.loads(row["attributes_json"])
+        attributes.pop("hsnCode", None)
+        attributes.pop("gstRate", None)
         source_variants = _row_variants(row)
         variants = [
             {
@@ -1543,6 +1559,8 @@ class ShopWorkflow:
     @staticmethod
     def _product_values_to_change_payload(values: dict[str, Any]) -> dict[str, Any]:
         attributes = json.loads(values["attributes_json"])
+        attributes.pop("hsnCode", None)
+        attributes.pop("gstRate", None)
         return {
             "name": values["name"],
             "description": values["description"],
@@ -2688,6 +2706,8 @@ class ShopWorkflow:
     def _public_product(row: sqlite3.Row) -> dict[str, Any]:
         images = json.loads(row["image_urls_json"])
         attributes = json.loads(row["attributes_json"])
+        attributes.pop("hsnCode", None)
+        attributes.pop("gstRate", None)
         price = _customer_price_paise(row["price_paise"]) / 100
         original_price = _customer_price_paise(row["original_price_paise"]) / 100
         discount = (
@@ -2777,6 +2797,8 @@ class ShopWorkflow:
             price = _customer_price_paise(row["price_paise"]) / 100
             images = json.loads(row["image_urls_json"]) if row["image_urls_json"] else []
             attributes = json.loads(row["attributes_json"]) if row["attributes_json"] else {}
+            attributes.pop("hsnCode", None)
+            attributes.pop("gstRate", None)
             delivery_type = attributes.get("deliveryType", "normal")
             if delivery_type not in {"normal", "express", "both"}:
                 delivery_type = "normal"

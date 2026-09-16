@@ -1,6 +1,6 @@
 {
   "currency": "INR",
-  "taxRate": 0.05,
+  "taxRate": 0,
   "freeDeliveryThreshold": 999,
   "deliveryFees": {
     "express": 80,
@@ -39,5 +39,17 @@
       "active": true,
       "expiryDate": "2026-12-31"
     }
-  ]
+  ],
+  "gst": {
+    "operatorGstin": "23JVZPM8734E1ZT",
+    "legalName": "Manorama",
+    "tradeName": "Vibe4You",
+    "registrationType": "Regular",
+    "effectiveFrom": "2026-09-16",
+    "stateCode": "23",
+    "state": "Madhya Pradesh",
+    "principalPlace": "H-5, Alkaloid Colony, Industrial Area Jhanjharwada, Neemuch, Madhya Pradesh 458441",
+    "productGstEnabled": false,
+    "tcsRate": 0.005
+  }
 }

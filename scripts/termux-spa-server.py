@@ -1195,6 +1195,11 @@ class PaymentService:
                         "termsAccepted": True,
                         "status": "reserved",
                     }
+                if isinstance(self.settings.get("gst"), dict) and self.settings["gst"].get("productGstEnabled") is True:
+                    if product.get("hsnCode"):
+                        trusted_item["hsnCode"] = str(product["hsnCode"])
+                    if product.get("gstRate") not in (None, ""):
+                        trusted_item["gstRate"] = str(product["gstRate"])
                 for key, value in (
                     ("storeId", product.get("vendorId")),
                     ("storeName", product.get("storeName")),
@@ -1234,12 +1239,24 @@ class PaymentService:
 
         delivery_fee = _money(delivery_fees[delivery_method], "delivery fee")
         taxable_merchandise_total = max(Decimal("0"), subtotal - coupon_discount)
-        tax_rate = _money(self.settings["taxRate"], "tax")
-        taxes = Decimal("0") if tax_rate == 0 else Decimal(
-            _rounded_rupees(
-                taxable_merchandise_total * tax_rate / (Decimal("1") + tax_rate)
-            )
-        )
+        gst_settings = self.settings.get("gst") if isinstance(self.settings.get("gst"), dict) else {}
+        product_gst_enabled = gst_settings.get("productGstEnabled") is True
+        default_tax_rate = _money(self.settings["taxRate"], "tax") if product_gst_enabled else Decimal("0")
+        taxes = Decimal("0")
+        discount_ratio = (coupon_discount / subtotal) if subtotal > 0 else Decimal("0")
+        for item in trusted_items:
+            configured_rate = item.get("gstRate")
+            item_rate = default_tax_rate if configured_rate in (None, "") else (_money(configured_rate, "GST rate") / Decimal("100"))
+            if not product_gst_enabled:
+                item_rate = Decimal("0")
+            discounted_line_total = Decimal(str(item["lineTotal"])) * (Decimal("1") - discount_ratio)
+            item_tax = Decimal("0") if item_rate == 0 else discounted_line_total * item_rate / (Decimal("1") + item_rate)
+            if product_gst_enabled:
+                item["taxableValue"] = _rounded_rupees(discounted_line_total - item_tax)
+                item["gstAmount"] = _rounded_rupees(item_tax)
+                item["gstRate"] = _rounded_rupees(item_rate * Decimal("100"))
+            taxes += item_tax
+        taxes = Decimal(str(_rounded_rupees(taxes)))
         grand_total = taxable_merchandise_total + delivery_fee + try_at_home_fee
         amount_paise = _rounded_rupees(grand_total * Decimal("100"))
         if amount_paise < 100:

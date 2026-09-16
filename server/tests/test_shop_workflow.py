@@ -926,6 +926,42 @@ class ShopWorkflowTests(unittest.TestCase):
 
 
 
+    def test_product_tax_fields_are_rejected_while_gst_rollout_is_disabled(self) -> None:
+        payload = self.complete_product("GST Deferred Product")
+        payload["hsnCode"] = "6109"
+        payload["gstRate"] = "5"
+        self.assert_error("product_tax_disabled", lambda: self.store._product_payload(payload))
+        nested = self.complete_product("Nested GST Deferred Product")
+        nested["attributes"]["gstRate"] = "18"
+        self.assert_error("product_tax_disabled", lambda: self.store._product_payload(nested))
+        nested_hsn = self.complete_product("Nested HSN Deferred Product")
+        nested_hsn["attributes"]["hsnCode"] = "6109"
+        self.assert_error("product_tax_disabled", lambda: self.store._product_payload(nested_hsn))
+
+    def test_legacy_tax_metadata_is_hidden_and_preserved_during_non_tax_edit(self) -> None:
+        self.create_active_shop("user-a", "Legacy Tax Metadata Shop")
+        product = self.store.create_product_draft("user-a", self.complete_product("Legacy Metadata Product"))
+        with self.store.connect() as db:
+            row = db.execute("SELECT attributes_json FROM shop_product_submissions WHERE id=?", (product["id"],)).fetchone()
+            attrs = json.loads(row[0]); attrs.update({"hsnCode": "6109", "gstRate": "5"})
+            db.execute("UPDATE shop_product_submissions SET attributes_json=? WHERE id=?", (json.dumps(attrs, separators=(",", ":"), sort_keys=True), product["id"]))
+            db.commit()
+        seller = next(item for item in self.store.list_products("user-a") if item["id"] == product["id"])
+        self.assertNotIn("hsnCode", seller["attributes"])
+        self.assertNotIn("gstRate", seller["attributes"])
+        with self.store.connect() as db:
+            current = db.execute("SELECT * FROM shop_product_submissions WHERE id=?", (product["id"],)).fetchone()
+        edit_payload = self.complete_product("Legacy Metadata Product Updated")
+        edit_payload["attributes"] = attrs
+        edit_payload["pricePaise"] = current["price_paise"]
+        edit_payload["originalPricePaise"] = current["original_price_paise"]
+        edit_payload.pop("inventory")
+        edit_payload.pop("size")
+        values = self.store._product_payload(edit_payload, current)
+        preserved = json.loads(values["attributes_json"])
+        self.assertEqual(preserved["hsnCode"], "6109")
+        self.assertEqual(preserved["gstRate"], "5")
+
     def test_customer_commission_boundaries_are_hidden_outside_private_admin(self) -> None:
         self.create_active_shop("user-a", "Commission Shop")
         cases = [(49900, 54890), (50000, 54000), (100000, 108000), (100100, 106106)]
