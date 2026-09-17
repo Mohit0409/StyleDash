@@ -129,10 +129,17 @@ export const trackEvent = async (eventName: string, eventParams: AnalyticsParams
   }
 };
 
+const sanitizePagePath = (pathWithSearch: string): string => {
+  const rawPath = pathWithSearch.split('?', 1)[0] || '/';
+  const normalized = rawPath.startsWith('/') ? rawPath.slice(0, 500) : `/${rawPath.slice(0, 499)}`;
+  return normalized
+    .replace(/^\/order-success\/[^/]+$/, '/order-success/:orderId')
+    .replace(/^\/orders\/[^/]+\/track$/, '/orders/:orderId/track');
+};
+
 export const trackPageView = async (pathWithSearch: string): Promise<boolean> => {
   if (typeof window === 'undefined') return false;
-  const rawPath = pathWithSearch.split('?', 1)[0] || '/';
-  const safePath = rawPath.startsWith('/') ? rawPath.slice(0, 500) : `/${rawPath.slice(0, 499)}`;
+  const safePath = sanitizePagePath(pathWithSearch);
   return trackEvent('page_view', {
     page_location: `${window.location.origin}${safePath}`,
     page_path: safePath,

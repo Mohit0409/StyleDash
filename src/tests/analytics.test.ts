@@ -101,6 +101,21 @@ describe('GA4 analytics integration', () => {
     expect(analyticsMocks.logEvent).not.toHaveBeenCalled();
   });
 
+  it('redacts customer order identifiers from page-view paths', async () => {
+    const { trackPageView } = await import('../services/analytics');
+
+    await expect(trackPageView('/order-success/SD-20260917-SECRET?source=checkout')).resolves.toBe(true);
+    await expect(trackPageView('/orders/SD-20260917-SECRET/track')).resolves.toBe(true);
+
+    const first = analyticsMocks.logEvent.mock.calls[0][2] as Record<string, unknown>;
+    const second = analyticsMocks.logEvent.mock.calls[1][2] as Record<string, unknown>;
+    expect(first.page_path).toBe('/order-success/:orderId');
+    expect(first.page_location).toBe('https://vibe4you.in/order-success/:orderId');
+    expect(second.page_path).toBe('/orders/:orderId/track');
+    expect(second.page_location).toBe('https://vibe4you.in/orders/:orderId/track');
+    expect(JSON.stringify([first, second])).not.toContain('SD-20260917-SECRET');
+  });
+
   it('does not count pending or failed online orders as purchases', async () => {
     const { trackPurchase } = await import('../services/analytics');
 
