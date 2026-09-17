@@ -13,6 +13,7 @@ import { useCart } from '../context/CartContext';
 import { useWishlist } from '../context/WishlistContext';
 import { useToast } from '../context/ToastContext';
 import { CONFIG } from '../config';
+import { trackEvent } from '../services/analytics';
 
 export const ProductDetail: React.FC = () => {
   const { slug } = useParams<{ slug: string }>();
@@ -55,6 +56,23 @@ export const ProductDetail: React.FC = () => {
       setLoading(false);
     });
   }, [slug]);
+
+  useEffect(() => {
+    if (!product) return;
+    void trackEvent('view_item', {
+      currency: 'INR',
+      value: product.price,
+      items: [{
+        item_id: product.id,
+        item_name: product.name,
+        item_brand: product.brand,
+        item_category: product.category,
+        affiliation: product.storeName || 'Vibe4You',
+        price: product.price,
+        quantity: 1,
+      }],
+    });
+  }, [product?.id]);
 
   useEffect(() => {
     if (!product) return;

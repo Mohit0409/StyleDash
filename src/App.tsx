@@ -7,6 +7,7 @@ import { WishlistProvider } from './context/WishlistContext';
 import { ToastProvider } from './context/ToastContext';
 import { MainLayout } from './layouts/MainLayout';
 import { ProtectedRoute } from './components/ProtectedRoute';
+import { AnalyticsTracker } from './components/AnalyticsTracker';
 
 const Home = lazy(() => import('./pages/Home').then(m => ({ default: m.Home })));
 const Products = lazy(() => import('./pages/Products').then(m => ({ default: m.Products })));
@@ -39,6 +40,7 @@ export const App: React.FC = () => {
           <CartProvider>
             <WishlistProvider>
               <ToastProvider>
+                <AnalyticsTracker />
                 <Suspense fallback={
                   <div className="h-screen w-full flex items-center justify-center text-sm font-bold text-neutral-500">
                     Loading Vibe4You...

@@ -2094,6 +2094,11 @@ class HttpApiTests(unittest.TestCase):
             self.assertIn("checkout.razorpay.com", policy)
             self.assertIn("https://static.cloudflareinsights.com", policy)
             self.assertIn("https://cloudflareinsights.com", policy)
+            self.assertIn("https://www.googletagmanager.com", policy)
+            self.assertIn("https://www.google-analytics.com", policy)
+            self.assertIn("https://region1.google-analytics.com", policy)
+            self.assertIn("https://firebaseinstallations.googleapis.com", policy)
+            self.assertIn("https://firebase.googleapis.com", policy)
 
     def test_process_identity_header_is_localhost_only(self) -> None:
         port = self.server.server_address[1]

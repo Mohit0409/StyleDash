@@ -2,6 +2,20 @@
 
 Canonical cross-chat coordination file: `C:\movieXsuggestion\MyProject\VIBE4YOU_DEV_COORDINATION.md`
 
+## GA4 / Firebase Analytics - 2026-09-17
+
+- Branch: `agent/ga4-analytics-20260917`, based on `1168df52fea83d596969ba23cefc5cf799a02fbe`.
+- Firebase Analytics measurement ID: `G-PSHXB46P50` (public measurement configuration; no Firebase service-account or payment secrets added).
+- Analytics runs only on the canonical customer hosts `vibe4you.in` and `www.vibe4you.in`; localhost, E2E, and staging hosts do not send GA4 traffic.
+- Manual SPA page views plus privacy-sanitized funnel events cover search actions (without raw search text), product/store views, cart add/remove/view, promotions, checkout start, password/Google/phone authentication success, and trusted order purchase confirmation.
+- Event parameters are allowlisted. Customer account/contact/address fields are not attached to analytics events, query strings are stripped from page views, customer order identifiers in `/order-success/:orderId` and `/orders/:orderId/track` are redacted from page-view paths and analytics page titles, and analytics is disabled entirely on `/reset-password` so reset-token URLs are never initialized for GA4.
+- Purchase events are emitted only after the server-owned order is loaded; payment-test/no-fulfillment orders are excluded. Online card/UPI orders must also be server-confirmed `paymentStatus=paid`, placed COD orders remain valid while collection is pending, and cancelled/returned orders cannot emit a new purchase event. Client storage is used only to avoid duplicate analytics emission after a reload and is not authoritative for orders/payments.
+- Public CSP was widened narrowly for Google Tag Manager, Google Analytics, and Firebase installation/config endpoints required by the Firebase Analytics SDK. Existing Razorpay/auth/admin boundaries are unchanged.
+- Privacy notice now discloses aggregate Firebase/Google Analytics measurement.
+- **GA4 web-stream prerequisite before release:** in Enhanced Measurement > Page views, disable **Page changes based on browser history events**. Google documents that these SPA history page views can fire independently of `send_page_view: false`; leaving this enabled could bypass the app's sanitized manual SPA page views. This property setting must be verified before production activation.
+- Validation after the purchase-integrity and order-path privacy hardening: typecheck/lint PASS; frontend unit tests **113/113 PASS** with analytics-focused coverage **7/7 PASS**; production build PASS; backend **283 PASS / 1 skipped**. A combined local Playwright run reached **153 PASS / 1 skipped** before a local private-admin readiness/port issue stopped the two CSP-preview project probes; after clearing the local listener, the private-admin CSP probe reran **3/3 PASS**. GitHub CI is the release-gate browser run after the amended commit is pushed.
+- Deployment: **NOT PERFORMED**. Merge/release still requires normal PR review and the independent Tester, Security, and Manager release gates in `AGENTS.md`.
+
 ## Admin store category + popup form UX ? 2026-09-14
 
 - Branch: `agent/admin-store-modal-ux`, based on `87f4fc4302ba659a5d27e391323a3d158cc4532f`.

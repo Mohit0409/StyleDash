@@ -3,6 +3,7 @@ import { UserProfile } from '../types';
 import { authApi } from '../services/authApi';
 import type { TermsAcceptance } from '../services/authApi';
 import { ApiError, clearCsrfToken } from '../services/apiClient';
+import { trackEvent } from '../services/analytics';
 
 export type FederatedProvider = 'google' | 'phone';
 
@@ -38,14 +39,26 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const login = async (email: string, password: string, terms: TermsAcceptance) => {
     setLoading(true); setError('');
-    try { const response = await authApi.login(email, password, terms); setUser(response.user); setNeedsProfile(false); return true; }
+    try {
+      const response = await authApi.login(email, password, terms);
+      setUser(response.user);
+      setNeedsProfile(false);
+      void trackEvent('login', { method: 'password' });
+      return true;
+    }
     catch (cause) { setError(cause instanceof ApiError ? cause.message : 'Login failed.'); return false; }
     finally { setLoading(false); }
   };
 
   const register = async (name: string, email: string, password: string, phone: string | undefined, terms: TermsAcceptance) => {
     setLoading(true); setError('');
-    try { const response = await authApi.register(name, email, password, phone, terms); setUser(response.user); setNeedsProfile(false); return true; }
+    try {
+      const response = await authApi.register(name, email, password, phone, terms);
+      setUser(response.user);
+      setNeedsProfile(false);
+      void trackEvent('sign_up', { method: 'password' });
+      return true;
+    }
     catch (cause) { setError(cause instanceof ApiError ? cause.message : 'Registration failed.'); return false; }
     finally { setLoading(false); }
   };
@@ -56,6 +69,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const response = await authApi.federated(provider, idToken, terms);
       setUser(response.user);
       setNeedsProfile(Boolean(response.needsProfile || (response.user.phone && !response.user.name)));
+      void trackEvent('login', { method: provider });
       return true;
     }
     catch (cause) { setError(cause instanceof ApiError ? cause.message : 'Sign in failed.'); return false; }

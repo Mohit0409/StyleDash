@@ -34,6 +34,18 @@ export const Privacy = () => (
     </section>
 
     <section className="space-y-2">
+      <h2 className="font-black">Website analytics</h2>
+      <p className="text-sm text-neutral-600">
+        Vibe4You uses Google Analytics to understand visits and interactions such
+        as page, product and store views, searches, cart activity, checkout
+        starts, and completed orders. Analytics events are configured not to attach account or checkout fields such
+        as customer email addresses, phone numbers, delivery addresses, or payment
+        credentials. Google may process device, browser, network, cookie,
+        and similar measurement data as part of providing the analytics service.
+      </p>
+    </section>
+
+    <section className="space-y-2">
       <h2 className="font-black">Payments</h2>
       <p className="text-sm text-neutral-600">
         Online payment entry is handled through Razorpay. Vibe4You stores

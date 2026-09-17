@@ -4,6 +4,7 @@ import { CheckCircle2 } from 'lucide-react';
 import { SEO } from '../components/SEO';
 import { orderApi } from '../services/businessApi';
 import { ServerOrder } from '../services/paymentApi';
+import { trackPurchase } from '../services/analytics';
 
 export const OrderSuccess: React.FC = () => {
   const { orderId = '' } = useParams();
@@ -16,7 +17,12 @@ export const OrderSuccess: React.FC = () => {
     setLoading(true);
     setError('');
     orderApi.one(orderId)
-      .then(result => { if (active) setOrder(result); })
+      .then(result => {
+        if (active) {
+          setOrder(result);
+          void trackPurchase(result);
+        }
+      })
       .catch(cause => { if (active) setError(cause instanceof Error ? cause.message : 'This order could not be loaded.'); })
       .finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
