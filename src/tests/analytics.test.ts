@@ -103,6 +103,7 @@ describe('GA4 analytics integration', () => {
 
   it('redacts customer order identifiers from page-view paths', async () => {
     const { trackPageView } = await import('../services/analytics');
+    document.title = 'Track SD-20260917-SECRET - Vibe4You';
 
     await expect(trackPageView('/order-success/SD-20260917-SECRET?source=checkout')).resolves.toBe(true);
     await expect(trackPageView('/orders/SD-20260917-SECRET/track')).resolves.toBe(true);
@@ -111,8 +112,10 @@ describe('GA4 analytics integration', () => {
     const second = analyticsMocks.logEvent.mock.calls[1][2] as Record<string, unknown>;
     expect(first.page_path).toBe('/order-success/:orderId');
     expect(first.page_location).toBe('https://vibe4you.in/order-success/:orderId');
+    expect(first.page_title).toBe('Order Confirmed - Vibe4You');
     expect(second.page_path).toBe('/orders/:orderId/track');
     expect(second.page_location).toBe('https://vibe4you.in/orders/:orderId/track');
+    expect(second.page_title).toBe('Track Order - Vibe4You');
     expect(JSON.stringify([first, second])).not.toContain('SD-20260917-SECRET');
   });
 

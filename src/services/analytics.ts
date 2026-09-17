@@ -140,10 +140,15 @@ const sanitizePagePath = (pathWithSearch: string): string => {
 export const trackPageView = async (pathWithSearch: string): Promise<boolean> => {
   if (typeof window === 'undefined') return false;
   const safePath = sanitizePagePath(pathWithSearch);
+  const safeTitle = safePath === '/order-success/:orderId'
+    ? 'Order Confirmed - Vibe4You'
+    : safePath === '/orders/:orderId/track'
+      ? 'Track Order - Vibe4You'
+      : document.title.slice(0, 200);
   return trackEvent('page_view', {
     page_location: `${window.location.origin}${safePath}`,
     page_path: safePath,
-    page_title: document.title.slice(0, 200),
+    page_title: safeTitle,
   });
 };
 
