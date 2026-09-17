@@ -9,11 +9,11 @@ Canonical cross-chat coordination file: `C:\movieXsuggestion\MyProject\VIBE4YOU_
 - Analytics runs only on the canonical customer hosts `vibe4you.in` and `www.vibe4you.in`; localhost, E2E, and staging hosts do not send GA4 traffic.
 - Manual SPA page views plus privacy-sanitized funnel events cover search actions (without raw search text), product/store views, cart add/remove/view, promotions, checkout start, password/Google/phone authentication success, and trusted order purchase confirmation.
 - Event parameters are allowlisted. Customer account/contact/address fields are not attached to analytics events, query strings are stripped from page views, and analytics is disabled entirely on `/reset-password` so reset-token URLs are never initialized for GA4.
-- Purchase events are emitted only after the server-owned order is loaded; payment-test/no-fulfillment orders are excluded. Client storage is used only to avoid duplicate analytics emission after a reload and is not authoritative for orders/payments.
+- Purchase events are emitted only after the server-owned order is loaded; payment-test/no-fulfillment orders are excluded. Online card/UPI orders must also be server-confirmed `paymentStatus=paid`, placed COD orders remain valid while collection is pending, and cancelled/returned orders cannot emit a new purchase event. Client storage is used only to avoid duplicate analytics emission after a reload and is not authoritative for orders/payments.
 - Public CSP was widened narrowly for Google Tag Manager, Google Analytics, and Firebase installation/config endpoints required by the Firebase Analytics SDK. Existing Razorpay/auth/admin boundaries are unchanged.
 - Privacy notice now discloses aggregate Firebase/Google Analytics measurement.
-- Validation: final verify:full PASS on Python 3.12 - frontend typecheck/lint/unit/build PASS with **110/110** frontend unit tests, backend **283 PASS / 1 skipped**, and Playwright **156 PASS / 4 skipped (160 total)** across desktop + mobile. Analytics-focused coverage is **4/4 PASS**.
-- Deployment: **NOT PERFORMED**. Merge/release still requires normal PR review and the independent security/release gates in `AGENTS.md`.
+- Validation after the purchase-integrity hardening: typecheck/lint PASS; frontend unit tests **112/112 PASS** with analytics-focused coverage **6/6 PASS**; backend **283 PASS / 1 skipped**. A combined local Playwright run reached **153 PASS / 1 skipped** before a local private-admin readiness/port issue stopped the two CSP-preview project probes; after clearing the local listener, the private-admin CSP probe reran **3/3 PASS**. GitHub CI is the release-gate browser run after the amended commit is pushed.
+- Deployment: **NOT PERFORMED**. Merge/release still requires normal PR review and the independent Tester, Security, and Manager release gates in `AGENTS.md`.
 
 ## Admin store category + popup form UX ? 2026-09-14
 

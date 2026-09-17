@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import type { ServerOrder } from '../services/paymentApi';
 
 const analyticsMocks = vi.hoisted(() => ({
   analyticsClient: { name: 'analytics-client' },
@@ -16,6 +17,15 @@ vi.mock('firebase/analytics', () => ({
 vi.mock('../services/firebaseClient', () => ({
   getFirebaseApp: vi.fn(() => ({ name: 'firebase-app' })),
 }));
+
+const makeOrder = (overrides: Partial<ServerOrder> = {}): ServerOrder => ({
+  id: 'order-1', userId: 'user-1', items: [],
+  address: { id: 'address-1', name: 'Customer', phone: '9999999999', street: 'Street', city: 'Neemuch', state: 'Madhya Pradesh', pincode: '458441' },
+  paymentMethod: 'card', paymentStatus: 'paid', subtotal: 499, discount: 0, walletAmount: 0,
+  deliveryFee: 0, taxes: 0, grandTotal: 499, deliveryMethod: 'standard', estimatedDelivery: 'Today',
+  status: 'confirmed', statusHistory: [], createdAt: '2026-09-17T00:00:00Z', updatedAt: '2026-09-17T00:00:00Z',
+  ...overrides,
+});
 
 const installBrowser = (hostname = 'vibe4you.in', pathname = '/') => {
   Object.defineProperty(globalThis, 'window', {
@@ -88,6 +98,24 @@ describe('GA4 analytics integration', () => {
     await expect(trackPageView('/reset-password?token=secret&email=customer@example.com')).resolves.toBe(false);
 
     expect(analyticsMocks.initializeAnalytics).not.toHaveBeenCalled();
+    expect(analyticsMocks.logEvent).not.toHaveBeenCalled();
+  });
+
+  it('does not count pending or failed online orders as purchases', async () => {
+    const { trackPurchase } = await import('../services/analytics');
+
+    await expect(trackPurchase(makeOrder({ paymentMethod: 'card', paymentStatus: 'pending' }))).resolves.toBe(false);
+    await expect(trackPurchase(makeOrder({ paymentMethod: 'upi', paymentStatus: 'failed' }))).resolves.toBe(false);
+    expect(analyticsMocks.logEvent).not.toHaveBeenCalled();
+  });
+
+  it('still counts a placed COD order but rejects cancelled orders', async () => {
+    const { trackPurchase } = await import('../services/analytics');
+
+    await expect(trackPurchase(makeOrder({ paymentMethod: 'cod', paymentStatus: 'pending', status: 'placed' }))).resolves.toBe(true);
+    expect(analyticsMocks.logEvent).toHaveBeenCalledTimes(1);
+    analyticsMocks.logEvent.mockClear();
+    await expect(trackPurchase(makeOrder({ id: 'order-2', paymentMethod: 'cod', paymentStatus: 'pending', status: 'cancelled' }))).resolves.toBe(false);
     expect(analyticsMocks.logEvent).not.toHaveBeenCalled();
   });
 

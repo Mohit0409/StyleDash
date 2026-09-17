@@ -154,6 +154,8 @@ const readTrackedPurchases = (): string[] => {
 
 export const trackPurchase = async (order: ServerOrder): Promise<boolean> => {
   if (!order.id || order.isPaymentTestOrder || order.fulfillmentRequired === false) return false;
+  if (order.paymentMethod !== 'cod' && order.paymentStatus !== 'paid') return false;
+  if (['cancelled', 'returned'].includes(order.status)) return false;
   const tracked = readTrackedPurchases();
   if (tracked.includes(order.id)) return true;
 
