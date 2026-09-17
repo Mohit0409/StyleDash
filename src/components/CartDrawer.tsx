@@ -1,12 +1,14 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { X, Trash2, Plus, Minus, Zap, ArrowRight, Tag, ShieldCheck } from 'lucide-react';
 import { useCart } from '../context/CartContext';
 import { CONFIG } from '../config';
 import { cartExpressEligibility, deliveryAvailabilityMessage, isExpressDeliveryAvailable } from '../utils/delivery';
+import { trackEvent } from '../services/analytics';
 
 export const CartDrawer: React.FC<{ isOpen: boolean; onClose: () => void }> = ({ isOpen, onClose }) => {
   const navigate = useNavigate();
+  const cartOpenTrackedRef = useRef(false);
   const {
     items,
     removeItem,
@@ -24,6 +26,29 @@ export const CartDrawer: React.FC<{ isOpen: boolean; onClose: () => void }> = ({
   const expressBlockedReason = !expressAvailable
     ? 'Express Delivery is available Saturday and Sunday for every product.'
     : '';
+
+  useEffect(() => {
+    if (!isOpen) {
+      cartOpenTrackedRef.current = false;
+      return;
+    }
+    if (cartOpenTrackedRef.current) return;
+    cartOpenTrackedRef.current = true;
+    void trackEvent('view_cart', {
+      currency: 'INR',
+      value: grandTotal,
+      items: items.map((item) => ({
+        item_id: item.productId,
+        item_name: item.product.name,
+        item_brand: item.product.brand,
+        item_category: item.product.category,
+        item_variant: [item.selectedSize, item.selectedColour].filter(Boolean).join(' / '),
+        affiliation: item.product.storeName || 'Vibe4You',
+        price: item.unitPrice,
+        quantity: item.quantity,
+      })),
+    });
+  }, [grandTotal, isOpen, items]);
 
   useEffect(() => {
     if (!isOpen) return undefined;

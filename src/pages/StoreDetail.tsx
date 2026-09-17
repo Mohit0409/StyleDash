@@ -7,6 +7,7 @@ import { StoreImage } from '../components/StoreImage';
 import { vendorRepository } from '../repositories/vendorRepository';
 import { productRepository } from '../repositories/productRepository';
 import { VendorStore, Product } from '../types';
+import { trackEvent } from '../services/analytics';
 
 export const StoreDetail: React.FC = () => {
   const { slug } = useParams<{ slug: string }>();
@@ -28,6 +29,15 @@ export const StoreDetail: React.FC = () => {
       }
     });
   }, [slug]);
+
+  useEffect(() => {
+    if (!store) return;
+    void trackEvent('view_store', {
+      store_id: store.id,
+      store_name: store.storeName,
+      store_category: store.category,
+    });
+  }, [store?.id]);
 
   if (loading) {
     return <div className="max-w-7xl mx-auto p-12 text-center text-xs text-neutral-500">Loading Store...</div>;

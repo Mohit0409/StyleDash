@@ -14,6 +14,7 @@ const getFirebaseConfig = () => ({
   authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || '',
   projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || '',
   appId: import.meta.env.VITE_FIREBASE_APP_ID || '',
+  measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID || 'G-PSHXB46P50',
 });
 
 export function isFirebaseConfigured(): boolean {
@@ -30,7 +31,7 @@ export function normalizeIndianPhone(value: string): string {
   throw new Error('Enter a valid 10-digit Indian mobile number.');
 }
 
-function getOrCreateApp(): FirebaseApp {
+export function getFirebaseApp(): FirebaseApp {
   if (typeof window === 'undefined') {
     throw new Error('Firebase authentication requires a browser environment.');
   }
@@ -51,14 +52,14 @@ export interface PhoneVerificationSession {
 }
 
 export async function signInWithGoogleProvider(): Promise<string> {
-  const auth = getAuth(getOrCreateApp());
+  const auth = getAuth(getFirebaseApp());
   const provider = new GoogleAuthProvider();
   const result = await signInWithPopup(auth, provider);
   return result.user.getIdToken();
 }
 
 export async function startPhoneVerification(phone: string): Promise<PhoneVerificationSession> {
-  const auth = getAuth(getOrCreateApp());
+  const auth = getAuth(getFirebaseApp());
   const container = document.getElementById('recaptcha-container');
   if (!container) {
     throw new Error('The reCAPTCHA container is unavailable.');

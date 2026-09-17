@@ -2,6 +2,19 @@
 
 Canonical cross-chat coordination file: `C:\movieXsuggestion\MyProject\VIBE4YOU_DEV_COORDINATION.md`
 
+## GA4 / Firebase Analytics - 2026-09-17
+
+- Branch: `agent/ga4-analytics-20260917`, based on `1168df52fea83d596969ba23cefc5cf799a02fbe`.
+- Firebase Analytics measurement ID: `G-PSHXB46P50` (public measurement configuration; no Firebase service-account or payment secrets added).
+- Analytics runs only on the canonical customer hosts `vibe4you.in` and `www.vibe4you.in`; localhost, E2E, and staging hosts do not send GA4 traffic.
+- Manual SPA page views plus privacy-sanitized funnel events cover search actions (without raw search text), product/store views, cart add/remove/view, promotions, checkout start, password/Google/phone authentication success, and trusted order purchase confirmation.
+- Event parameters are allowlisted. Customer account/contact/address fields are not attached to analytics events, query strings are stripped from page views, and analytics is disabled entirely on `/reset-password` so reset-token URLs are never initialized for GA4.
+- Purchase events are emitted only after the server-owned order is loaded; payment-test/no-fulfillment orders are excluded. Client storage is used only to avoid duplicate analytics emission after a reload and is not authoritative for orders/payments.
+- Public CSP was widened narrowly for Google Tag Manager, Google Analytics, and Firebase installation/config endpoints required by the Firebase Analytics SDK. Existing Razorpay/auth/admin boundaries are unchanged.
+- Privacy notice now discloses aggregate Firebase/Google Analytics measurement.
+- Validation: final verify:full PASS on Python 3.12 - frontend typecheck/lint/unit/build PASS with **110/110** frontend unit tests, backend **283 PASS / 1 skipped**, and Playwright **156 PASS / 4 skipped (160 total)** across desktop + mobile. Analytics-focused coverage is **4/4 PASS**.
+- Deployment: **NOT PERFORMED**. Merge/release still requires normal PR review and the independent security/release gates in `AGENTS.md`.
+
 ## Admin store category + popup form UX ? 2026-09-14
 
 - Branch: `agent/admin-store-modal-ux`, based on `87f4fc4302ba659a5d27e391323a3d158cc4532f`.

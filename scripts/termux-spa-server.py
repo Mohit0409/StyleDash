@@ -226,19 +226,21 @@ def store_product_image_payload(product_image_directory: Path, payload: dict[str
             pass
         os.replace(temporary, target)
     return {"url": f"/media/product-images/{target.name}", "bytes": len(content), "contentType": content_type}
-# Firebase/Google endpoints are added narrowly (never a wildcard) and only to
-# support the Google + Phone-OTP identity flows; Firebase is never granted
-# order/payment/inventory/admin authority.
+# Firebase/Google endpoints are added narrowly (never a wildcard) for
+# Google + Phone-OTP identity and GA4 measurement. Firebase/Analytics are never
+# granted order/payment/inventory/admin authority.
 SECURITY_POLICY = (
     "default-src 'self'; "
     "base-uri 'self'; object-src 'none'; frame-ancestors 'self'; "
     "script-src 'self' https://checkout.razorpay.com https://*.razorpay.com "
     "https://apis.google.com https://www.gstatic.com https://www.google.com https://www.recaptcha.net "
-    "https://static.cloudflareinsights.com; "
+    "https://www.googletagmanager.com https://static.cloudflareinsights.com; "
     "style-src 'self' 'unsafe-inline' https://*.razorpay.com; "
     "img-src 'self' data: https:; font-src 'self' data: https:; "
     "connect-src 'self' https://api.razorpay.com https://*.razorpay.com "
     "https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://www.googleapis.com "
+    "https://firebaseinstallations.googleapis.com https://firebase.googleapis.com "
+    "https://www.google-analytics.com https://region1.google-analytics.com https://www.googletagmanager.com "
     "https://*.firebaseio.com wss://*.firebaseio.com https://cloudflareinsights.com; "
     "frame-src https://api.razorpay.com https://checkout.razorpay.com https://*.razorpay.com "
     "https://accounts.google.com https://*.firebaseapp.com https://www.google.com https://www.recaptcha.net; "
