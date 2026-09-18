@@ -4,7 +4,7 @@ Vibe4You is a production-quality, hyperlocal fashion marketplace built for fast 
 
 ## Features
 
-- **Same Day + Weekend Express Delivery**: Free Same Day Delivery in Neemuch (`458441`), with ₹80 Express Delivery available on Saturday and Sunday when enabled by the server.
+- **Same Day + Weekend Express Delivery**: Same Day Delivery is ₹50 below ₹300 and free from ₹300 in Neemuch (`458441`), with ₹80 Express Delivery available on Saturday and Sunday when enabled by the server.
 - **Authoritative Serviceability API**: `/api/serviceability?pincode=<six digits>` checks delivery availability from the same backend configuration used by checkout.
 - **Controlled Payment Validation**: An optional server-gated ₹10 Razorpay validation item is hidden from the catalogue and restricted to privately configured, mailbox-verified authenticated accounts; it never enters fulfillment or fashion inventory.
 - **Complete Fashion Catalogue**: Over 125 clothing, footwear, and accessory products across Men, Women, Kids, and Accessories.

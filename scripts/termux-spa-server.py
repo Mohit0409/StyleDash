@@ -1238,6 +1238,10 @@ class PaymentService:
             applied_coupon = normalized
 
         delivery_fee = _money(delivery_fees[delivery_method], "delivery fee")
+        if delivery_method == "standard":
+            free_delivery_threshold = _money(self.settings["freeDeliveryThreshold"], "free delivery threshold")
+            if subtotal >= free_delivery_threshold:
+                delivery_fee = Decimal("0")
         taxable_merchandise_total = max(Decimal("0"), subtotal - coupon_discount)
         gst_settings = self.settings.get("gst") if isinstance(self.settings.get("gst"), dict) else {}
         product_gst_enabled = gst_settings.get("productGstEnabled") is True

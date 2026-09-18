@@ -251,7 +251,7 @@ export const Header: React.FC<{ onOpenCart: () => void }> = ({ onOpenCart }) => 
       {/* Top Banner */}
       <div className="bg-neutral-950 text-white text-xs py-1.5 px-4 text-center flex items-center justify-center gap-2">
         <Zap className="w-3.5 h-3.5 text-lime-400 fill-lime-400" />
-        <span>{isExpressDeliveryAvailable() ? <><strong>FREE SAME DAY + ₹80 EXPRESS DELIVERY</strong> in {CONFIG.SERVICE_CITY} this weekend.</> : <><strong>FREE SAME DAY DELIVERY</strong> in {CONFIG.SERVICE_CITY} · Express is available Saturday and Sunday.</>}</span>
+        <span>{isExpressDeliveryAvailable() ? <><strong>SAME DAY: ₹50 below ₹300 · FREE ₹300+ · ₹80 EXPRESS</strong> in {CONFIG.SERVICE_CITY} this weekend.</> : <><strong>SAME DAY: ₹50 below ₹300 · FREE ₹300+</strong> in {CONFIG.SERVICE_CITY} · Express is available Saturday and Sunday.</>}</span>
       </div>
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">

@@ -33,7 +33,7 @@ export const Home: React.FC = () => {
         <div className="max-w-7xl mx-auto grid lg:grid-cols-2 gap-12 items-center">
           <div className="space-y-6 z-10">
             <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-lime-400 text-neutral-950 text-xs font-black uppercase tracking-wider">
-              <Zap className="w-3.5 h-3.5 fill-neutral-950" /> FREE Same Day Delivery in {CONFIG.SERVICE_CITY}
+              <Zap className="w-3.5 h-3.5 fill-neutral-950" /> Same Day Delivery: FREE on ₹300+ in {CONFIG.SERVICE_CITY}
             </div>
 
             <h1 className="text-4xl sm:text-6xl font-black tracking-tight leading-none">
@@ -68,7 +68,7 @@ export const Home: React.FC = () => {
 
             {/* Quick Specs */}
             <div className="pt-6 border-t border-neutral-800 grid grid-cols-3 gap-4 text-xs text-neutral-400">
-              <div><strong className="text-white block text-sm">Free Same Day</strong> Delivery</div>
+              <div><strong className="text-white block text-sm">Same Day</strong> ₹50 below ₹300 · FREE ₹300+</div>
               <div><strong className="text-white block text-sm">Local Stores</strong> Curated Marketplace</div>
               <Link to="/products?maxPrice=499" className="rounded focus-visible:outline focus-visible:outline-2 focus-visible:outline-lime-400">
                 <strong className="text-white block text-sm">Shop by Budget</strong> Under ₹199, ₹299 &amp; ₹499

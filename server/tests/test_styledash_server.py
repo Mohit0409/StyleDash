@@ -159,6 +159,29 @@ class PaymentServiceTests(unittest.TestCase):
         self.assertEqual(quote["taxes"], 0)
         self.assertEqual(quote["grandTotal"], 1499)
 
+    def test_same_day_delivery_fee_boundary_is_enforced_server_side(self):
+        product_id = "sd-prod-001"
+        variant_id = "sd-prod-001-var-2"
+        original = self.service._static_products[product_id]
+        try:
+            for price, expected_fee, expected_total in ((299, 50, 349), (300, 0, 300)):
+                self.service._static_products[product_id] = {
+                    **original,
+                    "variants": [
+                        {**variant, "price": price} if variant["id"] == variant_id else dict(variant)
+                        for variant in original["variants"]
+                    ],
+                }
+                quote = self.service.calculate_order(self.payload(items=[
+                    {"productId": product_id, "variantId": variant_id, "quantity": 1}
+                ]))
+                self.assertEqual(quote["subtotal"], price)
+                self.assertEqual(quote["deliveryMethod"], "standard")
+                self.assertEqual(quote["deliveryFee"], expected_fee)
+                self.assertEqual(quote["grandTotal"], expected_total)
+        finally:
+            self.service._static_products[product_id] = original
+
     def payload(self, **overrides):
         payload = {
             "items": [{"productId": "sd-prod-001", "variantId": "sd-prod-001-var-2", "quantity": 2}],

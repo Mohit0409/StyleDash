@@ -1,10 +1,10 @@
 {
   "currency": "INR",
   "taxRate": 0,
-  "freeDeliveryThreshold": 999,
+  "freeDeliveryThreshold": 300,
   "deliveryFees": {
     "express": 80,
-    "standard": 0
+    "standard": 50
   },
   "supportedPincodes": [
     "458441",

@@ -28,8 +28,8 @@ export const cartExpressEligibility = (
 
 export const deliveryAvailabilityMessage = (date = new Date()): string =>
   isExpressDeliveryAvailable(date)
-    ? 'Same Day Delivery is FREE. Express Delivery is also available this Saturday and Sunday for every product for ₹80.'
-    : 'FREE Same Day Delivery is selected. Express Delivery is unavailable Monday–Friday.';
+    ? 'Same Day Delivery is ₹50 below ₹300 and FREE on orders of ₹300 or more. Express Delivery is also available this Saturday and Sunday for every product for ₹80.'
+    : 'Same Day Delivery is ₹50 below ₹300 and FREE on orders of ₹300 or more. Express Delivery is unavailable Monday–Friday.';
 
 export interface ExpressCatalogueState {
   requested: boolean;
