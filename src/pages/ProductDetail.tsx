@@ -13,6 +13,7 @@ import { useCart } from '../context/CartContext';
 import { useWishlist } from '../context/WishlistContext';
 import { useToast } from '../context/ToastContext';
 import { CONFIG } from '../config';
+import { productGalleryImages } from '../utils/productGallery';
 
 export const ProductDetail: React.FC = () => {
   const { slug } = useParams<{ slug: string }>();
@@ -59,7 +60,7 @@ export const ProductDetail: React.FC = () => {
   useEffect(() => {
     if (!product) return;
     const variantImages = product.variants.find(variant => variant.colourName === selectedColour)?.images || [];
-    const colourImages = variantImages.length > 0 ? variantImages : product.images;
+    const colourImages = productGalleryImages(product.images, variantImages);
     setSelectedImage(colourImages[0] || product.thumbnail);
     setImageViewerOpen(false);
   }, [product, selectedColour]);
@@ -87,7 +88,7 @@ export const ProductDetail: React.FC = () => {
   const availabilityResolved = product.variants.length === 0
     || product.variants.every(variant => typeof variant.available === 'boolean');
   const variantImages = product.variants.find(v => v.colourName === selectedColour)?.images || [];
-  const selectedColourImages = variantImages.length > 0 ? variantImages : product.images;
+  const selectedColourImages = productGalleryImages(product.images, variantImages);
   const galleryImages = selectedColourImages.length > 0 ? selectedColourImages : [product.thumbnail];
   const tryAtHomeVariants = product.variants.filter(
     variant => variant.available === true && variant.colourName === selectedColour,
