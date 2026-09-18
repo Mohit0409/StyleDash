@@ -52,4 +52,19 @@ describe('site quality guardrails', () => {
     expect(home).toContain('Shop by Budget');
     expect(home).toContain('/products?maxPrice=499');
   });
+
+  it('keeps customer product imagery uncropped across shopping and order surfaces', () => {
+    const productCard = readText('../components/ProductCard.tsx');
+    const productDetail = readText('../pages/ProductDetail.tsx');
+    const cartDrawer = readText('../components/CartDrawer.tsx');
+    const orders = readText('../pages/Orders.tsx');
+    const orderTracking = readText('../pages/OrderTracking.tsx');
+
+    for (const source of [productCard, productDetail, cartDrawer, orders, orderTracking]) {
+      expect(source).toContain('object-contain');
+    }
+    expect(cartDrawer).not.toContain('object-cover');
+    expect(orders).not.toContain('object-cover');
+    expect(orderTracking).not.toContain('object-cover');
+  });
 });
