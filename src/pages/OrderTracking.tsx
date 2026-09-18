@@ -153,7 +153,7 @@ export const OrderTracking: React.FC = () => {
         <div className="flex items-center gap-2"><Package className="w-5 h-5" /><h2 className="text-lg font-black">Order items</h2></div>
         <div className="divide-y divide-neutral-200 dark:divide-neutral-800">
           {(order.items || []).map(item => <div key={item.variantId} className="py-4 first:pt-0 last:pb-0 flex gap-4">
-            <div className="w-20 h-20 rounded-2xl bg-neutral-100 dark:bg-neutral-800 overflow-hidden shrink-0">{item.imageUrl ? <img src={item.imageUrl} alt="" className="w-full h-full object-cover" /> : <div className="w-full h-full grid place-items-center"><Package className="w-7 h-7 text-neutral-400" /></div>}</div>
+            <div className="w-20 h-20 rounded-2xl bg-neutral-100 dark:bg-neutral-800 overflow-hidden shrink-0">{item.imageUrl ? <img src={item.imageUrl} alt="" className="w-full h-full object-contain object-center p-1" /> : <div className="w-full h-full grid place-items-center"><Package className="w-7 h-7 text-neutral-400" /></div>}</div>
             <div className="min-w-0 flex-1"><div className="flex items-center gap-1.5 text-xs font-bold text-neutral-500"><Store className="w-3.5 h-3.5" /><span>{item.storeName || 'Vibe4You'}</span></div><h3 className="font-black mt-1">{item.productName}</h3><p className="text-sm text-neutral-600 dark:text-neutral-400 mt-1">Size: <strong>{item.size || '—'}</strong> · Color: <strong>{item.colourName || '—'}</strong> · Qty: <strong>{item.quantity}</strong></p></div>
             <strong className="shrink-0">{money(item.lineTotal)}</strong>
           </div>)}

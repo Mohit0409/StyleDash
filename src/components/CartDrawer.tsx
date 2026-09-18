@@ -82,7 +82,7 @@ export const CartDrawer: React.FC<{ isOpen: boolean; onClose: () => void }> = ({
                 <img
                   src={item.product.thumbnail}
                   alt={item.product.name}
-                  className="w-20 h-24 object-cover rounded-xl bg-neutral-200"
+                  className="w-20 h-24 object-contain object-center rounded-xl bg-neutral-100 p-1 dark:bg-neutral-800"
                 />
                 <div className="flex-1 flex flex-col justify-between">
                   <div>
