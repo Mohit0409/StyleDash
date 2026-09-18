@@ -77,8 +77,14 @@ byId('content').addEventListener('change', event => {
   if(shopControl){shopProductFilter=shopControl.value;loadTab(activeTab);return;}
   const adminControl=event.target.closest('[data-admin-filter]');
   if(adminControl){adminFilters[activeTab][adminControl.dataset.adminFilter]=adminControl.value;loadTab(activeTab);return;}
+  const bulkAll=event.target.closest('[data-bulk-select-all]');
+  if(bulkAll){
+    const resource=bulkAll.dataset.bulkSelectAll;
+    byId('content').querySelectorAll(`[data-bulk-select="${resource}"]`).forEach(box=>{box.checked=bulkAll.checked;const key=`${resource}:${box.value}`;box.checked?bulkSelection.add(key):bulkSelection.delete(key);});
+    syncBulkSelectionUi(resource);return;
+  }
   const bulk=event.target.closest('[data-bulk-select]');
-  if(bulk){const key=`${bulk.dataset.bulkSelect}:${bulk.value}`;bulk.checked?bulkSelection.add(key):bulkSelection.delete(key);const count=byId(`bulk-count-${bulk.dataset.bulkSelect}`);if(count)count.textContent=String([...bulkSelection].filter(value=>value.startsWith(`${bulk.dataset.bulkSelect}:`)).length);}
+  if(bulk){const key=`${bulk.dataset.bulkSelect}:${bulk.value}`;bulk.checked?bulkSelection.add(key):bulkSelection.delete(key);syncBulkSelectionUi(bulk.dataset.bulkSelect);}
 });
 
 function status(message) { byId('app-status').textContent = message || ''; }
@@ -389,8 +395,9 @@ async function cancellationReasonFor(){
   return details&&type!=='Other'?`${type}: ${details}`:(details||type);
 }
 async function inventoryAdjustment(){const values=await formDialog('Adjust inventory',[{name:'delta',label:'Stock adjustment (for example 5 or -2)',type:'number',required:true,step:'1'}],'Apply adjustment');if(!values)return null;const delta=Number(values.delta);if(!Number.isSafeInteger(delta))throw new Error('Enter a whole-number stock adjustment.');return delta;}
-function bulkToolbar(resource,statuses){return `<div class="actions bulk-toolbar"><span><strong id="bulk-count-${resource}">0</strong> selected</span><select data-bulk-target="${resource}"><option value="">Bulk action...</option>${statuses.map(value=>`<option value="${value}">${escapeText(value.replaceAll('_',' '))}</option>`).join('')}</select><button data-action="bulk-transition" data-resource="${resource}">Apply once</button></div>`;}
-function addBulkControls(resource,statuses,selector){for(const key of [...bulkSelection])if(key.startsWith(`${resource}:`))bulkSelection.delete(key);const root=byId('content');root.querySelector('h2')?.insertAdjacentHTML('afterend',bulkToolbar(resource,statuses));const seen=new Set();root.querySelectorAll(selector).forEach(container=>{const id=resource==='orders'?container.querySelector('h3')?.textContent:container.querySelector('[data-id]')?.dataset.id;if(!id||seen.has(id))return;seen.add(id);container.insertAdjacentHTML('afterbegin',`<label class="bulk-select"><input type="checkbox" data-bulk-select="${resource}" value="${escapeText(id)}"> Select</label>`);});}
+function bulkToolbar(resource,statuses){return `<div class="actions bulk-toolbar"><label class="bulk-select bulk-select-all"><input type="checkbox" id="bulk-select-all-${resource}" data-bulk-select-all="${resource}"> Select all</label><span><strong id="bulk-count-${resource}">0</strong> selected</span><select data-bulk-target="${resource}"><option value="">Bulk action...</option>${statuses.map(value=>`<option value="${value}">${escapeText(value.replaceAll('_',' '))}</option>`).join('')}</select><button data-action="bulk-transition" data-resource="${resource}">Apply once</button></div>`;}
+function syncBulkSelectionUi(resource){const boxes=[...byId('content').querySelectorAll(`[data-bulk-select="${resource}"]`)];const selected=boxes.filter(box=>box.checked).length;const count=byId(`bulk-count-${resource}`);if(count)count.textContent=String(selected);const selectAll=byId(`bulk-select-all-${resource}`);if(selectAll){selectAll.checked=boxes.length>0&&selected===boxes.length;selectAll.indeterminate=selected>0&&selected<boxes.length;selectAll.disabled=boxes.length===0;}}
+function addBulkControls(resource,statuses,selector){for(const key of [...bulkSelection])if(key.startsWith(`${resource}:`))bulkSelection.delete(key);const root=byId('content');root.querySelector('h2')?.insertAdjacentHTML('afterend',bulkToolbar(resource,statuses));const seen=new Set();root.querySelectorAll(selector).forEach(container=>{const id=resource==='orders'?container.querySelector('h3')?.textContent:container.querySelector('[data-id]')?.dataset.id;if(!id||seen.has(id))return;seen.add(id);container.insertAdjacentHTML('afterbegin',`<label class="bulk-select"><input type="checkbox" data-bulk-select="${resource}" value="${escapeText(id)}"> Select</label>`);});syncBulkSelectionUi(resource);}
 async function bulkTransition(resource){
   const ids=[...bulkSelection].filter(value=>value.startsWith(`${resource}:`)).map(value=>value.slice(resource.length+1));
   const target=document.querySelector(`[data-bulk-target="${resource}"]`)?.value;

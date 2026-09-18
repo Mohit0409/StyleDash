@@ -164,3 +164,31 @@ test('delivery-zone map draws points and keeps coordinates synchronized', async 
   await expect(page.locator('.delivery-zone-map-marker')).toHaveCount(0);
   await expect(page.locator('#delivery-zone-boundary')).toHaveValue('');
 });
+
+
+test('bulk toolbar Select all controls every visible record and tracks partial selection', async ({ page }) => {
+  await page.goto('http://127.0.0.1:8081/');
+  await page.evaluate(() => {
+    document.getElementById('login-view')!.hidden = true;
+    document.getElementById('app-view')!.hidden = false;
+    const content = document.getElementById('content')!;
+    content.innerHTML = '<h2>Customers</h2><table><tbody><tr><td><button data-id="cust-1">One</button></td></tr><tr><td><button data-id="cust-2">Two</button></td></tr><tr><td><button data-id="cust-3">Three</button></td></tr></tbody></table>';
+    (window as any).addBulkControls('customers', ['enable', 'disable'], 'tbody tr');
+  });
+  const selectAll = page.locator('[data-bulk-select-all="customers"]');
+  const rows = page.locator('[data-bulk-select="customers"]');
+  await expect(selectAll).toBeVisible();
+  await expect(rows).toHaveCount(3);
+  await selectAll.check();
+  for (let index = 0; index < 3; index += 1) await expect(rows.nth(index)).toBeChecked();
+  await expect(page.locator('#bulk-count-customers')).toHaveText('3');
+  await rows.first().uncheck();
+  await expect(selectAll).not.toBeChecked();
+  expect(await selectAll.evaluate((node: HTMLInputElement) => node.indeterminate)).toBe(true);
+  await expect(page.locator('#bulk-count-customers')).toHaveText('2');
+  await selectAll.check();
+  await expect(page.locator('#bulk-count-customers')).toHaveText('3');
+  await selectAll.uncheck();
+  for (let index = 0; index < 3; index += 1) await expect(rows.nth(index)).not.toBeChecked();
+  await expect(page.locator('#bulk-count-customers')).toHaveText('0');
+});
