@@ -47,6 +47,28 @@ describe('Vibe4You Cart & Variant Logic', () => {
     });
   });
 
+  it('charges ₹50 for Same Day below ₹300 and makes Same Day free from ₹300', () => {
+    expect(calculateCartTotals({
+      subtotal: 299,
+      appliedCoupon: null,
+      deliveryMethod: 'standard',
+    })).toMatchObject({ deliveryFee: 50, grandTotal: 349 });
+
+    expect(calculateCartTotals({
+      subtotal: 300,
+      appliedCoupon: null,
+      deliveryMethod: 'standard',
+    })).toMatchObject({ deliveryFee: 0, grandTotal: 300 });
+  });
+
+  it('keeps Express at ₹80 even below the Same Day free-delivery threshold', () => {
+    expect(calculateCartTotals({
+      subtotal: 299,
+      appliedCoupon: null,
+      deliveryMethod: 'express',
+    })).toMatchObject({ deliveryFee: 80, grandTotal: 379 });
+  });
+
   it('ignores stale wallet-shaped browser data', () => {
     const staleInput = {
       subtotal: 800,

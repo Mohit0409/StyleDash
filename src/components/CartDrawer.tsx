@@ -54,7 +54,7 @@ export const CartDrawer: React.FC<{ isOpen: boolean; onClose: () => void }> = ({
         {/* Delivery promise */}
         <div className="bg-lime-100 dark:bg-lime-950/40 p-3 text-xs text-center font-bold text-lime-800 dark:text-lime-300 border-b border-lime-200 dark:border-lime-900 flex items-center justify-center gap-1.5">
           <Zap className="w-4 h-4 fill-lime-500 text-lime-600" />
-          <span><strong>FREE SAME DAY DELIVERY</strong> in {CONFIG.SERVICE_CITY}</span>
+          <span><strong>SAME DAY: ₹50 below ₹300 · FREE ₹300+</strong> in {CONFIG.SERVICE_CITY}</span>
         </div>
 
         {/* Cart Item List */}
@@ -65,7 +65,7 @@ export const CartDrawer: React.FC<{ isOpen: boolean; onClose: () => void }> = ({
                 <Tag className="w-10 h-10" />
               </div>
               <h4 className="font-bold text-lg text-neutral-900 dark:text-white mb-1">Your cart is empty</h4>
-              <p className="text-xs text-neutral-500 mb-6">Free Same Day Delivery is available in {CONFIG.SERVICE_CITY} ({CONFIG.DEFAULT_PINCODE}). Express Delivery is available on Saturday and Sunday for ₹80.</p>
+              <p className="text-xs text-neutral-500 mb-6">Same Day Delivery is ₹50 below ₹300 and free from ₹300 in {CONFIG.SERVICE_CITY} ({CONFIG.DEFAULT_PINCODE}). Express Delivery is available on Saturday and Sunday for ₹80.</p>
               <button
                 onClick={() => { onClose(); navigate('/products'); }}
                 className="px-6 py-2.5 bg-neutral-950 dark:bg-lime-400 text-white dark:text-neutral-950 font-bold text-xs rounded-xl"

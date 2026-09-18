@@ -210,7 +210,7 @@ export const Checkout: React.FC = () => {
                 <Truck className="mt-0.5 h-4 w-4 shrink-0 text-neutral-500" />
                 <span>
                   <span className="font-bold text-xs text-neutral-900 dark:text-white block">Same Day Delivery</span>
-                  <span className="text-[11px] text-neutral-500">FREE - delivered the same day</span>
+                  <span className="text-[11px] text-neutral-500">{subtotal < CONFIG.FREE_DELIVERY_THRESHOLD ? '₹50 for orders below ₹300' : 'FREE on orders of ₹300+'} - delivered the same day</span>
                 </span>
               </label>
               <label className={`flex items-start gap-3 p-4 rounded-2xl border transition-all ${expressSelectable ? 'cursor-pointer' : 'cursor-not-allowed opacity-60'} ${deliveryMethod === 'express' ? 'border-lime-500 bg-lime-50 dark:border-lime-400 dark:bg-lime-950/20 shadow-md' : 'border-neutral-200 dark:border-neutral-800'}`}>

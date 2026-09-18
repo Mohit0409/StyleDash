@@ -101,8 +101,8 @@ export const LocationSelector: React.FC<{ isOpen: boolean; onClose: () => void }
               <p className="mt-0.5">
                 {isSuccess
                   ? result?.expressAvailable && result?.estimatedDeliveryMinutes
-                    ? `Same Day Delivery is FREE. Express Delivery is also available within ${result.estimatedDeliveryMinutes} minutes for ₹80.`
-                    : 'Same Day Delivery is FREE. Express Delivery is unavailable Monday–Friday.'
+                    ? `Same Day Delivery is ₹50 below ₹300 and FREE from ₹300. Express Delivery is also available within ${result.estimatedDeliveryMinutes} minutes for ₹80.`
+                    : 'Same Day Delivery is ₹50 below ₹300 and FREE from ₹300. Express Delivery is unavailable Monday–Friday.'
                   : null}
                 {isProblem && checkState === 'unserviceable' ? 'We are not delivering to this pincode yet.' : null}
                 {isProblem && checkState === 'invalid' ? 'Pincodes must contain exactly six numbers.' : null}

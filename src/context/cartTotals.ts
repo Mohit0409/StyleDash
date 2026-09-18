@@ -34,7 +34,9 @@ export const calculateCartTotals = ({
 
   const deliveryFee = deliveryMethod === 'express'
     ? CONFIG.EXPRESS_DELIVERY_FEE
-    : CONFIG.STANDARD_DELIVERY_FEE;
+    : subtotal < CONFIG.FREE_DELIVERY_THRESHOLD
+      ? CONFIG.STANDARD_DELIVERY_FEE
+      : 0;
   const taxableMerchandiseTotal = Math.max(0, subtotal - couponDiscount);
   const taxes = Math.round(
     (taxableMerchandiseTotal * CONFIG.TAX_RATE) / (1 + CONFIG.TAX_RATE),

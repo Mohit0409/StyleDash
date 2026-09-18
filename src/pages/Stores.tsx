@@ -30,7 +30,7 @@ export const Stores: React.FC = () => {
           <span className="text-xs font-black text-lime-400 uppercase tracking-widest">Multi-Store Quick-Commerce Marketplace</span>
           <h1 className="text-2xl sm:text-3xl font-black">Local Boutiques & Partner Stores in {CONFIG.SERVICE_CITY}</h1>
           <p className="text-xs text-neutral-400">
-            Shop directly from verified neighbourhood clothing, ethnic wear, and footwear stores with free Same Day Delivery.
+            Shop directly from verified neighbourhood clothing, ethnic wear, and footwear stores with Same Day Delivery free from ₹300 (₹50 below ₹300).
           </p>
         </div>
 
