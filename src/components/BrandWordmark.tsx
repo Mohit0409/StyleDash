@@ -76,7 +76,7 @@ export const BrandWordmark: React.FC<BrandWordmarkProps> = ({
       </svg>
 
       {showTagline && (
-        <span className={`mt-1 whitespace-nowrap text-center text-[clamp(0.45rem,1.7vw,0.625rem)] font-medium tracking-normal ${taglineInk}`}>
+        <span className={`mt-1 whitespace-nowrap text-center text-xs sm:text-sm font-medium tracking-normal ${taglineInk}`}>
           {CONFIG.TAGLINE}
         </span>
       )}

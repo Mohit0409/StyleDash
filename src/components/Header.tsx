@@ -11,7 +11,6 @@ import { productRepository } from '../repositories/productRepository';
 import { vendorRepository } from '../repositories/vendorRepository';
 import type { Product, VendorStore } from '../types';
 import { buildSearchSuggestions, highlightSearchMatch, type SearchSuggestion } from '../utils/searchSuggestions';
-import { isExpressDeliveryAvailable } from '../utils/delivery';
 
 const SEARCH_DEBOUNCE_MS = 220;
 const MIN_SUGGESTION_QUERY = 2;
@@ -191,7 +190,7 @@ export const Header: React.FC<{ onOpenCart: () => void }> = ({ onOpenCart }) => 
           <button type="button" onClick={startSpeechSearch} disabled={isListening}
             aria-label={isListening ? 'Listening for a search' : 'Speak to search'}
             title={isListening ? 'Listening…' : 'Speak to search'}
-            className={`absolute right-2 rounded-full p-2 text-neutral-500 transition-colors hover:bg-neutral-200 hover:text-lime-700 disabled:cursor-wait disabled:text-rose-500 dark:hover:bg-neutral-700 dark:hover:text-lime-400 ${mobile ? 'top-[0.35rem]' : 'top-1/2 -translate-y-1/2'}`}>
+            className={`absolute right-0 flex min-h-11 min-w-11 items-center justify-center rounded-full text-neutral-500 transition-colors hover:bg-neutral-200 hover:text-lime-700 disabled:cursor-wait disabled:text-rose-500 dark:hover:bg-neutral-700 dark:hover:text-lime-400 ${mobile ? 'top-0' : 'top-1/2 -translate-y-1/2'}`}>
             <Mic className={`h-4 w-4 ${isListening ? 'animate-pulse text-rose-500' : ''}`} />
           </button>
         )}
@@ -249,9 +248,9 @@ export const Header: React.FC<{ onOpenCart: () => void }> = ({ onOpenCart }) => 
   return (
     <header className="sticky top-0 z-40 bg-white dark:bg-neutral-900 border-b border-neutral-200 dark:border-neutral-800 shadow-sm transition-colors">
       {/* Top Banner */}
-      <div className="bg-neutral-950 text-white text-xs py-1.5 px-4 text-center flex items-center justify-center gap-2">
+      <div className="min-h-8 bg-neutral-950 text-white text-xs py-1.5 px-4 text-center flex items-center justify-center gap-2">
         <Zap className="w-3.5 h-3.5 text-lime-400 fill-lime-400" />
-        <span>{isExpressDeliveryAvailable() ? <><strong>SAME DAY: ₹50 below ₹300 · FREE ₹300+ · ₹80 EXPRESS</strong> in {CONFIG.SERVICE_CITY} this weekend.</> : <><strong>SAME DAY: ₹50 below ₹300 · FREE ₹300+</strong> in {CONFIG.SERVICE_CITY} · Express is available Saturday and Sunday.</>}</span>
+        <span><strong>SAME-DAY DELIVERY</strong> in {CONFIG.SERVICE_CITY}</span>
       </div>
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -267,7 +266,7 @@ export const Header: React.FC<{ onOpenCart: () => void }> = ({ onOpenCart }) => 
           <div className="flex shrink-0 items-center gap-1 sm:gap-3">
             <Link
               to="/stores"
-              className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 text-xs font-extrabold text-neutral-800 dark:text-neutral-200 hover:text-lime-600 transition-colors"
+              className="hidden sm:flex min-h-11 items-center gap-1.5 px-3 py-1.5 text-xs font-extrabold text-neutral-800 dark:text-neutral-200 hover:text-lime-600 transition-colors"
               title="Browse Local Stores"
             >
               <Store className="w-4 h-4 text-lime-600" />
@@ -276,7 +275,7 @@ export const Header: React.FC<{ onOpenCart: () => void }> = ({ onOpenCart }) => 
 
             <button
               onClick={toggleTheme}
-              className="p-2 rounded-full hover:bg-neutral-100 dark:hover:bg-neutral-800 text-neutral-700 dark:text-neutral-300 transition-colors"
+              className="flex min-h-11 min-w-11 items-center justify-center p-2 rounded-full hover:bg-neutral-100 dark:hover:bg-neutral-800 text-neutral-700 dark:text-neutral-300 transition-colors"
               aria-label={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
               title="Toggle Dark Mode"
             >
@@ -285,7 +284,7 @@ export const Header: React.FC<{ onOpenCart: () => void }> = ({ onOpenCart }) => 
 
             <Link
               to="/wishlist"
-              className="p-2 rounded-full hover:bg-neutral-100 dark:hover:bg-neutral-800 text-neutral-700 dark:text-neutral-300 relative transition-colors"
+              className="relative flex min-h-11 min-w-11 items-center justify-center p-2 rounded-full hover:bg-neutral-100 dark:hover:bg-neutral-800 text-neutral-700 dark:text-neutral-300 transition-colors"
               aria-label={`Wishlist${wishlistIds.length ? `, ${wishlistIds.length} saved` : ''}`}
               title="Wishlist"
             >
@@ -299,7 +298,7 @@ export const Header: React.FC<{ onOpenCart: () => void }> = ({ onOpenCart }) => 
 
             <Link
               to="/profile"
-              className="p-2 rounded-full hover:bg-neutral-100 dark:hover:bg-neutral-800 text-neutral-700 dark:text-neutral-300 transition-colors"
+              className="flex min-h-11 min-w-11 items-center justify-center p-2 rounded-full hover:bg-neutral-100 dark:hover:bg-neutral-800 text-neutral-700 dark:text-neutral-300 transition-colors"
               aria-label={user ? 'Profile and account' : 'Sign in or open account'}
               title="Profile / Account"
             >
@@ -309,7 +308,7 @@ export const Header: React.FC<{ onOpenCart: () => void }> = ({ onOpenCart }) => 
             <button
               onClick={onOpenCart}
               aria-label={`Cart ${totalItemsCount}`}
-              className="flex items-center gap-2 bg-neutral-950 dark:bg-lime-400 text-white dark:text-neutral-950 px-4 py-2 rounded-full font-bold text-sm shadow-md hover:bg-neutral-800 dark:hover:bg-lime-300 transition-all transform active:scale-95"
+              className="flex min-h-11 items-center gap-2 bg-neutral-950 dark:bg-lime-400 text-white dark:text-neutral-950 px-4 py-2 rounded-full font-bold text-sm shadow-md hover:bg-neutral-800 dark:hover:bg-lime-300 transition-all transform active:scale-95"
             >
               <ShoppingBag className="w-4 h-4" />
               <span className="hidden sm:inline">Cart</span>
@@ -322,23 +321,23 @@ export const Header: React.FC<{ onOpenCart: () => void }> = ({ onOpenCart }) => 
 
         {renderSearchForm(true)}
 
-        <nav className="flex items-center gap-6 py-2.5 overflow-x-auto no-scrollbar border-t border-neutral-100 dark:border-neutral-800 text-xs font-bold text-neutral-700 dark:text-neutral-300">
-          <Link to="/stores" className="text-lime-600 dark:text-lime-400 font-black hover:underline whitespace-nowrap flex items-center gap-1">
-            <Store className="w-3.5 h-3.5" /> LOCAL STORES
+        <nav className="flex items-center gap-2 overflow-x-auto border-t border-neutral-100 text-xs font-semibold text-neutral-700 no-scrollbar sm:gap-5 dark:border-neutral-800 dark:text-neutral-300">
+          <Link to="/stores" className="inline-flex min-h-11 items-center gap-1 whitespace-nowrap text-lime-600 font-bold hover:underline sm:hidden dark:text-lime-400">
+            <Store className="w-3.5 h-3.5" /> Local stores
           </Link>
-          <Link to="/categories" className="hover:text-lime-600 transition-colors whitespace-nowrap flex items-center gap-1">
-            <Grid2X2 className="w-3.5 h-3.5" /> CATEGORIES
+          <Link to="/categories" className="inline-flex min-h-11 items-center hover:text-lime-600 transition-colors whitespace-nowrap flex items-center gap-1">
+            <Grid2X2 className="w-3.5 h-3.5" /> Categories
           </Link>
           <span className="text-neutral-300 dark:text-neutral-700">|</span>
-          <Link to="/products?dept=men" className="hover:text-lime-600 transition-colors whitespace-nowrap">MEN</Link>
-          <Link to="/products?dept=women" className="hover:text-lime-600 transition-colors whitespace-nowrap">WOMEN</Link>
-          <Link to="/products?dept=kids" className="hover:text-lime-600 transition-colors whitespace-nowrap">KIDS</Link>
-          <Link to="/products?category=Footwear" className="hover:text-lime-600 transition-colors whitespace-nowrap">FOOTWEAR</Link>
-          <Link to="/products?category=Accessories" className="hover:text-lime-600 transition-colors whitespace-nowrap">ACCESSORIES</Link>
-          <Link to="/products?category=Beauty%20%26%20Personal%20Care" className="hover:text-lime-600 transition-colors whitespace-nowrap">BEAUTY &amp; CARE</Link>
+          <Link to="/products?dept=men" className="inline-flex min-h-11 items-center hover:text-lime-600 transition-colors whitespace-nowrap">Men</Link>
+          <Link to="/products?dept=women" className="inline-flex min-h-11 items-center hover:text-lime-600 transition-colors whitespace-nowrap">Women</Link>
+          <Link to="/products?dept=kids" className="inline-flex min-h-11 items-center hover:text-lime-600 transition-colors whitespace-nowrap">Kids</Link>
+          <Link to="/products?category=Footwear" className="inline-flex min-h-11 items-center hover:text-lime-600 transition-colors whitespace-nowrap">Footwear</Link>
+          <Link to="/products?category=Accessories" className="inline-flex min-h-11 items-center hover:text-lime-600 transition-colors whitespace-nowrap">Accessories</Link>
+          <Link to="/products?category=Beauty%20%26%20Personal%20Care" className="inline-flex min-h-11 items-center hover:text-lime-600 transition-colors whitespace-nowrap">Beauty &amp; Care</Link>
           <span className="text-neutral-300 dark:text-neutral-700">|</span>
-          <Link to="/partner" className="text-emerald-600 dark:text-emerald-400 font-extrabold hover:underline whitespace-nowrap flex items-center gap-1">
-            <PlusCircle className="w-3.5 h-3.5" /> LIST YOUR SHOP
+          <Link to="/partner" className="inline-flex min-h-11 items-center text-emerald-600 dark:text-emerald-400 font-extrabold hover:underline whitespace-nowrap flex items-center gap-1">
+            <PlusCircle className="w-3.5 h-3.5" /> List your shop
           </Link>
         </nav>
       </div>

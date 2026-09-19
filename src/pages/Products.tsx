@@ -188,7 +188,7 @@ export const Products: React.FC = () => {
             {searchQuery ? (
               <>Found <strong>{matchingStores.length}</strong> local store{matchingStores.length === 1 ? '' : 's'} and <strong>{sortedProducts.length}</strong> available product{sortedProducts.length === 1 ? '' : 's'} in Neemuch</>
             ) : (
-              <>Showing <strong>{sortedProducts.length}</strong> available items from local Neemuch stores. Same Day Delivery is ₹50 below ₹300 and free from ₹300; all products also support ₹80 Express Delivery on Saturday and Sunday.</>
+              <>Showing <strong>{sortedProducts.length}</strong> available items from local Neemuch stores. Same Day Delivery is available across the supported Neemuch service area, with Weekend Express available Saturday and Sunday.</>
             )}
           </p>
         </div>
@@ -287,7 +287,7 @@ export const Products: React.FC = () => {
                 {expressFilterActive ? 'No Weekend Express products are available right now' : 'No matching products found'}
               </h3>
               <p className="text-xs text-neutral-500 mb-6">
-                {expressFilterActive ? 'Same Day Delivery is still available from local Neemuch stores: ₹50 below ₹300 and free from ₹300.' : 'Try relaxing your search terms or clearing filters to view more items.'}
+                {expressFilterActive ? 'Same Day Delivery is still available from local Neemuch stores.' : 'Try relaxing your search terms or clearing filters to view more items.'}
               </p>
               <button
                 onClick={expressFilterActive ? () => updateParam('filter', 'all') : handleClearAll}

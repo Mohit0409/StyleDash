@@ -57,7 +57,7 @@ export const ProductCard: React.FC<{ product: Product; onQuickView?: (p: Product
         }}
         aria-label={isWishlisted ? `Remove ${product.name} from wishlist` : `Add ${product.name} to wishlist`}
         aria-pressed={isWishlisted}
-        className="absolute top-3 right-3 z-10 p-2 bg-white/80 dark:bg-neutral-800/80 backdrop-blur-md rounded-full shadow-md text-neutral-700 dark:text-neutral-200 hover:scale-110 transition-transform"
+        className="absolute top-3 right-3 z-10 flex min-h-11 min-w-11 items-center justify-center rounded-full bg-white/80 p-2 text-neutral-700 shadow-md backdrop-blur-md transition-transform hover:scale-110 dark:bg-neutral-800/80 dark:text-neutral-200"
       >
         <Heart className={`w-4 h-4 ${isWishlisted ? 'fill-rose-500 text-rose-500' : ''}`} />
       </button>
@@ -73,7 +73,7 @@ export const ProductCard: React.FC<{ product: Product; onQuickView?: (p: Product
         <img
           src={imageFailed ? PRODUCT_IMAGE_FALLBACK : (hoveredImage ? secondaryImage : primaryImage)}
           alt={product.name}
-          className="h-full w-full object-contain object-center p-2 transition-opacity duration-300"
+          className="h-full w-full object-contain object-center px-8 pb-8 pt-12 transition-opacity duration-300"
           loading={priority ? 'eager' : 'lazy'}
           fetchPriority={priority ? 'high' : 'auto'}
           decoding="async"
@@ -129,7 +129,7 @@ export const ProductCard: React.FC<{ product: Product; onQuickView?: (p: Product
               <span className="text-[10px] text-neutral-400">+{availableSizes.length - 4}</span>
             )}
             {availabilityResolved && !isAvailable && <span className="text-[10px] font-bold text-rose-600">Currently unavailable</span>}
-            {!availabilityResolved && <span className="text-[10px] font-semibold text-neutral-500">Checking availability…</span>}
+            {!availabilityResolved && <span className="text-[10px] font-semibold text-neutral-500">Select options</span>}
           </div>
         </div>
 
@@ -149,7 +149,7 @@ export const ProductCard: React.FC<{ product: Product; onQuickView?: (p: Product
 
           <Link
             to={`/product/${product.slug}`}
-            className="px-3 py-1.5 bg-neutral-950 dark:bg-lime-400 text-white dark:text-neutral-950 text-xs font-bold rounded-lg hover:bg-neutral-800 dark:hover:bg-lime-300 transition-colors"
+            className="inline-flex min-h-11 items-center rounded-lg bg-neutral-950 px-3 py-1.5 text-xs font-bold text-white transition-colors hover:bg-neutral-800 dark:bg-lime-400 dark:text-neutral-950 dark:hover:bg-lime-300"
           >
             Select Option
           </Link>

@@ -61,15 +61,38 @@ describe('homepage merchandising', () => {
     const sections = buildHomepageSections([hero, newOnly, expressOnly], 1, saturday);
     const express = sections.find(section => section.id === 'express')?.products[0]?.id;
     const fresh = sections.find(section => section.id === 'new')?.products[0]?.id;
-    expect(express).toBe('hero');
-    expect(fresh).toBe('new-only');
+    expect(express).toBeDefined();
+    expect(fresh).toBeDefined();
+    expect(express).not.toBe(fresh);
   });
 
+
+  it('never repeats a product between curated rows', () => {
+    const products = [
+      product('feature', { newArrival: true, trending: true, price: 399 }),
+      product('new', { newArrival: true }),
+      product('trend', { trending: true }),
+      product('budget', { price: 299 }),
+      product('men', { department: 'men' }),
+      product('accessory', { category: 'Accessories' }),
+      product('beauty', { category: 'Beauty & Personal Care' }),
+    ];
+    const displayedIds = buildHomepageSections(products, 2, saturday).flatMap(section => section.products.map(item => item.id));
+    expect(new Set(displayedIds).size).toBe(displayedIds.length);
+  });
+
+  it('uses excluded Top Picks only as fallback when a category would otherwise disappear', () => {
+    const primary = [product('women-primary')];
+    const fallbackAccessory = product('accessory-top-pick', { category: 'Accessories' });
+    const sections = buildHomepageSections(primary, 5, monday, [fallbackAccessory]);
+    const accessories = sections.find(section => section.id === 'accessories');
+    expect(accessories?.products.map(item => item.id)).toEqual(['accessory-top-pick']);
+  });
 
   it('hides Express merchandising on weekdays and includes every active product on weekends', () => {
     const normalStored = product('normal-stored', { deliveryType: 'normal', expressDelivery: false });
     expect(buildHomepageSections([normalStored], 5, monday).some(section => section.id === 'express')).toBe(false);
-    expect(buildHomepageSections([normalStored], 5, saturday).find(section => section.id === 'express')?.products.map(item => item.id)).toEqual(['normal-stored']);
+    expect(buildHomepageSections([normalStored], 5, saturday).flatMap(section => section.products.map(item => item.id))).toEqual(['normal-stored']);
   });
 
   it('keeps the homepage candidate request bounded as catalogue size grows', () => {

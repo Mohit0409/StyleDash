@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { ShieldCheck, Truck, RefreshCw, Zap } from 'lucide-react';
+import { ShieldCheck, RefreshCw, Zap } from 'lucide-react';
 import { CONFIG } from '../config';
 import { BrandWordmark } from './BrandWordmark';
 
@@ -10,14 +10,14 @@ export const Footer: React.FC = () => {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
 
         {/* Trust Badges */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-6 pb-12 border-b border-neutral-800 text-center">
+        <div className="grid grid-cols-1 gap-6 border-b border-neutral-800 pb-12 text-center sm:grid-cols-3">
           <div className="flex flex-col items-center gap-2">
             <div className="p-3 bg-neutral-900 rounded-full text-lime-400">
               <Zap className="w-6 h-6 fill-lime-400" />
             </div>
-            <h4 className="font-bold text-white text-sm">Same Day Delivery</h4>
+            <h4 className="font-bold text-white text-sm">Local delivery</h4>
             <p className="text-xs text-neutral-400">
-              FREE across our supported {CONFIG.SERVICE_CITY} service area
+              Same-day delivery across our supported {CONFIG.SERVICE_CITY} service area
             </p>
           </div>
           <div className="flex flex-col items-center gap-2">
@@ -40,19 +40,11 @@ export const Footer: React.FC = () => {
               Listings from participating local stores
             </p>
           </div>
-          <div className="flex flex-col items-center gap-2">
-            <div className="p-3 bg-neutral-900 rounded-full text-lime-400">
-              <Truck className="w-6 h-6" />
-            </div>
-            <h4 className="font-bold text-white text-sm">Express Delivery</h4>
-            <p className="text-xs text-neutral-400">
-              ₹80 on Saturday and Sunday
-            </p>
-          </div>
+
         </div>
 
         {/* Footer Nav Links */}
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-8 py-10">
+        <div className="grid grid-cols-2 gap-8 py-10 md:grid-cols-4 lg:grid-cols-6">
           <div className="col-span-2">
             <div className="mb-3 w-44 max-w-full">
               <BrandWordmark inverse />
@@ -65,13 +57,13 @@ export const Footer: React.FC = () => {
               Service Area: {CONFIG.SERVICE_CITY}, MP ({CONFIG.DEFAULT_PINCODE})
             </p>
             <p className="text-xs text-neutral-500">
-              Support: {CONFIG.LEGAL.SUPPORT_PHONE} | {CONFIG.LEGAL.SUPPORT_EMAIL}
+              Support: <a className="underline-offset-2 hover:text-lime-400 hover:underline" href={`tel:${CONFIG.LEGAL.SUPPORT_PHONE.replace(/\s+/g, '')}`}>{CONFIG.LEGAL.SUPPORT_PHONE}</a><span aria-hidden="true"> | </span><a className="underline-offset-2 hover:text-lime-400 hover:underline" href={`mailto:${CONFIG.LEGAL.SUPPORT_EMAIL}`}>{CONFIG.LEGAL.SUPPORT_EMAIL}</a>
             </p>
           </div>
 
-          <div>
-            <h5 className="font-bold text-white text-sm mb-3">Shop Departments</h5>
-            <ul className="space-y-2 text-xs">
+          <div className="col-span-2">
+            <h5 className="mb-3 text-sm font-bold text-white">Shop Departments</h5>
+            <ul className="grid grid-cols-2 gap-x-4 gap-y-2 text-xs">
               <li><Link to="/products?dept=men" className="hover:text-lime-400">Men&apos;s Fashion</Link></li>
               <li><Link to="/products?dept=women" className="hover:text-lime-400">Women&apos;s Clothing</Link></li>
               <li><Link to="/products?dept=kids" className="hover:text-lime-400">Kids Wear</Link></li>
