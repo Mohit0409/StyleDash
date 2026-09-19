@@ -8,6 +8,7 @@ import { Product } from '../types';
 import { productRepository } from '../repositories/productRepository';
 import { BANNERS } from '../data/banners';
 import { CONFIG } from '../config';
+import { selectTopPicks } from '../utils/homeMerchandising';
 
 export const Home: React.FC = () => {
   const [products, setProducts] = useState<Product[]>([]);
@@ -20,9 +21,9 @@ export const Home: React.FC = () => {
     });
   }, []);
 
-  const topPicks = [...products]
-    .sort((first, second) => Number(second.trending) - Number(first.trending) || second.rating - first.rating || second.reviewCount - first.reviewCount)
-    .slice(0, 8);
+  const discoveryDate = new Date();
+  const topPicks = selectTopPicks(products, 8, discoveryDate);
+  const topPickIds = topPicks.map(product => product.id);
 
   return (
     <div className="space-y-12 pb-16">
@@ -156,7 +157,7 @@ export const Home: React.FC = () => {
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <div className="p-2 bg-violet-600 text-white rounded-xl"><Trophy className="w-5 h-5" /></div>
-                <div><h2 className="text-2xl font-black text-neutral-900 dark:text-white">Top Picks</h2><p className="text-xs text-neutral-500">Customer favourites and highly rated local styles</p></div>
+                <div><h2 className="text-2xl font-black text-neutral-900 dark:text-white">Top Picks</h2><p className="text-xs text-neutral-500">A rotating mix from different local shops and categories</p></div>
               </div>
               <Link to="/products?sort=rating" className="text-xs font-bold text-lime-600 dark:text-lime-400 hover:underline flex items-center gap-1">View All <ArrowRight className="w-3.5 h-3.5" /></Link>
             </div>
@@ -164,7 +165,7 @@ export const Home: React.FC = () => {
           </section>
         )}
 
-        <HomepageMerchandising products={products} loading={loading} />
+        <HomepageMerchandising products={products} loading={loading} avoidProductIds={topPickIds} />
 
       </div>
     </div>
