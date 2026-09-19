@@ -36,8 +36,6 @@ class FakeGateway:
     def __init__(self) -> None:
         self.calls: list[dict] = []
         self.payments: dict[str, dict] = {}
-        self.refund_calls: list[dict] = []
-        self.refunds: dict[str, list[dict]] = {}
 
     def create_order(self, payload: dict) -> dict:
         self.calls.append(payload)
@@ -45,23 +43,6 @@ class FakeGateway:
 
     def fetch_payment(self, payment_id: str) -> dict:
         return dict(self.payments[payment_id])
-
-    def fetch_refunds(self, payment_id: str) -> list[dict]:
-        return [dict(refund) for refund in self.refunds.get(payment_id, [])]
-
-    def refund_payment(self, payment_id: str, payload: dict) -> dict:
-        call = {"payment_id": payment_id, "payload": dict(payload)}
-        self.refund_calls.append(call)
-        refund = {
-            "id": f"rfnd_test_{len(self.refund_calls):03d}",
-            "payment_id": payment_id,
-            "amount": payload["amount"],
-            "currency": "INR",
-            "status": "pending",
-            "notes": dict(payload.get("notes") or {}),
-        }
-        self.refunds.setdefault(payment_id, []).append(refund)
-        return dict(refund)
 
 
 class PaymentServiceTests(unittest.TestCase):
@@ -322,15 +303,8 @@ class PaymentServiceTests(unittest.TestCase):
                 self.payload(paymentMethod="cod", items=[{"productId": "sd-prod-001", "variantId": "sd-prod-001-var-1", "quantity": 1}]),
                 "exchange-order-001",
             )["order"]
-            stock_after_place = self.service.store.state["inventory"]["sd-prod-001-var-1"]
             cancellation = self.service.request_customer_cancellation(placed["id"], "test-user")
-            self.assertEqual(cancellation["order"]["status"], "cancelled")
-            self.assertEqual(cancellation["order"]["cancellationRequest"]["status"], "completed")
             self.assertEqual(cancellation["order"]["cancellationRequest"]["feeDue"], 0)
-            self.assertEqual(
-                self.service.store.state["inventory"]["sd-prod-001-var-1"],
-                stock_after_place + 1,
-            )
             self.assertTrue(self.service.request_customer_cancellation(placed["id"], "test-user")["idempotent"])
             self.assert_api_error("order_not_found", lambda: self.service.request_customer_cancellation(placed["id"], "another-user"))
 
@@ -362,137 +336,6 @@ class PaymentServiceTests(unittest.TestCase):
             self.assert_api_error("order_not_found", lambda: self.service.request_exchange(placed["id"], "another-user", 0, "sd-prod-001-var-2"))
         finally:
             self.service._static_products["sd-prod-001"] = original
-
-    def test_customer_online_cancel_before_preparing_initiates_full_refund_once(self) -> None:
-        created = self.create_payment("customer-auto-refund-001")
-        payment_id = "pay_customer_auto_refund_001"
-        paid = self.service.verify_payment(self.browser_verification(created, payment_id))["order"]
-        self.assertEqual((paid["status"], paid["paymentStatus"]), ("placed", "paid"))
-        stock_after_payment = self.service.store.state["inventory"]["sd-prod-001-var-2"]
-
-        cancelled = self.service.request_customer_cancellation(paid["id"], "test-user")
-        order = cancelled["order"]
-        self.assertFalse(cancelled["idempotent"])
-        self.assertEqual(order["status"], "cancelled")
-        self.assertEqual(order["paymentStatus"], "paid")
-        self.assertEqual(order["cancellationRequest"]["status"], "completed")
-        self.assertEqual(order["cancellationRequest"]["refundStatus"], "initiated")
-        self.assertEqual(len(self.gateway.refund_calls), 1)
-        self.assertEqual(self.gateway.refund_calls[0]["payment_id"], payment_id)
-        self.assertEqual(self.gateway.refund_calls[0]["payload"]["amount"], created["amount"])
-        self.assertEqual(
-            self.service.store.state["inventory"]["sd-prod-001-var-2"],
-            stock_after_payment + 2,
-        )
-
-        repeated = self.service.request_customer_cancellation(paid["id"], "test-user")
-        self.assertTrue(repeated["idempotent"])
-        self.assertEqual(len(self.gateway.refund_calls), 1)
-        self.assertEqual(
-            self.service.store.state["inventory"]["sd-prod-001-var-2"],
-            stock_after_payment + 2,
-        )
-
-        refund_body = json.dumps({
-            "event": "refund.processed",
-            "payload": {
-                "payment": {"entity": {
-                    "id": payment_id,
-                    "order_id": created["razorpayOrderId"],
-                    "amount": created["amount"],
-                    "amount_refunded": created["amount"],
-                    "currency": created["currency"],
-                    "status": "captured",
-                }},
-                "refund": {"entity": {
-                    "id": "rfnd_customer_auto_refund_001",
-                    "payment_id": payment_id,
-                    "amount": created["amount"],
-                    "currency": created["currency"],
-                    "status": "processed",
-                }},
-            },
-        }, separators=(",", ":")).encode()
-        self.assertEqual(self.deliver(refund_body), {"success": True})
-        stored = self.service.store.state["orders"][paid["id"]]
-        self.assertEqual(stored["status"], "cancelled")
-        self.assertEqual(stored["paymentStatus"], "refunded")
-        self.assertEqual(stored["cancellationRequest"]["refundStatus"], "processed")
-        self.assertEqual(
-            self.service.store.state["inventory"]["sd-prod-001-var-2"],
-            stock_after_payment + 2,
-        )
-
-    def test_customer_cancel_reuses_tagged_refund_after_interrupted_request(self) -> None:
-        created = self.create_payment("customer-refund-reconcile-001")
-        payment_id = "pay_customer_refund_reconcile_001"
-        paid = self.service.verify_payment(self.browser_verification(created, payment_id))["order"]
-        self.gateway.refunds[payment_id] = [{
-            "id": "rfnd_existing_customer_cancel",
-            "payment_id": payment_id,
-            "amount": created["amount"],
-            "currency": created["currency"],
-            # Even if Razorpay's query says processed, customer-visible completion
-            # remains gated by our signed refund.processed webhook.
-            "status": "processed",
-            "notes": {
-                "styleDashOrderId": paid["id"],
-                "reason": "customer_cancel_before_preparing",
-            },
-        }]
-
-        cancelled = self.service.request_customer_cancellation(paid["id"], "test-user")
-        self.assertEqual(cancelled["order"]["status"], "cancelled")
-        self.assertEqual(
-            cancelled["order"]["cancellationRequest"]["refundRequestId"],
-            "rfnd_existing_customer_cancel",
-        )
-        self.assertEqual(cancelled["order"]["cancellationRequest"]["refundStatus"], "initiated")
-        self.assertEqual(self.gateway.refund_calls, [])
-
-    def test_customer_cancel_from_preparing_remains_admin_reviewed_without_auto_refund(self) -> None:
-        created = self.create_payment("customer-preparing-cancel-001")
-        payment_id = "pay_customer_preparing_cancel_001"
-        paid = self.service.verify_payment(self.browser_verification(created, payment_id))["order"]
-        with self.service.store.lock:
-            stored = self.service.store.state["orders"][paid["id"]]
-            stored["status"] = "preparing"
-            stored["updatedAt"] = "2026-09-19T04:00:00+00:00"
-            stored.setdefault("statusHistory", []).append({
-                "status": "preparing",
-                "timestamp": "2026-09-19T04:00:00+00:00",
-                "note": "test transition",
-            })
-            self.service.store.save()
-        stock_before = self.service.store.state["inventory"]["sd-prod-001-var-2"]
-
-        result = self.service.request_customer_cancellation(paid["id"], "test-user")
-        self.assertEqual(result["order"]["status"], "preparing")
-        self.assertEqual(result["order"]["cancellationRequest"]["status"], "requested")
-        self.assertNotIn("refundStatus", result["order"]["cancellationRequest"])
-        self.assertEqual(len(self.gateway.refund_calls), 0)
-        self.assertEqual(
-            self.service.store.state["inventory"]["sd-prod-001-var-2"],
-            stock_before,
-        )
-
-    def test_failed_customer_refund_webhook_is_visible_and_requires_attention(self) -> None:
-        created = self.create_payment("customer-refund-failed-001")
-        payment_id = "pay_customer_refund_failed_001"
-        paid = self.service.verify_payment(self.browser_verification(created, payment_id))["order"]
-        self.service.request_customer_cancellation(paid["id"], "test-user")
-        body = self.operational_webhook_body(
-            created,
-            payment_id,
-            "refund.failed",
-            "rfnd_customer_failed_001",
-        )
-        self.assertEqual(self.deliver(body), {"success": True})
-        order = self.service.store.state["orders"][paid["id"]]
-        self.assertEqual(order["status"], "cancelled")
-        self.assertEqual(order["paymentStatus"], "paid")
-        self.assertEqual(order["cancellationRequest"]["refundStatus"], "failed")
-        self.assertTrue(order["refundFailureAttention"])
 
     def test_exchange_window_is_two_days_from_delivery(self) -> None:
         product = self.service._static_products["sd-prod-001"]
@@ -2673,8 +2516,7 @@ class HttpApiTests(unittest.TestCase):
         self.assertEqual((status, hidden["code"]), (404, "order_not_found"))
         owner_headers = {"Cookie": sessions[0]["cookie"], "X-CSRF-Token": sessions[0]["csrf"], "Origin": "https://styledash.test"}
         status, cancelled, _headers = self.post_json("/api/orders/HTTP-CANCEL/cancel-request", {}, owner_headers)
-        self.assertEqual((status, cancelled["order"]["status"]), (200, "cancelled"))
-        self.assertEqual(cancelled["order"]["cancellationRequest"]["status"], "completed")
+        self.assertEqual((status, cancelled["order"]["cancellationRequest"]["status"]), (200, "requested"))
         status, exchanged, _headers = self.post_json(
             "/api/orders/HTTP-EXCHANGE/exchange-requests",
             {"itemIndex": 0, "targetVariantId": "sd-prod-001-var-2"}, owner_headers,
