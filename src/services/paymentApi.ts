@@ -109,9 +109,6 @@ export interface ServerOrder {
   cancellationRequest?: {
     status: 'requested' | 'completed'; requestedAt: string; feeDue: number; feePaid: boolean;
     feeCollectionMethod?: 'cash' | 'upi_at_delivery'; feeCollectedAt?: string; completedAt?: string;
-    refundStatus?: 'initiated' | 'processed' | 'failed';
-    refundRequestedAt?: string; refundInitiatedAt?: string; refundRequestId?: string;
-    refundFailedAt?: string; refundProcessedAt?: string;
   };
   exchangeRequests?: Array<{
     id: string; itemIndex: number; productId: string; sourceVariantId: string; sourceSize: string;

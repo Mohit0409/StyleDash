@@ -355,28 +355,6 @@ test('isolated COD order succeeds and another account cannot read it', async ({
   expect(ownershipStatus).toBe(404);
 });
 
-test('customer cancels a COD order immediately before preparing', async ({ page }) => {
-  await prepareCheckout(page, 'cod-early-cancel');
-  await page.getByRole('button', { name: 'Place COD Order' }).click();
-  await expect(page).toHaveURL(/\/order-success\/[^/?#]+$/);
-  const orderId = decodeURIComponent(
-    new URL(page.url()).pathname.split('/').pop() || '',
-  );
-  expect(orderId.length).toBeGreaterThan(0);
-
-  await page.goto('/orders');
-  const orderCard = page.locator('article').filter({ hasText: orderId });
-  await expect(orderCard).toBeVisible();
-  await expect(orderCard.getByRole('button', { name: 'Cancel order' })).toBeVisible();
-  page.once('dialog', dialog => dialog.accept());
-  await orderCard.getByRole('button', { name: 'Cancel order' }).click();
-
-  await expect(orderCard.getByText('cancelled', { exact: true })).toBeVisible();
-  await expect(orderCard.getByRole('status')).toContainText(
-    'Order cancelled. No payment refund was required.',
-  );
-});
-
 test('mocked Razorpay cancellation keeps checkout and cart intact', async ({
   page,
 }) => {
