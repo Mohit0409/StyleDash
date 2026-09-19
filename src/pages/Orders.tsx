@@ -12,6 +12,25 @@ const statusClass = (value: string) => value === 'cancelled'
     ? 'bg-green-100 text-green-700 dark:bg-green-950/40 dark:text-green-300'
     : 'bg-lime-100 text-lime-800 dark:bg-lime-950/40 dark:text-lime-300';
 
+const EARLY_CANCEL_STATUSES = new Set(['payment_review_required', 'placed', 'confirmed']);
+const CANCELLATION_STATUSES = new Set(['payment_pending', 'payment_review_required', 'placed', 'confirmed', 'preparing', 'packed', 'out_for_delivery']);
+const isOnlinePayment = (order: ServerOrder) => order.paymentMethod === 'upi' || order.paymentMethod === 'card';
+const cancellationButtonLabel = (order: ServerOrder) => {
+  if (EARLY_CANCEL_STATUSES.has(order.status)) return isOnlinePayment(order) ? 'Cancel & get refund' : 'Cancel order';
+  return order.status === 'out_for_delivery' ? 'Request cancellation (₹50)' : 'Request cancellation';
+};
+const cancellationStatusText = (order: ServerOrder) => {
+  const request = order.cancellationRequest;
+  if (!request) return '';
+  if (request.refundStatus === 'processed') return 'Order cancelled. Your full refund has been confirmed to the original payment method.';
+  if (request.refundStatus === 'failed') return 'Order cancelled, but the refund needs attention. Please contact Vibe4You support.';
+  if (request.refundStatus === 'initiated') return 'Order cancelled. Your full refund has been initiated to the original payment method and is awaiting payment-provider confirmation.';
+  if (request.status === 'completed') return 'Order cancelled. No payment refund was required.';
+  return request.feeDue > 0
+    ? `Cancellation requested. ₹${request.feeDue} fee ${request.feePaid ? 'paid' : 'due'}.`
+    : 'Cancellation requested. No cancellation fee applies.';
+};
+
 export const Orders: React.FC = () => {
   const [orders, setOrders] = useState<ServerOrder[]>([]);
   const [loading, setLoading] = useState(true);
@@ -24,10 +43,18 @@ export const Orders: React.FC = () => {
   }, []);
 
   const replaceOrder = (updated: ServerOrder) => setOrders(current => current.map(order => order.id === updated.id ? updated : order));
-  const requestCancellation = async (orderId: string) => {
-    if (!window.confirm('Submit this cancellation request? A ₹50 fee applies if the order is already out for delivery.')) return;
-    setBusyOrderId(orderId); setError('');
-    try { replaceOrder(await orderApi.requestCancellation(orderId)); }
+  const requestCancellation = async (order: ServerOrder) => {
+    const early = EARLY_CANCEL_STATUSES.has(order.status);
+    const confirmation = early
+      ? isOnlinePayment(order)
+        ? 'Cancel this order now and initiate a full refund to your original payment method?'
+        : 'Cancel this Cash on Delivery order now?'
+      : order.status === 'out_for_delivery'
+        ? 'Submit this cancellation request? A ₹50 fee applies because the order is already out for delivery.'
+        : 'Submit this cancellation request?';
+    if (!window.confirm(confirmation)) return;
+    setBusyOrderId(order.id); setError('');
+    try { replaceOrder(await orderApi.requestCancellation(order.id)); }
     catch (cause) { setError(cause instanceof Error ? cause.message : 'Cancellation could not be requested.'); }
     finally { setBusyOrderId(''); }
   };
@@ -61,12 +88,12 @@ export const Orders: React.FC = () => {
                 <strong className="shrink-0">₹{item.lineTotal}</strong>
                 {item.exchangeEligible && order.status === 'delivered' && !order.exchangeRequests?.some(request => request.itemIndex === itemIndex && ['requested', 'approved', 'completed'].includes(request.status)) && <div className="basis-full rounded-xl bg-sky-50 p-3 dark:bg-sky-950/20"><p className="mb-2 text-xs font-bold text-sky-800 dark:text-sky-200">Exchange this item for another available size (₹50)</p><div className="flex flex-wrap gap-2"><select aria-label={`Replacement size for ${item.productName}`} value={exchangeChoice[`${order.id}:${itemIndex}`] || ''} onChange={event => setExchangeChoice(current => ({ ...current, [`${order.id}:${itemIndex}`]: event.target.value }))} className="rounded-lg border bg-white px-3 py-2 text-sm dark:bg-neutral-900"><option value="">Choose size</option>{(item.exchangeOptions || []).map(option => <option key={option.variantId} value={option.variantId}>{option.size}</option>)}</select><button type="button" disabled={busyOrderId === order.id || !(item.exchangeOptions || []).length} onClick={() => void requestExchange(order.id, itemIndex)} className="rounded-lg bg-sky-700 px-3 py-2 text-xs font-black text-white disabled:opacity-50">Request exchange</button></div></div>}
               </div>)}</div>
-              {order.cancellationRequest && <div role="status" className="rounded-xl border border-amber-300 bg-amber-50 p-3 text-sm font-bold text-amber-900 dark:border-amber-800 dark:bg-amber-950/20 dark:text-amber-200">Cancellation {order.cancellationRequest.status}. {order.cancellationRequest.feeDue > 0 ? `₹${order.cancellationRequest.feeDue} fee ${order.cancellationRequest.feePaid ? 'paid' : 'due'}.` : 'No cancellation fee applies.'}</div>}
+              {order.cancellationRequest && <div role="status" className="rounded-xl border border-amber-300 bg-amber-50 p-3 text-sm font-bold text-amber-900 dark:border-amber-800 dark:bg-amber-950/20 dark:text-amber-200">{cancellationStatusText(order)}</div>}
               {(order.exchangeRequests || []).map(request => <div key={request.id} role="status" className="rounded-xl border border-sky-200 bg-sky-50 p-3 text-sm dark:border-sky-900 dark:bg-sky-950/20"><strong>Exchange {statusLabel(request.status)}:</strong> {request.sourceSize} to {request.targetSize} · ₹{request.feeDue} fee {request.feePaid ? 'paid' : 'due'}</div>)}
               {order.status === 'cancelled' && order.cancellationReason && <div className="rounded-xl border border-red-200 bg-red-50 dark:border-red-900 dark:bg-red-950/20 p-3 text-sm"><strong>Cancellation reason:</strong> {order.cancellationReason}</div>}
               <div className="flex flex-wrap items-center justify-between gap-3 pt-1">
                 <p className="text-sm text-neutral-500">Deliver to <strong className="text-neutral-800 dark:text-neutral-200">{order.address.name}</strong> · {order.address.phone}</p>
-                <div className="flex flex-wrap gap-2">{!order.cancellationRequest && ['payment_pending','payment_review_required','placed','confirmed','preparing','packed','out_for_delivery'].includes(order.status) && <button type="button" disabled={busyOrderId === order.id} onClick={() => void requestCancellation(order.id)} className="rounded-xl border border-red-300 px-4 py-2.5 text-sm font-black text-red-700 disabled:opacity-50">{order.status === 'out_for_delivery' ? 'Cancel order (₹50)' : 'Cancel order'}</button>}<Link to={`/orders/${encodeURIComponent(order.id)}/track`} className="px-4 py-2.5 rounded-xl bg-neutral-950 text-white dark:bg-lime-400 dark:text-neutral-950 font-black">Track order</Link></div>
+                <div className="flex flex-wrap gap-2">{!order.cancellationRequest && CANCELLATION_STATUSES.has(order.status) && <button type="button" disabled={busyOrderId === order.id} onClick={() => void requestCancellation(order)} className="rounded-xl border border-red-300 px-4 py-2.5 text-sm font-black text-red-700 disabled:opacity-50">{cancellationButtonLabel(order)}</button>}<Link to={`/orders/${encodeURIComponent(order.id)}/track`} className="px-4 py-2.5 rounded-xl bg-neutral-950 text-white dark:bg-lime-400 dark:text-neutral-950 font-black">Track order</Link></div>
               </div>
             </article>)}</div>}
     </div>
