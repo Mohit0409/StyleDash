@@ -5,14 +5,12 @@ interface BrandWordmarkProps {
   showTagline?: boolean;
   inverse?: boolean;
   className?: string;
-  taglineClassName?: string;
 }
 
 export const BrandWordmark: React.FC<BrandWordmarkProps> = ({
   showTagline = false,
   inverse = false,
   className = '',
-  taglineClassName = '',
 }) => {
   const ink = inverse
     ? 'text-[#f7f3ee]'
@@ -78,7 +76,7 @@ export const BrandWordmark: React.FC<BrandWordmarkProps> = ({
       </svg>
 
       {showTagline && (
-        <span className={`mt-1 whitespace-nowrap text-center text-xs font-medium tracking-normal sm:text-sm ${taglineInk} ${taglineClassName}`}>
+        <span className={`mt-1 whitespace-nowrap text-center text-xs sm:text-sm font-medium tracking-normal ${taglineInk}`}>
           {CONFIG.TAGLINE}
         </span>
       )}
