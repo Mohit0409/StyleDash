@@ -2879,7 +2879,13 @@ class StyleDashRequestHandler(SimpleHTTPRequestHandler):
         return self.rfile.read(length)
 
     def _rate_limit(self, route: str, limit: int) -> None:
-        if not self.rate_limiter.allow(self._client_key(route), limit):
+        raw_multiplier = os.environ.get("STYLEDASH_E2E_RATE_LIMIT_MULTIPLIER", "1")
+        try:
+            multiplier = max(1, min(int(raw_multiplier), 100))
+        except (TypeError, ValueError):
+            multiplier = 1
+        effective_limit = limit * multiplier
+        if not self.rate_limiter.allow(self._client_key(route), effective_limit):
             raise ApiError(HTTPStatus.TOO_MANY_REQUESTS, "Too many requests. Please wait and try again.", "rate_limited")
 
     def _password_reset_rate_limit(self, payload: dict[str, Any]) -> None:
