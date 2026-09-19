@@ -161,7 +161,7 @@ export const Header: React.FC<{ onOpenCart: () => void }> = ({ onOpenCart }) => 
     return (
       <form
         onSubmit={handleSearchSubmit}
-        className={`${mobile ? 'md:hidden pb-3' : 'hidden md:block flex-1 max-w-lg'} relative`}
+        className={`${mobile ? 'md:hidden pb-2' : 'hidden md:block flex-1 max-w-lg'} relative`}
         role="search"
       >
         <input
@@ -180,9 +180,9 @@ export const Header: React.FC<{ onOpenCart: () => void }> = ({ onOpenCart }) => 
           aria-expanded={showSuggestionPanel}
           aria-activedescendant={activeSuggestionIndex >= 0 ? `${listboxId}-${activeSuggestionIndex}` : undefined}
           role="combobox"
-          placeholder={mobile ? 'Search products, brands, categories, or stores' : 'Search products, brands, categories, or local Neemuch stores...'}
+          placeholder={mobile ? 'Search products or local stores' : 'Search products, brands, categories, or local Neemuch stores...'}
           className={mobile
-            ? 'w-full pl-10 pr-11 py-2.5 rounded-xl border border-neutral-300 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-800 text-neutral-900 dark:text-white placeholder-neutral-400 focus:outline-none focus:ring-2 focus:ring-lime-400 text-sm'
+            ? 'min-h-11 w-full rounded-xl border border-neutral-300 bg-neutral-50 py-2.5 pl-10 pr-11 text-sm text-neutral-900 placeholder-neutral-400 focus:outline-none focus:ring-2 focus:ring-lime-400 dark:border-neutral-700 dark:bg-neutral-800 dark:text-white'
             : 'w-full pl-10 pr-11 py-2 rounded-full border border-neutral-300 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-800 text-neutral-900 dark:text-white placeholder-neutral-400 focus:outline-none focus:ring-2 focus:ring-lime-400 text-sm transition-all'}
         />
         <Search className={`w-4 h-4 text-neutral-400 absolute left-3.5 ${mobile ? 'top-[0.7rem]' : 'top-1/2 -translate-y-1/2'}`} />
@@ -254,16 +254,20 @@ export const Header: React.FC<{ onOpenCart: () => void }> = ({ onOpenCart }) => 
       </div>
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex items-center justify-between h-16 gap-2 sm:gap-4">
-          <div className="flex min-w-0 items-center gap-2 sm:gap-6">
-            <Link to="/" aria-label="vibe4you home" className="group block w-[168px] sm:w-[205px]">
-              <BrandWordmark showTagline className="transition-transform duration-200 group-hover:scale-[1.015]" />
+        <div className="flex min-h-16 items-center justify-between gap-2 py-1.5 sm:h-16 sm:py-0 sm:gap-4">
+          <div className="flex min-w-0 shrink items-center">
+            <Link
+              to="/"
+              aria-label="vibe4you home"
+              className="group block w-[clamp(7.25rem,37vw,9.5rem)] shrink-0 sm:w-[205px]"
+            >
+              <BrandWordmark showTagline taglineClassName="hidden sm:block" className="transition-transform duration-200 group-hover:scale-[1.015]" />
             </Link>
           </div>
 
           {renderSearchForm(false)}
 
-          <div className="flex shrink-0 items-center gap-1 sm:gap-3">
+          <div className="flex shrink-0 items-center gap-0.5 sm:gap-3">
             <Link
               to="/stores"
               className="hidden sm:flex min-h-11 items-center gap-1.5 px-3 py-1.5 text-xs font-extrabold text-neutral-800 dark:text-neutral-200 hover:text-lime-600 transition-colors"
@@ -275,7 +279,7 @@ export const Header: React.FC<{ onOpenCart: () => void }> = ({ onOpenCart }) => 
 
             <button
               onClick={toggleTheme}
-              className="flex min-h-11 min-w-11 items-center justify-center p-2 rounded-full hover:bg-neutral-100 dark:hover:bg-neutral-800 text-neutral-700 dark:text-neutral-300 transition-colors"
+              className="hidden min-h-11 min-w-11 items-center justify-center rounded-full p-2 text-neutral-700 transition-colors hover:bg-neutral-100 dark:text-neutral-300 dark:hover:bg-neutral-800 sm:flex"
               aria-label={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
               title="Toggle Dark Mode"
             >
@@ -284,7 +288,7 @@ export const Header: React.FC<{ onOpenCart: () => void }> = ({ onOpenCart }) => 
 
             <Link
               to="/wishlist"
-              className="relative flex min-h-11 min-w-11 items-center justify-center p-2 rounded-full hover:bg-neutral-100 dark:hover:bg-neutral-800 text-neutral-700 dark:text-neutral-300 transition-colors"
+              className="relative flex min-h-11 min-w-11 items-center justify-center rounded-full p-2 text-neutral-700 transition-colors hover:bg-neutral-100 dark:text-neutral-300 dark:hover:bg-neutral-800"
               aria-label={`Wishlist${wishlistIds.length ? `, ${wishlistIds.length} saved` : ''}`}
               title="Wishlist"
             >
@@ -298,7 +302,7 @@ export const Header: React.FC<{ onOpenCart: () => void }> = ({ onOpenCart }) => 
 
             <Link
               to="/profile"
-              className="flex min-h-11 min-w-11 items-center justify-center p-2 rounded-full hover:bg-neutral-100 dark:hover:bg-neutral-800 text-neutral-700 dark:text-neutral-300 transition-colors"
+              className="flex min-h-11 min-w-11 items-center justify-center rounded-full p-2 text-neutral-700 transition-colors hover:bg-neutral-100 dark:text-neutral-300 dark:hover:bg-neutral-800"
               aria-label={user ? 'Profile and account' : 'Sign in or open account'}
               title="Profile / Account"
             >
@@ -308,7 +312,7 @@ export const Header: React.FC<{ onOpenCart: () => void }> = ({ onOpenCart }) => 
             <button
               onClick={onOpenCart}
               aria-label={`Cart ${totalItemsCount}`}
-              className="flex min-h-11 items-center gap-2 bg-neutral-950 dark:bg-lime-400 text-white dark:text-neutral-950 px-4 py-2 rounded-full font-bold text-sm shadow-md hover:bg-neutral-800 dark:hover:bg-lime-300 transition-all transform active:scale-95"
+              className="flex min-h-11 items-center gap-1.5 rounded-full bg-neutral-950 px-2.5 py-2 text-sm font-bold text-white shadow-md transition-all active:scale-95 hover:bg-neutral-800 dark:bg-lime-400 dark:text-neutral-950 dark:hover:bg-lime-300 sm:gap-2 sm:px-4"
             >
               <ShoppingBag className="w-4 h-4" />
               <span className="hidden sm:inline">Cart</span>
@@ -321,8 +325,20 @@ export const Header: React.FC<{ onOpenCart: () => void }> = ({ onOpenCart }) => 
 
         {renderSearchForm(true)}
 
-        <nav className="flex items-center gap-2 overflow-x-auto border-t border-neutral-100 text-xs font-semibold text-neutral-700 no-scrollbar sm:gap-5 dark:border-neutral-800 dark:text-neutral-300">
-          <Link to="/stores" className="inline-flex min-h-11 items-center gap-1 whitespace-nowrap text-lime-600 font-bold hover:underline sm:hidden dark:text-lime-400">
+        <nav
+          aria-label="Shop navigation"
+          className="-mx-4 flex items-center gap-1.5 overflow-x-auto border-t border-neutral-100 px-4 py-1 text-xs font-semibold text-neutral-700 no-scrollbar dark:border-neutral-800 dark:text-neutral-300 sm:mx-0 sm:gap-4 sm:px-0 sm:py-0"
+        >
+          <button
+            type="button"
+            onClick={toggleTheme}
+            className="inline-flex min-h-11 shrink-0 items-center gap-1.5 rounded-full bg-neutral-100 px-3 text-neutral-700 dark:bg-neutral-800 dark:text-neutral-200 sm:hidden"
+            aria-label={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
+          >
+            {isDark ? <Sun className="h-3.5 w-3.5 text-amber-400" /> : <Moon className="h-3.5 w-3.5" />}
+            <span>{isDark ? 'Light' : 'Dark'}</span>
+          </button>
+          <Link to="/stores" className="inline-flex min-h-11 shrink-0 items-center gap-1 rounded-full px-2.5 whitespace-nowrap text-lime-600 font-bold hover:bg-lime-50 sm:px-0 sm:hover:bg-transparent sm:hover:underline sm:hidden dark:text-lime-400 dark:hover:bg-lime-950/30">
             <Store className="w-3.5 h-3.5" /> Local stores
           </Link>
           <Link to="/categories" className="inline-flex min-h-11 items-center hover:text-lime-600 transition-colors whitespace-nowrap flex items-center gap-1">

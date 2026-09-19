@@ -27,69 +27,69 @@ export const Home: React.FC = () => {
   const merchandisingProducts = products.filter(product => !topPickIds.has(product.id));
 
   return (
-    <div className="space-y-12 pb-16">
+    <div className="space-y-10 pb-16 sm:space-y-12">
       <SEO title="Vibe4You - Your look, delivered fast" />
 
       {/* Hero Section */}
-      <section className="relative overflow-hidden bg-neutral-950 text-white py-16 lg:py-24 px-4 sm:px-6 lg:px-8">
-        <div className="max-w-7xl mx-auto grid lg:grid-cols-2 gap-12 items-center">
-          <div className="space-y-6 z-10">
-            <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-lime-400 text-neutral-950 text-xs font-black uppercase tracking-wider">
+      <section className="relative overflow-hidden bg-neutral-950 px-4 py-8 text-white sm:px-6 sm:py-12 lg:px-8 lg:py-20">
+        <div className="mx-auto grid max-w-7xl items-center gap-8 lg:grid-cols-2 lg:gap-12">
+          <div className="z-10 space-y-5 sm:space-y-6">
+            <div className="inline-flex max-w-full items-center gap-2 rounded-full bg-lime-400 px-3 py-1.5 text-[11px] font-black uppercase tracking-wide text-neutral-950 sm:text-xs sm:tracking-wider">
               <Zap className="w-3.5 h-3.5 fill-neutral-950" /> Same Day Delivery in {CONFIG.SERVICE_CITY}
             </div>
 
-            <h1 className="text-4xl sm:text-6xl font-black tracking-tight leading-none">
+            <h1 className="text-[2.5rem] font-black leading-[0.96] tracking-tight sm:text-6xl sm:leading-none">
               Your look, <br />
               <span className="text-lime-400">delivered fast.</span>
             </h1>
 
-            <p className="text-neutral-400 text-sm sm:text-base max-w-lg leading-relaxed">
+            <p className="max-w-lg text-sm leading-relaxed text-neutral-300 sm:text-base sm:text-neutral-400">
               Trending streetwear, ethnic wear, footwear and last-minute party outfits dispatched from verified local fashion boutiques straight to your doorstep.
             </p>
 
-            <div className="flex flex-wrap gap-4 pt-2">
+            <div className="grid grid-cols-2 gap-3 pt-1 sm:flex sm:flex-wrap sm:gap-4 sm:pt-2">
               <Link
                 to="/products?dept=women"
-                className="inline-flex min-h-11 items-center justify-center px-8 py-3.5 bg-lime-400 text-neutral-950 font-black rounded-xl text-sm shadow-xl hover:bg-lime-300 transition-all transform hover:-translate-y-0.5"
+                className="inline-flex min-h-11 items-center justify-center rounded-xl bg-lime-400 px-4 py-3 text-sm font-black text-neutral-950 shadow-xl transition-all hover:-translate-y-0.5 hover:bg-lime-300 sm:px-8 sm:py-3.5"
               >
                 Shop Women
               </Link>
               <Link
                 to="/products?dept=men"
-                className="inline-flex min-h-11 items-center justify-center rounded-xl border border-white/30 bg-white/10 px-8 py-3.5 text-sm font-black text-white transition-all hover:bg-white/20"
+                className="inline-flex min-h-11 items-center justify-center rounded-xl border border-white/30 bg-white/10 px-4 py-3 text-sm font-black text-white transition-all hover:bg-white/20 sm:px-8 sm:py-3.5"
               >
                 Shop Men
               </Link>
               <Link
                 to="/products?filter=express"
-                className="inline-flex min-h-11 items-center justify-center gap-1.5 rounded-xl border border-rose-300/70 px-6 py-3.5 text-sm font-black text-rose-100 transition-all hover:bg-rose-500/15"
+                className="col-span-2 inline-flex min-h-11 items-center justify-center gap-1.5 rounded-xl border border-rose-300/60 px-4 py-3 text-sm font-black text-rose-100 transition-all hover:bg-rose-500/15 sm:col-auto sm:px-6 sm:py-3.5"
               >
                 <Zap className="w-4 h-4 fill-white" /> Weekend Express Picks
               </Link>
             </div>
 
             {/* Quick Specs */}
-            <div className="pt-6 border-t border-neutral-800 grid grid-cols-3 gap-4 text-xs text-neutral-400">
-              <div><strong className="text-white block text-sm">Same Day</strong> Fast local delivery</div>
-              <div><strong className="text-white block text-sm">Local Stores</strong> Curated Marketplace</div>
-              <Link to="/products?maxPrice=499" className="flex min-h-11 flex-col justify-center rounded focus-visible:outline focus-visible:outline-2 focus-visible:outline-lime-400">
-                <strong className="text-white block text-sm">Shop by Budget</strong> Under ₹199, ₹299 &amp; ₹499
+            <div className="grid grid-cols-3 gap-2 border-t border-neutral-800 pt-5 text-[11px] leading-4 text-neutral-400 sm:gap-4 sm:pt-6 sm:text-xs">
+              <div className="rounded-xl bg-white/[0.04] p-3"><strong className="mb-1 block text-sm text-white">Same Day</strong>Fast local delivery</div>
+              <div className="rounded-xl bg-white/[0.04] p-3"><strong className="mb-1 block text-sm text-white">Local Stores</strong>Verified local shops</div>
+              <Link to="/products?maxPrice=499" className="flex min-h-11 flex-col justify-center rounded-xl bg-white/[0.04] p-3 focus-visible:outline focus-visible:outline-2 focus-visible:outline-lime-400">
+                <strong className="mb-1 block text-sm text-white">Budget Picks</strong>Under ₹499
               </Link>
             </div>
           </div>
 
           {/* Banner Gallery */}
-          <div className="relative group">
-            <div className="absolute -inset-1 bg-gradient-to-r from-lime-400 to-emerald-400 rounded-3xl blur opacity-30 group-hover:opacity-50 transition duration-1000"></div>
-            <div className="relative rounded-3xl overflow-hidden aspect-[4/3] shadow-2xl border border-neutral-800">
+          <div className="group relative">
+            <div className="absolute -inset-1 rounded-2xl bg-gradient-to-r from-lime-400 to-emerald-400 opacity-25 blur transition duration-1000 group-hover:opacity-40 sm:rounded-3xl"></div>
+            <div className="relative aspect-[16/10] overflow-hidden rounded-2xl border border-neutral-800 shadow-2xl sm:aspect-[4/3] sm:rounded-3xl">
               <img
                 src={BANNERS[0].imageUrl}
                 alt={BANNERS[0].title}
                 fetchPriority="high"
                 decoding="async"
-                className="w-full h-full object-cover object-center"
+                className="h-full w-full object-cover object-center"
               />
-              <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent flex flex-col justify-end p-6">
+              <div className="absolute inset-0 flex flex-col justify-end bg-gradient-to-t from-black/80 via-transparent to-transparent p-4 sm:p-6">
                 <span className="text-xs font-bold tracking-wide text-lime-400">Featured collection</span>
                 <h2 className="text-xl font-black text-white">{BANNERS[0].title}</h2>
               </div>
@@ -104,7 +104,7 @@ export const Home: React.FC = () => {
         <section className="space-y-6">
           <div className="flex items-center justify-between">
             <div>
-              <h2 className="text-2xl font-black text-neutral-900 dark:text-white">Shop by Department</h2>
+              <h2 className="text-xl font-black text-neutral-900 dark:text-white sm:text-2xl">Shop by Department</h2>
               <p className="text-xs text-neutral-500">Explore curated collections across all categories</p>
             </div>
             <Link to="/categories" className="inline-flex min-h-11 items-center text-xs font-bold text-lime-600 dark:text-lime-400 hover:underline gap-1">
@@ -125,7 +125,7 @@ export const Home: React.FC = () => {
               <Link
                 key={item.query}
                 to={`/products?${item.query}`}
-                className="group relative rounded-2xl overflow-hidden aspect-[3/4] shadow-md hover:shadow-xl transition-all duration-300 border border-neutral-200 dark:border-neutral-800"
+                className="group relative aspect-square overflow-hidden rounded-2xl border border-neutral-200 shadow-md transition-all duration-300 hover:shadow-xl dark:border-neutral-800 sm:aspect-[3/4]"
               >
                 <img src={item.img} alt={item.name} loading="lazy" decoding="async" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
                 <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent flex flex-col justify-end p-4">
