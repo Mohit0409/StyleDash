@@ -80,10 +80,13 @@ export const Returns = () => (
     <section className="space-y-2">
       <h2 className="font-black">Cancellation</h2>
       <p className="text-sm text-neutral-600">
-        A customer may submit a cancellation request before delivery. If the
-        order is already out for delivery, the cancellation costs INR 50. Any
-        required fee collection and online refund must be reconciled before the
-        order is finally marked cancelled.
+        Before an order reaches the preparing stage, the customer may cancel it
+        directly. For a captured online payment, Vibe4You initiates a full
+        refund to the original payment method and confirms completion after the
+        payment provider reports the refund as processed. Cash on Delivery
+        orders need no payment refund. From the preparing stage onward,
+        cancellation is handled as a request; if the order is already out for
+        delivery, the cancellation costs INR 50.
       </p>
     </section>
 

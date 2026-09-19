@@ -80,6 +80,9 @@ Object.assign(env, {
   STYLEDASH_PUBLIC_ORIGIN: 'http://127.0.0.1:4173',
   STYLEDASH_TRUST_LOOPBACK_PROXY: '1',
   STYLEDASH_ORDERING_ENABLED: 'true',
+  // E2E uses one synthetic client IP across many serial browser tests.
+  // Raise only the test-server request budget; production defaults remain unchanged.
+  STYLEDASH_E2E_RATE_LIMIT_MULTIPLIER: '100',
 
   // Enable the feature so authorization—not merely the flag—is exercised.
   STYLEDASH_ENABLE_TEST_PRODUCT: 'true',
