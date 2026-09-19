@@ -81,6 +81,14 @@ describe('homepage merchandising', () => {
     expect(new Set(displayedIds).size).toBe(displayedIds.length);
   });
 
+  it('uses excluded Top Picks only as fallback when a category would otherwise disappear', () => {
+    const primary = [product('women-primary')];
+    const fallbackAccessory = product('accessory-top-pick', { category: 'Accessories' });
+    const sections = buildHomepageSections(primary, 5, monday, [fallbackAccessory]);
+    const accessories = sections.find(section => section.id === 'accessories');
+    expect(accessories?.products.map(item => item.id)).toEqual(['accessory-top-pick']);
+  });
+
   it('hides Express merchandising on weekdays and includes every active product on weekends', () => {
     const normalStored = product('normal-stored', { deliveryType: 'normal', expressDelivery: false });
     expect(buildHomepageSections([normalStored], 5, monday).some(section => section.id === 'express')).toBe(false);

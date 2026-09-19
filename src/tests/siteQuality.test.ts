@@ -74,4 +74,25 @@ describe('site quality guardrails', () => {
     expect(orders).not.toContain('object-cover');
     expect(orderTracking).not.toContain('object-cover');
   });
+
+  it('keeps delivery fee amounts at checkout instead of marketing surfaces', () => {
+    const checkout = readText('../pages/Checkout.tsx');
+    const marketingSources = [
+      readText('../components/SEO.tsx'),
+      readText('../pages/ProductDetail.tsx'),
+      readText('../pages/Products.tsx'),
+      readText('../pages/Stores.tsx'),
+      readText('../utils/delivery.ts'),
+      readText('../utils/homeMerchandising.ts'),
+    ];
+
+    expect(checkout).toContain('₹50 for orders below ₹300');
+    expect(checkout).toContain('FREE on orders of ₹300+');
+    for (const source of marketingSources) {
+      expect(source).not.toMatch(/Same Day Delivery[^'\n<]*₹/i);
+      expect(source).not.toMatch(/Express Delivery[^'\n<]*₹/i);
+      expect(source).not.toContain('below ₹300');
+      expect(source).not.toContain('free from ₹300');
+    }
+  });
 });

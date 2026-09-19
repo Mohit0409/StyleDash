@@ -136,8 +136,8 @@ test('category subcategory links apply the selected filters', async ({ page }) =
 test('header uses category queries for Footwear and Accessories', async ({ page }) => {
   await page.goto('/');
   const header = page.locator('header');
-  await expect(header.getByRole('link', { name: 'FOOTWEAR', exact: true })).toHaveAttribute('href', '/products?category=Footwear');
-  await expect(header.getByRole('link', { name: 'ACCESSORIES', exact: true })).toHaveAttribute('href', '/products?category=Accessories');
+  await expect(header.getByRole('link', { name: 'Footwear', exact: true })).toHaveAttribute('href', '/products?category=Footwear');
+  await expect(header.getByRole('link', { name: 'Accessories', exact: true })).toHaveAttribute('href', '/products?category=Accessories');
 });
 
 test('weekday Weekend Express request keeps normal catalogue visible', async ({ page }) => {

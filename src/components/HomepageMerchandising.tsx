@@ -9,6 +9,7 @@ import { buildHomepageSections, selectHomepageStores, type HomeMerchSectionId } 
 
 interface HomepageMerchandisingProps {
   products: Product[];
+  fallbackProducts?: Product[];
   loading: boolean;
 }
 
@@ -26,8 +27,8 @@ const cardWrapClass = 'min-w-[72%] snap-start sm:min-w-[44%] md:min-w-[31%] lg:m
 const storeRailClass = 'flex w-full snap-x snap-mandatory gap-4 overflow-x-auto overscroll-x-contain pb-3 pr-4 scroll-smooth sm:gap-5';
 const storeCardClass = 'group flex h-[23rem] basis-[82%] shrink-0 snap-start flex-col overflow-hidden rounded-2xl border border-neutral-200 bg-white shadow-sm transition hover:-translate-y-0.5 hover:shadow-lg dark:border-neutral-800 dark:bg-neutral-900 sm:basis-[47%] md:basis-[31%] lg:basis-[24%]';
 
-export const HomepageMerchandising: React.FC<HomepageMerchandisingProps> = ({ products, loading }) => {
-  const sections = useMemo(() => buildHomepageSections(products, 5), [products]);
+export const HomepageMerchandising: React.FC<HomepageMerchandisingProps> = ({ products, fallbackProducts = [], loading }) => {
+  const sections = useMemo(() => buildHomepageSections(products, 5, new Date(), fallbackProducts), [products, fallbackProducts]);
   const [stores, setStores] = useState<VendorStore[]>([]);
   const storesRailRef = useRef<HTMLDivElement>(null);
 

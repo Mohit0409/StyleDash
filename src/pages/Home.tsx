@@ -167,7 +167,7 @@ export const Home: React.FC = () => {
           </section>
         )}
 
-        <HomepageMerchandising products={merchandisingProducts} loading={loading} />
+        <HomepageMerchandising products={merchandisingProducts} fallbackProducts={products} loading={loading} />
 
       </div>
     </div>

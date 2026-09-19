@@ -368,7 +368,7 @@ export const ProductDetail: React.FC = () => {
               <Zap className="w-4 h-4 fill-lime-500" />
               <span>Dispatched from Neemuch Partner Boutique</span>
             </div>
-            <p>Same Day Delivery is ₹50 below ₹300 and free from ₹300 to pincode 458441. Weekend Express remains ₹80 at checkout on Saturday and Sunday.</p>
+            <p>Same Day Delivery is available to pincode 458441. Weekend Express is available at checkout on Saturday and Sunday.</p>
           </div>
 
           {/* Specifications */}

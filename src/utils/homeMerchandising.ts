@@ -27,7 +27,7 @@ interface SectionDefinition {
   matches: (product: Product) => boolean;
 }
 const SECTIONS: SectionDefinition[] = [
-  { id: 'express', title: 'Weekend Express Picks', subtitle: 'Every active product supports Same Day (₹50 below ₹300, free from ₹300) + ₹80 Express Delivery on Saturday and Sunday', href: '/products?filter=express', matches: () => true },
+  { id: 'express', title: 'Weekend Express Picks', subtitle: 'Fast weekend delivery picks from local Neemuch stores', href: '/products?filter=express', matches: () => true },
   { id: 'new', title: 'New Drops', subtitle: 'Freshly added styles without taking over your whole feed', href: '/products?filter=new', matches: p => p.newArrival === true },
   { id: 'trending', title: 'Trending in Neemuch', subtitle: 'Popular local styles customers are checking out now', href: '/products?sort=rating', matches: p => p.trending === true },
   { id: 'under499', title: 'Styles Under ₹499', subtitle: 'Budget-friendly finds from local stores', href: '/products?maxPrice=499', matches: p => p.price <= 499 },
@@ -80,12 +80,22 @@ export const selectHomepageCandidates = (products: Product[], perSection = 8, da
   return [...selected.values()];
 };
 
-export const buildHomepageSections = (products: Product[], limit = 5, date = new Date()): HomeMerchSection[] => {
+export const buildHomepageSections = (
+  products: Product[],
+  limit = 5,
+  date = new Date(),
+  fallbackProducts: Product[] = [],
+): HomeMerchSection[] => {
   const usedProductIds = new Set<string>();
   return sectionsForDate(date).map(definition => {
-    const chosen = sectionCandidates(products, definition)
+    const primary = sectionCandidates(products, definition)
       .filter(product => !usedProductIds.has(product.id))
       .slice(0, limit);
+    const chosen = primary.length > 0
+      ? primary
+      : sectionCandidates(fallbackProducts, definition)
+        .filter(product => !usedProductIds.has(product.id))
+        .slice(0, 1);
     chosen.forEach(product => usedProductIds.add(product.id));
     return { ...definition, products: chosen };
   }).filter(section => section.products.length > 0);
