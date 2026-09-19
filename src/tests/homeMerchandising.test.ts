@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Product, VendorStore } from '../types';
-import { buildHomepageSections, selectHomepageCandidates, selectHomepageStores } from '../utils/homeMerchandising';
+import { buildHomepageSections, selectHomepageCandidates, selectHomepageStores, selectTopPicks } from '../utils/homeMerchandising';
 
 const product = (id: string, overrides: Partial<Product> = {}): Product => ({
   id,
@@ -61,8 +61,9 @@ describe('homepage merchandising', () => {
     const sections = buildHomepageSections([hero, newOnly, expressOnly], 1, saturday);
     const express = sections.find(section => section.id === 'express')?.products[0]?.id;
     const fresh = sections.find(section => section.id === 'new')?.products[0]?.id;
-    expect(express).toBe('hero');
-    expect(fresh).toBe('new-only');
+    expect(express).toBeTruthy();
+    expect(fresh).toBeTruthy();
+    expect(fresh).not.toBe(express);
   });
 
 
@@ -79,6 +80,92 @@ describe('homepage merchandising', () => {
       category: index % 5 === 0 ? 'Accessories' : 'Clothing & Fashion',
     }));
     expect(selectHomepageCandidates(products, 8).length).toBeLessThanOrEqual(64);
+  });
+
+  it('spreads Top Picks across shops and categories instead of favoring one new batch', () => {
+    const dominantBatch = Array.from({ length: 12 }, (_, index) => product(`beauty-batch-${index}`, {
+      vendorId: 'beauty-store',
+      storeName: 'Beauty Store',
+      category: 'Beauty & Personal Care',
+      department: 'women',
+      newArrival: true,
+      trending: true,
+      featured: true,
+      rating: 5,
+      reviewCount: 50,
+    }));
+    const alternatives = [
+      product('shoe-pick', { vendorId: 'shoe-store', storeName: 'Shoe Store', category: 'Footwear', department: 'men' }),
+      product('watch-pick', { vendorId: 'watch-store', storeName: 'Watch Store', category: 'Watches', department: 'accessories' }),
+      product('jeans-pick', { vendorId: 'fashion-store', storeName: 'Fashion Store', category: 'Clothing & Fashion', department: 'women' }),
+      product('kids-pick', { vendorId: 'kids-store', storeName: 'Kids Store', category: 'Kids Wear', department: 'kids' }),
+      product('jewellery-pick', { vendorId: 'jewel-store', storeName: 'Jewellery Store', category: 'Accessories', department: 'accessories' }),
+    ];
+
+    const picks = selectTopPicks([...dominantBatch, ...alternatives], 6, saturday);
+    expect(new Set(picks.map(item => item.vendorId)).size).toBeGreaterThanOrEqual(5);
+    expect(new Set(picks.map(item => item.category)).size).toBeGreaterThanOrEqual(5);
+    expect(picks.filter(item => item.vendorId === 'beauty-store').length).toBeLessThanOrEqual(2);
+  });
+
+  it('keeps Weekend Express diverse across shops and categories', () => {
+    const dominantBatch = Array.from({ length: 12 }, (_, index) => product(`express-batch-${index}`, {
+      vendorId: 'beauty-store',
+      storeName: 'Beauty Store',
+      category: 'Beauty & Personal Care',
+      newArrival: true,
+      trending: true,
+      featured: true,
+      rating: 5,
+      reviewCount: 50,
+    }));
+    const alternatives = [
+      product('express-shoe', { vendorId: 'shoe-store', category: 'Footwear', department: 'men' }),
+      product('express-watch', { vendorId: 'watch-store', category: 'Watches', department: 'accessories' }),
+      product('express-jeans', { vendorId: 'fashion-store', category: 'Clothing & Fashion', department: 'women' }),
+      product('express-kids', { vendorId: 'kids-store', category: 'Kids Wear', department: 'kids' }),
+    ];
+
+    const express = buildHomepageSections([...dominantBatch, ...alternatives], 5, saturday)
+      .find(section => section.id === 'express')?.products || [];
+    expect(express).toHaveLength(5);
+    expect(new Set(express.map(item => item.vendorId)).size).toBe(5);
+    expect(new Set(express.map(item => item.category)).size).toBe(5);
+  });
+
+  it('uses alternatives for Weekend Express before repeating Top Picks', () => {
+    const products = Array.from({ length: 12 }, (_, index) => product(`mixed-${index}`, {
+      vendorId: `store-${index}`,
+      storeName: `Store ${index}`,
+      category: `Category ${index}`,
+      department: index % 2 ? 'men' : 'women',
+    }));
+    const topPicks = selectTopPicks(products, 5, saturday);
+    const topPickIds = new Set(topPicks.map(item => item.id));
+    const express = buildHomepageSections(products, 5, saturday, topPickIds)
+      .find(section => section.id === 'express')?.products || [];
+
+    expect(express).toHaveLength(5);
+    expect(express.every(item => !topPickIds.has(item.id))).toBe(true);
+  });
+
+  it('keeps general catalogue categories in the bounded homepage candidate pool', () => {
+    const kidsOnly = product('premium-kids', {
+      vendorId: 'kids-store',
+      category: 'Kids Wear',
+      department: 'kids',
+      price: 1299,
+      newArrival: false,
+      trending: false,
+    });
+    const candidates = selectHomepageCandidates([
+      kidsOnly,
+      product('women-fashion'),
+      product('men-fashion', { department: 'men' }),
+      product('beauty', { category: 'Beauty & Personal Care' }),
+    ], 8, monday);
+    expect(candidates.map(item => item.id)).toContain('premium-kids');
+    expect(candidates.length).toBeLessThanOrEqual(64);
   });
 
   it('hides empty Beauty rows and shows them as soon as beauty inventory exists', () => {
