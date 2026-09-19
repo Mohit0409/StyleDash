@@ -261,7 +261,7 @@ export const Header: React.FC<{ onOpenCart: () => void }> = ({ onOpenCart }) => 
               aria-label="vibe4you home"
               className="group block w-[clamp(7.25rem,37vw,9.5rem)] shrink-0 sm:w-[205px]"
             >
-              <BrandWordmark showTagline taglineClassName="hidden sm:block" className="transition-transform duration-200 group-hover:scale-[1.015]" />
+              <BrandWordmark showTagline className="transition-transform duration-200 group-hover:scale-[1.015]" />
             </Link>
           </div>
 
