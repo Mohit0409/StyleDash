@@ -53,6 +53,13 @@ describe('site quality guardrails', () => {
     expect(home).toContain('/products?maxPrice=499');
   });
 
+  it('keeps one department grid and separates Top Picks from lower curated rows', () => {
+    const home = readText('../pages/Home.tsx');
+    expect((home.match(/<h2[^>]*>Shop by Department<\/h2>/g) || [])).toHaveLength(1);
+    expect(home).toContain('merchandisingProducts');
+    expect(home).toContain('products.filter(product => !topPickIds.has(product.id))');
+  });
+
   it('keeps customer product imagery uncropped across shopping and order surfaces', () => {
     const productCard = readText('../components/ProductCard.tsx');
     const productDetail = readText('../pages/ProductDetail.tsx');

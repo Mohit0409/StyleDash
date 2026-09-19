@@ -24,7 +24,7 @@ const iconFor = (id: HomeMerchSectionId) => {
 const rowClass = 'flex snap-x snap-mandatory gap-4 overflow-x-auto pb-2 pr-2 sm:gap-5';
 const cardWrapClass = 'min-w-[72%] snap-start sm:min-w-[44%] md:min-w-[31%] lg:min-w-[23%] xl:min-w-[19%]';
 const storeRailClass = 'flex w-full snap-x snap-mandatory gap-4 overflow-x-auto overscroll-x-contain pb-3 pr-4 scroll-smooth sm:gap-5';
-const storeCardClass = 'group flex h-[21rem] basis-[82%] shrink-0 snap-start flex-col overflow-hidden rounded-2xl border border-neutral-200 bg-white shadow-sm transition hover:-translate-y-0.5 hover:shadow-lg dark:border-neutral-800 dark:bg-neutral-900 sm:basis-[47%] md:basis-[31%] lg:basis-[24%]';
+const storeCardClass = 'group flex h-[23rem] basis-[82%] shrink-0 snap-start flex-col overflow-hidden rounded-2xl border border-neutral-200 bg-white shadow-sm transition hover:-translate-y-0.5 hover:shadow-lg dark:border-neutral-800 dark:bg-neutral-900 sm:basis-[47%] md:basis-[31%] lg:basis-[24%]';
 
 export const HomepageMerchandising: React.FC<HomepageMerchandisingProps> = ({ products, loading }) => {
   const sections = useMemo(() => buildHomepageSections(products, 5), [products]);
@@ -71,7 +71,7 @@ export const HomepageMerchandising: React.FC<HomepageMerchandisingProps> = ({ pr
                 <p className="mt-1 text-xs text-neutral-500 sm:text-sm">{section.subtitle}</p>
               </div>
             </div>
-            <Link to={section.href} className="inline-flex shrink-0 items-center gap-1 text-xs font-black text-lime-700 hover:underline dark:text-lime-400 sm:text-sm">
+            <Link to={section.href} className="inline-flex min-h-11 shrink-0 items-center gap-1 text-xs font-black text-lime-700 hover:underline dark:text-lime-400 sm:text-sm">
               View All <ArrowRight className="h-3.5 w-3.5" />
             </Link>
           </div>
@@ -97,14 +97,14 @@ export const HomepageMerchandising: React.FC<HomepageMerchandisingProps> = ({ pr
             </div>
             <div className="flex shrink-0 items-center gap-2">
               <div className="hidden items-center gap-1 md:flex" aria-label="Local Stores carousel controls">
-                <button type="button" onClick={() => scrollStores(-1)} aria-label="Previous local stores" className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-neutral-200 bg-white text-neutral-700 transition hover:border-neutral-400 hover:text-neutral-950 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-200">
+                <button type="button" onClick={() => scrollStores(-1)} aria-label="Previous local stores" className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-full border border-neutral-200 bg-white text-neutral-700 transition hover:border-neutral-400 hover:text-neutral-950 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-200">
                   <ChevronLeft className="h-4 w-4" />
                 </button>
-                <button type="button" onClick={() => scrollStores(1)} aria-label="Next local stores" className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-neutral-200 bg-white text-neutral-700 transition hover:border-neutral-400 hover:text-neutral-950 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-200">
+                <button type="button" onClick={() => scrollStores(1)} aria-label="Next local stores" className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-full border border-neutral-200 bg-white text-neutral-700 transition hover:border-neutral-400 hover:text-neutral-950 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-200">
                   <ChevronRight className="h-4 w-4" />
                 </button>
               </div>
-              <Link to="/stores" className="inline-flex shrink-0 items-center gap-1 text-xs font-black text-lime-700 hover:underline dark:text-lime-400 sm:text-sm">
+              <Link to="/stores" className="inline-flex min-h-11 shrink-0 items-center gap-1 text-xs font-black text-lime-700 hover:underline dark:text-lime-400 sm:text-sm">
                 View All <ArrowRight className="h-3.5 w-3.5" />
               </Link>
             </div>
@@ -121,6 +121,7 @@ export const HomepageMerchandising: React.FC<HomepageMerchandisingProps> = ({ pr
                     <span className="shrink-0 rounded-full bg-lime-100 px-2 py-1 text-lime-800 dark:bg-lime-950 dark:text-lime-300">Same Day Delivery</span>
                   </div>
                   <p className="line-clamp-2 min-h-8 text-xs leading-4 text-neutral-500">{store.description}</p>
+                  <span className="inline-flex min-h-9 items-center gap-1 text-xs font-black text-lime-700 dark:text-lime-400">Visit store <ChevronRight className="h-3.5 w-3.5" aria-hidden="true" /></span>
                   <p className="mt-auto flex min-w-0 items-center gap-1 text-xs font-bold text-neutral-500"><MapPin className="h-3.5 w-3.5 shrink-0 text-lime-600" /><span className="truncate">{store.city}</span></p>
                 </div>
               </Link>

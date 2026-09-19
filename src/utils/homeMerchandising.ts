@@ -37,8 +37,21 @@ const SECTIONS: SectionDefinition[] = [
   { id: 'beauty', title: 'Beauty & Care', subtitle: 'Beauty and personal-care picks from local sellers', href: '/products?category=Beauty%20%26%20Personal%20Care', matches: p => p.category === 'Beauty & Personal Care' },
 ];
 
+const HOMEPAGE_SECTION_PRIORITY: Record<HomeMerchSectionId, number> = {
+  beauty: 0,
+  accessories: 1,
+  women: 2,
+  men: 3,
+  new: 4,
+  trending: 5,
+  under499: 6,
+  express: 7,
+};
+
 const sectionsForDate = (date: Date): SectionDefinition[] =>
-  SECTIONS.filter(definition => definition.id !== 'express' || isExpressDeliveryAvailable(date));
+  SECTIONS
+    .filter(definition => definition.id !== 'express' || isExpressDeliveryAvailable(date))
+    .sort((first, second) => HOMEPAGE_SECTION_PRIORITY[first.id] - HOMEPAGE_SECTION_PRIORITY[second.id]);
 
 const merchandisingScore = (product: Product): number =>
   (product.featured ? 50 : 0)
@@ -68,15 +81,12 @@ export const selectHomepageCandidates = (products: Product[], perSection = 8, da
 };
 
 export const buildHomepageSections = (products: Product[], limit = 5, date = new Date()): HomeMerchSection[] => {
-  const usage = new Map<string, number>();
+  const usedProductIds = new Set<string>();
   return sectionsForDate(date).map(definition => {
-    const candidates = sectionCandidates(products, definition).sort((a, b) =>
-      (usage.get(a.id) || 0) - (usage.get(b.id) || 0)
-      || merchandisingScore(b) - merchandisingScore(a)
-      || newestFirst(a, b),
-    );
-    const chosen = candidates.slice(0, limit);
-    chosen.forEach(product => usage.set(product.id, (usage.get(product.id) || 0) + 1));
+    const chosen = sectionCandidates(products, definition)
+      .filter(product => !usedProductIds.has(product.id))
+      .slice(0, limit);
+    chosen.forEach(product => usedProductIds.add(product.id));
     return { ...definition, products: chosen };
   }).filter(section => section.products.length > 0);
 };

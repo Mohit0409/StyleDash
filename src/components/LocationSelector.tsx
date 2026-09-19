@@ -52,7 +52,7 @@ export const LocationSelector: React.FC<{ isOpen: boolean; onClose: () => void }
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in">
       <div role="dialog" aria-modal="true" aria-labelledby="location-dialog-title" className="bg-white dark:bg-neutral-900 rounded-3xl max-w-md w-full p-6 shadow-2xl border border-neutral-200 dark:border-neutral-800 relative">
-        <button aria-label="Close delivery availability dialog" onClick={onClose} className="absolute top-4 right-4 p-2 rounded-full hover:bg-neutral-100 dark:hover:bg-neutral-800">
+        <button aria-label="Close delivery availability dialog" onClick={onClose} className="absolute top-4 right-4 flex min-h-11 min-w-11 items-center justify-center p-2 rounded-full hover:bg-neutral-100 dark:hover:bg-neutral-800">
           <X className="w-5 h-5 text-neutral-500" />
         </button>
 
@@ -78,7 +78,7 @@ export const LocationSelector: React.FC<{ isOpen: boolean; onClose: () => void }
           <button
             type="submit"
             disabled={checkState === 'checking'}
-            className="px-5 py-2.5 bg-neutral-950 dark:bg-lime-400 text-white dark:text-neutral-950 font-bold text-xs rounded-xl disabled:cursor-not-allowed disabled:opacity-60"
+            className="min-h-11 px-5 py-2.5 bg-neutral-950 dark:bg-lime-400 text-white dark:text-neutral-950 font-bold text-xs rounded-xl disabled:cursor-not-allowed disabled:opacity-60"
           >
             {checkState === 'checking' ? 'Checking' : 'Check'}
           </button>
@@ -101,8 +101,8 @@ export const LocationSelector: React.FC<{ isOpen: boolean; onClose: () => void }
               <p className="mt-0.5">
                 {isSuccess
                   ? result?.expressAvailable && result?.estimatedDeliveryMinutes
-                    ? `Same Day Delivery is ₹50 below ₹300 and FREE from ₹300. Express Delivery is also available within ${result.estimatedDeliveryMinutes} minutes for ₹80.`
-                    : 'Same Day Delivery is ₹50 below ₹300 and FREE from ₹300. Express Delivery is unavailable Monday–Friday.'
+                    ? `Delivery is available. Express delivery can arrive within ${result.estimatedDeliveryMinutes} minutes.`
+                    : 'Same-day delivery is available for this pincode.'
                   : null}
                 {isProblem && checkState === 'unserviceable' ? 'We are not delivering to this pincode yet.' : null}
                 {isProblem && checkState === 'invalid' ? 'Pincodes must contain exactly six numbers.' : null}
