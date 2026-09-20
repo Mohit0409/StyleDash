@@ -140,6 +140,37 @@ test('header uses category queries for Footwear and Accessories', async ({ page 
   await expect(header.getByRole('link', { name: 'Accessories', exact: true })).toHaveAttribute('href', '/products?category=Accessories');
 });
 
+test('header brand and controls do not overlap', async ({ page }) => {
+  await page.goto('/');
+  const layout = await page.evaluate(() => {
+    const visibleRect = (element: Element | null) => {
+      if (!element) return null;
+      const style = window.getComputedStyle(element);
+      const rect = element.getBoundingClientRect();
+      if (style.display === 'none' || style.visibility === 'hidden' || rect.width === 0 || rect.height === 0) return null;
+      return { left: rect.left, right: rect.right, top: rect.top, bottom: rect.bottom };
+    };
+    const overlaps = (first: ReturnType<typeof visibleRect>, second: ReturnType<typeof visibleRect>) =>
+      Boolean(first && second && first.left < second.right && first.right > second.left && first.top < second.bottom && first.bottom > second.top);
+
+    const brand = visibleRect(document.querySelector('a[aria-label="vibe4you home"]'));
+    const controls = [
+      document.querySelector('a[aria-label^="Wishlist"]'),
+      document.querySelector('a[aria-label*="account"]'),
+      document.querySelector('button[aria-label^="Cart"]'),
+      ...document.querySelectorAll('button[aria-label*="mode"]'),
+    ].map(visibleRect).filter(Boolean);
+
+    return {
+      brandOverlapsControl: controls.some(control => overlaps(brand, control)),
+      pageOverflow: document.documentElement.scrollWidth > document.documentElement.clientWidth,
+    };
+  });
+
+  expect(layout.brandOverlapsControl).toBe(false);
+  expect(layout.pageOverflow).toBe(false);
+});
+
 test('weekday Weekend Express request keeps normal catalogue visible', async ({ page }) => {
   await page.clock.setFixedTime(new Date('2026-08-31T06:00:00Z'));
   await page.goto('/products?filter=express');
