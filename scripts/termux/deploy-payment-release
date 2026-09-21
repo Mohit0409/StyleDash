@@ -314,15 +314,18 @@ try:
     review_versions = {row[0] for row in connection.execute("SELECT version FROM review_schema_migrations")}
     shop_product_columns = {row[1] for row in connection.execute("PRAGMA table_info(shop_product_submissions)")}
     review_columns = {row[1] for row in connection.execute("PRAGMA table_info(product_reviews)")}
+    store_review_columns = {row[1] for row in connection.execute("PRAGMA table_info(store_reviews)")}
     shop_application_columns = {row[1] for row in connection.execute("PRAGMA table_info(vendor_applications)")}
     integrity = connection.execute("PRAGMA integrity_check").fetchone()[0]
     foreign_keys = connection.execute("PRAGMA foreign_key_check").fetchall()
 finally:
     connection.close()
-if 8 not in identity_versions or not {1, 2, 3, 4, 5, 6}.issubset(shop_versions) or 1 not in review_versions:
+if 8 not in identity_versions or not {1, 2, 3, 4, 5, 6}.issubset(shop_versions) or 2 not in review_versions:
     raise SystemExit("Vibe4You schema migrations are incomplete")
 if "variants_json" not in shop_product_columns:
     raise SystemExit("Vibe4You product variant schema is incomplete")
+if not {"store_id", "user_id", "order_id", "rating", "comment"}.issubset(store_review_columns):
+    raise SystemExit("Vibe4You local-store review schema is incomplete")
 if not {"banner_image_url", "logo_image_url"}.issubset(shop_application_columns):
     raise SystemExit("Vibe4You store branding schema is incomplete")
 if not {"product_id", "user_id", "order_id", "rating", "comment", "status"}.issubset(review_columns):

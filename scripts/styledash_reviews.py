@@ -27,7 +27,7 @@ def _now() -> str:
 
 
 class ReviewWorkflow:
-    """Verified product reviews backed by the customer SQLite database."""
+    """Verified product and local-store reviews backed by the customer SQLite database."""
 
     def __init__(self, path: Path) -> None:
         self.path = Path(path)
@@ -67,10 +67,32 @@ class ReviewWorkflow:
                   ON product_reviews(product_id, status, created_at DESC);
                 CREATE INDEX IF NOT EXISTS product_reviews_user_idx
                   ON product_reviews(user_id, created_at DESC);
+                CREATE TABLE IF NOT EXISTS store_reviews(
+                  id TEXT PRIMARY KEY,
+                  store_id TEXT NOT NULL REFERENCES vendor_applications(id) ON DELETE CASCADE,
+                  user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                  order_id TEXT NOT NULL,
+                  rating INTEGER NOT NULL CHECK(rating BETWEEN 1 AND 5),
+                  title TEXT,
+                  comment TEXT NOT NULL,
+                  status TEXT NOT NULL DEFAULT 'published'
+                    CHECK(status IN ('published','hidden')),
+                  created_at TEXT NOT NULL,
+                  updated_at TEXT NOT NULL,
+                  UNIQUE(user_id, store_id)
+                );
+                CREATE INDEX IF NOT EXISTS store_reviews_store_idx
+                  ON store_reviews(store_id, status, created_at DESC);
+                CREATE INDEX IF NOT EXISTS store_reviews_user_idx
+                  ON store_reviews(user_id, created_at DESC);
                 """
             )
             db.execute(
                 "INSERT OR IGNORE INTO review_schema_migrations(version,applied_at) VALUES(1,?)",
+                (_now(),),
+            )
+            db.execute(
+                "INSERT OR IGNORE INTO review_schema_migrations(version,applied_at) VALUES(2,?)",
                 (_now(),),
             )
             db.commit()
@@ -83,6 +105,15 @@ class ReviewWorkflow:
         if not product_id or len(product_id) > 128 or "/" in product_id:
             raise SecurityError(400, "Invalid product.", "invalid_product")
         return product_id
+
+    @staticmethod
+    def _store_id(value: Any) -> str:
+        if not isinstance(value, str):
+            raise SecurityError(400, "Invalid local store.", "invalid_store")
+        store_id = value.strip()
+        if not store_id or len(store_id) > 128 or "/" in store_id:
+            raise SecurityError(400, "Invalid local store.", "invalid_store")
+        return store_id
 
     @staticmethod
     def _rating(value: Any) -> int:
@@ -146,6 +177,20 @@ class ReviewWorkflow:
             if order.get("isPaymentTestOrder") or order.get("fulfillmentRequired") is False:
                 continue
             if any(item.get("productId") == product_id for item in order.get("items", [])):
+                eligible.append(order)
+        return max(eligible, key=lambda order: order.get("updatedAt") or order.get("createdAt") or "", default=None)
+
+    def _qualifying_store_order(self, payment_store: Any, user_id: str, store_id: str) -> dict[str, Any] | None:
+        """Only an immutable, server-created order item can qualify a store review."""
+        with payment_store.lock:
+            orders = list(payment_store.state.get("orders", {}).values())
+        eligible = []
+        for order in orders:
+            if order.get("userId") != user_id or order.get("status") not in REVIEWABLE_ORDER_STATUSES:
+                continue
+            if order.get("isPaymentTestOrder") or order.get("fulfillmentRequired") is False:
+                continue
+            if any(item.get("storeId") == store_id for item in order.get("items", [])):
                 eligible.append(order)
         return max(eligible, key=lambda order: order.get("updatedAt") or order.get("createdAt") or "", default=None)
 
@@ -286,4 +331,144 @@ class ReviewWorkflow:
                 "DELETE FROM product_reviews WHERE id=? AND user_id=?",
                 (review_id, user_id),
             )
+            db.commit()
+
+    def _store_owned_row(self, review_id: str, user_id: str) -> sqlite3.Row:
+        if not isinstance(review_id, str) or not review_id or len(review_id) > 64:
+            raise SecurityError(404, "Store review not found.", "store_review_not_found")
+        with self.connect() as db:
+            row = db.execute(
+                """SELECT r.*,u.name AS user_name FROM store_reviews r
+                   JOIN users u ON u.id=r.user_id
+                   WHERE r.id=? AND r.user_id=?""",
+                (review_id, user_id),
+            ).fetchone()
+        if row is None:
+            raise SecurityError(404, "Store review not found.", "store_review_not_found")
+        return row
+
+    def _public_store_row(self, row: sqlite3.Row) -> dict[str, Any]:
+        return {
+            "id": row["id"], "storeId": row["store_id"],
+            # Store reviews must never expose a customer identity. Product
+            # reviews predate this endpoint; do not extend that disclosure to
+            # a new public store-level index.
+            "userName": "Verified local customer", "rating": row["rating"],
+            "title": row["title"], "comment": row["comment"],
+            "createdAt": row["created_at"], "updatedAt": row["updated_at"],
+            "verifiedPurchase": True,
+        }
+
+    def _store_owner_id(self, db: sqlite3.Connection, store_id: str) -> str | None:
+        row = db.execute(
+            "SELECT submitted_by_user_id FROM vendor_applications WHERE id=?", (store_id,)
+        ).fetchone()
+        if row is None:
+            raise SecurityError(404, "Local store not found.", "store_not_found")
+        return row["submitted_by_user_id"]
+
+    def _store_review_draft(self, payload: Any, *, include_store: bool) -> tuple[str | None, int, str | None, str]:
+        allowed = {"rating", "title", "comment"} | ({"storeId"} if include_store else set())
+        if not isinstance(payload, dict) or set(payload) - allowed:
+            raise SecurityError(400, "Invalid local store review fields.", "invalid_store_review")
+        return (
+            self._store_id(payload.get("storeId")) if include_store else None,
+            self._rating(payload.get("rating")), self._title(payload.get("title")),
+            self._comment(payload.get("comment")),
+        )
+
+    def list_store(self, store_id: str, sort: str = "newest") -> dict[str, Any]:
+        store_id = self._store_id(store_id)
+        if sort not in REVIEW_SORTS:
+            raise SecurityError(400, "Invalid review sort.", "invalid_review_sort")
+        ordering = {
+            "newest": "r.created_at DESC", "highest": "r.rating DESC,r.created_at DESC",
+            "lowest": "r.rating ASC,r.created_at DESC",
+        }[sort]
+        with self.connect() as db:
+            self._store_owner_id(db, store_id)
+            stats = db.execute(
+                """SELECT COUNT(*) AS review_count,AVG(rating) AS average_rating
+                   FROM store_reviews WHERE store_id=? AND status='published'""", (store_id,)
+            ).fetchone()
+            distribution_rows = db.execute(
+                """SELECT rating,COUNT(*) AS review_count FROM store_reviews
+                   WHERE store_id=? AND status='published' GROUP BY rating""", (store_id,)
+            ).fetchall()
+            rows = db.execute(
+                f"""SELECT r.*,u.name AS user_name FROM store_reviews r
+                    JOIN users u ON u.id=r.user_id
+                    WHERE r.store_id=? AND r.status='published'
+                    ORDER BY {ordering} LIMIT 100""", (store_id,)
+            ).fetchall()
+        count = int(stats["review_count"] or 0)
+        distribution = {str(stars): 0 for stars in range(5, 0, -1)}
+        for row in distribution_rows:
+            distribution[str(row["rating"])] = int(row["review_count"])
+        return {
+            "storeId": store_id,
+            "rating": round(float(stats["average_rating"]), 1) if count else 0,
+            "reviewCount": count, "distribution": distribution,
+            "reviews": [self._public_store_row(row) for row in rows],
+        }
+
+    def store_eligibility(self, payment_store: Any, user_id: str, store_id: str) -> dict[str, Any]:
+        store_id = self._store_id(store_id)
+        order = self._qualifying_store_order(payment_store, user_id, store_id)
+        with self.connect() as db:
+            owner_id = self._store_owner_id(db, store_id)
+            existing = db.execute(
+                """SELECT r.*,u.name AS user_name FROM store_reviews r
+                   JOIN users u ON u.id=r.user_id WHERE r.user_id=? AND r.store_id=?""",
+                (user_id, store_id),
+            ).fetchone()
+        owner = owner_id == user_id
+        return {
+            "eligible": order is not None and not owner,
+            "orderId": order.get("id") if order else None,
+            "existingReview": self._public_store_row(existing) if existing is not None else None,
+            "reason": "own_store_review_forbidden" if owner else (None if order else "delivered_purchase_required"),
+        }
+
+    def create_store(self, payment_store: Any, user_id: str, payload: dict[str, Any]) -> dict[str, Any]:
+        store_id, rating, title, comment = self._store_review_draft(payload, include_store=True)
+        assert store_id is not None
+        order = self._qualifying_store_order(payment_store, user_id, store_id)
+        if order is None:
+            raise SecurityError(403, "Only customers with a delivered purchase can review this local store.", "delivered_purchase_required")
+        review_id, now = f"store_rev_{secrets.token_hex(12)}", _now()
+        try:
+            with self.connect() as db:
+                if self._store_owner_id(db, store_id) == user_id:
+                    raise SecurityError(403, "Store owners cannot review their own local store.", "own_store_review_forbidden")
+                db.execute(
+                    """INSERT INTO store_reviews(id,store_id,user_id,order_id,rating,title,comment,status,created_at,updated_at)
+                       VALUES(?,?,?,?,?,?,?,'published',?,?)""",
+                    (review_id, store_id, user_id, order["id"], rating, title, comment, now, now),
+                )
+                db.commit()
+        except sqlite3.IntegrityError as exc:
+            if "UNIQUE constraint failed" in str(exc):
+                raise SecurityError(409, "You have already reviewed this local store.", "store_review_exists") from exc
+            raise
+        return self.get_owned_store(review_id, user_id)
+
+    def get_owned_store(self, review_id: str, user_id: str) -> dict[str, Any]:
+        return self._public_store_row(self._store_owned_row(review_id, user_id))
+
+    def edit_store(self, user_id: str, review_id: str, payload: dict[str, Any]) -> dict[str, Any]:
+        self._store_owned_row(review_id, user_id)
+        _unused, rating, title, comment = self._store_review_draft(payload, include_store=False)
+        with self.connect() as db:
+            db.execute(
+                """UPDATE store_reviews SET rating=?,title=?,comment=?,updated_at=? WHERE id=? AND user_id=?""",
+                (rating, title, comment, _now(), review_id, user_id),
+            )
+            db.commit()
+        return self.get_owned_store(review_id, user_id)
+
+    def delete_store(self, user_id: str, review_id: str) -> None:
+        self._store_owned_row(review_id, user_id)
+        with self.connect() as db:
+            db.execute("DELETE FROM store_reviews WHERE id=? AND user_id=?", (review_id, user_id))
             db.commit()

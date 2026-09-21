@@ -3007,6 +3007,16 @@ class StyleDashRequestHandler(SimpleHTTPRequestHandler):
                 result = self._reviews().list_product(product_values[0], sort_values[0])
                 self._json_response(HTTPStatus.OK, {"success": True, **result})
                 return
+            if path == "/api/store-reviews":
+                self._rate_limit("store-reviews:list", 120)
+                query = parse_qs(parsed.query, keep_blank_values=True)
+                store_values = query.get("storeId", [])
+                sort_values = query.get("sort", ["newest"])
+                if len(store_values) != 1 or len(sort_values) != 1:
+                    raise SecurityError(400, "Invalid local store review request.", "invalid_store_review_request")
+                result = self._reviews().list_store(store_values[0], sort_values[0])
+                self._json_response(HTTPStatus.OK, {"success": True, **result})
+                return
             if path == "/api/reviews/summaries":
                 self._rate_limit("reviews:summaries", 240)
                 query = parse_qs(parsed.query, keep_blank_values=True)
@@ -3022,6 +3032,16 @@ class StyleDashRequestHandler(SimpleHTTPRequestHandler):
                 if len(product_values) != 1:
                     raise SecurityError(400, "Invalid product.", "invalid_product")
                 result = self._reviews().eligibility(self.payment_service.store, user["id"], product_values[0])
+                self._json_response(HTTPStatus.OK, {"success": True, **result})
+                return
+            if path == "/api/store-reviews/eligibility":
+                self._rate_limit("store-reviews:eligibility", 60)
+                user, _session = self._current_user()
+                query = parse_qs(parsed.query, keep_blank_values=True)
+                store_values = query.get("storeId", [])
+                if len(store_values) != 1:
+                    raise SecurityError(400, "Invalid local store review request.", "invalid_store_review_request")
+                result = self._reviews().store_eligibility(self.payment_service.store, user["id"], store_values[0])
                 self._json_response(HTTPStatus.OK, {"success": True, **result})
                 return
             if path == "/api/auth/me":
@@ -3270,6 +3290,13 @@ class StyleDashRequestHandler(SimpleHTTPRequestHandler):
                 review = self._reviews().create(self.payment_service.store, user["id"], self._read_json())
                 self._json_response(HTTPStatus.CREATED, {"success": True, "review": review})
                 return
+            if path == "/api/store-reviews":
+                self._rate_limit("store-reviews:create", 10)
+                user, _session = self._current_user()
+                self._csrf()
+                review = self._reviews().create_store(self.payment_service.store, user["id"], self._read_json())
+                self._json_response(HTTPStatus.CREATED, {"success": True, "review": review})
+                return
             if path.startswith("/api/reviews/") and path.endswith("/edit"):
                 self._rate_limit("reviews:edit", 10)
                 user, _session = self._current_user()
@@ -3280,6 +3307,16 @@ class StyleDashRequestHandler(SimpleHTTPRequestHandler):
                 review = self._reviews().edit(user["id"], review_id, self._read_json())
                 self._json_response(HTTPStatus.OK, {"success": True, "review": review})
                 return
+            if path.startswith("/api/store-reviews/") and path.endswith("/edit"):
+                self._rate_limit("store-reviews:edit", 10)
+                user, _session = self._current_user()
+                self._csrf()
+                review_id = unquote(path.removeprefix("/api/store-reviews/").removesuffix("/edit"))
+                if not review_id or "/" in review_id:
+                    raise SecurityError(404, "Store review not found.", "store_review_not_found")
+                review = self._reviews().edit_store(user["id"], review_id, self._read_json())
+                self._json_response(HTTPStatus.OK, {"success": True, "review": review})
+                return
             if path.startswith("/api/reviews/") and path.endswith("/delete"):
                 self._rate_limit("reviews:delete", 10)
                 user, _session = self._current_user()
@@ -3288,6 +3325,16 @@ class StyleDashRequestHandler(SimpleHTTPRequestHandler):
                 if not review_id or "/" in review_id:
                     raise SecurityError(404, "Review not found.", "review_not_found")
                 self._reviews().delete(user["id"], review_id)
+                self._json_response(HTTPStatus.OK, {"success": True})
+                return
+            if path.startswith("/api/store-reviews/") and path.endswith("/delete"):
+                self._rate_limit("store-reviews:delete", 10)
+                user, _session = self._current_user()
+                self._csrf()
+                review_id = unquote(path.removeprefix("/api/store-reviews/").removesuffix("/delete"))
+                if not review_id or "/" in review_id:
+                    raise SecurityError(404, "Store review not found.", "store_review_not_found")
+                self._reviews().delete_store(user["id"], review_id)
                 self._json_response(HTTPStatus.OK, {"success": True})
                 return
             if path == "/api/auth/register":

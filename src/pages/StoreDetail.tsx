@@ -1,9 +1,10 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { MapPin, Zap, Star, Phone, Mail } from 'lucide-react';
 import { SEO } from '../components/SEO';
 import { ProductCard } from '../components/ProductCard';
 import { StoreImage } from '../components/StoreImage';
+import { StoreReviews } from '../components/StoreReviews';
 import { vendorRepository } from '../repositories/vendorRepository';
 import { productRepository } from '../repositories/productRepository';
 import { VendorStore, Product } from '../types';
@@ -13,6 +14,9 @@ export const StoreDetail: React.FC = () => {
   const [store, setStore] = useState<VendorStore | null>(null);
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
+  const updateReviewSummary = useCallback((rating: number, reviewCount: number) => {
+    setStore(current => current ? { ...current, rating, reviewCount } : current);
+  }, []);
 
   useEffect(() => {
     if (!slug) return;
@@ -81,6 +85,8 @@ export const StoreDetail: React.FC = () => {
           </div>
         </div>
       </div>
+
+      <StoreReviews storeId={store.id} onSummaryChange={updateReviewSummary} />
 
       {/* Store Inventory Section */}
       <div className="space-y-6">

@@ -6,6 +6,7 @@ let currentShopProducts = [];
 let shopProductStores = [];
 let shopProductFilter = 'all';
 let currentVendors = [];
+let inventoryShops = [];
 const bulkSelection = new Set();
 let adminFilters = {
   vendors:{status:'all',category:'all'},
@@ -531,7 +532,7 @@ async function loadTab(tab) {
       renderShopProducts(currentShopProducts,shopProductStores);addBulkControls('products',['UNDER_REVIEW','APPROVED','REJECTED','PUBLISHED'],'.card');return;
     }
     if(tab==='shop-product-requests'){renderShopProductRequests((await api('/api/admin/shop-product-requests')).requests);addBulkControls('requests',['UNDER_REVIEW','APPROVED','REJECTED'],'.card');return;}
-    if(tab==='inventory'){renderInventory((await api(`/api/admin/inventory?low=0&q=${query}`)).inventory);addBulkControls('inventory',['1','5','-1','-5'],'tbody tr');return;}
+    if(tab==='inventory'){const snapshot=await api(`/api/admin/inventory?low=0&q=${query}`);inventoryShops=Array.isArray(snapshot.shops)?snapshot.shops:[];renderInventory(snapshot.inventory,inventoryShops);addBulkControls('inventory',['1','5','-1','-5'],'tbody tr');return;}
     if(tab==='customers'){renderCustomers((await api(`/api/admin/customers?q=${query}`)).customers);addBulkControls('customers',['enable','disable'],'tbody tr');return;}
     if(tab==='payment-alerts') return renderPaymentAlerts((await api('/api/admin/payment-alerts')).alerts);
     if(tab==='delivery-zone') return renderDeliveryZone((await api('/api/admin/delivery-zone')).configuration);
@@ -621,13 +622,16 @@ function renderShopProductRequests(items){
   const controls=[adminSelect('Status','status',all.map(item=>item.status),f.status),adminSelect('Request type','action',all.map(item=>item.action),f.action)];
   byId('content').innerHTML=`<h2>Product change requests</h2>${adminFilterBar('Product change request filters',controls,filtered.length,all.length)}<div class="grid">${filtered.map(item=>{const changes=Array.isArray(item.changeSummary)?item.changeSummary:[];const summary=changes.length?`<table class="change-summary"><thead><tr><th>Changed field</th><th>Current value</th><th>Requested value</th></tr></thead><tbody>${changes.map(change=>`<tr><td><strong>${escapeText(change.field)}</strong></td><td>${escapeText(change.before)}</td><td>${escapeText(change.after)}</td></tr>`).join('')}</tbody></table>`:'<p class="muted">Seller requested this product be unpublished, or this legacy request has no saved field-by-field summary.</p>';return `<article class="card"><h3>${escapeText(item.productName||item.productId)}</h3><p>${escapeText(item.shopName||item.applicationId)} / ${escapeText(item.action)}</p>${summary}${item.rejectionReason?`<p class="error">${escapeText(item.rejectionReason)}</p>`:''}<strong>${escapeText(item.status)}</strong><div class="actions">${productRequestTransitions(item.status).map(status=>`<button class="${status==='REJECTED'?'danger':'success'}" data-action="shop-product-request" data-id="${escapeText(item.id)}" data-value="${status}">${escapeText(status.replaceAll('_',' '))}</button>`).join('')}</div></article>`;}).join('')||'<p>No product change requests match the current search and filters.</p>'}</div>`;
 }
-function renderInventory(items){
+function renderInventory(items,shops=inventoryShops){
   const all=Array.isArray(items)?items:[]; const f=adminFilters.inventory;
   const stockMatch=item=>{const stock=Number(item.stock);return f.stock==='all'||(f.stock==='attention'&&stock<=5)||(f.stock==='out'&&stock===0)||(f.stock==='low'&&stock>0&&stock<=5)||(f.stock==='healthy'&&stock>5);};
-  const filtered=all.filter(item=>matchesAdminSearch(item,['productName','size','colour','variantId','productId','brand','category','department','storeName'])&&stockMatch(item)&&(f.category==='all'||item.category===f.category)&&(f.department==='all'||item.department===f.department)&&(f.shop==='all'||item.storeName===f.shop)&&(f.brand==='all'||item.brand===f.brand));
+  const knownShops=Array.isArray(shops)?shops:[];
+  if(f.shop!=='all'&&!knownShops.some(shop=>shop.id===f.shop))f.shop='all';
+  const shopOptions=['<option value="all"'+(f.shop==='all'?' selected':'')+'>All Shops</option>',...knownShops.map(shop=>`<option value="${escapeText(shop.id)}"${f.shop===shop.id?' selected':''}>${escapeText(shop.name)}${shop.status==='ACTIVE'?'':` (${escapeText(shop.status)})`}</option>`)].join('');
+  const filtered=all.filter(item=>matchesAdminSearch(item,['productName','size','colour','variantId','productId','brand','category','department','storeName'])&&stockMatch(item)&&(f.category==='all'||item.category===f.category)&&(f.department==='all'||item.department===f.department)&&(f.shop==='all'||item.storeId===f.shop)&&(f.brand==='all'||item.brand===f.brand));
   const controls=[
     `<label>Stock<select data-admin-filter="stock"><option value="attention"${f.stock==='attention'?' selected':''}>Needs attention (5 or fewer)</option><option value="out"${f.stock==='out'?' selected':''}>Out of stock</option><option value="low"${f.stock==='low'?' selected':''}>Low stock (1-5)</option><option value="healthy"${f.stock==='healthy'?' selected':''}>Healthy stock (6+)</option><option value="all"${f.stock==='all'?' selected':''}>All stock</option></select></label>`,
-    adminSelect('Category','category',all.map(item=>item.category),f.category),adminSelect('Department','department',all.map(item=>item.department),f.department),adminSelect('Shop','shop',all.map(item=>item.storeName),f.shop),adminSelect('Brand','brand',all.map(item=>item.brand),f.brand),
+    adminSelect('Category','category',all.map(item=>item.category),f.category),adminSelect('Department','department',all.map(item=>item.department),f.department),`<label>Shop<select data-admin-filter="shop">${shopOptions}</select></label>`,adminSelect('Brand','brand',all.map(item=>item.brand),f.brand),
   ];
   byId('content').innerHTML=`<h2>Inventory</h2>${adminFilterBar('Inventory filters',controls,filtered.length,all.length)}<table><thead><tr><th>Product</th><th>Shop / category</th><th>Variant</th><th>Stock</th><th>Action</th></tr></thead><tbody>${filtered.map(item=>{const variant=[item.size&&item.size!==DEFAULT_VARIANT_SIZE?item.size:'',item.colour&&item.colour!==DEFAULT_VARIANT_COLOUR?item.colour:''].filter(Boolean).join(' / ')||'Single stock';return `<tr><td><div class="inventory-product-cell">${inventoryThumbnail(item)}<span><strong>${escapeText(item.productName)}</strong><br><small>${escapeText(item.brand||'-')}</small></span></div></td><td>${escapeText(item.storeName||'-')}<br><small>${escapeText([item.category,item.department].filter(Boolean).join(' / '))}</small></td><td>${escapeText(variant)}<br><small>${escapeText(item.variantId)}</small></td><td><strong>${escapeText(item.stock)}</strong></td><td><button data-action="inventory" data-id="${escapeText(item.variantId)}">Adjust</button></td></tr>`;}).join('')}</tbody></table>${filtered.length?'':'<p>No inventory matches the current search and filters.</p>'}`;
 }

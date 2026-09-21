@@ -863,6 +863,19 @@ class AdminApplication:
                     result.append(record)
         return result[:500]
 
+    def inventory_snapshot(self, admin_id: str, query: str = "", low_only: bool = False) -> dict[str, Any]:
+        """Inventory rows plus every shop known to the private admin service.
+
+        The shop selector must not be derived from product rows: a newly added
+        shop can legitimately have no published product or stock yet.
+        """
+        applications = self.shops.admin_list_applications(admin_id)
+        shops = [
+            {"id": item["id"], "name": item["shopName"], "status": item["status"]}
+            for item in applications
+        ]
+        return {"inventory": self.inventory(query, low_only), "shops": shops}
+
     def adjust_inventory(
         self,
         admin_id: str,
@@ -1110,8 +1123,8 @@ class AdminHandler(BaseHTTPRequestHandler):
                 admin, _session = self._admin()
                 self._json(200, {"success": True, "requests": self._shops().admin_list_product_change_requests(admin["id"])}); return
             if path == "/api/admin/inventory":
-                self._admin(); query = self._query(); needle = query.get("q", [""])[0]; low = query.get("low", ["0"])[0] == "1"
-                self._json(200, {"success": True, "inventory": self.application.inventory(needle, low)}); return
+                admin, _session = self._admin(); query = self._query(); needle = query.get("q", [""])[0]; low = query.get("low", ["0"])[0] == "1"
+                self._json(200, {"success": True, **self.application.inventory_snapshot(admin["id"], needle, low)}); return
             if path == "/api/admin/customers":
                 self._admin(); query = self._query().get("q", [""])[0]
                 self._json(200, {"success": True, "customers": self.application.identity.customers(query)}); return

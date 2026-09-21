@@ -4234,6 +4234,44 @@ class HttpApiTests(unittest.TestCase):
         status, empty_again, _headers = self.get_json("/api/reviews?productId=sd-prod-001")
         self.assertEqual((status, empty_again["reviewCount"]), (200, 0))
 
+    def test_verified_local_store_review_http_contract(self) -> None:
+        status, owner, _headers = self.post_json("/api/auth/register", {
+            "name": "Store Review Owner", "email": "store-review-owner@example.test",
+            "password": "very secure owner password 123", "phone": "9888888811",
+        })
+        self.assertEqual(status, 201)
+        store = self.service.shops.create_draft(owner["user"]["id"], {
+            "shopName": "HTTP Review Store", "ownerName": "Store Review Owner",
+            "category": "Clothing & Fashion", "description": "Store used for secure HTTP review testing.",
+            "address": "15 Main Market Road", "city": "Neemuch", "state": "Madhya Pradesh",
+            "pincode": "458441", "businessInformation": "HTTP review test store",
+        })
+        status, registered, headers = self.post_json("/api/auth/register", {
+            "name": "Store Review Customer", "email": "store-review-customer@example.test",
+            "password": "very secure customer password 123", "phone": "9888888812",
+        })
+        self.assertEqual(status, 201)
+        session_headers = {"Cookie": headers["Set-Cookie"].split(";", 1)[0], "X-CSRF-Token": registered["csrfToken"], "Origin": "https://styledash.test"}
+        user_id = registered["user"]["id"]
+        status, ineligible, _headers = self.get_json(f"/api/store-reviews/eligibility?storeId={store['id']}", {"Cookie": session_headers["Cookie"]})
+        self.assertEqual((status, ineligible["eligible"]), (200, False))
+        with self.service.store.lock:
+            self.service.store.state["orders"]["store-review-http-order"] = {
+                "id": "store-review-http-order", "userId": user_id, "status": "delivered",
+                "createdAt": "2026-09-01T01:00:00+00:00", "updatedAt": "2026-09-01T02:00:00+00:00",
+                "fulfillmentRequired": True, "items": [{"productId": "local-product", "storeId": store["id"]}],
+            }
+            self.service.store.save()
+        status, created, _headers = self.post_json("/api/store-reviews", {
+            "storeId": store["id"], "rating": 5, "title": "Excellent", "comment": "A secure verified local-store review.",
+        }, session_headers)
+        self.assertEqual(status, 201)
+        review_id = created["review"]["id"]
+        status, public, _headers = self.get_json(f"/api/store-reviews?storeId={store['id']}&sort=highest")
+        self.assertEqual((status, public["rating"], public["reviewCount"], public["reviews"][0]["id"]), (200, 5.0, 1, review_id))
+        status, idor, _headers = self.post_json(f"/api/store-reviews/{review_id}/edit", {"rating": 1, "comment": "no"})
+        self.assertEqual((status, idor["code"]), (401, "authentication_required"))
+
 
 if __name__ == "__main__":
     unittest.main()

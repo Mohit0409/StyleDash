@@ -14,6 +14,12 @@ export interface ProductReviews extends ReviewSummary {
   reviews: Review[];
 }
 
+export interface StoreReviews extends ReviewSummary {
+  storeId: string;
+  distribution: Record<string, number>;
+  reviews: Review[];
+}
+
 export interface ReviewEligibility {
   eligible: boolean;
   orderId: string | null;
@@ -62,5 +68,27 @@ export const reviewApi = {
     await apiJson<{ success: true }>(
       `/api/reviews/${encodeURIComponent(reviewId)}/delete`, 'POST', {},
     );
+  },
+};
+
+export const storeReviewApi = {
+  async list(storeId: string, sort: ReviewSort = 'newest'): Promise<StoreReviews> {
+    const query = new URLSearchParams({ storeId, sort });
+    return apiFetch<{ success: true } & StoreReviews>(`/api/store-reviews?${query.toString()}`);
+  },
+  async eligibility(storeId: string): Promise<ReviewEligibility> {
+    const query = new URLSearchParams({ storeId });
+    return apiFetch<{ success: true } & ReviewEligibility>(`/api/store-reviews/eligibility?${query.toString()}`);
+  },
+  async create(storeId: string, draft: ReviewDraft): Promise<Review> {
+    return (await apiJson<{ success: true; review: Review }>('/api/store-reviews', 'POST', { storeId, ...draft })).review;
+  },
+  async edit(reviewId: string, draft: ReviewDraft): Promise<Review> {
+    return (await apiJson<{ success: true; review: Review }>(
+      `/api/store-reviews/${encodeURIComponent(reviewId)}/edit`, 'POST', draft,
+    )).review;
+  },
+  async delete(reviewId: string): Promise<void> {
+    await apiJson<{ success: true }>(`/api/store-reviews/${encodeURIComponent(reviewId)}/delete`, 'POST', {});
   },
 };

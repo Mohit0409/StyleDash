@@ -750,6 +750,25 @@ class AdminStoreTests(unittest.TestCase):
                 out_notification["message"],
             )
 
+    def test_inventory_snapshot_lists_new_shops_before_they_have_products(self):
+        app = ADMIN_SERVER.AdminApplication(
+            self.database, self.key, ROOT / "server/payment-data/catalog.json",
+            ROOT / "server/payment-data/settings.json", self.root / "data-inventory-shops",
+        )
+        owner = app.identity.create_customer_account(self.admin["id"], {
+            "name": "Inventory Shop Owner", "email": "inventory-shop@example.test",
+            "phone": "9876543299", "password": "TempPass8!",
+        })
+        shop = app.shops.admin_create_application(self.admin["id"], owner["id"], {
+            "shopName": "New Empty Inventory Shop", "ownerName": "Inventory Shop Owner",
+            "category": "Clothing & Fashion", "description": "A newly created shop with no submitted product.",
+            "address": "12 Main Market Road", "city": "Neemuch", "state": "Madhya Pradesh", "pincode": "458441",
+        })
+        snapshot = app.inventory_snapshot(self.admin["id"])
+        listed = next(item for item in snapshot["shops"] if item["id"] == shop["id"])
+        self.assertEqual((listed["name"], listed["status"]), ("New Empty Inventory Shop", "ACTIVE"))
+        self.assertFalse(any(row.get("storeId") == shop["id"] for row in snapshot["inventory"]))
+
     def test_paid_order_reconciliation_can_trigger_low_stock_notification(self):
         app = ADMIN_SERVER.AdminApplication(
             self.database,
