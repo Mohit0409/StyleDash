@@ -46,6 +46,7 @@ describe('authoritative inventory repository', () => {
     };
     const fetcher = vi.fn<typeof fetch>(async input => {
       const url = String(input);
+      if (url === '/api/shop-products/homepage') return productsResponse([publishedProduct]);
       if (url === '/api/shop-products/published') return productsResponse([publishedProduct]);
       if (url.startsWith('/api/reviews/summaries?')) return reviewResponse();
       return response([{ productId: 'shopprod_home', variantId: 'shopprod_home-var-1', available: true }]);

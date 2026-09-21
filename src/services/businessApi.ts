@@ -113,6 +113,9 @@ export const publicStoreApi = {
 };
 
 export const shopProductApi = {
+  async homepage(): Promise<Product[]> {
+    return (await apiFetch<{ success: true; products: Product[] }>('/api/shop-products/homepage')).products;
+  },
   async published(): Promise<Product[]> {
     return (await apiFetch<{ success: true; products: Product[] }>('/api/shop-products/published')).products;
   },

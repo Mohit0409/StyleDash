@@ -92,6 +92,72 @@ CANCELLATION_AFTER_DISPATCH_FEE_RUPEES = 50
 
 
 
+def _homepage_sort_key(product: dict[str, Any]) -> tuple:
+    created = product.get("createdAt") or ""
+    score = (
+        (50 if product.get("featured") else 0)
+        + (30 if product.get("trending") else 0)
+        + (20 if product.get("newArrival") else 0)
+        + round(float(product.get("rating") or 0) * 5)
+        + min(int(product.get("reviewCount") or 0), 20)
+    )
+    return (score, created, str(product.get("name") or ""))
+
+
+def _homepage_product_candidates(products: list[dict[str, Any]], per_section: int = 8) -> list[dict[str, Any]]:
+    active = [product for product in products if product.get("active") is True]
+    definitions = (
+        lambda p: p.get("category") == "Beauty & Personal Care",
+        lambda p: p.get("category") == "Accessories" or p.get("department") == "accessories",
+        lambda p: p.get("department") == "women",
+        lambda p: p.get("department") == "men",
+        lambda p: p.get("newArrival") is True,
+        lambda p: p.get("trending") is True,
+        lambda p: float(p.get("price") or 0) <= 499,
+        lambda p: True,
+    )
+    selected: dict[str, dict[str, Any]] = {}
+    for matches in definitions:
+        store_counts: dict[str, int] = defaultdict(int)
+        candidates = sorted((p for p in active if matches(p)), key=_homepage_sort_key, reverse=True)
+        chosen = 0
+        for product in candidates:
+            store = str(product.get("vendorId") or product.get("storeSlug") or "")
+            if store_counts[store] >= 2:
+                continue
+            selected[str(product["id"])] = product
+            store_counts[store] += 1
+            chosen += 1
+            if chosen >= per_section:
+                break
+    return list(selected.values())
+
+
+def _homepage_product_projection(product: dict[str, Any]) -> dict[str, Any]:
+    projected = dict(product)
+    images = list(product.get("images") or [])
+    projected["images"] = images[:2]
+    projected["description"] = ""
+    projected["shortDescription"] = ""
+    projected["material"] = ""
+    projected["careInstructions"] = []
+    projected["tags"] = []
+    projected["variants"] = [
+        {
+            "id": variant.get("id"),
+            "sku": variant.get("sku") or "",
+            "size": variant.get("size") or "",
+            "colourName": variant.get("colourName") or "",
+            "colourHex": variant.get("colourHex"),
+            "stock": 0,
+        }
+        for variant in product.get("variants", [])
+    ]
+    return projected
+
+
+
+
 def _validate_png(content: bytes) -> bool:
     if not content.startswith(b"\x89PNG\r\n\x1a\n"):
         return False
@@ -2975,6 +3041,14 @@ class StyleDashRequestHandler(SimpleHTTPRequestHandler):
             if path == "/api/stores/active":
                 self._rate_limit(path, 60)
                 self._json_response(HTTPStatus.OK, {"success": True, "stores": self._shops().list_active_stores()})
+                return
+            if path == "/api/shop-products/homepage":
+                self._rate_limit(path, 120)
+                products = _homepage_product_candidates(self._shops().list_published_products())
+                self._json_response(
+                    HTTPStatus.OK,
+                    {"success": True, "products": [_homepage_product_projection(product) for product in products]},
+                )
                 return
             if path == "/api/shop-products/published":
                 self._rate_limit(path, 60)
