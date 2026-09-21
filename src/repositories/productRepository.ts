@@ -18,6 +18,8 @@ const isObviouslyPageUrl = (value: string): boolean => {
 
 let publishedShopCache: { expiresAt: number; products: Product[] } | null = null;
 let publishedShopRequest: Promise<Product[]> | null = null;
+let homepageShopCache: { expiresAt: number; products: Product[] } | null = null;
+let homepageShopRequest: Promise<Product[]> | null = null;
 let availabilityRequest: ReturnType<typeof inventoryRepository.getAvailability> | null = null;
 
 const retryOnce = async <T>(request: () => Promise<T>): Promise<T> => {
@@ -97,6 +99,23 @@ const getPublishedShopProducts = async (): Promise<Product[]> => {
     .catch(() => [])
     .finally(() => { publishedShopRequest = null; });
   return publishedShopRequest;
+};
+
+const getHomepageShopProducts = async (): Promise<Product[]> => {
+  if (homepageShopCache && homepageShopCache.expiresAt > Date.now()) return homepageShopCache.products;
+  if (homepageShopRequest) return homepageShopRequest;
+
+  homepageShopRequest = shopProductApi.homepage()
+    .then(products => products.filter(product => product.active === true).map(normalizeStoreMetadata))
+    .then(products => {
+      homepageShopCache = { expiresAt: Date.now() + PUBLISHED_SHOP_CACHE_MS, products };
+      return products;
+    })
+    // Keep rolling deployments and transient endpoint failures fail-open: the
+    // existing published catalogue remains the compatibility fallback.
+    .catch(() => getPublishedShopProducts())
+    .finally(() => { homepageShopRequest = null; });
+  return homepageShopRequest;
 };
 
 const mergeCatalogue = (staticProducts: Product[], shopProducts: Product[]): Product[] => {
@@ -179,7 +198,8 @@ const withHomepageAvailability = async (products: Product[]): Promise<Product[]>
 
 export const productRepository = {
   async getHomepageProducts(): Promise<Product[]> {
-    const products = selectHomepageProducts(await getCatalogue());
+    const [staticProducts, shopProducts] = await Promise.all([getStaticProducts(), getHomepageShopProducts()]);
+    const products = selectHomepageProducts(mergeCatalogue(staticProducts, shopProducts));
     const [availableProducts, summaries] = await Promise.all([
       withHomepageAvailability(products),
       getReviewSummaries(products),

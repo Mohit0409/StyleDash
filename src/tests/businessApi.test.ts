@@ -91,6 +91,7 @@ describe('seller product submission API', () => {
     await shopProductApi.createDraft(draft);
     await shopProductApi.updateDraft('shopprod_1', draft);
     await shopProductApi.submit('shopprod_1');
+    await shopProductApi.homepage();
     await shopProductApi.published();
 
     expect(fetchSpy.mock.calls.map(([endpoint]) => endpoint)).toEqual([
@@ -98,6 +99,7 @@ describe('seller product submission API', () => {
       '/api/shop-products',
       '/api/shop-products/shopprod_1',
       '/api/shop-products/shopprod_1/submit',
+      '/api/shop-products/homepage',
       '/api/shop-products/published',
     ]);
     for (const [endpoint, init] of fetchSpy.mock.calls as Array<[RequestInfo | URL, RequestInit]>) {

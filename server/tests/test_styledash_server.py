@@ -2814,6 +2814,15 @@ class HttpApiTests(unittest.TestCase):
         self.assertEqual([item["id"] for item in public_after["products"]], [product_id])
         public_product = public_after["products"][0]
         self.assertNotIn("submittedByUserId", public_product)
+        status, homepage_after, _headers = self.get_json("/api/shop-products/homepage")
+        self.assertEqual(status, 200)
+        self.assertEqual([item["id"] for item in homepage_after["products"]], [product_id])
+        homepage_product = homepage_after["products"][0]
+        self.assertEqual(homepage_product["description"], "")
+        self.assertEqual(homepage_product["shortDescription"], "")
+        self.assertLessEqual(len(homepage_product["images"]), 2)
+        self.assertEqual(homepage_product["variants"][0]["id"], public_product["variants"][0]["id"])
+        self.assertEqual(homepage_product["variants"][0]["stock"], 0)
         self.assertNotIn("registeredEmail", public_product)
         status, stores_response, _headers = self.get_json("/api/stores/active")
         self.assertEqual(status, 200)
