@@ -60,14 +60,16 @@ describe('site quality guardrails', () => {
     expect(home).toContain('products.filter(product => !topPickIds.has(product.id))');
   });
 
-  it('keeps customer product imagery uncropped across shopping and order surfaces', () => {
+  it('fills product-card media while keeping order and detail imagery uncropped', () => {
     const productCard = readText('../components/ProductCard.tsx');
     const productDetail = readText('../pages/ProductDetail.tsx');
     const cartDrawer = readText('../components/CartDrawer.tsx');
     const orders = readText('../pages/Orders.tsx');
     const orderTracking = readText('../pages/OrderTracking.tsx');
 
-    for (const source of [productCard, productDetail, cartDrawer, orders, orderTracking]) {
+    expect(productCard).toContain("'object-cover'");
+    expect(productCard).toContain("'object-contain p-8'");
+    for (const source of [productDetail, cartDrawer, orders, orderTracking]) {
       expect(source).toContain('object-contain');
     }
     expect(cartDrawer).not.toContain('object-cover');
