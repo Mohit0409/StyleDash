@@ -66,14 +66,14 @@ export const ProductCard: React.FC<{ product: Product; onQuickView?: (p: Product
       <Link
         to={`/product/${product.slug}`}
         data-product-card-image
-        className="block relative aspect-[3/4] bg-neutral-100 dark:bg-neutral-800 overflow-hidden"
+        className="block relative aspect-[4/5] bg-neutral-100 dark:bg-neutral-800 overflow-hidden"
         onMouseEnter={() => setHoveredImage(true)}
         onMouseLeave={() => setHoveredImage(false)}
       >
         <img
           src={imageFailed ? PRODUCT_IMAGE_FALLBACK : (hoveredImage ? secondaryImage : primaryImage)}
           alt={product.name}
-          className="h-full w-full object-contain object-center px-8 pb-8 pt-12 transition-opacity duration-300"
+          className={`h-full w-full object-center transition-opacity duration-300 ${imageFailed ? 'object-contain p-8' : 'object-cover'}`}
           loading={priority ? 'eager' : 'lazy'}
           fetchPriority={priority ? 'high' : 'auto'}
           decoding="async"
