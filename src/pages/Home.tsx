@@ -1,6 +1,6 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowRight, Zap, ChevronRight, Grid2X2, Trophy } from 'lucide-react';
+import { ArrowRight, Zap, ChevronLeft, ChevronRight, Grid2X2, Trophy } from 'lucide-react';
 import { SEO } from '../components/SEO';
 import { HomepageMerchandising } from '../components/HomepageMerchandising';
 import { ProductCard } from '../components/ProductCard';
@@ -9,9 +9,26 @@ import { productRepository } from '../repositories/productRepository';
 import { BANNERS } from '../data/banners';
 import { CONFIG } from '../config';
 
+const DEPARTMENT_CATEGORIES = [
+  { name: "Men's Fashion", query: 'dept=men', img: 'https://images.unsplash.com/photo-1516826957135-700dedea698c?auto=format&fit=crop&w=500&q=80' },
+  { name: "Women's Fashion", query: 'dept=women', img: 'https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?auto=format&fit=crop&w=500&q=80' },
+  { name: 'Kids Wear', query: 'dept=kids', img: 'https://images.unsplash.com/photo-1529374255404-311a2a4f1fd9?auto=format&fit=crop&w=500&q=80' },
+  { name: 'Footwear', query: 'category=Footwear', img: 'https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&w=500&q=80' },
+  { name: 'Accessories', query: 'category=Accessories', img: 'https://images.unsplash.com/photo-1515562141207-7a88fb7ce338?auto=format&fit=crop&w=500&q=80' },
+  { name: 'Beauty & Personal Care', query: 'category=Beauty%20%26%20Personal%20Care', img: 'https://images.unsplash.com/photo-1596462502278-27bfdc403348?auto=format&fit=crop&w=500&q=80' },
+  { name: 'Gifts', query: 'category=Gifts', img: 'https://images.unsplash.com/photo-1549465220-1a8b9238cd48?auto=format&fit=crop&w=500&q=80' },
+] as const;
+
 export const Home: React.FC = () => {
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
+  const categoryRailRef = useRef<HTMLDivElement>(null);
+
+  const scrollCategories = (direction: -1 | 1) => {
+    const rail = categoryRailRef.current;
+    if (!rail) return;
+    rail.scrollBy({ left: direction * Math.max(rail.clientWidth * 0.78, 260), behavior: 'smooth' });
+  };
 
   useEffect(() => {
     productRepository.getHomepageProducts().then(data => {
@@ -107,25 +124,27 @@ export const Home: React.FC = () => {
               <h2 className="text-xl font-black text-neutral-900 dark:text-white sm:text-2xl">Shop by Department</h2>
               <p className="text-xs text-neutral-500">Explore curated collections across all categories</p>
             </div>
-            <Link to="/categories" className="inline-flex min-h-11 items-center text-xs font-bold text-lime-600 dark:text-lime-400 hover:underline gap-1">
-              All Categories <Grid2X2 className="w-3.5 h-3.5" />
-            </Link>
+            <div className="flex items-center gap-1.5 sm:gap-2">
+              <div className="hidden items-center gap-1 sm:flex" aria-label="Department carousel controls">
+                <button type="button" onClick={() => scrollCategories(-1)} aria-label="Previous departments" className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-full border border-neutral-200 bg-white text-neutral-700 transition hover:border-neutral-400 hover:text-neutral-950 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-200">
+                  <ChevronLeft className="h-4 w-4" />
+                </button>
+                <button type="button" onClick={() => scrollCategories(1)} aria-label="Next departments" className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-full border border-neutral-200 bg-white text-neutral-700 transition hover:border-neutral-400 hover:text-neutral-950 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-200">
+                  <ChevronRight className="h-4 w-4" />
+                </button>
+              </div>
+              <Link to="/categories" className="inline-flex min-h-11 items-center text-xs font-bold text-lime-600 dark:text-lime-400 hover:underline gap-1">
+                All Categories <Grid2X2 className="w-3.5 h-3.5" />
+              </Link>
+            </div>
           </div>
 
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-[repeat(7,minmax(0,1fr))] gap-4">
-            {[
-              { name: "Men's Fashion", query: 'dept=men', img: 'https://images.unsplash.com/photo-1516826957135-700dedea698c?auto=format&fit=crop&w=500&q=80' },
-              { name: "Women's Fashion", query: 'dept=women', img: 'https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?auto=format&fit=crop&w=500&q=80' },
-              { name: 'Kids Wear', query: 'dept=kids', img: 'https://images.unsplash.com/photo-1529374255404-311a2a4f1fd9?auto=format&fit=crop&w=500&q=80' },
-              { name: 'Footwear', query: 'category=Footwear', img: 'https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&w=500&q=80' },
-              { name: 'Accessories', query: 'category=Accessories', img: 'https://images.unsplash.com/photo-1515562141207-7a88fb7ce338?auto=format&fit=crop&w=500&q=80' },
-              { name: 'Beauty & Personal Care', query: 'category=Beauty%20%26%20Personal%20Care', img: 'https://images.unsplash.com/photo-1596462502278-27bfdc403348?auto=format&fit=crop&w=500&q=80' },
-              { name: 'Gifts', query: 'category=Gifts', img: 'https://images.unsplash.com/photo-1549465220-1a8b9238cd48?auto=format&fit=crop&w=500&q=80' }
-            ].map(item => (
+          <div ref={categoryRailRef} className="flex snap-x snap-mandatory gap-3 overflow-x-auto overscroll-x-contain pb-3 pr-4 scroll-smooth sm:gap-4" data-testid="department-category-rail">
+            {DEPARTMENT_CATEGORIES.map(item => (
               <Link
                 key={item.query}
                 to={`/products?${item.query}`}
-                className="group relative aspect-square overflow-hidden rounded-2xl border border-neutral-200 shadow-md transition-all duration-300 hover:shadow-xl dark:border-neutral-800 sm:aspect-[3/4]"
+                className="group relative h-44 basis-[42%] shrink-0 snap-start overflow-hidden rounded-2xl border border-neutral-200 shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:shadow-xl dark:border-neutral-800 sm:h-52 sm:basis-40 md:h-56 md:basis-44"
               >
                 <img src={item.img} alt={item.name} loading="lazy" decoding="async" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
                 <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent flex flex-col justify-end p-4">

@@ -9,6 +9,7 @@ import urllib.error
 import urllib.request
 from datetime import datetime
 from http.cookiejar import CookieJar
+from types import SimpleNamespace
 from unittest.mock import patch
 from pathlib import Path
 
@@ -750,6 +751,25 @@ class AdminStoreTests(unittest.TestCase):
                 out_notification["message"],
             )
 
+    def test_inventory_snapshot_lists_new_shops_before_they_have_products(self):
+        app = ADMIN_SERVER.AdminApplication(
+            self.database, self.key, ROOT / "server/payment-data/catalog.json",
+            ROOT / "server/payment-data/settings.json", self.root / "data-inventory-shops",
+        )
+        owner = app.identity.create_customer_account(self.admin["id"], {
+            "name": "Inventory Shop Owner", "email": "inventory-shop@example.test",
+            "phone": "9876543299", "password": "TempPass8!",
+        })
+        shop = app.shops.admin_create_application(self.admin["id"], owner["id"], {
+            "shopName": "New Empty Inventory Shop", "ownerName": "Inventory Shop Owner",
+            "category": "Clothing & Fashion", "description": "A newly created shop with no submitted product.",
+            "address": "12 Main Market Road", "city": "Neemuch", "state": "Madhya Pradesh", "pincode": "458441",
+        })
+        snapshot = app.inventory_snapshot(self.admin["id"])
+        listed = next(item for item in snapshot["shops"] if item["id"] == shop["id"])
+        self.assertEqual((listed["name"], listed["status"]), ("New Empty Inventory Shop", "ACTIVE"))
+        self.assertFalse(any(row.get("storeId") == shop["id"] for row in snapshot["inventory"]))
+
     def test_paid_order_reconciliation_can_trigger_low_stock_notification(self):
         app = ADMIN_SERVER.AdminApplication(
             self.database,
@@ -883,6 +903,8 @@ class AdminStoreTests(unittest.TestCase):
         self.assertIn("Shop application filters", admin_ui)
         self.assertIn("Product change request filters", admin_ui)
         self.assertIn("Inventory filters", admin_ui)
+        self.assertIn("New verified-purchase reviews stay private until approved", admin_ui)
+        self.assertIn("/api/admin/store-reviews", admin_ui)
         self.assertIn('width="48" height="48"', admin_ui)
         self.assertNotIn('referrerpolicy="no-referrer" style=', admin_ui)
         self.assertNotIn('fallback.style.cssText', admin_ui)
@@ -929,9 +951,10 @@ class AdminStoreTests(unittest.TestCase):
         self.assertNotIn("alert(", admin_ui)
         self.assertNotIn("confirm(", admin_ui)
         admin_index = (ROOT / "server/admin/index.html").read_text(encoding="utf-8")
+        self.assertIn('data-tab="store-reviews"', admin_index)
         map_ui = (ROOT / "server/admin/delivery-zone-map.js").read_text(encoding="utf-8")
         admin_css = (ROOT / "server/admin/admin.css").read_text(encoding="utf-8")
-        self.assertIn('/admin.js?v=thumbnail-20260916-4', admin_index)
+        self.assertIn('/admin.js?v=reviews-20260922-1', admin_index)
         self.assertIn('/admin.css?v=thumbnail-20260916-4', admin_index)
         self.assertIn('id="admin-dialog"', admin_index)
         self.assertIn('role="status"', admin_index)
@@ -1010,8 +1033,8 @@ class AdminHttpTests(unittest.TestCase):
         status, index, headers = self.request("/")
         self.assertEqual(status, 200)
         self.assertEqual(headers.get("Cache-Control"), "no-store")
-        self.assertIn("/admin.js?v=thumbnail-20260916-4", index)
-        status, script, headers = self.request("/admin.js?v=thumbnail-20260916-4")
+        self.assertIn("/admin.js?v=reviews-20260922-1", index)
+        status, script, headers = self.request("/admin.js?v=reviews-20260922-1")
         self.assertEqual(status, 200)
         self.assertEqual(headers.get("Cache-Control"), "no-store")
         self.assertIn('width="48" height="48"', script)
@@ -1061,6 +1084,58 @@ class AdminHttpTests(unittest.TestCase):
         self.assertEqual((status, body["code"]), (403, "admin_csrf_failed"))
         status, body, _headers = self.request("/api/admin/logout", {}, headers={"X-CSRF-Token": csrf}, method="POST")
         self.assertEqual(status, 200)
+
+    def test_store_review_queue_is_private_csrf_protected_and_audited(self):
+        customers = SECURITY.SecurityStore(self.database, self.key)
+        reviewer, _raw, _csrf = customers.register({
+            "name": "Reviewing Customer", "email": "reviewing@example.test",
+            "password": "long customer password 123", "phone": "9999999901",
+        })
+        owner, _raw, _csrf = customers.register({
+            "name": "Store Owner", "email": "store-owner@example.test",
+            "password": "long customer password 123", "phone": "9999999902",
+        })
+        shops = ADMIN_SERVER.ShopWorkflow(self.database)
+        store = shops.create_draft(owner["id"], {
+            "shopName": "Moderation Store", "ownerName": "Store Owner",
+            "category": "Clothing & Fashion", "description": "A complete local store for review moderation tests.",
+            "address": "12 Test Market", "city": "Neemuch", "state": "Madhya Pradesh", "pincode": "458441",
+        })
+        app = self.server.RequestHandlerClass.application
+        review_order_store = SimpleNamespace(
+            lock=threading.RLock(), state={"orders": {"review-http-order": {
+                "id": "review-http-order", "userId": reviewer["id"], "status": "delivered",
+                "fulfillmentRequired": True, "createdAt": "2026-09-22T10:00:00+00:00",
+                "updatedAt": "2026-09-22T10:01:00+00:00",
+                "items": [{"productId": "review-product", "storeId": store["id"]}],
+            }}},
+        )
+        created = app.reviews.create_store(review_order_store, reviewer["id"], {
+            "storeId": store["id"], "rating": 5, "comment": "Helpful service after a delivered local order.",
+        })
+        self.assertEqual(created["status"], "pending")
+        status, body, _ = self.request("/api/admin/store-reviews")
+        self.assertEqual((status, body["code"]), (401, "admin_authentication_required"))
+        self.request("/api/admin/login", {"username": "local-owner", "password": "long administrator password 123"}, method="POST")
+        status, auth, _ = self.request("/api/admin/totp", {"code": pyotp.TOTP(self.secret).now()}, method="POST")
+        self.assertEqual(status, 200)
+        csrf = auth["csrfToken"]
+        status, queue, _ = self.request("/api/admin/store-reviews")
+        self.assertEqual((status, len(queue["reviews"]), queue["reviews"][0]["status"]), (200, 1, "pending"))
+        self.assertEqual(queue["reviews"][0]["customerEmail"], "reviewing@example.test")
+        status, missing, _ = self.request(
+            f"/api/admin/store-reviews/{created['id']}", {"status": "approved"}, method="PATCH",
+        )
+        self.assertEqual((status, missing["code"]), (403, "admin_csrf_failed"))
+        status, approved, _ = self.request(
+            f"/api/admin/store-reviews/{created['id']}", {"status": "approved"},
+            headers={"X-CSRF-Token": csrf}, method="PATCH",
+        )
+        self.assertEqual((status, approved["review"]["status"]), (200, "approved"))
+        self.assertEqual(app.reviews.list_store(store["id"])["reviewCount"], 1)
+        status, audit, _ = self.request("/api/admin/audit")
+        self.assertEqual(status, 200)
+        self.assertTrue(any(row["action"] == "store_review_approved" for row in audit["audit"]))
 
     def test_delivery_zone_admin_is_private_csrf_protected_and_fail_closed(self):
         status, body, _ = self.request("/api/admin/delivery-zone")

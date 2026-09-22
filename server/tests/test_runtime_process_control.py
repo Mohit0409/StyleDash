@@ -65,6 +65,15 @@ class RuntimeProcessControlTests(unittest.TestCase):
             if script.exists():
                 script.unlink()
 
+    def require_posix_process_control(self) -> None:
+        # The library validates process identity through /proc and uses POSIX
+        # signal/process semantics. Git Bash on Windows cannot faithfully
+        # provide those guarantees and can leave grandchildren holding the
+        # captured output pipes open. Keep the syntax check portable, while
+        # running the behavioural tests on the supported Termux/Linux host.
+        if os.name == "nt":
+            self.skipTest("runtime process-control behaviour requires a POSIX /proc host")
+
     def test_changed_shell_files_parse(self) -> None:
         for path in SHELL_FILES:
             with self.subTest(path=path.name):
@@ -78,6 +87,7 @@ class RuntimeProcessControlTests(unittest.TestCase):
                 self.assertEqual(result.returncode, 0, result.stderr)
 
     def test_orphan_and_duplicate_processes_are_discovered_and_stopped(self) -> None:
+        self.require_posix_process_control()
         library = bash_path(PROCESS_LIB)
         body = f'''#!/usr/bin/env bash
 set -eu
@@ -111,6 +121,7 @@ echo process_control_regression=PASS
         self.assertIn("process_control_regression=PASS", result.stdout)
 
     def test_runit_supervisor_is_paused_before_watchdog_shutdown(self) -> None:
+        self.require_posix_process_control()
         library = bash_path(PROCESS_LIB)
         body = f'''#!/usr/bin/env bash
 set -eu
@@ -185,6 +196,7 @@ echo runit_watchdog_regression=PASS
         self.assertIn("runit_watchdog_regression=PASS", result.stdout)
 
     def test_watchdog_manual_fallback_without_runit(self) -> None:
+        self.require_posix_process_control()
         library = bash_path(PROCESS_LIB)
         body = f'''#!/usr/bin/env bash
 set -eu
