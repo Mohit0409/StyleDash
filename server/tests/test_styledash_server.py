@@ -22,6 +22,8 @@ from unittest.mock import patch
 
 from cryptography.fernet import Fernet
 
+from scripts.styledash_admin import AdminStore
+from scripts.styledash_reviews import ReviewWorkflow
 from scripts import styledash_notify as NOTIFY
 
 
@@ -2052,8 +2054,9 @@ class HttpApiTests(unittest.TestCase):
         (web_root / "utf8.js").write_text("window.price = 'â‚¹576';", encoding="utf-8")
         self.reset_deliveries = []
         self.firebase_claims = {}
+        self.security_key = Fernet.generate_key().decode()
         security_store = SERVER.SecurityStore(
-            root / "styledash.db", Fernet.generate_key().decode(),
+            root / "styledash.db", self.security_key,
             password_reset_sender=lambda email, token: self.reset_deliveries.append((email, token)),
             firebase_verifier=lambda token: self.firebase_claims[token],
         )
@@ -4267,6 +4270,17 @@ class HttpApiTests(unittest.TestCase):
         }, session_headers)
         self.assertEqual(status, 201)
         review_id = created["review"]["id"]
+        status, awaiting_moderation, _headers = self.get_json(
+            f"/api/store-reviews?storeId={store['id']}&sort=highest"
+        )
+        self.assertEqual(
+            (status, awaiting_moderation["rating"], awaiting_moderation["reviewCount"], awaiting_moderation["reviews"]),
+            (200, 0, 0, []),
+        )
+        moderator = AdminStore(self.service.security.path, self.security_key).create_admin(
+            "http-review-moderator", "long administrator password 123", "JBSWY3DPEHPK3PXP", ["ABCDEF123456"]
+        )
+        ReviewWorkflow(self.service.security.path).moderate_store_review(moderator["id"], review_id, "approved")
         status, public, _headers = self.get_json(f"/api/store-reviews?storeId={store['id']}&sort=highest")
         self.assertEqual((status, public["rating"], public["reviewCount"], public["reviews"][0]["id"]), (200, 5.0, 1, review_id))
         status, idor, _headers = self.post_json(f"/api/store-reviews/{review_id}/edit", {"rating": 1, "comment": "no"})
