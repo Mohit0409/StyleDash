@@ -2,7 +2,7 @@ import { expect, test } from '@playwright/test';
 
 const PRODUCT_ROUTE = '/product/pure-cotton-oversized-graphic-tee-sd-prod-001';
 
-test('product images stay contained in fixed cards and the detail viewer is accessible', async ({ page }) => {
+test('product images fill fixed cards and the detail viewer is accessible', async ({ page }) => {
   // Exercise the four requested responsive viewports without creating any order,
   // payment, account, or catalogue state.
   for (const viewport of [
@@ -16,7 +16,7 @@ test('product images stay contained in fixed cards and the detail viewer is acce
 
     const cards = page.locator('[data-product-card-image]');
     await expect(cards.first()).toBeVisible();
-    await expect(cards.first().locator('img')).toHaveCSS('object-fit', 'contain');
+    await expect(cards.first().locator('img')).toHaveCSS('object-fit', 'cover');
 
     const firstBox = await cards.nth(0).boundingBox();
     const secondBox = await cards.nth(1).boundingBox();
