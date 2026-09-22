@@ -182,8 +182,9 @@ class ReviewWorkflowTests(unittest.TestCase):
         with self.reviews.connect() as db:
             versions = {row['version'] for row in db.execute('SELECT version FROM review_schema_migrations')}
             schema = db.execute("SELECT sql FROM sqlite_master WHERE type='table' AND name='store_reviews'").fetchone()['sql']
-        self.assertIn(3, versions)
+        self.assertTrue({3, 4}.issubset(versions))
         self.assertIn("'pending'", schema)
+        self.assertIn("'published'", schema)
 
     def test_store_review_migration_preserves_legacy_published_reviews_as_approved(self) -> None:
         self.add_order(store_id=self.store['id'])
@@ -206,14 +207,76 @@ class ReviewWorkflowTests(unittest.TestCase):
                    FROM store_reviews_current"""
             )
             db.execute('DROP TABLE store_reviews_current')
-            db.execute('DELETE FROM review_schema_migrations WHERE version=3')
+            db.execute('DELETE FROM review_schema_migrations WHERE version IN (3, 4)')
             db.commit()
         upgraded = ReviewWorkflow(self.security.path)
         summary = upgraded.list_store(self.store['id'])
         self.assertEqual((summary['reviewCount'], summary['reviews'][0]['id'], summary['reviews'][0]['status']), (1, created['id'], 'approved'))
         with upgraded.connect() as db:
             versions = {row['version'] for row in db.execute('SELECT version FROM review_schema_migrations')}
-        self.assertIn(3, versions)
+        self.assertTrue({3, 4}.issubset(versions))
+
+    def test_v4_migration_maps_v3_approved_reviews_to_the_rollback_safe_storage_value(self) -> None:
+        self.add_order(store_id=self.store['id'])
+        created = self.reviews.create_store(self.payment_store, self.user['id'], {
+            'storeId': self.store['id'], 'rating': 5, 'comment': 'A v3 approved review remains visible after the compatibility migration.',
+        })
+        with self.reviews.connect() as db:
+            # Model a database that was already migrated by the first v3
+            # release, before the v4 rollback-compatibility patch is applied.
+            db.execute('BEGIN IMMEDIATE')
+            db.execute('ALTER TABLE store_reviews RENAME TO store_reviews_current')
+            db.execute("""CREATE TABLE store_reviews(
+                id TEXT PRIMARY KEY, store_id TEXT NOT NULL REFERENCES vendor_applications(id) ON DELETE CASCADE,
+                user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE, order_id TEXT NOT NULL,
+                rating INTEGER NOT NULL CHECK(rating BETWEEN 1 AND 5), title TEXT, comment TEXT NOT NULL,
+                status TEXT NOT NULL DEFAULT 'pending' CHECK(status IN ('pending','approved','rejected','hidden')),
+                created_at TEXT NOT NULL, updated_at TEXT NOT NULL, UNIQUE(user_id, store_id)
+            )""")
+            db.execute(
+                """INSERT INTO store_reviews(id,store_id,user_id,order_id,rating,title,comment,status,created_at,updated_at)
+                   SELECT id,store_id,user_id,order_id,rating,title,comment,'approved',created_at,updated_at
+                   FROM store_reviews_current"""
+            )
+            db.execute('DROP TABLE store_reviews_current')
+            db.execute('DELETE FROM review_schema_migrations WHERE version=4')
+            db.commit()
+        upgraded = ReviewWorkflow(self.security.path)
+        with upgraded.connect() as db:
+            stored_status = db.execute(
+                'SELECT status FROM store_reviews WHERE id=?', (created['id'],)
+            ).fetchone()['status']
+            versions = {row['version'] for row in db.execute('SELECT version FROM review_schema_migrations')}
+        summary = upgraded.list_store(self.store['id'])
+        self.assertEqual(stored_status, 'published')
+        self.assertIn(4, versions)
+        self.assertEqual((summary['reviewCount'], summary['reviews'][0]['status']), (1, 'approved'))
+
+    def test_moderation_schema_keeps_the_v2_published_rollback_contract(self) -> None:
+        self.add_order(store_id=self.store['id'])
+        created = self.reviews.create_store(self.payment_store, self.user['id'], {
+            'storeId': self.store['id'], 'rating': 5, 'comment': 'Approved review remains rollback compatible.',
+        })
+        self.reviews.moderate_store_review(self.admin['id'], created['id'], 'approved')
+        self.add_order(user_id=self.other['id'], store_id=self.store['id'], order_id='legacy-rollback-order')
+        now = '2026-09-22T12:00:00+00:00'
+        with self.reviews.connect() as db:
+            # This is the status and insert shape used by the v2 rollback
+            # code. It must remain valid after the v4 migration.
+            self.assertEqual(
+                db.execute('SELECT status FROM store_reviews WHERE id=?', (created['id'],)).fetchone()['status'],
+                'published',
+            )
+            db.execute(
+                """INSERT INTO store_reviews(id,store_id,user_id,order_id,rating,title,comment,status,created_at,updated_at)
+                   VALUES(?,?,?,?,?,?,?,?,?,?)""",
+                ('legacy-rollback-review', self.store['id'], self.other['id'], 'legacy-rollback-order', 4,
+                 None, 'A review created while the v2 rollback code is active.', 'published', now, now),
+            )
+            db.commit()
+        summary = self.reviews.list_store(self.store['id'])
+        self.assertEqual(summary['reviewCount'], 2)
+        self.assertEqual({item['status'] for item in summary['reviews']}, {'approved'})
 
     def test_store_review_requires_delivered_order_and_blocks_idor_and_owner(self) -> None:
         payload = {'storeId': self.store['id'], 'rating': 5, 'comment': 'Review without delivery'}

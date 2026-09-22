@@ -76,7 +76,7 @@ class ReviewWorkflow:
                   title TEXT,
                   comment TEXT NOT NULL,
                   status TEXT NOT NULL DEFAULT 'pending'
-                    CHECK(status IN ('pending','approved','rejected','hidden')),
+                    CHECK(status IN ('pending','published','rejected','hidden')),
                   created_at TEXT NOT NULL,
                   updated_at TEXT NOT NULL,
                   UNIQUE(user_id, store_id)
@@ -97,15 +97,17 @@ class ReviewWorkflow:
             )
             db.commit()
             self._migrate_store_review_moderation(db)
+            self._migrate_store_review_rollback_compatibility(db)
 
     @staticmethod
     def _migrate_store_review_moderation(db: sqlite3.Connection) -> None:
         """Upgrade the original public-only store-review status model safely.
 
-        Version 2 stored only ``published`` and ``hidden``.  Rebuild the
-        small, isolated table inside one transaction so historical public
-        reviews become approved while preserving all review ownership and
-        timestamps.  SQLite cannot widen a CHECK constraint in place.
+        Version 2 stored only ``published`` and ``hidden``. Rebuild the
+        small, isolated table inside one transaction while preserving review
+        ownership and timestamps. SQLite cannot widen a CHECK constraint in
+        place. ``published`` remains the durable approved value so an
+        emergency rollback to the v2 application remains functional.
         """
         if db.execute(
             "SELECT 1 FROM review_schema_migrations WHERE version=3"
@@ -126,7 +128,7 @@ class ReviewWorkflow:
                   title TEXT,
                   comment TEXT NOT NULL,
                   status TEXT NOT NULL DEFAULT 'pending'
-                    CHECK(status IN ('pending','approved','rejected','hidden')),
+                    CHECK(status IN ('pending','published','rejected','hidden')),
                   created_at TEXT NOT NULL,
                   updated_at TEXT NOT NULL,
                   UNIQUE(user_id, store_id)
@@ -138,8 +140,8 @@ class ReviewWorkflow:
                    )
                    SELECT id,store_id,user_id,order_id,rating,title,comment,
                      CASE status
-                       WHEN 'published' THEN 'approved'
-                       WHEN 'approved' THEN 'approved'
+                       WHEN 'published' THEN 'published'
+                       WHEN 'approved' THEN 'published'
                        WHEN 'rejected' THEN 'rejected'
                        WHEN 'hidden' THEN 'hidden'
                        ELSE 'pending'
@@ -156,6 +158,65 @@ class ReviewWorkflow:
             )
             db.execute(
                 "INSERT INTO review_schema_migrations(version,applied_at) VALUES(3,?)",
+                (_now(),),
+            )
+            db.commit()
+        except Exception:
+            db.rollback()
+            raise
+
+    @staticmethod
+    def _migrate_store_review_rollback_compatibility(db: sqlite3.Connection) -> None:
+        """Restore the durable v2 approved-state contract after the v3 rollout.
+
+        Version 3 used ``approved`` as a new stored value. The last safe
+        rollback code still reads and writes ``published``. This v4 migration
+        maps the v3 value back to ``published`` and keeps the moderation queue
+        states, so rollback remains usable without restoring or losing data.
+        """
+        if db.execute(
+            "SELECT 1 FROM review_schema_migrations WHERE version=4"
+        ).fetchone() is not None:
+            return
+        db.execute("BEGIN IMMEDIATE")
+        try:
+            db.execute("DROP INDEX IF EXISTS store_reviews_store_idx")
+            db.execute("DROP INDEX IF EXISTS store_reviews_user_idx")
+            db.execute("ALTER TABLE store_reviews RENAME TO store_reviews_pre_rollback_compatibility")
+            db.execute(
+                """CREATE TABLE store_reviews(
+                  id TEXT PRIMARY KEY,
+                  store_id TEXT NOT NULL REFERENCES vendor_applications(id) ON DELETE CASCADE,
+                  user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                  order_id TEXT NOT NULL,
+                  rating INTEGER NOT NULL CHECK(rating BETWEEN 1 AND 5),
+                  title TEXT,
+                  comment TEXT NOT NULL,
+                  status TEXT NOT NULL DEFAULT 'pending'
+                    CHECK(status IN ('pending','published','rejected','hidden')),
+                  created_at TEXT NOT NULL,
+                  updated_at TEXT NOT NULL,
+                  UNIQUE(user_id, store_id)
+                )"""
+            )
+            db.execute(
+                """INSERT INTO store_reviews(
+                     id,store_id,user_id,order_id,rating,title,comment,status,created_at,updated_at
+                   )
+                   SELECT id,store_id,user_id,order_id,rating,title,comment,
+                     CASE status WHEN 'approved' THEN 'published' ELSE status END,
+                     created_at,updated_at
+                   FROM store_reviews_pre_rollback_compatibility"""
+            )
+            db.execute("DROP TABLE store_reviews_pre_rollback_compatibility")
+            db.execute(
+                "CREATE INDEX store_reviews_store_idx ON store_reviews(store_id, status, created_at DESC)"
+            )
+            db.execute(
+                "CREATE INDEX store_reviews_user_idx ON store_reviews(user_id, created_at DESC)"
+            )
+            db.execute(
+                "INSERT INTO review_schema_migrations(version,applied_at) VALUES(4,?)",
                 (_now(),),
             )
             db.commit()
@@ -421,10 +482,16 @@ class ReviewWorkflow:
             # a new public store-level index.
             "userName": "Verified local customer", "rating": row["rating"],
             "title": row["title"], "comment": row["comment"],
-            "status": row["status"],
+            "status": self._store_review_api_status(row["status"]),
             "createdAt": row["created_at"], "updatedAt": row["updated_at"],
             "verifiedPurchase": True,
         }
+
+    @staticmethod
+    def _store_review_api_status(status: Any) -> str:
+        # Keep the historical database value for rollback compatibility while
+        # presenting the clearer moderation term to current clients.
+        return "approved" if status == "published" else str(status)
 
     def _store_owner_id(self, db: sqlite3.Connection, store_id: str) -> str | None:
         row = db.execute(
@@ -456,16 +523,16 @@ class ReviewWorkflow:
             self._store_owner_id(db, store_id)
             stats = db.execute(
                 """SELECT COUNT(*) AS review_count,AVG(rating) AS average_rating
-                   FROM store_reviews WHERE store_id=? AND status='approved'""", (store_id,)
+                   FROM store_reviews WHERE store_id=? AND status='published'""", (store_id,)
             ).fetchone()
             distribution_rows = db.execute(
                 """SELECT rating,COUNT(*) AS review_count FROM store_reviews
-                   WHERE store_id=? AND status='approved' GROUP BY rating""", (store_id,)
+                   WHERE store_id=? AND status='published' GROUP BY rating""", (store_id,)
             ).fetchall()
             rows = db.execute(
                 f"""SELECT r.*,u.name AS user_name FROM store_reviews r
                     JOIN users u ON u.id=r.user_id
-                    WHERE r.store_id=? AND r.status='approved'
+                    WHERE r.store_id=? AND r.status='published'
                     ORDER BY {ordering} LIMIT 100""", (store_id,)
             ).fetchall()
         count = int(stats["review_count"] or 0)
@@ -553,7 +620,7 @@ class ReviewWorkflow:
                    ORDER BY CASE r.status WHEN 'pending' THEN 0 ELSE 1 END,r.updated_at DESC LIMIT 500"""
             ).fetchall()
         return [{
-            **self._public_store_row(row), "status": row["status"], "storeName": row["shop_name"],
+            **self._public_store_row(row), "status": self._store_review_api_status(row["status"]), "storeName": row["shop_name"],
             "customerName": self._display_name(row["user_name"]), "customerEmail": row["user_email"],
         } for row in rows]
 
@@ -569,6 +636,7 @@ class ReviewWorkflow:
             row = db.execute("SELECT * FROM store_reviews WHERE id=?", (review_id,)).fetchone()
             if row is None:
                 raise SecurityError(404, "Store review not found.", "store_review_not_found")
-            db.execute("UPDATE store_reviews SET status=?,updated_at=? WHERE id=?", (target, _now(), review_id))
+            storage_status = "published" if target == "approved" else target
+            db.execute("UPDATE store_reviews SET status=?,updated_at=? WHERE id=?", (storage_status, _now(), review_id))
             db.commit()
         return {"id": review_id, "storeId": row["store_id"], "status": target}
