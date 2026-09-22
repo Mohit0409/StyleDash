@@ -36,6 +36,14 @@ enabled() {
   esac
 }
 
+run_rclone() {
+  if command -v ionice >/dev/null 2>&1; then
+    nice -n 10 ionice -c 3 rclone "$@"
+  else
+    nice -n 10 rclone "$@"
+  fi
+}
+
 stamp="$(date -u +%Y%m%dT%H%M%SZ)"
 target="$BACKUP_ROOT/$stamp"
 mkdir -p "$target"
@@ -120,10 +128,10 @@ if [ "$LOCAL_ONLY" = false ]; then
     fi
 
     remote_target="${remote%/}/$stamp"
-    rclone copy "$target" "$remote_target" \
+    run_rclone copy "$target" "$remote_target" \
       --immutable \
       --create-empty-src-dirs
-    rclone check "$target" "$remote_target" \
+    run_rclone check "$target" "$remote_target" \
       --one-way \
       --download
 
@@ -135,9 +143,9 @@ if [ "$LOCAL_ONLY" = false ]; then
     if [ -n "$secondary" ]; then
       secondary_target="${secondary%/}/$stamp"
 
-      rclone copy "$target" "$secondary_target"         --immutable         --create-empty-src-dirs
+      run_rclone copy "$target" "$secondary_target"         --immutable         --create-empty-src-dirs
 
-      rclone check "$target" "$secondary_target"         --one-way         --download
+      run_rclone check "$target" "$secondary_target"         --one-way         --download
 
       printf '%s\n' "$stamp" > "$RUN_DIR/styledash-last-secondary-backup"
       chmod 600 "$RUN_DIR/styledash-last-secondary-backup"
