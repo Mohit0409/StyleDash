@@ -94,10 +94,10 @@ class ProductionReliabilityTests(unittest.TestCase):
         self.assertIn('"service":"Vibe4You"', script)
         self.assertIn("public_origin_failed", script)
 
-    def test_cloudflare_tunnel_uses_auto_transport_fallback(self) -> None:
+    def test_cloudflare_tunnel_uses_http2_transport(self) -> None:
         script = self.read("scripts/termux/start-styledash-cloudflare")
-        self.assertIn("cloudflared tunnel run --protocol auto", script)
-        self.assertNotIn("cloudflared tunnel run --protocol http2", script)
+        self.assertIn("cloudflared tunnel run --protocol http2", script)
+        self.assertNotIn("cloudflared tunnel run --protocol auto", script)
         self.assertIn("styledash_assert_single_process", script)
         self.assertIn('styledash_stop_matching_processes "StyleDash Cloudflare tunnel"', script)
         self.assertIn("styledash_cloudflare_process_count=1", script)

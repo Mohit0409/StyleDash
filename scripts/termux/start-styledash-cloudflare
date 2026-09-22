@@ -41,7 +41,7 @@ fi
 # Normalize stale, missing, unrelated, and duplicate PID-file states.
 styledash_stop_matching_processes "StyleDash Cloudflare tunnel" "$CLOUDFLARE_MARKER" "$CLOUDFLARE_IDENTITY"
 rm -f -- "$PID_FILE"
-nohup cloudflared tunnel run --protocol auto --token-file "$TOKEN_FILE" >> "$LOG_FILE" 2>&1 &
+nohup cloudflared tunnel run --protocol http2 --token-file "$TOKEN_FILE" >> "$LOG_FILE" 2>&1 &
 pid="$!"
 printf '%s\n' "$pid" > "$PID_FILE"
 chmod 600 "$PID_FILE"
