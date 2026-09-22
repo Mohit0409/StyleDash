@@ -34,6 +34,11 @@ except ModuleNotFoundError:
     from scripts.styledash_shops import PRODUCT_MEDIA_PATH_PATTERN, ShopWorkflow
 
 try:
+    from styledash_reviews import ReviewWorkflow
+except ModuleNotFoundError:
+    from scripts.styledash_reviews import ReviewWorkflow
+
+try:
     from styledash_notify import owner_notifier
 except ModuleNotFoundError:
     from scripts.styledash_notify import owner_notifier
@@ -258,6 +263,7 @@ class AdminApplication:
         finally:
             probe.close()
         self.shops = ShopWorkflow(database) if has_customers else None
+        self.reviews = ReviewWorkflow(database) if has_customers else None
         self._store_product_image_payload = public.store_product_image_payload
         self._public_security_error = public.SecurityError
         self.product_image_directory = database.parent / "product-images"
@@ -279,6 +285,25 @@ class AdminApplication:
         config = self.delivery_zones.configuration()
         policy = self.delivery_zones.policy()
         return {"configuration": config, "activeZoneCount": len(policy.zones)}
+
+    def list_store_reviews(self, admin_id: str) -> list[dict[str, Any]]:
+        if self.reviews is None:
+            raise SecurityError(503, "Local-store reviews are unavailable until customer storage is initialized.", "reviews_unavailable")
+        return self.reviews.admin_list_store_reviews(admin_id)
+
+    def moderate_store_review(self, admin_id: str, review_id: str, status: Any) -> dict[str, Any]:
+        if self.reviews is None:
+            raise SecurityError(503, "Local-store reviews are unavailable until customer storage is initialized.", "reviews_unavailable")
+        result = self.reviews.moderate_store_review(admin_id, review_id, status)
+        self.identity.record_action(
+            admin_id,
+            f"store_review_{result['status']}",
+            "store_review",
+            result["id"],
+            "success",
+            {"storeId": result["storeId"], "status": result["status"]},
+        )
+        return result
 
     def replace_delivery_zone_configuration(self, admin_id: str, payload: Any) -> dict[str, Any]:
         if not isinstance(payload, dict):
@@ -1122,6 +1147,9 @@ class AdminHandler(BaseHTTPRequestHandler):
             if path == "/api/admin/shop-product-requests":
                 admin, _session = self._admin()
                 self._json(200, {"success": True, "requests": self._shops().admin_list_product_change_requests(admin["id"])}); return
+            if path == "/api/admin/store-reviews":
+                admin, _session = self._admin()
+                self._json(200, {"success": True, "reviews": self.application.list_store_reviews(admin["id"])}); return
             if path == "/api/admin/inventory":
                 admin, _session = self._admin(); query = self._query(); needle = query.get("q", [""])[0]; low = query.get("low", ["0"])[0] == "1"
                 self._json(200, {"success": True, **self.application.inventory_snapshot(admin["id"], needle, low)}); return
@@ -1287,6 +1315,11 @@ class AdminHandler(BaseHTTPRequestHandler):
                 require_existing_admin_product_media(payload, self.application.product_image_directory)
                 result = self._shops().admin_update_product(admin["id"], product_id, payload)
                 self._json(200, {"success": True, "product": result}); return
+            review_match = re.fullmatch(r"/api/admin/store-reviews/([^/]+)", path)
+            if review_match:
+                review_id = unquote(review_match.group(1))
+                result = self.application.moderate_store_review(admin["id"], review_id, payload.get("status"))
+                self._json(200, {"success": True, "review": result}); return
             if path.startswith("/api/admin/customers/") and path.endswith("/password"):
                 user_id = unquote(path.removeprefix("/api/admin/customers/").removesuffix("/password"))
                 result = self.application.identity.set_customer_password(admin["id"], user_id, payload.get("password"))

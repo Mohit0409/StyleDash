@@ -75,8 +75,8 @@ class ReviewWorkflow:
                   rating INTEGER NOT NULL CHECK(rating BETWEEN 1 AND 5),
                   title TEXT,
                   comment TEXT NOT NULL,
-                  status TEXT NOT NULL DEFAULT 'published'
-                    CHECK(status IN ('published','hidden')),
+                  status TEXT NOT NULL DEFAULT 'pending'
+                    CHECK(status IN ('pending','approved','rejected','hidden')),
                   created_at TEXT NOT NULL,
                   updated_at TEXT NOT NULL,
                   UNIQUE(user_id, store_id)
@@ -96,6 +96,72 @@ class ReviewWorkflow:
                 (_now(),),
             )
             db.commit()
+            self._migrate_store_review_moderation(db)
+
+    @staticmethod
+    def _migrate_store_review_moderation(db: sqlite3.Connection) -> None:
+        """Upgrade the original public-only store-review status model safely.
+
+        Version 2 stored only ``published`` and ``hidden``.  Rebuild the
+        small, isolated table inside one transaction so historical public
+        reviews become approved while preserving all review ownership and
+        timestamps.  SQLite cannot widen a CHECK constraint in place.
+        """
+        if db.execute(
+            "SELECT 1 FROM review_schema_migrations WHERE version=3"
+        ).fetchone() is not None:
+            return
+        db.execute("BEGIN IMMEDIATE")
+        try:
+            db.execute("DROP INDEX IF EXISTS store_reviews_store_idx")
+            db.execute("DROP INDEX IF EXISTS store_reviews_user_idx")
+            db.execute("ALTER TABLE store_reviews RENAME TO store_reviews_pre_moderation")
+            db.execute(
+                """CREATE TABLE store_reviews(
+                  id TEXT PRIMARY KEY,
+                  store_id TEXT NOT NULL REFERENCES vendor_applications(id) ON DELETE CASCADE,
+                  user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                  order_id TEXT NOT NULL,
+                  rating INTEGER NOT NULL CHECK(rating BETWEEN 1 AND 5),
+                  title TEXT,
+                  comment TEXT NOT NULL,
+                  status TEXT NOT NULL DEFAULT 'pending'
+                    CHECK(status IN ('pending','approved','rejected','hidden')),
+                  created_at TEXT NOT NULL,
+                  updated_at TEXT NOT NULL,
+                  UNIQUE(user_id, store_id)
+                )"""
+            )
+            db.execute(
+                """INSERT INTO store_reviews(
+                     id,store_id,user_id,order_id,rating,title,comment,status,created_at,updated_at
+                   )
+                   SELECT id,store_id,user_id,order_id,rating,title,comment,
+                     CASE status
+                       WHEN 'published' THEN 'approved'
+                       WHEN 'approved' THEN 'approved'
+                       WHEN 'rejected' THEN 'rejected'
+                       WHEN 'hidden' THEN 'hidden'
+                       ELSE 'pending'
+                     END,
+                     created_at,updated_at
+                   FROM store_reviews_pre_moderation"""
+            )
+            db.execute("DROP TABLE store_reviews_pre_moderation")
+            db.execute(
+                "CREATE INDEX store_reviews_store_idx ON store_reviews(store_id, status, created_at DESC)"
+            )
+            db.execute(
+                "CREATE INDEX store_reviews_user_idx ON store_reviews(user_id, created_at DESC)"
+            )
+            db.execute(
+                "INSERT INTO review_schema_migrations(version,applied_at) VALUES(3,?)",
+                (_now(),),
+            )
+            db.commit()
+        except Exception:
+            db.rollback()
+            raise
 
     @staticmethod
     def _product_id(value: Any) -> str:
@@ -355,6 +421,7 @@ class ReviewWorkflow:
             # a new public store-level index.
             "userName": "Verified local customer", "rating": row["rating"],
             "title": row["title"], "comment": row["comment"],
+            "status": row["status"],
             "createdAt": row["created_at"], "updatedAt": row["updated_at"],
             "verifiedPurchase": True,
         }
@@ -389,16 +456,16 @@ class ReviewWorkflow:
             self._store_owner_id(db, store_id)
             stats = db.execute(
                 """SELECT COUNT(*) AS review_count,AVG(rating) AS average_rating
-                   FROM store_reviews WHERE store_id=? AND status='published'""", (store_id,)
+                   FROM store_reviews WHERE store_id=? AND status='approved'""", (store_id,)
             ).fetchone()
             distribution_rows = db.execute(
                 """SELECT rating,COUNT(*) AS review_count FROM store_reviews
-                   WHERE store_id=? AND status='published' GROUP BY rating""", (store_id,)
+                   WHERE store_id=? AND status='approved' GROUP BY rating""", (store_id,)
             ).fetchall()
             rows = db.execute(
                 f"""SELECT r.*,u.name AS user_name FROM store_reviews r
                     JOIN users u ON u.id=r.user_id
-                    WHERE r.store_id=? AND r.status='published'
+                    WHERE r.store_id=? AND r.status='approved'
                     ORDER BY {ordering} LIMIT 100""", (store_id,)
             ).fetchall()
         count = int(stats["review_count"] or 0)
@@ -443,7 +510,7 @@ class ReviewWorkflow:
                     raise SecurityError(403, "Store owners cannot review their own local store.", "own_store_review_forbidden")
                 db.execute(
                     """INSERT INTO store_reviews(id,store_id,user_id,order_id,rating,title,comment,status,created_at,updated_at)
-                       VALUES(?,?,?,?,?,?,?,'published',?,?)""",
+                       VALUES(?,?,?,?,?,?,?,'pending',?,?)""",
                     (review_id, store_id, user_id, order["id"], rating, title, comment, now, now),
                 )
                 db.commit()
@@ -461,7 +528,9 @@ class ReviewWorkflow:
         _unused, rating, title, comment = self._store_review_draft(payload, include_store=False)
         with self.connect() as db:
             db.execute(
-                """UPDATE store_reviews SET rating=?,title=?,comment=?,updated_at=? WHERE id=? AND user_id=?""",
+                """UPDATE store_reviews
+                   SET rating=?,title=?,comment=?,status='pending',updated_at=?
+                   WHERE id=? AND user_id=?""",
                 (rating, title, comment, _now(), review_id, user_id),
             )
             db.commit()
@@ -472,3 +541,34 @@ class ReviewWorkflow:
         with self.connect() as db:
             db.execute("DELETE FROM store_reviews WHERE id=? AND user_id=?", (review_id, user_id))
             db.commit()
+
+    def admin_list_store_reviews(self, admin_id: str) -> list[dict[str, Any]]:
+        with self.connect() as db:
+            if db.execute("SELECT 1 FROM admin_users WHERE id=?", (admin_id,)).fetchone() is None:
+                raise SecurityError(403, "Administrator access is required.", "admin_required")
+            rows = db.execute(
+                """SELECT r.*,a.shop_name,u.name AS user_name,u.email AS user_email
+                   FROM store_reviews r JOIN vendor_applications a ON a.id=r.store_id
+                   JOIN users u ON u.id=r.user_id
+                   ORDER BY CASE r.status WHEN 'pending' THEN 0 ELSE 1 END,r.updated_at DESC LIMIT 500"""
+            ).fetchall()
+        return [{
+            **self._public_store_row(row), "status": row["status"], "storeName": row["shop_name"],
+            "customerName": self._display_name(row["user_name"]), "customerEmail": row["user_email"],
+        } for row in rows]
+
+    def moderate_store_review(self, admin_id: str, review_id: str, status: Any) -> dict[str, Any]:
+        if not isinstance(review_id, str) or not review_id or len(review_id) > 64:
+            raise SecurityError(404, "Store review not found.", "store_review_not_found")
+        target = str(status or "").strip().lower()
+        if target not in {"approved", "rejected", "hidden"}:
+            raise SecurityError(400, "Invalid store review status.", "invalid_store_review_status")
+        with self.connect() as db:
+            if db.execute("SELECT 1 FROM admin_users WHERE id=?", (admin_id,)).fetchone() is None:
+                raise SecurityError(403, "Administrator access is required.", "admin_required")
+            row = db.execute("SELECT * FROM store_reviews WHERE id=?", (review_id,)).fetchone()
+            if row is None:
+                raise SecurityError(404, "Store review not found.", "store_review_not_found")
+            db.execute("UPDATE store_reviews SET status=?,updated_at=? WHERE id=?", (target, _now(), review_id))
+            db.commit()
+        return {"id": review_id, "storeId": row["store_id"], "status": target}

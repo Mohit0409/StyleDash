@@ -11,6 +11,7 @@ ROOT = Path(__file__).resolve().parents[2]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
+from scripts.styledash_admin import AdminStore
 from scripts.styledash_reviews import ReviewWorkflow
 from scripts.styledash_security import SecurityError, SecurityStore
 from scripts.styledash_shops import ShopWorkflow
@@ -20,7 +21,8 @@ class ReviewWorkflowTests(unittest.TestCase):
     def setUp(self) -> None:
         self.temporary = tempfile.TemporaryDirectory()
         self.root = Path(self.temporary.name)
-        self.security = SecurityStore(self.root / 'styledash.db', Fernet.generate_key().decode())
+        self.key = Fernet.generate_key().decode()
+        self.security = SecurityStore(self.root / 'styledash.db', self.key)
         self.user, _raw, _csrf = self.security.register({
             'name': 'Review Customer',
             'email': 'review@example.test',
@@ -45,6 +47,10 @@ class ReviewWorkflowTests(unittest.TestCase):
             'pincode': '458441', 'businessInformation': 'Review test business',
         })
         self.reviews = ReviewWorkflow(self.security.path)
+        self.admins = AdminStore(self.security.path, self.key)
+        self.admin = self.admins.create_admin(
+            'review-moderator', 'long administrator password 123', 'JBSWY3DPEHPK3PXP', ['ABCDEF123456']
+        )
         self.payment_store = SimpleNamespace(lock=threading.RLock(), state={'orders': {}})
 
     def tearDown(self) -> None:
@@ -146,13 +152,68 @@ class ReviewWorkflowTests(unittest.TestCase):
         self.assertTrue(created['verifiedPurchase'])
         self.assertEqual(created['userName'], 'Verified local customer')
         summary = self.reviews.list_store(self.store['id'])
+        self.assertEqual((summary['rating'], summary['reviewCount']), (0, 0))
+        queued = self.reviews.admin_list_store_reviews(self.admin['id'])
+        self.assertEqual((len(queued), queued[0]['id'], queued[0]['status']), (1, created['id'], 'pending'))
+        self.reviews.moderate_store_review(self.admin['id'], created['id'], 'approved')
+        summary = self.reviews.list_store(self.store['id'])
         self.assertEqual((summary['rating'], summary['reviewCount']), (5.0, 1))
         updated = self.reviews.edit_store(self.user['id'], created['id'], {
             'rating': 4, 'title': '', 'comment': 'Still a reliable neighbourhood store.',
         })
-        self.assertEqual((updated['rating'], updated['title']), (4, None))
+        self.assertEqual((updated['rating'], updated['title'], updated['status']), (4, None, 'pending'))
+        self.assertEqual(self.reviews.list_store(self.store['id'])['reviewCount'], 0)
+        self.reviews.moderate_store_review(self.admin['id'], created['id'], 'approved')
         self.reviews.delete_store(self.user['id'], created['id'])
         self.assertEqual(self.reviews.list_store(self.store['id'])['reviewCount'], 0)
+
+    def test_store_review_moderation_requires_an_administrator_and_persists_schema_version(self) -> None:
+        self.add_order(store_id=self.store['id'])
+        created = self.reviews.create_store(self.payment_store, self.user['id'], {
+            'storeId': self.store['id'], 'rating': 5, 'comment': 'Awaiting private review approval.',
+        })
+        self.assert_security_code(
+            'admin_required', lambda: self.reviews.admin_list_store_reviews(self.user['id'])
+        )
+        self.assert_security_code(
+            'invalid_store_review_status',
+            lambda: self.reviews.moderate_store_review(self.admin['id'], created['id'], 'published'),
+        )
+        with self.reviews.connect() as db:
+            versions = {row['version'] for row in db.execute('SELECT version FROM review_schema_migrations')}
+            schema = db.execute("SELECT sql FROM sqlite_master WHERE type='table' AND name='store_reviews'").fetchone()['sql']
+        self.assertIn(3, versions)
+        self.assertIn("'pending'", schema)
+
+    def test_store_review_migration_preserves_legacy_published_reviews_as_approved(self) -> None:
+        self.add_order(store_id=self.store['id'])
+        created = self.reviews.create_store(self.payment_store, self.user['id'], {
+            'storeId': self.store['id'], 'rating': 5, 'comment': 'Legacy public review retained after upgrade.',
+        })
+        with self.reviews.connect() as db:
+            db.execute('BEGIN IMMEDIATE')
+            db.execute('ALTER TABLE store_reviews RENAME TO store_reviews_current')
+            db.execute("""CREATE TABLE store_reviews(
+                id TEXT PRIMARY KEY, store_id TEXT NOT NULL REFERENCES vendor_applications(id) ON DELETE CASCADE,
+                user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE, order_id TEXT NOT NULL,
+                rating INTEGER NOT NULL CHECK(rating BETWEEN 1 AND 5), title TEXT, comment TEXT NOT NULL,
+                status TEXT NOT NULL DEFAULT 'published' CHECK(status IN ('published','hidden')),
+                created_at TEXT NOT NULL, updated_at TEXT NOT NULL, UNIQUE(user_id, store_id)
+            )""")
+            db.execute(
+                """INSERT INTO store_reviews(id,store_id,user_id,order_id,rating,title,comment,status,created_at,updated_at)
+                   SELECT id,store_id,user_id,order_id,rating,title,comment,'published',created_at,updated_at
+                   FROM store_reviews_current"""
+            )
+            db.execute('DROP TABLE store_reviews_current')
+            db.execute('DELETE FROM review_schema_migrations WHERE version=3')
+            db.commit()
+        upgraded = ReviewWorkflow(self.security.path)
+        summary = upgraded.list_store(self.store['id'])
+        self.assertEqual((summary['reviewCount'], summary['reviews'][0]['id'], summary['reviews'][0]['status']), (1, created['id'], 'approved'))
+        with upgraded.connect() as db:
+            versions = {row['version'] for row in db.execute('SELECT version FROM review_schema_migrations')}
+        self.assertIn(3, versions)
 
     def test_store_review_requires_delivered_order_and_blocks_idor_and_owner(self) -> None:
         payload = {'storeId': self.store['id'], 'rating': 5, 'comment': 'Review without delivery'}

@@ -64,10 +64,10 @@ export const StoreReviews: React.FC<StoreReviewsProps> = ({ storeId, onSummaryCh
     try {
       if (eligibility.existingReview) {
         await storeReviewApi.edit(eligibility.existingReview.id, draft);
-        showToast('Your local store review was updated.', 'success');
+        showToast('Your updated local store review was submitted for approval.', 'success');
       } else {
         await storeReviewApi.create(storeId, draft);
-        showToast('Thanks! Your verified local store review is live.', 'success');
+        showToast('Thanks! Your verified local store review was submitted for approval.', 'success');
       }
       await load();
     } catch (cause) {
@@ -95,11 +95,11 @@ export const StoreReviews: React.FC<StoreReviewsProps> = ({ storeId, onSummaryCh
 
   const form = eligibility?.eligible ? (
     <form onSubmit={save} className="rounded-2xl border border-neutral-200 dark:border-neutral-800 p-5 space-y-3">
-      <div className="flex items-center justify-between gap-3"><div><h3 className="font-black text-sm">{eligibility.existingReview ? 'Edit your store review' : 'Review this local store'}</h3><p className="text-[11px] text-neutral-500 mt-1 flex gap-1 items-center"><CheckCircle className="w-3.5 h-3.5 text-emerald-500" /> Verified delivered purchase</p></div>{eligibility.existingReview && <button type="button" onClick={() => void remove()} className="text-xs font-bold text-red-600">Delete</button>}</div>
+      <div className="flex items-center justify-between gap-3"><div><h3 className="font-black text-sm">{eligibility.existingReview ? 'Edit your store review' : 'Review this local store'}</h3><p className="text-[11px] text-neutral-500 mt-1 flex gap-1 items-center"><CheckCircle className="w-3.5 h-3.5 text-emerald-500" /> Verified delivered purchase{eligibility.existingReview?.status === 'pending' ? ' · Awaiting approval' : ' · Submitted reviews are approved before appearing publicly'}</p></div>{eligibility.existingReview && <button type="button" onClick={() => void remove()} className="text-xs font-bold text-red-600">Delete</button>}</div>
       <div className="flex gap-1" aria-label="Store rating">{[1, 2, 3, 4, 5].map(value => <button type="button" key={value} onClick={() => setRating(value)} aria-label={`${value} stars`} className="p-1"><Star className={`w-6 h-6 ${value <= rating ? 'fill-amber-400 text-amber-400' : 'text-neutral-300'}`} /></button>)}</div>
       <input value={title} onChange={event => setTitle(event.target.value)} maxLength={80} placeholder="Title (optional)" className="w-full rounded-xl border border-neutral-300 dark:border-neutral-700 bg-transparent px-3 py-2 text-sm" />
       <textarea required minLength={3} maxLength={1000} value={comment} onChange={event => setComment(event.target.value)} placeholder="Tell neighbours about your experience" className="w-full min-h-24 rounded-xl border border-neutral-300 dark:border-neutral-700 bg-transparent px-3 py-2 text-sm" />
-      <button disabled={saving} className="rounded-xl bg-neutral-950 dark:bg-white text-white dark:text-neutral-950 px-4 py-2 text-xs font-black disabled:opacity-50">{saving ? 'Saving…' : eligibility.existingReview ? 'Update review' : 'Publish review'}</button>
+      <button disabled={saving} className="rounded-xl bg-neutral-950 dark:bg-white text-white dark:text-neutral-950 px-4 py-2 text-xs font-black disabled:opacity-50">{saving ? 'Saving…' : eligibility.existingReview ? 'Update and submit' : 'Submit review'}</button>
     </form>
   ) : user ? <p className="rounded-2xl border border-neutral-200 dark:border-neutral-800 p-4 text-xs text-neutral-500">{eligibility?.reason === 'own_store_review_forbidden' ? 'Store owners cannot review their own store.' : 'You can review this store after a delivered purchase from it.'}</p>
     : <p className="rounded-2xl border border-neutral-200 dark:border-neutral-800 p-4 text-xs text-neutral-500"><Link to="/login" className="font-black underline text-neutral-900 dark:text-white">Sign in</Link> to review a delivered local-store purchase.</p>;

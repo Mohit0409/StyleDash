@@ -511,6 +511,7 @@ byId('content').addEventListener('click', async event => {
     if(action==='vendor') { const nextStatus=button.dataset.value; let reason=null; if(['REJECTED','SUSPENDED'].includes(nextStatus)){reason=await reasonFor(`Enter the ${nextStatus.toLowerCase()} reason`);if(!reason)return;} await api(`/api/admin/vendors/${encodeURIComponent(button.dataset.id)}`,{method:'PATCH',body:JSON.stringify({status:nextStatus,reason})}); status('Shop application status updated.'); }
     if(action==='shop-product') { const nextStatus=button.dataset.value; let reason=null; if(nextStatus==='REJECTED'){reason=await reasonFor('Enter the product rejection reason');if(!reason)return;} await api(`/api/admin/shop-products/${encodeURIComponent(button.dataset.id)}`,{method:'PATCH',body:JSON.stringify({status:nextStatus,reason})}); status('Shop product status updated.'); }
     if(action==='shop-product-request') { const nextStatus=button.dataset.value; let reason=null; if(nextStatus==='REJECTED'){reason=await reasonFor('Enter the product-request rejection reason');if(!reason)return;} await api(`/api/admin/shop-product-requests/${encodeURIComponent(button.dataset.id)}`,{method:'PATCH',body:JSON.stringify({status:nextStatus,reason})}); status('Product request status updated.'); }
+    if(action==='store-review') { const nextStatus=button.dataset.value; await api(`/api/admin/store-reviews/${encodeURIComponent(button.dataset.id)}`,{method:'PATCH',body:JSON.stringify({status:nextStatus})}); status(`Store review ${nextStatus}.`); }
     if(action==='inventory') { const delta=await inventoryAdjustment(); if(delta===null)return; await api(`/api/admin/inventory/${encodeURIComponent(button.dataset.id)}`,{method:'PATCH',body:JSON.stringify({delta})}); status('Inventory adjustment saved.'); }
     if(action==='customer') await api(`/api/admin/customers/${encodeURIComponent(button.dataset.id)}`,{method:'PATCH',body:JSON.stringify({active:button.dataset.value==='true'})});
     await loadTab(activeTab);
@@ -521,9 +522,9 @@ async function loadTab(tab) {
   error(''); byId('content').innerHTML='<p>Loading…</p>';
   try {
     const query=encodeURIComponent(byId('search').value.trim());
-    const searchLabels={orders:'orders, customers or products',vendors:'shops, owners or contact details','shop-products':'products, brands or shops','shop-product-requests':'products, shops or requests',inventory:'products, variants or sizes',customers:'customers, email or mobile','payment-alerts':'alerts, orders or payment references',audit:'audit actions, targets or results'};
+    const searchLabels={orders:'orders, customers or products',vendors:'shops, owners or contact details','shop-products':'products, brands or shops','shop-product-requests':'products, shops or requests',inventory:'products, variants or sizes','store-reviews':'stores, customers or review text',customers:'customers, email or mobile','payment-alerts':'alerts, orders or payment references',audit:'audit actions, targets or results'};
     if(searchLabels[tab])byId('search').placeholder=`Search ${searchLabels[tab]}`;
-    byId('search-form').hidden=!['orders','vendors','shop-products','shop-product-requests','inventory','customers','payment-alerts','audit'].includes(tab);
+    byId('search-form').hidden=!['orders','vendors','shop-products','shop-product-requests','inventory','store-reviews','customers','payment-alerts','audit'].includes(tab);
     if(tab==='orders'){renderOrders((await api(`/api/admin/orders?q=${query}`)).orders);return;}
     if(tab==='vendors'){renderVendors((await api('/api/admin/vendors')).applications);addBulkControls('vendors',['UNDER_REVIEW','APPROVED','REJECTED','ACTIVE','SUSPENDED'],'.card');return;}
     if(tab==='shop-products'){
@@ -533,6 +534,7 @@ async function loadTab(tab) {
     }
     if(tab==='shop-product-requests'){renderShopProductRequests((await api('/api/admin/shop-product-requests')).requests);addBulkControls('requests',['UNDER_REVIEW','APPROVED','REJECTED'],'.card');return;}
     if(tab==='inventory'){const snapshot=await api(`/api/admin/inventory?low=0&q=${query}`);inventoryShops=Array.isArray(snapshot.shops)?snapshot.shops:[];renderInventory(snapshot.inventory,inventoryShops);addBulkControls('inventory',['1','5','-1','-5'],'tbody tr');return;}
+    if(tab==='store-reviews'){renderStoreReviews((await api('/api/admin/store-reviews')).reviews);return;}
     if(tab==='customers'){renderCustomers((await api(`/api/admin/customers?q=${query}`)).customers);addBulkControls('customers',['enable','disable'],'tbody tr');return;}
     if(tab==='payment-alerts') return renderPaymentAlerts((await api('/api/admin/payment-alerts')).alerts);
     if(tab==='delivery-zone') return renderDeliveryZone((await api('/api/admin/delivery-zone')).configuration);
@@ -552,7 +554,7 @@ function orderActions(order){
     : actions;
 }
 
-function statusTone(value){return ({payment_pending:'amber',payment_review_required:'rose',placed:'sky',confirmed:'blue',preparing:'violet',packed:'indigo',out_for_delivery:'teal',delivered:'green',cancelled:'red',payment_test_completed:'slate',pending:'yellow',paid:'lime',failed:'crimson',refunded:'purple',refund_pending:'orange',partially_refunded:'fuchsia',review_required:'pink'})[String(value||'').toLowerCase()]||'slate';}
+function statusTone(value){return ({payment_pending:'amber',payment_review_required:'rose',placed:'sky',confirmed:'blue',preparing:'violet',packed:'indigo',out_for_delivery:'teal',delivered:'green',cancelled:'red',payment_test_completed:'slate',pending:'yellow',approved:'green',rejected:'red',hidden:'slate',paid:'lime',failed:'crimson',refunded:'purple',refund_pending:'orange',partially_refunded:'fuchsia',review_required:'pink'})[String(value||'').toLowerCase()]||'slate';}
 function statusBadge(value){const text=String(value||'unknown');return `<span class="status-badge tone-${statusTone(text)}">${escapeText(text.replaceAll('_',' '))}</span>`;}
 function filterOptions(values,selected){return ['all',...Array.from(new Set(values.filter(Boolean))).sort()].map(value=>`<option value="${escapeText(value)}"${value===selected?' selected':''}>${value==='all'?'All':escapeText(value.replaceAll('_',' '))}</option>`).join('');}
 function adminSearch(){return byId('search').value.trim().toLowerCase();}
@@ -621,6 +623,15 @@ function renderShopProductRequests(items){
   const filtered=all.filter(item=>matchesAdminSearch(item,['productName','productId','shopName','applicationId','action','status'])&&(f.status==='all'||item.status===f.status)&&(f.action==='all'||item.action===f.action));
   const controls=[adminSelect('Status','status',all.map(item=>item.status),f.status),adminSelect('Request type','action',all.map(item=>item.action),f.action)];
   byId('content').innerHTML=`<h2>Product change requests</h2>${adminFilterBar('Product change request filters',controls,filtered.length,all.length)}<div class="grid">${filtered.map(item=>{const changes=Array.isArray(item.changeSummary)?item.changeSummary:[];const summary=changes.length?`<table class="change-summary"><thead><tr><th>Changed field</th><th>Current value</th><th>Requested value</th></tr></thead><tbody>${changes.map(change=>`<tr><td><strong>${escapeText(change.field)}</strong></td><td>${escapeText(change.before)}</td><td>${escapeText(change.after)}</td></tr>`).join('')}</tbody></table>`:'<p class="muted">Seller requested this product be unpublished, or this legacy request has no saved field-by-field summary.</p>';return `<article class="card"><h3>${escapeText(item.productName||item.productId)}</h3><p>${escapeText(item.shopName||item.applicationId)} / ${escapeText(item.action)}</p>${summary}${item.rejectionReason?`<p class="error">${escapeText(item.rejectionReason)}</p>`:''}<strong>${escapeText(item.status)}</strong><div class="actions">${productRequestTransitions(item.status).map(status=>`<button class="${status==='REJECTED'?'danger':'success'}" data-action="shop-product-request" data-id="${escapeText(item.id)}" data-value="${status}">${escapeText(status.replaceAll('_',' '))}</button>`).join('')}</div></article>`;}).join('')||'<p>No product change requests match the current search and filters.</p>'}</div>`;
+}
+function storeReviewActions(item){
+  const actions={pending:[['approved','Approve','success'],['rejected','Reject','danger']],approved:[['hidden','Hide','secondary']],rejected:[['approved','Approve','success']],hidden:[['approved','Approve','success']]}[item.status]||[];
+  return actions.map(([value,label,style])=>`<button class="${style}" data-action="store-review" data-id="${escapeText(item.id)}" data-value="${value}">${label}</button>`).join('');
+}
+function renderStoreReviews(items){
+  const all=Array.isArray(items)?items:[];
+  const filtered=all.filter(item=>matchesAdminSearch(item,['storeName','customerName','customerEmail','title','comment','status','id']));
+  byId('content').innerHTML=`<h2>Store reviews</h2><p class="muted">New verified-purchase reviews stay private until approved. Customer details are shown only in this private administrator view.</p><div class="grid">${filtered.map(item=>`<article class="card"><div class="order-heading"><div><h3>${escapeText(item.storeName||item.storeId)}</h3><small>${escapeText(item.id)}</small></div>${statusBadge(item.status)}</div><p><strong>${escapeText(item.rating)} / 5 stars</strong>${item.title?` — ${escapeText(item.title)}`:''}</p><p>${escapeText(item.comment)}</p><p class="muted">Customer: ${escapeText(item.customerName)} · ${escapeText(item.customerEmail)}</p><p class="muted">Updated: ${escapeText(item.updatedAt||item.createdAt||'')}</p><div class="actions">${storeReviewActions(item)}</div></article>`).join('')||'<p>No store reviews match the current search.</p>'}</div>`;
 }
 function renderInventory(items,shops=inventoryShops){
   const all=Array.isArray(items)?items:[]; const f=adminFilters.inventory;

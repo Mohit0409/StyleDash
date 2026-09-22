@@ -23,6 +23,8 @@ export interface Review {
   createdAt: string;
   updatedAt?: string;
   verifiedPurchase: boolean;
+  /** Store-review moderation state; public review lists contain approved reviews only. */
+  status?: 'published' | 'pending' | 'approved' | 'rejected' | 'hidden';
 }
 
 export interface Product {
