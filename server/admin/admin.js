@@ -91,7 +91,7 @@ byId('content').addEventListener('change', event => {
 function status(message) { byId('app-status').textContent = message || ''; }
 const DEFAULT_VARIANT_SIZE='One Size';
 const DEFAULT_VARIANT_COLOUR='Default';
-const STORE_CATEGORIES=['Clothing & Fashion','Footwear','Accessories','Beauty & Personal Care','Electronics','Home & Living','General Store'];
+const STORE_CATEGORIES=['Clothing & Fashion','Footwear','Accessories','Beauty & Personal Care','Electronics','Gifts','Home & Living'];
 const PRODUCT_OPTION_MODE_VALUES=new Set(['single','size','colour','both']);
 function defaultProductOptionMode(category){return ['Clothing & Fashion','Footwear'].includes(category)?'both':'single';}
 function inferProductOptionMode(item){
@@ -281,7 +281,7 @@ async function editStore(button){
   const values=await formDialog(`Edit ${item.shopName}`,[
     {name:'shopName',label:'Store name',required:true,value:item.shopName||'',maxLength:100},
     {name:'ownerName',label:'Owner / contact name',required:true,value:item.ownerName||'',maxLength:80},
-    {name:'category',label:'Category',type:'select',required:true,value:STORE_CATEGORIES.includes(item.category)?item.category:STORE_CATEGORIES[0],options:STORE_CATEGORIES.map(value=>({value,label:value}))},
+    {name:'category',label:'Category',type:'select',required:true,value:STORE_CATEGORIES.includes(item.category)?item.category:'',options:[{value:'',label:'Choose a current category'},...STORE_CATEGORIES.map(value=>({value,label:value}))]},
     {name:'description',label:'Store description',type:'textarea',required:true,value:item.description||'',maxLength:1000},
     {name:'address',label:'Store address',type:'textarea',required:true,value:item.address||'',maxLength:250},
     {name:'city',label:'City',required:true,value:item.city||'Neemuch',maxLength:80},
@@ -299,7 +299,7 @@ async function editStore(button){
 }
 
 const PRODUCT_DEPARTMENTS=['men','women','kids','unisex'];
-const PRODUCT_CATEGORIES=['Clothing & Fashion','Footwear','Accessories','Beauty & Personal Care','Electronics','Home & Living','General Store'];
+const PRODUCT_CATEGORIES=['Clothing & Fashion','Footwear','Accessories','Beauty & Personal Care','Electronics','Gifts','Home & Living'];
 const PRODUCT_OPTION_MODES=[
   {value:'single',label:'Single stock - no size or colour'},
   {value:'size',label:'Size / volume only'},
@@ -342,7 +342,7 @@ async function createStoreProduct(){
     {name:'applicationId',label:'Store',type:'select',required:true,options:applications.map(item=>({value:item.id,label:item.shopName}))},
     {name:'name',label:'Product name',required:true,maxLength:140},{name:'description',label:'Product description',type:'textarea',required:true,maxLength:2000},{name:'brand',label:'Brand (optional)',maxLength:100},
     {name:'department',label:'Department',type:'select',required:true,value:'unisex',options:PRODUCT_DEPARTMENTS.map(value=>({value,label:value}))},{name:'category',label:'Category',type:'select',required:true,value:'Clothing & Fashion',options:PRODUCT_CATEGORIES.map(value=>({value,label:value}))},{name:'subcategory',label:'Subcategory (optional; inferred when clear)',maxLength:100},{name:'deliveryType',label:'Delivery schedule',type:'select',required:true,value:'normal',options:DELIVERY_OPTIONS},
-    {name:'optionMode',label:'Product options',type:'select',required:true,value:'both',options:PRODUCT_OPTION_MODES,autoCategoryDefault:true,help:'Choose only the options customers actually need. Beauty, electronics, home and general items default to single stock; clothing and footwear default to colour + size.'},
+    {name:'optionMode',label:'Product options',type:'select',required:true,value:'both',options:PRODUCT_OPTION_MODES,autoCategoryDefault:true,help:'Choose only the options customers actually need. Beauty, electronics, gifts and home products default to single stock; clothing and footwear default to colour + size.'},
     {name:'price',label:'Selling price in rupees',type:'number',required:true,min:1,step:'0.01'},{name:'originalPrice',label:'Original/MRP price in rupees',type:'number',min:1,step:'0.01'},
     {name:'tryAtHomeEnabled',label:'Try at Home offer',type:'select',required:true,value:'false',options:[{value:'false',label:'No'},{value:'true',label:'Yes - customer may try two sizes for Rs 50'}],help:'Enable only when this product has at least two real sizes of the same colour.'},
     {name:'exchangeAvailable',label:'Size exchange',type:'select',required:true,value:'false',options:[{value:'false',label:'No exchange'},{value:'true',label:'Yes - eligible size exchange for Rs 50'}],help:'Enable only when customers can select a replacement size.'},
@@ -359,7 +359,7 @@ async function editStoreProduct(button){
   const colourSource=(Array.isArray(item.colourVariants)&&item.colourVariants.length?item.colourVariants:[{colourName:item.colourName||'Multi',colourHex:item.colourHex||'',imageUrls:item.imageUrls||[],sizes:item.variants||[]}]).map(colour=>({...colour,sizes:(colour.sizes||[]).map(size=>({...size,inventory:liveById.has(size.id)?liveById.get(size.id):size.inventory}))}));
   const values=await formDialog('Edit product details',[
     {name:'name',label:'Product name',required:true,value:item.name||'',maxLength:140},{name:'description',label:'Description',type:'textarea',required:true,value:item.description||'',maxLength:2000},{name:'brand',label:'Brand (optional)',value:item.brand||'',maxLength:100},
-    {name:'department',label:'Department',type:'select',required:true,value:PRODUCT_DEPARTMENTS.includes(item.department)?item.department:'unisex',options:PRODUCT_DEPARTMENTS.map(value=>({value,label:value}))},{name:'category',label:'Category',type:'select',required:true,value:PRODUCT_CATEGORIES.includes(item.category)?item.category:'Clothing & Fashion',options:PRODUCT_CATEGORIES.map(value=>({value,label:value}))},{name:'subcategory',label:'Subcategory (optional; inferred when clear)',value:item.subcategory||item.attributes?.subcategory||'',maxLength:100},{name:'deliveryType',label:'Delivery schedule',type:'select',required:true,value:'normal',options:DELIVERY_OPTIONS},
+    {name:'department',label:'Department',type:'select',required:true,value:PRODUCT_DEPARTMENTS.includes(item.department)?item.department:'unisex',options:PRODUCT_DEPARTMENTS.map(value=>({value,label:value}))},{name:'category',label:'Category',type:'select',required:true,value:PRODUCT_CATEGORIES.includes(item.category)?item.category:'',options:[{value:'',label:'Choose a current category'},...PRODUCT_CATEGORIES.map(value=>({value,label:value}))]},{name:'subcategory',label:'Subcategory (optional; inferred when clear)',value:item.subcategory||item.attributes?.subcategory||'',maxLength:100},{name:'deliveryType',label:'Delivery schedule',type:'select',required:true,value:'normal',options:DELIVERY_OPTIONS},
     {name:'optionMode',label:'Product options',type:'select',required:true,value:inferProductOptionMode(item),options:PRODUCT_OPTION_MODES,help:'Use Single stock when size/colour do not apply; Size / volume for perfume volumes; Colour / shade for cosmetics such as foundation.'},
     {name:'price',label:'Selling price in rupees',type:'number',required:true,value:(item.pricePaise/100).toFixed(2),min:1,step:'0.01'},{name:'original',label:'Original/MRP price in rupees',type:'number',required:true,value:(item.originalPricePaise/100).toFixed(2),min:1,step:'0.01'},
     {name:'tryAtHomeEnabled',label:'Try at Home offer',type:'select',required:true,value:item.tryAtHomeEnabled===true?'true':'false',options:[{value:'false',label:'No'},{value:'true',label:'Yes - customer may try two sizes for Rs 50'}],help:'Requires at least two different sizes for the same colour.'},
