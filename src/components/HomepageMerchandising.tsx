@@ -1,8 +1,8 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowRight, ChevronLeft, ChevronRight, Gem, MapPin, Sparkles, Store, TrendingUp, UserRound, UsersRound, WalletCards, Zap } from 'lucide-react';
-import { ProductCard } from './ProductCard';
 import { StoreImage } from './StoreImage';
+import { HomepageProductSection, HOME_PRODUCT_CARD_WRAP_CLASS } from './HomepageProductSection';
 import { vendorRepository } from '../repositories/vendorRepository';
 import type { Product, VendorStore } from '../types';
 import { buildHomepageSections, selectHomepageStores, type HomeMerchSectionId } from '../utils/homeMerchandising';
@@ -22,8 +22,7 @@ const iconFor = (id: HomeMerchSectionId) => {
   if (id === 'men') return <UserRound className="h-5 w-5" />;
   return <Gem className="h-5 w-5" />;
 };
-const rowClass = 'flex snap-x snap-mandatory gap-4 overflow-x-auto pb-2 pr-2 sm:gap-5';
-const cardWrapClass = 'min-w-[72%] snap-start sm:min-w-[44%] md:min-w-[31%] lg:min-w-[23%] xl:min-w-[19%]';
+const loadingRailClass = 'flex snap-x snap-mandatory gap-3 overflow-x-hidden pb-2 pr-2 sm:gap-4';
 const storeRailClass = 'flex w-full snap-x snap-mandatory gap-4 overflow-x-auto overscroll-x-contain pb-3 pr-4 scroll-smooth sm:gap-5';
 const storeCardClass = 'group flex h-[23rem] basis-[82%] shrink-0 snap-start flex-col overflow-hidden rounded-2xl border border-neutral-200 bg-white shadow-sm transition hover:-translate-y-0.5 hover:shadow-lg dark:border-neutral-800 dark:bg-neutral-900 sm:basis-[47%] md:basis-[31%] lg:basis-[24%]';
 
@@ -50,9 +49,9 @@ export const HomepageMerchandising: React.FC<HomepageMerchandisingProps> = ({ pr
     return (
       <section aria-label="Loading local styles" className="space-y-5">
         <div className="h-8 w-56 animate-pulse rounded bg-neutral-200 dark:bg-neutral-800" />
-        <div className={rowClass}>
+        <div className={loadingRailClass}>
           {[0, 1, 2, 3].map(index => (
-            <div key={index} className={`${cardWrapClass} aspect-[3/4] animate-pulse rounded-2xl bg-neutral-200 dark:bg-neutral-800`} />
+            <div key={index} className={`${HOME_PRODUCT_CARD_WRAP_CLASS} aspect-[3/4] animate-pulse rounded-2xl bg-neutral-200 dark:bg-neutral-800`} />
           ))}
         </div>
       </section>
@@ -61,30 +60,15 @@ export const HomepageMerchandising: React.FC<HomepageMerchandisingProps> = ({ pr
   return (
     <div className="space-y-14 sm:space-y-16" data-testid="homepage-merchandising">
       {sections.map(section => (
-        <section key={section.id} aria-labelledby={`home-${section.id}`} className="space-y-5">
-          <div className="flex items-end justify-between gap-4">
-            <div className="flex min-w-0 items-start gap-3">
-              <div className="mt-0.5 rounded-xl bg-neutral-950 p-2 text-lime-400 dark:bg-lime-400 dark:text-neutral-950">
-                {iconFor(section.id)}
-              </div>
-              <div className="min-w-0">
-                <h2 id={`home-${section.id}`} className="text-xl font-black text-neutral-900 dark:text-white sm:text-2xl">{section.title}</h2>
-                <p className="mt-1 text-xs text-neutral-500 sm:text-sm">{section.subtitle}</p>
-              </div>
-            </div>
-            <Link to={section.href} className="inline-flex min-h-11 shrink-0 items-center gap-1 text-xs font-black text-lime-700 hover:underline dark:text-lime-400 sm:text-sm">
-              View All <ArrowRight className="h-3.5 w-3.5" />
-            </Link>
-          </div>
-
-          <div className={rowClass} data-home-section={section.id}>
-            {section.products.map(product => (
-              <div key={product.id} className={cardWrapClass}>
-                <ProductCard product={product} />
-              </div>
-            ))}
-          </div>
-        </section>
+        <HomepageProductSection
+          key={section.id}
+          id={section.id}
+          title={section.title}
+          subtitle={section.subtitle}
+          href={section.href}
+          products={section.products}
+          icon={iconFor(section.id)}
+        />
       ))}
       {stores.length > 0 && (
         <section aria-labelledby="home-local-stores" className="space-y-5">

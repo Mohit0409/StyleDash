@@ -34,7 +34,51 @@ SERVER = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(SERVER)
 
 
+
+class HomepageProjectionCandidateTests(unittest.TestCase):
+    def test_homepage_candidates_cover_current_categories_and_stay_bounded(self) -> None:
+        categories = [
+            "Clothing & Fashion",
+            "Footwear",
+            "Accessories",
+            "Beauty & Personal Care",
+            "Electronics",
+            "Gifts",
+            "Home & Living",
+        ]
+        products = []
+        for category_index, category in enumerate(categories):
+            for index in range(8):
+                products.append({
+                    "id": f"{category_index}-{index}",
+                    "name": f"{category} {index}",
+                    "active": True,
+                    "category": category,
+                    "department": "women" if index % 2 == 0 else "men",
+                    "vendorId": f"store-{category_index}-{index}",
+                    "createdAt": f"2026-09-{index + 1:02d}T00:00:00Z",
+                    "featured": index == 0,
+                    "trending": index < 2,
+                    "newArrival": index < 3,
+                    "rating": 4.0,
+                    "reviewCount": index,
+                    "price": 399 if index < 4 else 799,
+                })
+
+        selected = SERVER._homepage_product_candidates(products)
+        selected_categories = {product.get("category") for product in selected}
+
+        self.assertLessEqual(len(selected), 65)
+        self.assertTrue(set(categories).issubset(selected_categories))
+        for category in categories:
+            self.assertGreaterEqual(
+                sum(1 for product in selected if product.get("category") == category),
+                1,
+            )
+
+
 class FakeGateway:
+
     def __init__(self) -> None:
         self.calls: list[dict] = []
         self.payments: dict[str, dict] = {}

@@ -8,8 +8,13 @@ export type HomeMerchSectionId =
   | 'under499'
   | 'women'
   | 'men'
+  | 'clothing'
+  | 'footwear'
   | 'accessories'
-  | 'beauty';
+  | 'beauty'
+  | 'electronics'
+  | 'gifts'
+  | 'home';
 
 export interface HomeMerchSection {
   id: HomeMerchSectionId;
@@ -33,25 +38,46 @@ const SECTIONS: SectionDefinition[] = [
   { id: 'under499', title: 'Styles Under ₹499', subtitle: 'Budget-friendly finds from local stores', href: '/products?maxPrice=499', matches: p => p.price <= 499 },
   { id: 'women', title: 'Women', subtitle: 'A balanced edit from the women’s catalogue', href: '/products?dept=women', matches: p => p.department === 'women' },
   { id: 'men', title: 'Men', subtitle: 'Everyday and occasion-ready men’s styles', href: '/products?dept=men', matches: p => p.department === 'men' },
+  { id: 'clothing', title: 'Clothing & Fashion', subtitle: 'Everyday fashion and occasion-ready styles from local stores', href: '/products?category=Clothing%20%26%20Fashion', matches: p => p.category === 'Clothing & Fashion' },
+  { id: 'footwear', title: 'Footwear', subtitle: 'Sneakers, sandals, sliders and more from Neemuch stores', href: '/products?category=Footwear', matches: p => p.category === 'Footwear' },
   { id: 'accessories', title: 'Accessories', subtitle: 'Jewellery, bags and finishing touches', href: '/products?category=Accessories', matches: p => p.category === 'Accessories' || p.department === 'accessories' },
   { id: 'beauty', title: 'Beauty & Care', subtitle: 'Beauty and personal-care picks from local sellers', href: '/products?category=Beauty%20%26%20Personal%20Care', matches: p => p.category === 'Beauty & Personal Care' },
+  { id: 'electronics', title: 'Electronics', subtitle: 'Useful electronics and everyday tech from local sellers', href: '/products?category=Electronics', matches: p => p.category === 'Electronics' },
+  { id: 'gifts', title: 'Gifts', subtitle: 'Gift-ready finds for celebrations and thoughtful surprises', href: '/products?category=Gifts', matches: p => p.category === 'Gifts' },
+  { id: 'home', title: 'Home & Living', subtitle: 'Home, kitchen and everyday living essentials', href: '/products?category=Home%20%26%20Living', matches: p => p.category === 'Home & Living' },
 ];
 
 const HOMEPAGE_SECTION_PRIORITY: Record<HomeMerchSectionId, number> = {
-  beauty: 0,
-  accessories: 1,
-  women: 2,
-  men: 3,
-  new: 4,
-  trending: 5,
-  under499: 6,
+  clothing: 0,
+  footwear: 1,
+  accessories: 2,
+  beauty: 3,
+  electronics: 4,
+  gifts: 5,
+  home: 6,
   express: 7,
+  new: 8,
+  trending: 9,
+  under499: 10,
+  women: 11,
+  men: 12,
 };
 
 const sectionsForDate = (date: Date): SectionDefinition[] =>
   SECTIONS
     .filter(definition => definition.id !== 'express' || isExpressDeliveryAvailable(date))
     .sort((first, second) => HOMEPAGE_SECTION_PRIORITY[first.id] - HOMEPAGE_SECTION_PRIORITY[second.id]);
+
+
+const CATEGORY_SECTION_IDS = new Set<HomeMerchSectionId>([
+  'clothing',
+  'footwear',
+  'accessories',
+  'beauty',
+  'electronics',
+  'gifts',
+  'home',
+]);
 
 const merchandisingScore = (product: Product): number =>
   (product.featured ? 50 : 0)
@@ -88,15 +114,21 @@ export const buildHomepageSections = (
 ): HomeMerchSection[] => {
   const usedProductIds = new Set<string>();
   return sectionsForDate(date).map(definition => {
-    const primary = sectionCandidates(products, definition)
-      .filter(product => !usedProductIds.has(product.id))
+    const categorySection = CATEGORY_SECTION_IDS.has(definition.id);
+    const unused = (product: Product) => categorySection || !usedProductIds.has(product.id);
+    const candidates = sectionCandidates(products, definition);
+    const primary = candidates
+      .filter(unused)
       .slice(0, limit);
+    const fallbackCandidates = sectionCandidates(fallbackProducts, definition);
     const chosen = primary.length > 0
       ? primary
-      : sectionCandidates(fallbackProducts, definition)
-        .filter(product => !usedProductIds.has(product.id))
-        .slice(0, 1);
-    chosen.forEach(product => usedProductIds.add(product.id));
+      : categorySection
+        ? fallbackCandidates.slice(0, limit)
+        : candidates.slice(0, 1).length > 0
+          ? candidates.slice(0, 1)
+          : fallbackCandidates.slice(0, 1);
+    if (!categorySection) chosen.forEach(product => usedProductIds.add(product.id));
     return { ...definition, products: chosen };
   }).filter(section => section.products.length > 0);
 };
