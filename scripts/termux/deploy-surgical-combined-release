@@ -78,6 +78,37 @@ while IFS= read -r frontend_path; do
     *) echo "surgical release frontend contains an unexpected top-level file: $frontend_name" >&2; exit 1 ;;
   esac
 done < <(find "$STAGE/dist" -mindepth 1 -maxdepth 1 -type f -print)
+
+# A production build without VITE_FIREBASE_* still compiles successfully but
+# disables Google and phone login in the browser. Reject that artifact before
+# backup, process stops, or any production mutation.
+firebase_assets=("$STAGE"/dist/assets/*.js)
+if [ ! -f "${firebase_assets[0]}" ]; then
+  echo "surgical release is missing frontend JavaScript assets; deployment aborted" >&2
+  exit 1
+fi
+for empty_firebase_field in 'apiKey:""' 'authDomain:""' 'projectId:""' 'appId:""'; do
+  if grep -Fq "$empty_firebase_field" "${firebase_assets[@]}"; then
+    echo "surgical release contains an empty Firebase web configuration; deployment aborted" >&2
+    exit 1
+  fi
+done
+for firebase_field in apiKey authDomain projectId appId; do
+  if ! grep -Ehq "$firebase_field:\"[^\"]+\"" "${firebase_assets[@]}"; then
+    echo "surgical release is missing a complete Firebase web configuration; deployment aborted" >&2
+    exit 1
+  fi
+done
+firebase_project_id="$(
+  set -a
+  . "$HOME/.config/styledash/secrets.env"
+  set +a
+  printf '%s' "${STYLEDASH_FIREBASE_PROJECT_ID:-}"
+)"
+if [ -z "$firebase_project_id" ] || ! grep -Fq "projectId:\"$firebase_project_id\"" "${firebase_assets[@]}"; then
+  echo "Firebase browser and server project IDs do not match; deployment aborted" >&2
+  exit 1
+fi
 if ! grep -Fq -- 'cloudflared tunnel run --protocol http2' "$STAGE/scripts/termux/start-styledash-cloudflare"; then
   echo "surgical release Cloudflare launcher is not pinned to HTTP/2; deployment aborted" >&2
   exit 1
