@@ -285,6 +285,60 @@ class SecurityStoreTests(unittest.TestCase):
             stored = db.execute("SELECT status FROM vendor_applications WHERE id=?", (application["id"],)).fetchone()
             self.assertEqual(stored[0], "pending")
 
+    def test_vendor_application_current_categories_match_live_production(self):
+        expected = [
+            'Accessories',
+            'Beauty & Personal Care',
+            'Clothing & Fashion',
+            'Electronics',
+            'Footwear',
+            'Gifts',
+            'Home & Living',
+        ]
+        for index, category in enumerate(expected):
+            user, _raw, _csrf = self.store.register({
+                'name': f'Category Owner {index}',
+                'email': f'category-{index}@example.test',
+                'password': 'long test password 123',
+                'phone': f'99999999{index:02d}',
+            })
+            application = self.store.create_vendor_application(user['id'], {
+                'storeName': f'Category Shop {index}',
+                'ownerName': 'Customer A',
+                'email': user['email'],
+                'phone': f'99999999{index:02d}',
+                'category': category,
+                'address': '123 Test Market',
+                'pincode': '458441',
+                'description': 'Category reconciliation test application',
+            })
+            with self.store.connect() as db:
+                stored = db.execute(
+                    "SELECT category FROM vendor_applications WHERE id=?",
+                    (application['id'],),
+                ).fetchone()
+            self.assertEqual(stored[0], category)
+
+        legacy_user, _raw, _csrf = self.store.register({
+            'name': 'Legacy Category Owner',
+            'email': 'legacy-category@example.test',
+            'password': 'long test password 123',
+            'phone': '9888888888',
+        })
+        self.assert_security_error(
+            'invalid_vendor_application',
+            lambda: self.store.create_vendor_application(legacy_user['id'], {
+                'storeName': 'Legacy General Store',
+                'ownerName': 'Customer A',
+                'email': legacy_user['email'],
+                'phone': '9888888888',
+                'category': 'General Store',
+                'address': '123 Test Market',
+                'pincode': '458441',
+                'description': 'Legacy category should be rejected',
+            }),
+        )
+
     def test_profile_role_is_immutable_and_address_is_server_stored(self):
         user, _raw, _csrf = self.registration()
         profile = self.store.update_profile(user["id"], {
