@@ -104,11 +104,16 @@ def _homepage_sort_key(product: dict[str, Any]) -> tuple:
     return (score, created, str(product.get("name") or ""))
 
 
-def _homepage_product_candidates(products: list[dict[str, Any]], per_section: int = 8) -> list[dict[str, Any]]:
+def _homepage_product_candidates(products: list[dict[str, Any]], per_section: int = 5) -> list[dict[str, Any]]:
     active = [product for product in products if product.get("active") is True]
     definitions = (
-        lambda p: p.get("category") == "Beauty & Personal Care",
+        lambda p: p.get("category") == "Clothing & Fashion",
+        lambda p: p.get("category") == "Footwear",
         lambda p: p.get("category") == "Accessories" or p.get("department") == "accessories",
+        lambda p: p.get("category") == "Beauty & Personal Care",
+        lambda p: p.get("category") == "Electronics",
+        lambda p: p.get("category") == "Gifts",
+        lambda p: p.get("category") == "Home & Living",
         lambda p: p.get("department") == "women",
         lambda p: p.get("department") == "men",
         lambda p: p.get("newArrival") is True,

@@ -1,9 +1,9 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowRight, Zap, ChevronLeft, ChevronRight, Grid2X2, Trophy } from 'lucide-react';
+import { Zap, ChevronLeft, ChevronRight, Grid2X2, Trophy } from 'lucide-react';
 import { SEO } from '../components/SEO';
 import { HomepageMerchandising } from '../components/HomepageMerchandising';
-import { ProductCard } from '../components/ProductCard';
+import { HomepageProductSection } from '../components/HomepageProductSection';
 import { Product } from '../types';
 import { productRepository } from '../repositories/productRepository';
 import { BANNERS } from '../data/banners';
@@ -174,16 +174,16 @@ export const Home: React.FC = () => {
         </section>
 
         {topPicks.length > 0 && (
-          <section className="space-y-6">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <div className="rounded-xl bg-neutral-950 p-2 text-lime-400 dark:bg-lime-400 dark:text-neutral-950"><Trophy className="w-5 h-5" /></div>
-                <div><h2 className="text-2xl font-black text-neutral-900 dark:text-white">Top Picks</h2><p className="text-xs text-neutral-500">Customer favourites and highly rated local styles</p></div>
-              </div>
-              <Link to="/products?sort=rating" className="inline-flex min-h-11 items-center text-xs font-bold text-lime-600 dark:text-lime-400 hover:underline gap-1">View All <ArrowRight className="w-3.5 h-3.5" /></Link>
-            </div>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 sm:gap-6">{topPicks.map(product => <ProductCard key={product.id} product={product} />)}</div>
-          </section>
+          <HomepageProductSection
+            id="top-picks"
+            title="Top Picks"
+            subtitle="Customer favourites and highly rated local styles"
+            href="/products?sort=rating"
+            products={topPicks}
+            icon={<Trophy className="h-5 w-5" />}
+            testId="top-picks-rail"
+            priorityCount={2}
+          />
         )}
 
         <HomepageMerchandising products={merchandisingProducts} fallbackProducts={products} loading={loading} />

@@ -180,7 +180,7 @@ const applyReviewSummaries = (products: Product[], summaries: Record<string, Rev
   }));
 
 const selectHomepageProducts = (products: Product[]): Product[] =>
-  selectHomepageCandidates(products, 8);
+  selectHomepageCandidates(products, 5);
 
 const withHomepageAvailability = async (products: Product[]): Promise<Product[]> => {
   try {

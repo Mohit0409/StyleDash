@@ -60,6 +60,20 @@ describe('site quality guardrails', () => {
     expect(home).toContain('products.filter(product => !topPickIds.has(product.id))');
   });
 
+
+  it('keeps Top Picks and lower homepage products in compact horizontal rails', () => {
+    const home = readText('../pages/Home.tsx');
+    const rail = readText('../components/HomepageProductSection.tsx');
+    expect(home).toContain('testId="top-picks-rail"');
+    expect(home).toContain('<HomepageProductSection');
+    expect(home).not.toContain('grid grid-cols-2 md:grid-cols-4');
+    expect(rail).toContain("basis-[58%]");
+    expect(rail).toContain("xl:basis-[18%]");
+    expect(rail).toContain('horizontal product slider');
+    expect(rail).toContain('Previous ${title}');
+    expect(rail).toContain('Next ${title}');
+  });
+
   it('fills product-card media while keeping order and detail imagery uncropped', () => {
     const productCard = readText('../components/ProductCard.tsx');
     const productDetail = readText('../pages/ProductDetail.tsx');

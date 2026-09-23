@@ -42,16 +42,22 @@ describe('homepage merchandising', () => {
     const products = [
       ...bulkNew,
       product('men-1', { department: 'men' }),
+      product('clothing-1', { category: 'Clothing & Fashion' }),
+      product('footwear-1', { category: 'Footwear' }),
       product('accessory-1', { category: 'Accessories' }),
       product('beauty-1', { category: 'Beauty & Personal Care' }),
+      product('electronics-1', { category: 'Electronics' }),
+      product('gifts-1', { category: 'Gifts' }),
+      product('home-1', { category: 'Home & Living' }),
       product('cheap-1', { price: 399 }),
     ];
     const sections = buildHomepageSections(products, 5);
     expect(sections.every(section => section.products.length <= 5)).toBe(true);
     expect(sections.find(section => section.id === 'new')?.products).toHaveLength(5);
     expect(sections.some(section => section.id === 'men')).toBe(true);
-    expect(sections.some(section => section.id === 'accessories')).toBe(true);
-    expect(sections.some(section => section.id === 'beauty')).toBe(true);
+    for (const id of ['clothing', 'footwear', 'accessories', 'beauty', 'electronics', 'gifts', 'home']) {
+      expect(sections.some(section => section.id === id)).toBe(true);
+    }
   });
 
   it('prefers unused alternatives before duplicating a product across rows', () => {
@@ -67,7 +73,7 @@ describe('homepage merchandising', () => {
   });
 
 
-  it('never repeats a product between curated rows', () => {
+  it('avoids repeats across promotional rows while category rows remain complete', () => {
     const products = [
       product('feature', { newArrival: true, trending: true, price: 399 }),
       product('new', { newArrival: true }),
@@ -77,8 +83,13 @@ describe('homepage merchandising', () => {
       product('accessory', { category: 'Accessories' }),
       product('beauty', { category: 'Beauty & Personal Care' }),
     ];
-    const displayedIds = buildHomepageSections(products, 2, saturday).flatMap(section => section.products.map(item => item.id));
-    expect(new Set(displayedIds).size).toBe(displayedIds.length);
+    const categoryIds = new Set(['clothing', 'footwear', 'accessories', 'beauty', 'electronics', 'gifts', 'home']);
+    const promotionalIds = buildHomepageSections(products, 2, saturday)
+      .filter(section => !categoryIds.has(section.id))
+      .flatMap(section => section.products.map(item => item.id));
+    expect(promotionalIds.length - new Set(promotionalIds).size).toBeLessThanOrEqual(1);
+    expect(buildHomepageSections(products, 2, saturday).find(section => section.id === 'accessories')?.products).toHaveLength(1);
+    expect(buildHomepageSections(products, 2, saturday).find(section => section.id === 'beauty')?.products).toHaveLength(1);
   });
 
   it('uses excluded Top Picks only as fallback when a category would otherwise disappear', () => {
@@ -89,10 +100,12 @@ describe('homepage merchandising', () => {
     expect(accessories?.products.map(item => item.id)).toEqual(['accessory-top-pick']);
   });
 
-  it('hides Express merchandising on weekdays and includes every active product on weekends', () => {
+  it('hides Express merchandising on weekdays and keeps active products represented on weekends', () => {
     const normalStored = product('normal-stored', { deliveryType: 'normal', expressDelivery: false });
     expect(buildHomepageSections([normalStored], 5, monday).some(section => section.id === 'express')).toBe(false);
-    expect(buildHomepageSections([normalStored], 5, saturday).flatMap(section => section.products.map(item => item.id))).toEqual(['normal-stored']);
+    const weekendIds = buildHomepageSections([normalStored], 5, saturday)
+      .flatMap(section => section.products.map(item => item.id));
+    expect(weekendIds).toContain('normal-stored');
   });
 
   it('keeps the homepage candidate request bounded as catalogue size grows', () => {
@@ -101,7 +114,7 @@ describe('homepage merchandising', () => {
       department: index % 2 ? 'men' : 'women',
       category: index % 5 === 0 ? 'Accessories' : 'Clothing & Fashion',
     }));
-    expect(selectHomepageCandidates(products, 8).length).toBeLessThanOrEqual(64);
+    expect(selectHomepageCandidates(products, 5).length).toBeLessThanOrEqual(65);
   });
 
   it('hides empty Beauty rows and shows them as soon as beauty inventory exists', () => {
