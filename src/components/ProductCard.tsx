@@ -11,7 +11,7 @@ export const ProductCard: React.FC<{ product: Product; onQuickView?: (p: Product
   onQuickView,
   priority = false,
 }) => {
-  const { isInWishlist, toggleWishlist } = useWishlist();
+  const { isInWishlist, toggleWishlist, wishlistReady } = useWishlist();
   const [hoveredImage, setHoveredImage] = useState(false);
   const [failedProductId, setFailedProductId] = useState<string | null>(null);
   const isWishlisted = isInWishlist(product.id);
@@ -57,7 +57,8 @@ export const ProductCard: React.FC<{ product: Product; onQuickView?: (p: Product
         }}
         aria-label={isWishlisted ? `Remove ${product.name} from wishlist` : `Add ${product.name} to wishlist`}
         aria-pressed={isWishlisted}
-        className="absolute top-3 right-3 z-10 flex min-h-11 min-w-11 items-center justify-center rounded-full bg-white/80 p-2 text-neutral-700 shadow-md backdrop-blur-md transition-transform hover:scale-110 dark:bg-neutral-800/80 dark:text-neutral-200"
+        disabled={!wishlistReady}
+        className="absolute top-3 right-3 z-10 flex min-h-11 min-w-11 items-center justify-center rounded-full bg-white/80 p-2 text-neutral-700 shadow-md backdrop-blur-md transition-transform hover:scale-110 disabled:cursor-wait disabled:opacity-60 disabled:hover:scale-100 dark:bg-neutral-800/80 dark:text-neutral-200"
       >
         <Heart className={`w-4 h-4 ${isWishlisted ? 'fill-rose-500 text-rose-500' : ''}`} />
       </button>
@@ -147,12 +148,6 @@ export const ProductCard: React.FC<{ product: Product; onQuickView?: (p: Product
             </div>
           </div>
 
-          <Link
-            to={`/product/${product.slug}`}
-            className="inline-flex min-h-11 items-center rounded-lg bg-neutral-950 px-3 py-1.5 text-xs font-bold text-white transition-colors hover:bg-neutral-800 dark:bg-lime-400 dark:text-neutral-950 dark:hover:bg-lime-300"
-          >
-            Select Option
-          </Link>
         </div>
       </div>
     </div>

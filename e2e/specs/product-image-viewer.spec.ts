@@ -3,6 +3,14 @@ import { expect, test } from '@playwright/test';
 const PRODUCT_ROUTE = '/product/pure-cotton-oversized-graphic-tee-sd-prod-001';
 
 test('product images fill fixed cards and the detail viewer is accessible', async ({ page }) => {
+  // The test validates card layout, not a third-party image CDN. Use a stable
+  // valid image response so an external-image outage cannot switch the card to
+  // its intentional contained placeholder before the cover assertion runs.
+  await page.route('https://images.unsplash.com/**', route => route.fulfill({
+    contentType: 'image/svg+xml',
+    body: '<svg xmlns="http://www.w3.org/2000/svg" width="8" height="8"><rect width="8" height="8" fill="#111"/></svg>',
+  }));
+
   // Exercise the four requested responsive viewports without creating any order,
   // payment, account, or catalogue state.
   for (const viewport of [

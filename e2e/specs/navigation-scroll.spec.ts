@@ -19,7 +19,7 @@ test('normal route navigation opens at the top from a footer link', async ({ pag
 
 test('product detail navigation always starts at the top', async ({ page }) => {
   await page.goto('/products');
-  const productLink = page.getByRole('link', { name: 'Select Option' }).last();
+  const productLink = page.locator('[data-product-card-image]').last();
   await productLink.scrollIntoViewIfNeeded();
   expect(await page.evaluate(() => window.scrollY)).toBeGreaterThan(0);
 
@@ -42,7 +42,7 @@ test('same-page help anchors scroll to their requested content', async ({ page }
 
 test('back navigation preserves the browser history scroll position', async ({ page }) => {
   await page.goto('/products');
-  await page.getByRole('link', { name: 'Select Option' }).last().scrollIntoViewIfNeeded();
+  await page.locator('[data-product-card-image]').last().scrollIntoViewIfNeeded();
   const previousPosition = await page.evaluate(() => window.scrollY);
   expect(previousPosition).toBeGreaterThan(0);
 
