@@ -18,7 +18,7 @@ class SurgicalCombinedReleaseTests(unittest.TestCase):
         self.assertIn('"$ROLLBACK/admin/runtime/serve.py"', self.script)
         self.assertNotIn('"$ROLLBACK/serve.py"', self.script)
         self.assertIn('"$ROLLBACK/public/static/assets"', self.script)
-        self.assertIn('"$ROLLBACK/admin/static/admin.js"', self.script)
+        self.assertNotIn('"$ROLLBACK/admin/static/admin.js"', self.script)
 
     def test_services_are_stopped_before_any_runtime_install(self) -> None:
         watchdog = self.script.index('styledash_watchdog_stop "$WATCHDOG_MARKER"')
@@ -64,6 +64,8 @@ class SurgicalCombinedReleaseTests(unittest.TestCase):
             '"$ADMIN_DIR/styledash_security.py"',
             '"$ADMIN_DIR/catalog_normalization.py"',
             '"$ADMIN_DIR/styledash_shops.py"',
+            '"$ADMIN_DIR/admin/index.html"',
+            '"$ADMIN_DIR/admin/admin.js"',
             '"$DATA_ROOT/catalog.json"',
             '"$DATA_ROOT/settings.json"',
             '"$DATA_ROOT/delivery-zones.geojson"',
@@ -81,6 +83,13 @@ class SurgicalCombinedReleaseTests(unittest.TestCase):
             'install -m 600 "$STAGE/scripts/styledash_shops.py"', self.script
         )
 
+        self.assertNotIn(
+            'install -m 600 "$STAGE/server/admin/index.html"', self.script
+        )
+        self.assertNotIn(
+
+            'install -m 600 "$STAGE/server/admin/admin.js"', self.script
+        )
     def test_failure_after_mutation_triggers_automatic_code_only_rollback(self) -> None:
         self.assertIn("trap 'handle_failure $? $LINENO' ERR", self.script)
         self.assertIn('rollback_release || true', self.script)

@@ -45,8 +45,6 @@ required_stage_files=(
   "scripts/termux-spa-server.py"
   "scripts/termux-admin-server.py"
   "scripts/styledash_reviews.py"
-  "server/admin/index.html"
-  "server/admin/admin.js"
   "scripts/termux/backup-styledash-data"
   "scripts/termux/start-styledash-cloudflare"
 )
@@ -176,6 +174,8 @@ write_protected_hashes() {
     "$ADMIN_DIR/styledash_security.py"
     "$ADMIN_DIR/catalog_normalization.py"
     "$ADMIN_DIR/styledash_shops.py"
+    "$ADMIN_DIR/admin/index.html"
+    "$ADMIN_DIR/admin/admin.js"
     "$DATA_ROOT/catalog.json"
     "$DATA_ROOT/settings.json"
     "$DATA_ROOT/delivery-zones.geojson"
@@ -194,7 +194,7 @@ assert_protected_unchanged() {
   current="$ROLLBACK/protected-after.sha256"
   write_protected_hashes "$current"
   if ! cmp -s "$ROLLBACK/protected-before.sha256" "$current"; then
-    echo "a protected live category/configuration file changed; deployment rejected" >&2
+    echo "a protected live file changed; deployment rejected" >&2
     diff -u "$ROLLBACK/protected-before.sha256" "$current" >&2 || true
     return 1
   fi
@@ -248,8 +248,6 @@ rollback_release() {
   restore_frontend || rollback_failed=1
   restore_file "$ROLLBACK/admin/runtime/serve.py" "$ADMIN_DIR/serve.py" || rollback_failed=1
   restore_file "$ROLLBACK/admin/runtime/styledash_reviews.py" "$ADMIN_DIR/styledash_reviews.py" || rollback_failed=1
-  restore_file "$ROLLBACK/admin/static/index.html" "$ADMIN_DIR/admin/index.html" || rollback_failed=1
-  restore_file "$ROLLBACK/admin/static/admin.js" "$ADMIN_DIR/admin/admin.js" || rollback_failed=1
   restore_file "$ROLLBACK/ops/backup-styledash-data" "$HOME/bin/backup-styledash-data" || rollback_failed=1
   restore_file "$ROLLBACK/ops/start-styledash-cloudflare" "$HOME/bin/start-styledash-cloudflare" || rollback_failed=1
 
@@ -317,15 +315,12 @@ mkdir -p \
   "$ROLLBACK/public/runtime" \
   "$ROLLBACK/public/static/files" \
   "$ROLLBACK/admin/runtime" \
-  "$ROLLBACK/admin/static" \
   "$ROLLBACK/ops"
 
 snapshot_file "$PUBLIC_DIR/serve.py" "$ROLLBACK/public/runtime/serve.py"
 snapshot_file "$PUBLIC_DIR/styledash_reviews.py" "$ROLLBACK/public/runtime/styledash_reviews.py"
 snapshot_file "$ADMIN_DIR/serve.py" "$ROLLBACK/admin/runtime/serve.py"
 snapshot_file "$ADMIN_DIR/styledash_reviews.py" "$ROLLBACK/admin/runtime/styledash_reviews.py"
-snapshot_file "$ADMIN_DIR/admin/index.html" "$ROLLBACK/admin/static/index.html"
-snapshot_file "$ADMIN_DIR/admin/admin.js" "$ROLLBACK/admin/static/admin.js"
 snapshot_file "$HOME/bin/backup-styledash-data" "$ROLLBACK/ops/backup-styledash-data"
 snapshot_file "$HOME/bin/start-styledash-cloudflare" "$ROLLBACK/ops/start-styledash-cloudflare"
 
@@ -366,8 +361,6 @@ install -m 755 "$STAGE/scripts/termux-spa-server.py" "$PUBLIC_DIR/serve.py"
 install -m 600 "$STAGE/scripts/styledash_reviews.py" "$PUBLIC_DIR/styledash_reviews.py"
 install -m 600 "$STAGE/scripts/termux-admin-server.py" "$ADMIN_DIR/serve.py"
 install -m 600 "$STAGE/scripts/styledash_reviews.py" "$ADMIN_DIR/styledash_reviews.py"
-install -m 600 "$STAGE/server/admin/index.html" "$ADMIN_DIR/admin/index.html"
-install -m 600 "$STAGE/server/admin/admin.js" "$ADMIN_DIR/admin/admin.js"
 install -m 755 "$STAGE/scripts/termux/backup-styledash-data" "$HOME/bin/backup-styledash-data"
 install -m 700 "$STAGE/scripts/termux/start-styledash-cloudflare" "$HOME/bin/start-styledash-cloudflare"
 
