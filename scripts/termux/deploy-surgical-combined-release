@@ -348,7 +348,7 @@ database_check
 # The supported backup command performs SQLite online backup, integrity/FK
 # verification, and configured primary/secondary replication. No code is
 # changed unless this completes successfully.
-"$HOME/bin/backup-styledash-data"
+bash "$STAGE/scripts/termux/backup-styledash-data"
 
 ROLLBACK="$(mktemp -d "$BACKUP_ROOT/styledash-surgical-combined.XXXXXX")"
 chmod 700 "$ROLLBACK"

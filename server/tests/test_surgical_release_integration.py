@@ -193,6 +193,14 @@ printf '%s' "$status"
             env=env,
         )
 
+    def test_pre_mutation_backup_uses_staged_helper_not_installed_helper(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            home, stage, mock_bin = self.fixture(Path(temporary))
+            result = self.run_deploy(home, stage, mock_bin)
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertIn("staged-backup", result.stdout)
+            self.assertNotIn("backup=verified", result.stdout)
+
     def test_success_replaces_runtime_and_records_separate_rollback(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             home, stage, mock_bin = self.fixture(Path(temporary))
