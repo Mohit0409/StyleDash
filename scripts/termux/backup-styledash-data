@@ -175,7 +175,10 @@ if [ "$LOCAL_ONLY" = false ]; then
     if [ -n "$secondary" ]; then
       secondary_target="${secondary%/}/$stamp"
 
-      run_rclone copy "$target" "$secondary_target" --immutable --create-empty-src-dirs --transfers 1 --checkers 1 --contimeout 15s --timeout 60s --retries 2 --low-level-retries 2
+      # The Windows/SFTP secondary can normalize mtimes even when file bytes are
+      # unchanged. Compare content rather than timestamps for the immutable copy;
+      # verify_remote still performs a full --download byte check afterwards.
+      run_rclone copy "$target" "$secondary_target" --immutable --checksum --create-empty-src-dirs --transfers 1 --checkers 1 --contimeout 15s --timeout 60s --retries 2 --low-level-retries 2
       verify_remote "$target" "$secondary_target" "Secondary off-device backup"
 
       printf '%s\n' "$stamp" > "$RUN_DIR/styledash-last-secondary-backup"
