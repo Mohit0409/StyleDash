@@ -1158,7 +1158,7 @@ class SecurityStore:
             return dict(order)
 
     def create_vendor_application(self, user_id: str, payload: dict[str, Any]) -> dict[str, Any]:
-        allowed_categories = {"Clothing & Fashion", "Footwear", "Electronics", "Home & Living", "General Store"}
+        allowed_categories = {"Clothing & Fashion", "Footwear", "Accessories", "Beauty & Personal Care", "Electronics", "Gifts", "Home & Living"}
         category = payload.get("category")
         if category not in allowed_categories:
             raise SecurityError(400, "Invalid store category.", "invalid_vendor_application")

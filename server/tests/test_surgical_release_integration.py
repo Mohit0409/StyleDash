@@ -61,7 +61,6 @@ class SurgicalReleaseIntegrationTests(unittest.TestCase):
             home / "backups",
             stage / "dist" / "assets",
             stage / "scripts" / "termux",
-            stage / "server" / "admin",
             mock_bin,
         ):
             directory.mkdir(parents=True, exist_ok=True)
@@ -90,7 +89,10 @@ class SurgicalReleaseIntegrationTests(unittest.TestCase):
         self.write(data / "catalog.json", "{}\n")
         self.write(data / "settings.json", "{}\n")
         self.write(data / "delivery-zones.geojson", "{}\n")
-        self.write(home / ".config" / "styledash" / "secrets.env", "MOCK_ONLY=1\n")
+        self.write(
+            home / ".config" / "styledash" / "secrets.env",
+            "MOCK_ONLY=1\nSTYLEDASH_FIREBASE_PROJECT_ID=styledash-auth\n",
+        )
 
         self.write(home / "run" / "styledash.pid", "101\n")
         self.write(home / "run" / "styledash-admin.pid", "202\n")
@@ -123,12 +125,13 @@ styledash_cmdline() { echo "cloudflared tunnel run --protocol http2 --token-file
             stage / "dist" / "manifest.json": "{}\n",
             stage / "dist" / "product-placeholder.svg": "new-placeholder\n",
             stage / "dist" / "robots.txt": "User-agent: *\n",
-            stage / "dist" / "assets" / "new.js": "new-asset\n",
+            stage / "dist" / "assets" / "new.js": (
+                'const firebaseConfig={apiKey:"test-api-key",'
+                'authDomain:"styledash-auth.firebaseapp.com",projectId:"styledash-auth",appId:"test-app-id"};\n'
+            ),
             stage / "scripts" / "termux-spa-server.py": "new-public-server\n",
             stage / "scripts" / "termux-admin-server.py": "new-admin-server\n",
             stage / "scripts" / "styledash_reviews.py": "new-reviews\n",
-            stage / "server" / "admin" / "index.html": "new-admin-index\n",
-            stage / "server" / "admin" / "admin.js": "new-admin-js\n",
             stage / "scripts" / "termux" / "backup-styledash-data": "#!/usr/bin/env bash\necho staged-backup\n",
             stage / "scripts" / "termux" / "start-styledash-cloudflare": "#!/usr/bin/env bash\ncloudflared tunnel run --protocol http2 --token-file token\n",
         }
@@ -196,6 +199,12 @@ printf '%s' "$status"
             self.assertEqual((home / "server" / "serve.py").read_text(), "new-public-server\n")
             self.assertEqual((home / "admin" / "serve.py").read_text(), "new-admin-server\n")
             self.assertTrue((home / "server" / "assets" / "new.js").is_file())
+            self.assertEqual(
+                (home / "admin" / "admin" / "index.html").read_text(), "old-admin-index\n"
+            )
+            self.assertEqual(
+                (home / "admin" / "admin" / "admin.js").read_text(), "old-admin-js\n"
+            )
             self.assertFalse((home / "server" / "assets" / "old.js").exists())
             rollback_marker = (
                 home / "run" / "styledash-last-surgical-backup"
@@ -233,6 +242,21 @@ printf '%s' "$status"
                 (home / "server" / "styledash_shops.py").read_text(),
                 "shops-preserved\n",
             )
+
+
+    def test_empty_firebase_config_is_rejected_before_mutation(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            home, stage, mock_bin = self.fixture(Path(temporary))
+            self.write(
+                stage / "dist" / "assets" / "new.js",
+                'const firebaseConfig={apiKey:"",authDomain:"",projectId:"",appId:""};\n',
+            )
+            result = self.run_deploy(home, stage, mock_bin)
+            self.assertNotEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertIn("empty Firebase web configuration", result.stderr)
+            self.assertEqual((home / "server" / "index.html").read_text(), "old-frontend\n")
+            self.assertTrue((home / "server" / "assets" / "old.js").is_file())
+            self.assertFalse((home / "server" / "assets" / "new.js").exists())
 
 
 if __name__ == "__main__":

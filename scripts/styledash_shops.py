@@ -60,9 +60,11 @@ PRODUCT_CHANGE_ADMIN_TRANSITIONS = {
 ALLOWED_CATEGORIES = {
     "Clothing & Fashion",
     "Footwear",
+    "Accessories",
+    "Beauty & Personal Care",
     "Electronics",
+    "Gifts",
     "Home & Living",
-    "General Store",
 }
 APPLICATION_ADMIN_TRANSITIONS = {
     "SUBMITTED": {"UNDER_REVIEW"},
