@@ -4,7 +4,7 @@ import { X, Trash2, Plus, Minus, Zap, ArrowRight, Tag, ShieldCheck } from 'lucid
 import { useCart } from '../context/CartContext';
 import { CONFIG } from '../config';
 
-export const CartDrawer: React.FC<{ isOpen: boolean; onClose: () => void }> = ({ isOpen, onClose }) => {
+export const CartDrawer: React.FC<{ isOpen: boolean; onClose: () => void; onCheckout: () => void }> = ({ isOpen, onClose, onCheckout }) => {
   const navigate = useNavigate();
   const {
     items,
@@ -139,7 +139,7 @@ export const CartDrawer: React.FC<{ isOpen: boolean; onClose: () => void }> = ({
             </div>
 
             <button
-              onClick={() => { onClose(); navigate('/checkout'); }}
+              onClick={onCheckout}
               className="flex min-h-11 w-full items-center justify-center gap-2 py-3.5 bg-neutral-950 dark:bg-lime-400 text-white dark:text-neutral-950 font-black text-sm rounded-xl shadow-lg hover:bg-neutral-800 dark:hover:bg-lime-300 transition-all"
             >
               <span>Proceed to Checkout</span>

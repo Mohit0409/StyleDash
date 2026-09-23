@@ -109,6 +109,18 @@ class ProductionReliabilityTests(unittest.TestCase):
         self.assertIn('styledash_stop_matching_processes "StyleDash Cloudflare tunnel"', script)
         self.assertIn("styledash_cloudflare_process_count=1", script)
 
+    def test_surgical_release_reports_non_sensitive_ntfy_outcomes(self) -> None:
+        script = self.read("scripts/termux/deploy-surgical-combined-release")
+        self.assertIn('"$HOME/bin/styledash-notify"', script)
+        for event in (
+            "release_deployed",
+            "release_blocked",
+            "release_rolled_back",
+            "release_rollback_failed",
+        ):
+            self.assertIn(event, script)
+        self.assertNotIn("STYLEDASH_NTFY_TOPIC", script)
+
     def test_rollback_preserves_live_database_history(self) -> None:
         script = self.read("scripts/termux/rollback-payment-release")
         self.assertIn('backup-styledash-data" --local-only', script)

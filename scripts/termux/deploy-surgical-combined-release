@@ -137,6 +137,12 @@ fi
 # shellcheck disable=SC1090 -- production-installed process library.
 . "$PROCESS_LIB"
 
+notify() {
+  if [ -x "$HOME/bin/styledash-notify" ]; then
+    "$HOME/bin/styledash-notify" "$@" >/dev/null 2>&1 || true
+  fi
+}
+
 http_status() {
   curl -sS --max-time 10 -o /dev/null -w '%{http_code}' "$1"
 }
@@ -293,8 +299,10 @@ rollback_release() {
   set -e
   if [ "$rollback_failed" -ne 0 ]; then
     echo "automatic rollback was incomplete; manual recovery required from $ROLLBACK" >&2
+    notify release_rollback_failed "Vibe4You release rollback failed" "A surgical release rollback needs manual recovery. Production data was not restored from backup." 5 rotating_light
     return 1
   fi
+  notify release_rolled_back "Vibe4You release rolled back" "A surgical release did not pass acceptance checks and its code and static changes were restored. Production data was preserved." 5 warning
   printf 'automatic_rollback=PASS\n'
   printf 'rollback_restored=%s\n' "$ROLLBACK"
 }
@@ -306,6 +314,8 @@ handle_failure() {
   echo "surgical deployment error at line $line (status $status)" >&2
   if [ "$MUTATION_STARTED" -eq 1 ] && [ "$ROLLBACK_IN_PROGRESS" -eq 0 ] && [ -n "$ROLLBACK" ]; then
     rollback_release || true
+  else
+    notify release_blocked "Vibe4You release blocked" "A surgical release was blocked before production mutation. Existing production services and data were left unchanged." 4 warning
   fi
   exit "$status"
 }
@@ -418,6 +428,7 @@ fi
 printf 'cloudflare_transport=http2\n'
 
 styledash_watchdog_start "$WATCHDOG_MARKER" "$RUN_DIR/styledash-health.pid" "$HOME/logs/styledash-health.log"
+notify release_deployed "Vibe4You release deployed" "The surgical production release passed local health, isolation, database and protected-file validation." 3 white_check_mark
 trap - ERR INT TERM
 printf 'surgical_deployment=PASS\n'
 printf 'old_public_pid=%s\n' "$OLD_PUBLIC_PID"
