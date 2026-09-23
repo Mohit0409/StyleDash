@@ -38,6 +38,48 @@ DELIVERY_ALIASES = {
     "both": "both", "normal express": "both", "standard express": "both",
 }
 
+SUBCATEGORY_ALIASES = {
+    "sneaker": "Sneakers", "sneakers": "Sneakers", "semi sneaker": "Sneakers",
+    "sport shoe": "Sports Shoes", "sport shoes": "Sports Shoes",
+    "sports shoe": "Sports Shoes", "sports shoes": "Sports Shoes",
+    "running shoe": "Running Shoes", "running shoes": "Running Shoes",
+    "slider": "Sliders", "sliders": "Sliders", "slides": "Sliders",
+    "platform slider": "Sliders", "flipflop slider": "Sliders",
+    "slipper": "Slippers & Flip-Flops", "slippers": "Slippers & Flip-Flops",
+    "sleeper": "Slippers & Flip-Flops", "sleepers": "Slippers & Flip-Flops",
+    "flip flop": "Slippers & Flip-Flops", "flip flops": "Slippers & Flip-Flops",
+    "flipflop": "Slippers & Flip-Flops", "flipflops": "Slippers & Flip-Flops",
+    "flipflop slipper": "Slippers & Flip-Flops", "chappal slipper": "Slippers & Flip-Flops",
+    "loafer": "Loafers", "loafers": "Loafers", "slip on loafer": "Loafers",
+    "moc shoe without lace": "Loafers", "crocs": "Clogs & Crocs",
+    "watch": "Watches", "watch2": "Watches", "watches": "Watches",
+    "accesories": "Accessories", "accessory": "Accessories", "accessories": "Accessories",
+    "jewellery": "Fashion Jewellery", "jewelry": "Fashion Jewellery",
+    "traditional accessories": "Fashion Jewellery", "hair accessories": "Hair Accessories",
+    "skincare": "Skin Care", "skin care": "Skin Care",
+    "sanitary pads": "Feminine Care",
+    "gift hamper": "Gift Hampers", "gift hampers": "Gift Hampers",
+    "home appliance": "Home Appliances", "home appliances": "Home Appliances",
+    "rc toys": "Remote Control Toys", "drones rc toys": "Remote Control Toys",
+}
+
+CATEGORY_TAG_ALIASES = {
+    "Clothing & Fashion": ("clothing", "fashion", "apparel"),
+    "Footwear": ("footwear", "shoes"),
+    "Accessories": ("accessories", "fashion accessories"),
+    "Beauty & Personal Care": ("beauty", "personal care"),
+    "Electronics": ("electronics", "gadgets"),
+    "Gifts": ("gifts", "gift items"),
+    "Home & Living": ("home and living", "home essentials"),
+}
+
+DEPARTMENT_TAG_ALIASES = {
+    "men": ("men", "mens"),
+    "women": ("women", "womens"),
+    "kids": ("kids", "children"),
+    "unisex": ("unisex",),
+}
+
 
 def infer_product_category(name: str, description: str) -> str | None:
     text = f"{name} {description}".casefold()
@@ -168,10 +210,26 @@ def normalize_size_label(value: Any, category: str) -> str:
 
 def normalize_subcategory(value: Any, *, name: str, category: str) -> str | None:
     if value not in {None, ""}:
-        return clean_text(value, "subcategory", 1, 100)
+        raw = clean_text(value, "subcategory", 1, 100)
+        return SUBCATEGORY_ALIASES.get(_key(raw), raw)
     text = name.casefold()
-    if category == "Accessories" and re.search(r"\b(earrings?|jhumk(?:a|i)s?)\b", text):
-        return "Earrings"
+    if category == "Clothing & Fashion":
+        if re.search(r"\bt-?shirts?|tees?\b", text): return "T-Shirts"
+        if re.search(r"\bshirts?\b", text): return "Shirts"
+        if re.search(r"\bjeans?\b", text): return "Jeans"
+        if re.search(r"\b(?:trousers?|pants?|chinos?)\b", text): return "Trousers"
+        if re.search(r"\b(?:hoodies?|sweatshirts?|jackets?)\b", text): return "Hoodies & Jackets"
+        if re.search(r"\b(?:kurtas?|sarees?|ethnic)\b", text): return "Ethnic Wear"
+        if re.search(r"\b(?:dresses?|frocks?)\b", text): return "Dresses"
+        if re.search(r"\b(?:tops?|blouses?)\b", text): return "Tops"
+        if re.search(r"\b(?:shorts?|track pants?|gym)\b", text): return "Activewear"
+    if category == "Accessories":
+        if re.search(r"\b(earrings?|jhumk(?:a|i)s?)\b", text): return "Earrings"
+        if re.search(r"\b(watch(?:es)?|smartwatch(?:es)?)\b", text): return "Watches"
+        if re.search(r"\b(necklaces?|bracelets?|bangles?|jewell?ery)\b", text): return "Fashion Jewellery"
+        if re.search(r"\b(handbags?|backpacks?|totes?|wallets?|bags?)\b", text): return "Bags & Wallets"
+        if re.search(r"\bhair\s+(?:clip|clips|band|bands|accessor(?:y|ies))\b", text): return "Hair Accessories"
+        if re.search(r"\b(?:belts?|caps?|sunglasses?|scarves?)\b", text): return "Fashion Accessories"
     if category == "Beauty & Personal Care":
         if re.search(r"\b(perfumes?|fragrances?)\b", text): return "Perfume"
         if re.search(r"\b(deodorants?|deos?)\b", text): return "Deodorant"
@@ -191,13 +249,60 @@ def normalize_subcategory(value: Any, *, name: str, category: str) -> str | None
         if re.search(r"\b(storage|organis(?:er|ers|ation))\b", text): return "Storage & Organisation"
         if re.search(r"\b(home\s*(?:decor|décor)|furniture)\b", text): return "Home Decor"
     if category == "Footwear":
+        if re.search(r"\b(?:flip[ -]?flops?|slippers?|sleepers?|chappals?)\b", text): return "Slippers & Flip-Flops"
+        if re.search(r"\b(?:loafers?|moccasins?)\b", text): return "Loafers"
+        if re.search(r"\b(?:crocs?|clogs?)\b", text): return "Clogs & Crocs"
         if re.search(r"\bsliders?\b", text): return "Sliders"
         if re.search(r"\bsneakers?\b", text): return "Sneakers"
         if re.search(r"\brunning\b", text): return "Running Shoes"
         if re.search(r"\bsports?\b", text): return "Sports Shoes"
         if re.search(r"\bsandals?\b", text): return "Sandals"
         if re.search(r"\bshoes?\b", text): return "Shoes"
+    if category == "Electronics":
+        if re.search(r"\b(?:earbuds?|headphones?|earphones?|speakers?)\b", text): return "Audio"
+        if re.search(r"\b(?:chargers?|cables?|power banks?)\b", text): return "Mobile Accessories"
+        if re.search(r"\b(?:smartwatches?|smart watches?)\b", text): return "Wearables"
+        if re.search(r"\b(?:rc|remote control|drones?)\b", text): return "Remote Control Toys"
     return None
+
+
+def build_product_tags(
+    *,
+    name: str,
+    brand: str | None,
+    store_name: str,
+    department: str,
+    category: str,
+    subcategory: str | None,
+) -> list[str]:
+    """Build bounded public discovery tags from already-public catalogue fields."""
+    candidates: list[str | None] = [
+        "local-shop", name, brand, store_name, department, category, subcategory,
+        *DEPARTMENT_TAG_ALIASES.get(department, ()),
+        *CATEGORY_TAG_ALIASES.get(category, ()),
+    ]
+    if subcategory:
+        subcategory_key = _key(subcategory)
+        candidates.extend(
+            alias for alias, canonical in SUBCATEGORY_ALIASES.items()
+            if _key(canonical) == subcategory_key
+        )
+
+    tags: list[str] = []
+    seen: set[str] = set()
+    for candidate in candidates:
+        if not candidate:
+            continue
+        tag = re.sub(r"\s+", " ", str(candidate)).strip().casefold()
+        if not tag or len(tag) > 100 or tag in seen:
+            continue
+        seen.add(tag)
+        tags.append(tag)
+        if len(tags) == 24:
+            break
+    return tags
+
+
 def normalize_delivery_type(value: Any) -> str:
     key = _key(value or "normal")
     normalized = DELIVERY_ALIASES.get(key)

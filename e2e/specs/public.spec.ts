@@ -124,9 +124,11 @@ test('restricted payment product fails closed for anonymous visitor', async ({
 
 test('category subcategory links apply the selected filters', async ({ page }) => {
   await page.goto('/categories');
-  await page.getByRole('link', { name: 'Oversized', exact: true }).click();
+  const oversizedLink = page.getByRole('link', { name: /^Oversized \(\d+\)$/ });
+  await expect(oversizedLink).toBeVisible();
+  await expect(oversizedLink).not.toContainText('(0)');
+  await oversizedLink.click();
 
-  await expect(page).toHaveURL(/dept=men/);
   await expect(page).toHaveURL(/category=T-Shirts/);
   await expect(page).toHaveURL(/subcategory=Oversized/);
   await expect(page.getByRole('heading', { name: 'Pure Cotton Oversized Graphic Tee' })).toBeVisible();

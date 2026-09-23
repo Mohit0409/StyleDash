@@ -112,4 +112,18 @@ describe('catalogue dynamic facets', () => {
       'goutam-men', 'campus-men', 'nakoda-women', 'beauty-perfume',
     ]);
   });
+
+  it('matches category metadata case-insensitively and supports canonical tag aliases', () => {
+    const tagged = makeProduct({
+      id: 'tagged-slider',
+      brand: 'Local Brand',
+      department: 'men',
+      category: 'Footwear',
+      subcategory: 'Sliders',
+      tags: ['local-shop', 'slides'],
+    });
+    expect(matchesCatalogueProduct(tagged, baseFilters({ category: 'footwear', subcategory: 'sliders' }))).toBe(true);
+    expect(matchesCatalogueProduct(tagged, baseFilters({ category: 'Footwear', subcategory: 'Slides' }))).toBe(true);
+    expect(matchesCatalogueProduct(tagged, baseFilters({ category: 'Accessories' }))).toBe(false);
+  });
 });
