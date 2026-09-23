@@ -103,7 +103,7 @@ class SurgicalCombinedReleaseTests(unittest.TestCase):
         self.assertNotIn('orders.json', rollback_body)
 
     def test_fresh_supported_backup_finishes_before_mutation(self) -> None:
-        backup = self.script.index('"$HOME/bin/backup-styledash-data"')
+        backup = self.script.index('bash "$STAGE/scripts/termux/backup-styledash-data"')
         mutation = self.script.index('MUTATION_STARTED=1')
         self.assertLess(backup, mutation)
         self.assertIn('sqlite_integrity=ok', self.script)
@@ -130,7 +130,7 @@ class SurgicalCombinedReleaseTests(unittest.TestCase):
         self.assertIn('surgical release is missing a complete Firebase web configuration', self.script)
         self.assertIn('Firebase browser and server project IDs do not match', self.script)
         firebase_guard = self.script.index('firebase_assets=("$STAGE"/dist/assets/*.js)')
-        backup = self.script.index('"$HOME/bin/backup-styledash-data"')
+        backup = self.script.index('bash "$STAGE/scripts/termux/backup-styledash-data"')
         mutation = self.script.index('MUTATION_STARTED=1')
         self.assertLess(firebase_guard, backup)
         self.assertLess(firebase_guard, mutation)
