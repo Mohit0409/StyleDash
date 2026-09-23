@@ -1,6 +1,7 @@
 import unittest
 
 from scripts.catalog_normalization import (
+    PRODUCT_CATEGORIES,
     normalize_brand,
     normalize_delivery_type,
     normalize_department,
@@ -9,6 +10,7 @@ from scripts.catalog_normalization import (
     normalize_subcategory,
 )
 from scripts.styledash_security import SecurityError
+from scripts.styledash_shops import ALLOWED_CATEGORIES
 
 
 class CatalogNormalizationTests(unittest.TestCase):
@@ -81,6 +83,49 @@ class CatalogNormalizationTests(unittest.TestCase):
                 description='Fashion jewellery bangles',
             ),
             'Accessories',
+        )
+
+    def test_live_category_sets_and_gift_home_normalization(self) -> None:
+        expected = {
+            'Clothing & Fashion',
+            'Footwear',
+            'Accessories',
+            'Beauty & Personal Care',
+            'Electronics',
+            'Gifts',
+            'Home & Living',
+        }
+        self.assertEqual(PRODUCT_CATEGORIES, expected)
+        self.assertEqual(ALLOWED_CATEGORIES, expected)
+        self.assertNotIn('General Store', PRODUCT_CATEGORIES)
+        self.assertNotIn('General Store', ALLOWED_CATEGORIES)
+        self.assertEqual(
+            normalize_product_category(
+                'Clothing & Fashion',
+                name='Festive Gift Hamper',
+                description='Gift box with greeting card',
+            ),
+            'Gifts',
+        )
+        self.assertEqual(
+            normalize_subcategory(None, name='Festive Gift Hamper', category='Gifts'),
+            'Gift Hampers',
+        )
+        self.assertEqual(
+            normalize_product_category(
+                'Clothing & Fashion',
+                name='Kitchen Storage Organiser',
+                description='Home living household storage',
+            ),
+            'Home & Living',
+        )
+        self.assertEqual(
+            normalize_subcategory(
+                None,
+                name='Kitchen Storage Organiser',
+                category='Home & Living',
+            ),
+            'Kitchen & Dining',
         )
 
     def test_known_brand_is_inferred_only_when_deterministic(self) -> None:

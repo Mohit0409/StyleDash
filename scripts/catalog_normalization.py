@@ -13,7 +13,7 @@ CANONICAL_DEPARTMENTS = {"men", "women", "kids", "unisex"}
 LEGACY_DEPARTMENT_CLASSES = {"footwear", "accessories"}
 PRODUCT_CATEGORIES = {
     "Clothing & Fashion", "Footwear", "Accessories", "Beauty & Personal Care",
-    "Electronics", "Home & Living", "General Store",
+    "Electronics", "Gifts", "Home & Living",
 }
 
 
@@ -47,6 +47,10 @@ def infer_product_category(name: str, description: str) -> str | None:
         return "Footwear"
     if re.search(r"\b(earrings?|jhumk(?:a|i)s?|jewell?ery|necklaces?|bracelets?|bangles?|belts?|handbags?|bags?)\b", text):
         return "Accessories"
+    if re.search(r"\b(gifts?|gift\s*(?:box|boxes|hamper|hampers|wrap|wrapping)|teddy\s*bear|soft\s*toy|greeting\s*cards?)\b", text):
+        return "Gifts"
+    if re.search(r"\b(home\s*(?:decor|décor|living)|kitchen(?:ware)?|cookware|bedding|bedsheets?|cushions?|curtains?|storage|organis(?:er|ers|ation)|furniture|household)\b", text):
+        return "Home & Living"
     if re.search(r"\b(kurtas?|shirts?|t-?shirts?|tees?|jeans?|trousers?|dresses?|tops?|apparel|clothing)\b", text):
         return "Clothing & Fashion"
     return None
@@ -71,6 +75,10 @@ def normalize_product_category(value: Any, *, name: str, description: str, legac
         "skin care": "Beauty & Personal Care", "skincare": "Beauty & Personal Care",
         "hair care": "Beauty & Personal Care", "haircare": "Beauty & Personal Care",
         "grooming": "Beauty & Personal Care",
+        "gift": "Gifts", "gifts": "Gifts", "gift box": "Gifts", "gift boxes": "Gifts",
+        "gift hamper": "Gifts", "gift hampers": "Gifts", "greeting cards": "Gifts",
+        "home": "Home & Living", "home living": "Home & Living", "home and living": "Home & Living",
+        "home decor": "Home & Living", "home décor": "Home & Living", "household": "Home & Living",
         "clothing": "Clothing & Fashion", "fashion": "Clothing & Fashion", "apparel": "Clothing & Fashion",
     }
     normalized = aliases.get(key)
@@ -79,7 +87,7 @@ def normalize_product_category(value: Any, *, name: str, description: str, legac
         if inferred is None:
             raise SecurityError(400, "Invalid product category.", "invalid_product")
         return inferred
-    if normalized == "Clothing & Fashion" and inferred in {"Footwear", "Accessories", "Beauty & Personal Care"}:
+    if normalized == "Clothing & Fashion" and inferred in {"Footwear", "Accessories", "Beauty & Personal Care", "Gifts", "Home & Living"}:
         return inferred
     if normalized == "Accessories" and inferred == "Beauty & Personal Care":
         return inferred
@@ -173,6 +181,15 @@ def normalize_subcategory(value: Any, *, name: str, category: str) -> str | None
         if re.search(r"\b(hair\s*care|haircare)\b", text): return "Hair Care"
         if re.search(r"\bgrooming\b", text): return "Grooming"
         if re.search(r"\b(cosmetics?|makeup)\b", text): return "Cosmetics"
+    if category == "Gifts":
+        if re.search(r"\b(gift\s*(?:box|boxes)|hampers?)\b", text): return "Gift Hampers"
+        if re.search(r"\b(teddy\s*bear|soft\s*toy)\b", text): return "Soft Toys"
+        if re.search(r"\b(greeting\s*cards?)\b", text): return "Greeting Cards"
+    if category == "Home & Living":
+        if re.search(r"\b(kitchen|cookware)\b", text): return "Kitchen & Dining"
+        if re.search(r"\b(bedding|bedsheets?|cushions?|curtains?)\b", text): return "Bedding & Furnishings"
+        if re.search(r"\b(storage|organis(?:er|ers|ation))\b", text): return "Storage & Organisation"
+        if re.search(r"\b(home\s*(?:decor|décor)|furniture)\b", text): return "Home Decor"
     if category == "Footwear":
         if re.search(r"\bsliders?\b", text): return "Sliders"
         if re.search(r"\bsneakers?\b", text): return "Sneakers"
