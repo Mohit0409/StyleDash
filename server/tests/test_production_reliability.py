@@ -56,7 +56,10 @@ class ProductionReliabilityTests(unittest.TestCase):
         self.assertIn("--download", script)
         self.assertIn("--local-only", script)
         self.assertIn("STYLEDASH_BACKUP_REMOTE_SECONDARY", script)
-        self.assertIn('run_rclone copy "$target" "$secondary_target"', script)
+        self.assertIn(
+            'run_rclone copy "$target" "$secondary_target" --immutable --checksum',
+            script,
+        )
         self.assertIn('verify_remote "$target" "$secondary_target"', script)
         self.assertIn("styledash-last-secondary-backup", script)
         self.assertIn('nice -n 10 ionice -c 3 rclone "$@"', script)
