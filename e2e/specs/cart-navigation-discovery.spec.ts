@@ -22,9 +22,16 @@ test('initial home Back asks for a second press before exit', async ({ page }) =
   await expect(page.getByText('Press back again to exit')).toBeVisible();
 });
 
-test('home discovery exposes categories, budget tiers, and Top Picks', async ({ page }) => {
+test('home discovery exposes a browsable department rail, budget tiers, and Top Picks', async ({ page }, testInfo) => {
   await page.goto('/');
 
+  const departmentRail = page.getByTestId('department-category-rail');
+  await expect(departmentRail).toBeVisible();
+  await expect(departmentRail.getByRole('link')).toHaveCount(7);
+  if (testInfo.project.name === 'desktop-chromium') {
+    await page.getByRole('button', { name: 'Next departments' }).click();
+    await expect.poll(() => departmentRail.evaluate(element => element.scrollLeft)).toBeGreaterThan(0);
+  }
   await expect(page.getByRole('link', { name: /Categories/ }).first()).toHaveAttribute('href', '/categories');
   await expect(page.getByRole('heading', { name: 'Shop by Budget' })).toBeVisible();
   await expect(page.getByRole('link', { name: 'Under ₹199', exact: true })).toHaveAttribute('href', '/products?maxPrice=199');

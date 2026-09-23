@@ -1,5 +1,5 @@
 #!/data/data/com.termux/files/usr/bin/bash
-set -eu
+set -euo pipefail
 
 LOCAL_ONLY=false
 if [ "${1:-}" = "--local-only" ]; then
@@ -19,9 +19,23 @@ PRODUCT_IMAGES="$DATA_ROOT/product-images"
 PRIVATE_CONFIG_DIR="$HOME/.config/styledash"
 SECRETS_FILE="$PRIVATE_CONFIG_DIR/secrets.env"
 RUN_DIR="$HOME/run"
+LOCK_DIR="$RUN_DIR/styledash-backup.lock"
 
 mkdir -p "$BACKUP_ROOT" "$RUN_DIR"
 chmod 700 "$BACKUP_ROOT"
+
+if ! mkdir "$LOCK_DIR" 2>/dev/null; then
+  echo "A Vibe4You backup is already running; refusing an overlapping run" >&2
+  exit 75
+fi
+printf '%s\n' "$$" > "$LOCK_DIR/pid"
+chmod 600 "$LOCK_DIR/pid"
+release_lock() {
+  rm -f -- "$LOCK_DIR/pid"
+  rmdir -- "$LOCK_DIR" 2>/dev/null || true
+}
+trap release_lock EXIT
+trap 'exit 143' HUP INT TERM
 
 if [ -f "$SECRETS_FILE" ]; then
   set -a
@@ -42,6 +56,25 @@ run_rclone() {
   else
     nice -n 10 rclone "$@"
   fi
+}
+
+verify_remote() {
+  local source="$1"
+  local destination="$2"
+  local label="$3"
+  local attempt=1
+  while true; do
+    if run_rclone check "$source" "$destination" --one-way --download --checkers 1 --contimeout 15s --timeout 60s --retries 2 --low-level-retries 2; then
+      return 0
+    fi
+    if [ "$attempt" -ge 3 ]; then
+      echo "$label verification failed after retries" >&2
+      return 1
+    fi
+    attempt=$((attempt + 1))
+    echo "$label verification retry $attempt/3" >&2
+    sleep 10
+  done
 }
 
 stamp="$(date -u +%Y%m%dT%H%M%SZ)"
@@ -130,10 +163,9 @@ if [ "$LOCAL_ONLY" = false ]; then
     remote_target="${remote%/}/$stamp"
     run_rclone copy "$target" "$remote_target" \
       --immutable \
-      --create-empty-src-dirs
-    run_rclone check "$target" "$remote_target" \
-      --one-way \
-      --download
+      --create-empty-src-dirs \
+      --transfers 1 --checkers 1 --contimeout 15s --timeout 60s --retries 2 --low-level-retries 2
+    verify_remote "$target" "$remote_target" "Primary off-device backup"
 
     printf '%s\n' "$stamp" > "$RUN_DIR/styledash-last-offdevice-backup"
     chmod 600 "$RUN_DIR/styledash-last-offdevice-backup"
@@ -143,9 +175,8 @@ if [ "$LOCAL_ONLY" = false ]; then
     if [ -n "$secondary" ]; then
       secondary_target="${secondary%/}/$stamp"
 
-      run_rclone copy "$target" "$secondary_target"         --immutable         --create-empty-src-dirs
-
-      run_rclone check "$target" "$secondary_target"         --one-way         --download
+      run_rclone copy "$target" "$secondary_target" --immutable --create-empty-src-dirs --transfers 1 --checkers 1 --contimeout 15s --timeout 60s --retries 2 --low-level-retries 2
+      verify_remote "$target" "$secondary_target" "Secondary off-device backup"
 
       printf '%s\n' "$stamp" > "$RUN_DIR/styledash-last-secondary-backup"
       chmod 600 "$RUN_DIR/styledash-last-secondary-backup"
