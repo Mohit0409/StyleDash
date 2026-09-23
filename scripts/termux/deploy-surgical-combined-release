@@ -1,0 +1,404 @@
+#!/data/data/com.termux/files/usr/bin/bash
+# Deploy only the reviewed Vibe4You combined-release write set.
+#
+# This intentionally does not use deploy-payment-release: production contains
+# newer live-only category rules that a full-tree copy would overwrite.
+set -Eeuo pipefail
+
+if [ "$#" -ne 1 ] || [ ! -d "$1" ]; then
+  echo "usage: deploy-surgical-combined-release STAGING_DIRECTORY" >&2
+  exit 2
+fi
+
+STAGE="$(realpath -e "$1")"
+PUBLIC_DIR="$HOME/server"
+ADMIN_DIR="$HOME/admin"
+DATA_ROOT="$HOME/.local/share/styledash"
+LIVE_DB="$DATA_ROOT/styledash.db"
+RUN_DIR="$HOME/run"
+BACKUP_ROOT="$HOME/backups"
+PROCESS_LIB="$HOME/bin/styledash-process-lib"
+WATCHDOG_MARKER="$HOME/bin/styledash-health"
+PUBLIC_MARKER="$PUBLIC_DIR/serve.py --bind 127.0.0.1 --port 8080"
+PUBLIC_IDENTITY="--directory $PUBLIC_DIR"
+ADMIN_MARKER="$ADMIN_DIR/serve.py --bind 127.0.0.1 --port 8081"
+ADMIN_IDENTITY="--assets $ADMIN_DIR/admin"
+CLOUDFLARE_MARKER='cloudflared tunnel run'
+CLOUDFLARE_IDENTITY="--token-file $HOME/.config/styledash/cloudflare-tunnel-token"
+
+PUBLIC_PID_FILE="$RUN_DIR/styledash.pid"
+ADMIN_PID_FILE="$RUN_DIR/styledash-admin.pid"
+CLOUDFLARE_PID_FILE="$RUN_DIR/styledash-cloudflare.pid"
+
+ROLLBACK=''
+MUTATION_STARTED=0
+ROLLBACK_IN_PROGRESS=0
+OLD_PUBLIC_PID=''
+OLD_ADMIN_PID=''
+
+required_stage_files=(
+  "dist/index.html"
+  "dist/favicon.svg"
+  "dist/manifest.json"
+  "dist/product-placeholder.svg"
+  "dist/robots.txt"
+  "scripts/termux-spa-server.py"
+  "scripts/termux-admin-server.py"
+  "scripts/styledash_reviews.py"
+  "server/admin/index.html"
+  "server/admin/admin.js"
+  "scripts/termux/backup-styledash-data"
+  "scripts/termux/start-styledash-cloudflare"
+)
+
+for relative in "${required_stage_files[@]}"; do
+  if [ ! -f "$STAGE/$relative" ]; then
+    echo "surgical release is missing $relative; deployment aborted" >&2
+    exit 1
+  fi
+  if [ -L "$STAGE/$relative" ]; then
+    echo "surgical release file is a symbolic link: $relative" >&2
+    exit 1
+  fi
+done
+if [ ! -d "$STAGE/dist/assets" ]; then
+  echo "surgical release is missing dist/assets; deployment aborted" >&2
+  exit 1
+fi
+if find "$STAGE/dist" -type l -print -quit | grep -q .; then
+  echo "surgical release frontend contains a symbolic link; deployment aborted" >&2
+  exit 1
+fi
+if find "$STAGE/dist" -mindepth 1 -maxdepth 1 -type d ! -name assets -print -quit | grep -q .; then
+  echo "surgical release frontend contains an unexpected top-level directory; deployment aborted" >&2
+  exit 1
+fi
+while IFS= read -r frontend_path; do
+  frontend_name="$(basename "$frontend_path")"
+  case "$frontend_name" in
+    index.html|favicon.svg|manifest.json|product-placeholder.svg|robots.txt) ;;
+    *) echo "surgical release frontend contains an unexpected top-level file: $frontend_name" >&2; exit 1 ;;
+  esac
+done < <(find "$STAGE/dist" -mindepth 1 -maxdepth 1 -type f -print)
+if ! grep -Fq -- 'cloudflared tunnel run --protocol http2' "$STAGE/scripts/termux/start-styledash-cloudflare"; then
+  echo "surgical release Cloudflare launcher is not pinned to HTTP/2; deployment aborted" >&2
+  exit 1
+fi
+bash -n "$STAGE/scripts/termux/backup-styledash-data"
+bash -n "$STAGE/scripts/termux/start-styledash-cloudflare"
+
+for managed_dir in "$PUBLIC_DIR" "$ADMIN_DIR" "$DATA_ROOT"; do
+  if [ ! -d "$managed_dir" ] || \
+     [ "$(realpath -e "$managed_dir")" != "$managed_dir" ] || \
+     [ "$(stat -c '%u' "$managed_dir")" != "$(id -u)" ]; then
+    echo "managed production directory is missing or redirected: $managed_dir" >&2
+    exit 1
+  fi
+done
+case "$STAGE" in
+  "$PUBLIC_DIR"|"$PUBLIC_DIR"/*|"$ADMIN_DIR"|"$ADMIN_DIR"/*|"$DATA_ROOT"|"$DATA_ROOT"/*|"$BACKUP_ROOT"|"$BACKUP_ROOT"/*)
+    echo "staging directory overlaps a managed production or backup directory" >&2
+    exit 1
+    ;;
+esac
+if [ ! -r "$PROCESS_LIB" ]; then
+  echo "StyleDash process control library is missing; deployment aborted" >&2
+  exit 1
+fi
+# shellcheck disable=SC1090 -- production-installed process library.
+. "$PROCESS_LIB"
+
+http_status() {
+  curl -sS --max-time 10 -o /dev/null -w '%{http_code}' "$1"
+}
+
+assert_status() {
+  expected="$1"
+  url="$2"
+  actual="$(http_status "$url")"
+  if [ "$actual" != "$expected" ]; then
+    echo "unexpected HTTP $actual for $url (expected $expected)" >&2
+    return 1
+  fi
+}
+
+database_check() {
+  python3 - "$LIVE_DB" <<'PY'
+import sqlite3
+import sys
+
+connection = sqlite3.connect(f"file:{sys.argv[1]}?mode=ro", uri=True)
+try:
+    integrity = connection.execute("PRAGMA integrity_check").fetchone()[0]
+    foreign_keys = connection.execute("PRAGMA foreign_key_check").fetchall()
+finally:
+    connection.close()
+if integrity != "ok":
+    raise SystemExit(f"SQLite integrity check failed: {integrity}")
+if foreign_keys:
+    raise SystemExit(f"SQLite foreign-key check failed with {len(foreign_keys)} error(s)")
+print("sqlite_integrity=ok")
+print("sqlite_foreign_key_errors=0")
+PY
+}
+
+snapshot_file() {
+  source_path="$1"
+  snapshot_path="$2"
+  mkdir -p "$(dirname "$snapshot_path")"
+  if [ -f "$source_path" ]; then
+    cp -a -- "$source_path" "$snapshot_path"
+  else
+    : > "$snapshot_path.absent"
+  fi
+}
+
+restore_file() {
+  snapshot_path="$1"
+  target_path="$2"
+  if [ -f "$snapshot_path.absent" ]; then
+    rm -f -- "$target_path"
+  elif [ -f "$snapshot_path" ]; then
+    install -m "$(stat -c '%a' "$snapshot_path")" "$snapshot_path" "$target_path"
+  else
+    echo "rollback snapshot is missing for $target_path" >&2
+    return 1
+  fi
+}
+
+write_protected_hashes() {
+  output="$1"
+  : > "$output"
+  protected_paths=(
+    "$PUBLIC_DIR/styledash_security.py"
+    "$PUBLIC_DIR/catalog_normalization.py"
+    "$PUBLIC_DIR/styledash_shops.py"
+    "$ADMIN_DIR/styledash_security.py"
+    "$ADMIN_DIR/catalog_normalization.py"
+    "$ADMIN_DIR/styledash_shops.py"
+    "$DATA_ROOT/catalog.json"
+    "$DATA_ROOT/settings.json"
+    "$DATA_ROOT/delivery-zones.geojson"
+    "$HOME/.config/styledash/secrets.env"
+  )
+  for protected_path in "${protected_paths[@]}"; do
+    if [ ! -f "$protected_path" ]; then
+      echo "protected production file is missing: $protected_path" >&2
+      return 1
+    fi
+    printf '%s  %s\n' "$(sha256sum "$protected_path" | awk '{print $1}')" "$protected_path" >> "$output"
+  done
+}
+
+assert_protected_unchanged() {
+  current="$ROLLBACK/protected-after.sha256"
+  write_protected_hashes "$current"
+  if ! cmp -s "$ROLLBACK/protected-before.sha256" "$current"; then
+    echo "a protected live category/configuration file changed; deployment rejected" >&2
+    diff -u "$ROLLBACK/protected-before.sha256" "$current" >&2 || true
+    return 1
+  fi
+  printf 'protected_file_hashes=unchanged\n'
+}
+
+verify_runtime_acceptance() {
+  assert_status 200 "http://127.0.0.1:8080/api/health"
+  assert_status 404 "http://127.0.0.1:8080/admin"
+  assert_status 404 "http://127.0.0.1:8080/api/admin/me"
+  assert_status 200 "http://127.0.0.1:8080/api/shop-products/homepage"
+  assert_status 200 "http://127.0.0.1:8080/api/shop-products/published"
+  admin_status="$(curl -sS --max-time 10 -H 'Host: 127.0.0.1:8081' -o /dev/null -w '%{http_code}' http://127.0.0.1:8081/)"
+  if [ "$admin_status" != 200 ]; then
+    echo "private administrator health returned HTTP $admin_status" >&2
+    return 1
+  fi
+  database_check
+  assert_protected_unchanged
+}
+
+restore_frontend() {
+  rm -rf -- "$PUBLIC_DIR/assets"
+  if [ -d "$ROLLBACK/public/static/assets" ]; then
+    cp -a -- "$ROLLBACK/public/static/assets" "$PUBLIC_DIR/assets"
+  elif [ ! -f "$ROLLBACK/public/static/assets.absent" ]; then
+    echo "public asset rollback snapshot is incomplete" >&2
+    return 1
+  fi
+  while IFS= read -r frontend_name; do
+    [ -n "$frontend_name" ] || continue
+    restore_file "$ROLLBACK/public/static/files/$frontend_name" "$PUBLIC_DIR/$frontend_name"
+  done < "$ROLLBACK/public/static/dist-top-level.txt"
+}
+
+rollback_release() {
+  ROLLBACK_IN_PROGRESS=1
+  trap - ERR INT TERM
+  set +e
+  rollback_failed=0
+  echo "surgical deployment failed; restoring $ROLLBACK" >&2
+
+  styledash_stop_matching_processes "StyleDash administrator service" "$ADMIN_MARKER" "$ADMIN_IDENTITY" || rollback_failed=1
+  styledash_stop_matching_processes "StyleDash public service" "$PUBLIC_MARKER" "$PUBLIC_IDENTITY" || rollback_failed=1
+  rm -f -- "$PUBLIC_PID_FILE" "$ADMIN_PID_FILE"
+  styledash_wait_for_port_release 8080 "StyleDash public service" || rollback_failed=1
+  styledash_wait_for_port_release 8081 "StyleDash administrator service" || rollback_failed=1
+
+  restore_file "$ROLLBACK/public/runtime/serve.py" "$PUBLIC_DIR/serve.py" || rollback_failed=1
+  restore_file "$ROLLBACK/public/runtime/styledash_reviews.py" "$PUBLIC_DIR/styledash_reviews.py" || rollback_failed=1
+  restore_frontend || rollback_failed=1
+  restore_file "$ROLLBACK/admin/runtime/serve.py" "$ADMIN_DIR/serve.py" || rollback_failed=1
+  restore_file "$ROLLBACK/admin/runtime/styledash_reviews.py" "$ADMIN_DIR/styledash_reviews.py" || rollback_failed=1
+  restore_file "$ROLLBACK/admin/static/index.html" "$ADMIN_DIR/admin/index.html" || rollback_failed=1
+  restore_file "$ROLLBACK/admin/static/admin.js" "$ADMIN_DIR/admin/admin.js" || rollback_failed=1
+  restore_file "$ROLLBACK/ops/backup-styledash-data" "$HOME/bin/backup-styledash-data" || rollback_failed=1
+  restore_file "$ROLLBACK/ops/start-styledash-cloudflare" "$HOME/bin/start-styledash-cloudflare" || rollback_failed=1
+
+  "$HOME/bin/start-styledash" || rollback_failed=1
+  "$HOME/bin/start-styledash-admin" || rollback_failed=1
+  styledash_watchdog_start "$WATCHDOG_MARKER" "$RUN_DIR/styledash-health.pid" "$HOME/logs/styledash-health.log" || rollback_failed=1
+  assert_status 200 "http://127.0.0.1:8080/api/health" || rollback_failed=1
+  assert_status 404 "http://127.0.0.1:8080/admin" || rollback_failed=1
+  assert_status 404 "http://127.0.0.1:8080/api/admin/me" || rollback_failed=1
+  database_check || rollback_failed=1
+  assert_protected_unchanged || rollback_failed=1
+  set -e
+  if [ "$rollback_failed" -ne 0 ]; then
+    echo "automatic rollback was incomplete; manual recovery required from $ROLLBACK" >&2
+    return 1
+  fi
+  printf 'automatic_rollback=PASS\n'
+  printf 'rollback_restored=%s\n' "$ROLLBACK"
+}
+
+handle_failure() {
+  status="$1"
+  line="$2"
+  trap - ERR INT TERM
+  echo "surgical deployment error at line $line (status $status)" >&2
+  if [ "$MUTATION_STARTED" -eq 1 ] && [ "$ROLLBACK_IN_PROGRESS" -eq 0 ] && [ -n "$ROLLBACK" ]; then
+    rollback_release || true
+  fi
+  exit "$status"
+}
+
+trap 'handle_failure $? $LINENO' ERR
+trap 'handle_failure 130 $LINENO' INT
+trap 'handle_failure 143 $LINENO' TERM
+
+mkdir -p "$RUN_DIR" "$BACKUP_ROOT"
+for private_runtime_dir in "$RUN_DIR" "$BACKUP_ROOT"; do
+  if [ "$(realpath -e "$private_runtime_dir")" != "$private_runtime_dir" ] || \
+     [ "$(stat -c '%u' "$private_runtime_dir")" != "$(id -u)" ]; then
+    echo "private runtime directory is redirected or has unsafe ownership: $private_runtime_dir" >&2
+    exit 1
+  fi
+done
+chmod 700 "$BACKUP_ROOT"
+
+# Preflight the currently running services. A deployment must replace known,
+# healthy PIDs rather than adopt or race an unknown listener.
+OLD_PUBLIC_PID="$(styledash_read_pid_file "$PUBLIC_PID_FILE")"
+OLD_ADMIN_PID="$(styledash_read_pid_file "$ADMIN_PID_FILE")"
+styledash_assert_single_process "$OLD_PUBLIC_PID" "$PUBLIC_MARKER" "$PUBLIC_IDENTITY"
+styledash_assert_single_process "$OLD_ADMIN_PID" "$ADMIN_MARKER" "$ADMIN_IDENTITY"
+assert_status 200 "http://127.0.0.1:8080/api/health"
+assert_status 404 "http://127.0.0.1:8080/admin"
+assert_status 404 "http://127.0.0.1:8080/api/admin/me"
+database_check
+
+# The supported backup command performs SQLite online backup, integrity/FK
+# verification, and configured primary/secondary replication. No code is
+# changed unless this completes successfully.
+"$HOME/bin/backup-styledash-data"
+
+ROLLBACK="$(mktemp -d "$BACKUP_ROOT/styledash-surgical-combined.XXXXXX")"
+chmod 700 "$ROLLBACK"
+mkdir -p \
+  "$ROLLBACK/public/runtime" \
+  "$ROLLBACK/public/static/files" \
+  "$ROLLBACK/admin/runtime" \
+  "$ROLLBACK/admin/static" \
+  "$ROLLBACK/ops"
+
+snapshot_file "$PUBLIC_DIR/serve.py" "$ROLLBACK/public/runtime/serve.py"
+snapshot_file "$PUBLIC_DIR/styledash_reviews.py" "$ROLLBACK/public/runtime/styledash_reviews.py"
+snapshot_file "$ADMIN_DIR/serve.py" "$ROLLBACK/admin/runtime/serve.py"
+snapshot_file "$ADMIN_DIR/styledash_reviews.py" "$ROLLBACK/admin/runtime/styledash_reviews.py"
+snapshot_file "$ADMIN_DIR/admin/index.html" "$ROLLBACK/admin/static/index.html"
+snapshot_file "$ADMIN_DIR/admin/admin.js" "$ROLLBACK/admin/static/admin.js"
+snapshot_file "$HOME/bin/backup-styledash-data" "$ROLLBACK/ops/backup-styledash-data"
+snapshot_file "$HOME/bin/start-styledash-cloudflare" "$ROLLBACK/ops/start-styledash-cloudflare"
+
+if [ -d "$PUBLIC_DIR/assets" ]; then
+  cp -a -- "$PUBLIC_DIR/assets" "$ROLLBACK/public/static/assets"
+else
+  : > "$ROLLBACK/public/static/assets.absent"
+fi
+: > "$ROLLBACK/public/static/dist-top-level.txt"
+while IFS= read -r frontend_path; do
+  frontend_name="$(basename "$frontend_path")"
+  case "$frontend_name" in
+    ''|.|..|*[!A-Za-z0-9._-]*) echo "unsafe frontend filename: $frontend_name" >&2; exit 1 ;;
+  esac
+  printf '%s\n' "$frontend_name" >> "$ROLLBACK/public/static/dist-top-level.txt"
+  snapshot_file "$PUBLIC_DIR/$frontend_name" "$ROLLBACK/public/static/files/$frontend_name"
+done < <(find "$STAGE/dist" -mindepth 1 -maxdepth 1 -type f -print | LC_ALL=C sort)
+
+write_protected_hashes "$ROLLBACK/protected-before.sha256"
+printf '%s\n' "$ROLLBACK" > "$RUN_DIR/styledash-last-surgical-backup"
+chmod 600 "$RUN_DIR/styledash-last-surgical-backup"
+printf 'rollback=%s\n' "$ROLLBACK"
+
+MUTATION_STARTED=1
+styledash_watchdog_stop "$WATCHDOG_MARKER" "$RUN_DIR/styledash-health.pid"
+styledash_stop_matching_processes "StyleDash administrator service" "$ADMIN_MARKER" "$ADMIN_IDENTITY"
+styledash_stop_matching_processes "StyleDash public service" "$PUBLIC_MARKER" "$PUBLIC_IDENTITY"
+rm -f -- "$PUBLIC_PID_FILE" "$ADMIN_PID_FILE"
+styledash_wait_for_port_release 8080 "StyleDash public service"
+styledash_wait_for_port_release 8081 "StyleDash administrator service"
+
+# Exact reviewed application write set. Category/security/shop rule modules,
+# authoritative configuration, secrets, payments, orders, and the database are
+# deliberately not copied here.
+rm -rf -- "$PUBLIC_DIR/assets"
+cp -a -- "$STAGE/dist/." "$PUBLIC_DIR/"
+install -m 755 "$STAGE/scripts/termux-spa-server.py" "$PUBLIC_DIR/serve.py"
+install -m 600 "$STAGE/scripts/styledash_reviews.py" "$PUBLIC_DIR/styledash_reviews.py"
+install -m 600 "$STAGE/scripts/termux-admin-server.py" "$ADMIN_DIR/serve.py"
+install -m 600 "$STAGE/scripts/styledash_reviews.py" "$ADMIN_DIR/styledash_reviews.py"
+install -m 600 "$STAGE/server/admin/index.html" "$ADMIN_DIR/admin/index.html"
+install -m 600 "$STAGE/server/admin/admin.js" "$ADMIN_DIR/admin/admin.js"
+install -m 755 "$STAGE/scripts/termux/backup-styledash-data" "$HOME/bin/backup-styledash-data"
+install -m 700 "$STAGE/scripts/termux/start-styledash-cloudflare" "$HOME/bin/start-styledash-cloudflare"
+
+assert_protected_unchanged
+"$HOME/bin/start-styledash"
+"$HOME/bin/start-styledash-admin"
+NEW_PUBLIC_PID="$(styledash_read_pid_file "$PUBLIC_PID_FILE")"
+NEW_ADMIN_PID="$(styledash_read_pid_file "$ADMIN_PID_FILE")"
+if [ "$NEW_PUBLIC_PID" = "$OLD_PUBLIC_PID" ] || [ "$NEW_ADMIN_PID" = "$OLD_ADMIN_PID" ]; then
+  echo "service PID did not change after the surgical runtime replacement" >&2
+  exit 1
+fi
+styledash_assert_single_process "$NEW_PUBLIC_PID" "$PUBLIC_MARKER" "$PUBLIC_IDENTITY"
+styledash_assert_single_process "$NEW_ADMIN_PID" "$ADMIN_MARKER" "$ADMIN_IDENTITY"
+
+verify_runtime_acceptance
+
+CLOUDFLARE_PID="$(styledash_read_pid_file "$CLOUDFLARE_PID_FILE")"
+styledash_assert_single_process "$CLOUDFLARE_PID" "$CLOUDFLARE_MARKER" "$CLOUDFLARE_IDENTITY"
+if ! styledash_cmdline "$CLOUDFLARE_PID" | grep -Fq -- '--protocol http2'; then
+  echo "running Cloudflare tunnel is not using HTTP/2" >&2
+  exit 1
+fi
+printf 'cloudflare_transport=http2\n'
+
+styledash_watchdog_start "$WATCHDOG_MARKER" "$RUN_DIR/styledash-health.pid" "$HOME/logs/styledash-health.log"
+trap - ERR INT TERM
+printf 'surgical_deployment=PASS\n'
+printf 'old_public_pid=%s\n' "$OLD_PUBLIC_PID"
+printf 'new_public_pid=%s\n' "$NEW_PUBLIC_PID"
+printf 'old_admin_pid=%s\n' "$OLD_ADMIN_PID"
+printf 'new_admin_pid=%s\n' "$NEW_ADMIN_PID"
+printf 'rollback_snapshot=%s\n' "$ROLLBACK"
+printf 'production_data=preserved\n'
