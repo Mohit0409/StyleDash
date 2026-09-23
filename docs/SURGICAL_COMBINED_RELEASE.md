@@ -27,8 +27,6 @@ The surgical command can replace only:
 - the customer frontend files from `dist/`
 - `~/admin/serve.py`
 - `~/admin/styledash_reviews.py`
-- `~/admin/admin/index.html`
-- `~/admin/admin/admin.js`
 - `~/bin/backup-styledash-data`
 - `~/bin/start-styledash-cloudflare`
 
@@ -37,9 +35,12 @@ settings, delivery-zone, secret, payment, order, or database files.
 
 Before mutation it records SHA-256 values for both public and private copies
 of `styledash_security.py`, `catalog_normalization.py`, and
-`styledash_shops.py`, plus authoritative catalogue/settings/delivery-zone
-configuration and `secrets.env`. The same hashes must match after the copy and
-after any automatic rollback.
+`styledash_shops.py`, the live private Admin `index.html` and `admin.js`, plus
+authoritative catalogue/settings/delivery-zone configuration and `secrets.env`.
+The same hashes must match after the copy and after any automatic rollback.
+
+The private Admin frontend is deliberately preserved in this release because
+production contains live-only Admin hotfixes that are not yet reconciled into Git.
 
 ## Backup and rollback
 
@@ -54,7 +55,6 @@ The code/static rollback snapshot is created under:
   public/runtime/
   public/static/
   admin/runtime/
-  admin/static/
   ops/
 ```
 

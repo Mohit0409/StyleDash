@@ -61,7 +61,6 @@ class SurgicalReleaseIntegrationTests(unittest.TestCase):
             home / "backups",
             stage / "dist" / "assets",
             stage / "scripts" / "termux",
-            stage / "server" / "admin",
             mock_bin,
         ):
             directory.mkdir(parents=True, exist_ok=True)
@@ -127,8 +126,6 @@ styledash_cmdline() { echo "cloudflared tunnel run --protocol http2 --token-file
             stage / "scripts" / "termux-spa-server.py": "new-public-server\n",
             stage / "scripts" / "termux-admin-server.py": "new-admin-server\n",
             stage / "scripts" / "styledash_reviews.py": "new-reviews\n",
-            stage / "server" / "admin" / "index.html": "new-admin-index\n",
-            stage / "server" / "admin" / "admin.js": "new-admin-js\n",
             stage / "scripts" / "termux" / "backup-styledash-data": "#!/usr/bin/env bash\necho staged-backup\n",
             stage / "scripts" / "termux" / "start-styledash-cloudflare": "#!/usr/bin/env bash\ncloudflared tunnel run --protocol http2 --token-file token\n",
         }
@@ -196,6 +193,12 @@ printf '%s' "$status"
             self.assertEqual((home / "server" / "serve.py").read_text(), "new-public-server\n")
             self.assertEqual((home / "admin" / "serve.py").read_text(), "new-admin-server\n")
             self.assertTrue((home / "server" / "assets" / "new.js").is_file())
+            self.assertEqual(
+                (home / "admin" / "admin" / "index.html").read_text(), "old-admin-index\n"
+            )
+            self.assertEqual(
+                (home / "admin" / "admin" / "admin.js").read_text(), "old-admin-js\n"
+            )
             self.assertFalse((home / "server" / "assets" / "old.js").exists())
             rollback_marker = (
                 home / "run" / "styledash-last-surgical-backup"
