@@ -16,6 +16,7 @@ SHELL_FILES = [
     ROOT / "scripts" / "termux" / "start-styledash-cloudflare",
     ROOT / "scripts" / "termux" / "start-styledash-stack",
     ROOT / "scripts" / "termux" / "deploy-payment-release",
+    ROOT / "scripts" / "termux" / "deploy-surgical-combined-release",
     ROOT / "scripts" / "termux" / "rollback-payment-release",
     ROOT / "scripts" / "termux" / "styledash-health",
     ROOT / "scripts" / "termux" / "verify-styledash-processes",
