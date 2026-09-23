@@ -74,7 +74,7 @@ const hydrateLine = (line: SavedCartLine, products: Map<string, Product>): CartI
 };
 
 export const hydrateSavedCart = async (lines: SavedCartLine[]): Promise<CartItem[]> => {
-  const products = await productRepository.getAllProducts();
+  const products = await productRepository.getCartProducts();
   const byId = new Map(products.map(product => [product.id, product]));
   return lines.flatMap(line => {
     const item = hydrateLine(line, byId);

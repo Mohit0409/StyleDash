@@ -175,6 +175,35 @@ describe('authoritative inventory repository', () => {
     expect(products[0].variants[0].available).toBeUndefined();
   });
 
+  it('hydrates cart metadata without waiting for inventory or review requests', async () => {
+    vi.spyOn(Date, 'now').mockReturnValue(Date.now() + 60_000);
+    vi.stubGlobal('window', { location: { hostname: 'vibe4you.in' } });
+    const publishedProduct = {
+      id: 'shopprod_cart', slug: 'cart-local-product', name: 'Cart Local Product', brand: 'Test Shop',
+      department: 'women', category: 'Fashion', shortDescription: 'Local product', description: 'Local product',
+      material: 'Cotton', careInstructions: [], price: 450, originalPrice: 500, discount: 10,
+      images: ['/media/product-images/cart.jpg'], thumbnail: '/media/product-images/cart.jpg', rating: 0, reviewCount: 0,
+      variants: [{ id: 'shopprod_cart-var-1', sku: 'SHOP-CART', size: 'M', colourName: 'Black', stock: 1, available: false }],
+      tags: ['local-shop'], badge: 'Local Shop', active: true, newArrival: true, returnWindowDays: 0, exchangeAvailable: false,
+      vendorId: 'shop-cart', storeName: 'Test Shop', storeSlug: 'test-shop',
+    };
+    const fetcher = vi.fn<typeof fetch>(async input => {
+      const url = String(input);
+      if (url === '/api/shop-products/published') return productsResponse([publishedProduct]);
+      throw new Error(`cart hydration requested unrelated endpoint: ${url}`);
+    });
+    vi.stubGlobal('fetch', fetcher);
+
+    const products = await productRepository.getCartProducts();
+
+    expect(products.map(product => product.id)).toEqual(['shopprod_cart']);
+    expect(fetcher).toHaveBeenCalledTimes(1);
+    expect(fetcher).toHaveBeenCalledWith(
+      '/api/shop-products/published',
+      expect.objectContaining({ credentials: 'include' }),
+    );
+  });
+
   it('keeps display availability unresolved when the availability server cannot be reached', async () => {
     vi.stubGlobal('fetch', vi.fn<typeof fetch>().mockRejectedValue(new TypeError('offline')));
     const product = await productRepository.getProductBySlug('sd-prod-001');

@@ -197,6 +197,15 @@ const withHomepageAvailability = async (products: Product[]): Promise<Product[]>
 };
 
 export const productRepository = {
+  async getCartProducts(): Promise<Product[]> {
+    // Cart hydration only needs stable product/variant metadata. Waiting for
+    // catalogue-wide live availability and review summaries here can hold an
+    // authenticated cart at zero long enough for checkout to render as empty.
+    // Stock is still checked by add-to-cart and authoritatively revalidated by
+    // the server during checkout.
+    return getCatalogue();
+  },
+
   async getHomepageProducts(): Promise<Product[]> {
     const [staticProducts, shopProducts] = await Promise.all([getStaticProducts(), getHomepageShopProducts()]);
     const products = selectHomepageProducts(mergeCatalogue(staticProducts, shopProducts));
