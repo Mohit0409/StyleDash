@@ -5,7 +5,7 @@ import type { Product } from '../types';
 import { ProductCard } from './ProductCard';
 
 export const HOME_PRODUCT_CARD_WRAP_CLASS =
-  'basis-[58%] shrink-0 snap-start sm:basis-[42%] md:basis-[30%] lg:basis-[22%] xl:basis-[18%]';
+  'w-[58%] min-w-0 flex-none snap-start sm:w-[42%] md:w-[30%] lg:w-[22%] xl:w-[18%]';
 
 interface HomepageProductSectionProps {
   id?: string;

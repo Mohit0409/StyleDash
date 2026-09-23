@@ -67,8 +67,8 @@ describe('site quality guardrails', () => {
     expect(home).toContain('testId="top-picks-rail"');
     expect(home).toContain('<HomepageProductSection');
     expect(home).not.toContain('grid grid-cols-2 md:grid-cols-4');
-    expect(rail).toContain("basis-[58%]");
-    expect(rail).toContain("xl:basis-[18%]");
+    expect(rail).toContain("w-[58%]");
+    expect(rail).toContain("xl:w-[18%]");
     expect(rail).toContain('horizontal product slider');
     expect(rail).toContain('Previous ${title}');
     expect(rail).toContain('Next ${title}');
