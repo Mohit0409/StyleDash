@@ -125,6 +125,16 @@ class SurgicalCombinedReleaseTests(unittest.TestCase):
         self.assertIn('surgical release file is a symbolic link', self.script)
         self.assertIn("stat -c '%u'", self.script)
 
+    def test_firebase_browser_config_is_required_before_mutation(self) -> None:
+        self.assertIn('surgical release contains an empty Firebase web configuration', self.script)
+        self.assertIn('surgical release is missing a complete Firebase web configuration', self.script)
+        self.assertIn('Firebase browser and server project IDs do not match', self.script)
+        firebase_guard = self.script.index('firebase_assets=("$STAGE"/dist/assets/*.js)')
+        backup = self.script.index('"$HOME/bin/backup-styledash-data"')
+        mutation = self.script.index('MUTATION_STARTED=1')
+        self.assertLess(firebase_guard, backup)
+        self.assertLess(firebase_guard, mutation)
+
 
 if __name__ == "__main__":
     unittest.main()
