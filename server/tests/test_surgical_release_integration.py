@@ -109,6 +109,11 @@ styledash_cmdline() { echo "cloudflared tunnel run --protocol http2 --token-file
 '''
         self.write(home / "bin" / "styledash-process-lib", process_lib, True)
         self.write(
+            home / "bin" / "styledash-notify",
+            "#!/usr/bin/env bash\nexit 0\n",
+            True,
+        )
+        self.write(
             home / "bin" / "start-styledash",
             '#!/usr/bin/env bash\nprintf "303\\n" > "$HOME/run/styledash.pid"\n',
             True,

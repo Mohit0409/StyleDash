@@ -164,6 +164,19 @@ async function prepareCheckout(page: Page, label: string) {
   await expect(page.getByLabel('Pincode')).toHaveAttribute('readonly', '');
 }
 
+test('cart drawer proceeds to checkout without losing navigation to its temporary history entry', async ({ page }) => {
+  await loginCustomer(page, USER_A);
+  await addKnownProduct(page);
+
+  await page.getByRole('button', { name: /^Cart\s+1$/ }).click();
+  const drawer = page.getByRole('dialog', { name: 'Your Cart' });
+  await expect(drawer).toBeVisible();
+  await drawer.getByRole('button', { name: 'Proceed to Checkout' }).click();
+
+  await expect(page).toHaveURL(/\/checkout$/);
+  await expect(page.getByRole('heading', { name: 'Secure Checkout' })).toBeVisible();
+});
+
 test('checkout enables Express and recalculates totals on a simulated Saturday', async ({ page }) => {
   await page.clock.install({ time: new Date('2026-09-05T06:30:00Z') });
   await prepareCheckout(page, 'weekend-express-selector');

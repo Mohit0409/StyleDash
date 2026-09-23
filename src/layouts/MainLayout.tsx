@@ -1,5 +1,5 @@
 import React, { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react';
-import { Outlet, useLocation } from 'react-router-dom';
+import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { Header } from '../components/Header';
 import { Footer } from '../components/Footer';
 import { NavigationScrollPolicy } from '../components/NavigationScrollPolicy';
@@ -11,6 +11,7 @@ export const MainLayout: React.FC = () => {
   const [isCartOpen, setIsCartOpen] = useState(false);
   const cartIsOpen = useRef(false);
   const location = useLocation();
+  const navigate = useNavigate();
   const { showToast } = useToast();
 
   useEffect(() => {
@@ -34,6 +35,17 @@ export const MainLayout: React.FC = () => {
       window.history.back();
     }
   }, []);
+
+  const proceedToCheckout = useCallback(() => {
+    if (!cartIsOpen.current) return;
+
+    // Opening the drawer adds a same-URL history entry so the browser Back
+    // button closes it. Replace that temporary entry rather than calling
+    // history.back(), which would otherwise race and undo checkout navigation.
+    cartIsOpen.current = false;
+    setIsCartOpen(false);
+    navigate('/checkout', { replace: true });
+  }, [navigate]);
 
   useEffect(() => {
     const closeDrawerOnBack = () => {
@@ -97,7 +109,7 @@ export const MainLayout: React.FC = () => {
       <Footer />
 
       <Suspense fallback={null}>
-        {isCartOpen && <CartDrawer isOpen onClose={closeCart} />}
+        {isCartOpen && <CartDrawer isOpen onClose={closeCart} onCheckout={proceedToCheckout} />}
       </Suspense>
     </div>
   );
