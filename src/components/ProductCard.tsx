@@ -147,12 +147,6 @@ export const ProductCard: React.FC<{ product: Product; onQuickView?: (p: Product
             </div>
           </div>
 
-          <Link
-            to={`/product/${product.slug}`}
-            className="inline-flex min-h-11 items-center rounded-lg bg-neutral-950 px-3 py-1.5 text-xs font-bold text-white transition-colors hover:bg-neutral-800 dark:bg-lime-400 dark:text-neutral-950 dark:hover:bg-lime-300"
-          >
-            Select Option
-          </Link>
         </div>
       </div>
     </div>

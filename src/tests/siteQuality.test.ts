@@ -77,6 +77,12 @@ describe('site quality guardrails', () => {
     expect(orderTracking).not.toContain('object-cover');
   });
 
+  it('does not show the removed Select Option product-card CTA', () => {
+    const productCard = readText('../components/ProductCard.tsx');
+    expect(productCard).not.toContain('Select Option');
+    expect(productCard).toContain('data-product-card-image');
+  });
+
   it('keeps delivery fee amounts at checkout instead of marketing surfaces', () => {
     const checkout = readText('../pages/Checkout.tsx');
     const marketingSources = [
