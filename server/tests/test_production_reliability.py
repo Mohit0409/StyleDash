@@ -47,19 +47,24 @@ class ProductionReliabilityTests(unittest.TestCase):
 
     def test_backup_is_online_integrity_checked_and_supports_offdevice_copy(self) -> None:
         script = self.read("scripts/termux/backup-styledash-data")
+        self.assertIn("set -euo pipefail", script)
         self.assertIn("source.backup(target)", script)
         self.assertIn("PRAGMA integrity_check", script)
         self.assertIn("STYLEDASH_BACKUP_REMOTE", script)
         self.assertIn('run_rclone copy "$target" "$remote_target"', script)
-        self.assertIn('run_rclone check "$target" "$remote_target"', script)
+        self.assertIn('verify_remote "$target" "$remote_target"', script)
         self.assertIn("--download", script)
         self.assertIn("--local-only", script)
         self.assertIn("STYLEDASH_BACKUP_REMOTE_SECONDARY", script)
         self.assertIn('run_rclone copy "$target" "$secondary_target"', script)
-        self.assertIn('run_rclone check "$target" "$secondary_target"', script)
+        self.assertIn('verify_remote "$target" "$secondary_target"', script)
         self.assertIn("styledash-last-secondary-backup", script)
         self.assertIn('nice -n 10 ionice -c 3 rclone "$@"', script)
         self.assertIn('nice -n 10 rclone "$@"', script)
+        self.assertIn('LOCK_DIR="$RUN_DIR/styledash-backup.lock"', script)
+        self.assertIn("refusing an overlapping run", script)
+        self.assertIn("--contimeout 15s", script)
+        self.assertIn("verification failed after retries", script)
 
     def test_full_recovery_bundle_is_encrypted_verified_and_offdevice(self) -> None:
         script = self.read("scripts/termux/backup-styledash-recovery")
