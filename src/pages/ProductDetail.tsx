@@ -19,7 +19,7 @@ export const ProductDetail: React.FC = () => {
   const { slug } = useParams<{ slug: string }>();
   const navigate = useNavigate();
   const { addItem, addTryAtHomeItem } = useCart();
-  const { isInWishlist, toggleWishlist } = useWishlist();
+  const { isInWishlist, toggleWishlist, wishlistReady } = useWishlist();
   const { showToast } = useToast();
 
   const [product, setProduct] = useState<Product | null>(null);
@@ -356,7 +356,8 @@ export const ProductDetail: React.FC = () => {
               onClick={() => toggleWishlist(product.id)}
               aria-label={isWishlisted ? `Remove ${product.name} from wishlist` : `Add ${product.name} to wishlist`}
               aria-pressed={isWishlisted}
-              className="p-4 rounded-2xl border border-neutral-300 dark:border-neutral-700 hover:bg-neutral-100 dark:hover:bg-neutral-800"
+              disabled={!wishlistReady}
+              className="p-4 rounded-2xl border border-neutral-300 dark:border-neutral-700 hover:bg-neutral-100 disabled:cursor-wait disabled:opacity-60 dark:hover:bg-neutral-800"
             >
               <Heart className={`w-5 h-5 ${isWishlisted ? 'fill-rose-500 text-rose-500' : ''}`} />
             </button>

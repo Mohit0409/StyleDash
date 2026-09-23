@@ -10,6 +10,7 @@ import { useAuth } from './AuthContext';
 
 interface WishlistContextType {
   wishlistIds: string[];
+  wishlistReady: boolean;
   toggleWishlist: (productId: string) => void;
   isInWishlist: (productId: string) => boolean;
 }
@@ -29,6 +30,9 @@ export const WishlistProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   const saveQueueRef = useRef<Promise<void>>(Promise.resolve());
 
   const wishlistIds = wishlistState.ownerId === userId ? wishlistState.ids : [];
+  const wishlistReady = !authLoading
+    && ownerRef.current === userId
+    && wishlistState.ownerId === userId;
 
   useEffect(() => {
     if (authLoading) return;
@@ -96,7 +100,7 @@ export const WishlistProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   const isInWishlist = (productId: string) => wishlistIds.includes(productId);
 
   return (
-    <WishlistContext.Provider value={{ wishlistIds, toggleWishlist, isInWishlist }}>
+    <WishlistContext.Provider value={{ wishlistIds, wishlistReady, toggleWishlist, isInWishlist }}>
       {children}
     </WishlistContext.Provider>
   );

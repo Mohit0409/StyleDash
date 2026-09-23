@@ -83,6 +83,17 @@ describe('site quality guardrails', () => {
     expect(productCard).toContain('data-product-card-image');
   });
 
+  it('does not accept wishlist clicks before the active account state is ready', () => {
+    const context = readText('../context/WishlistContext.tsx');
+    const productCard = readText('../components/ProductCard.tsx');
+    const productDetail = readText('../pages/ProductDetail.tsx');
+
+    expect(context).toContain('wishlistReady');
+    expect(context).toContain('ownerRef.current === userId');
+    expect(productCard).toContain('disabled={!wishlistReady}');
+    expect(productDetail).toContain('disabled={!wishlistReady}');
+  });
+
   it('keeps delivery fee amounts at checkout instead of marketing surfaces', () => {
     const checkout = readText('../pages/Checkout.tsx');
     const marketingSources = [
