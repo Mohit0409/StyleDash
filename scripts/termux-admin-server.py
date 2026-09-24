@@ -886,7 +886,7 @@ class AdminApplication:
                     if low_only and stock > 5:
                         continue
                     result.append(record)
-        return result[:500]
+        return result
 
     def inventory_snapshot(self, admin_id: str, query: str = "", low_only: bool = False) -> dict[str, Any]:
         """Inventory rows plus every shop known to the private admin service.
