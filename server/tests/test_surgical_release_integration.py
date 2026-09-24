@@ -137,6 +137,8 @@ styledash_cmdline() { echo "cloudflared tunnel run --protocol http2 --token-file
             stage / "scripts" / "termux-spa-server.py": "new-public-server\n",
             stage / "scripts" / "termux-admin-server.py": "new-admin-server\n",
             stage / "scripts" / "styledash_reviews.py": "new-reviews\n",
+            stage / "scripts" / "catalog_normalization.py": "new-normalization\n",
+            stage / "scripts" / "styledash_shops.py": "new-shops\n",
             stage / "scripts" / "termux" / "backup-styledash-data": "#!/usr/bin/env bash\necho staged-backup\n",
             stage / "scripts" / "termux" / "start-styledash-cloudflare": "#!/usr/bin/env bash\ncloudflared tunnel run --protocol http2 --token-file token\n",
         }
@@ -158,6 +160,32 @@ esac
 printf '%s' "$status"
 '''
         self.write(mock_bin / "curl", curl_mock, True)
+        sha256sum_mock = r'''#!/usr/bin/env bash
+case "$1" in
+  */stage/scripts/catalog_normalization.py)
+    if grep -Fq 'tampered-stage-module' "$1"; then
+      printf '%s  %s\n' '1111111111111111111111111111111111111111111111111111111111111111' "$1"
+    else
+      printf '%s  %s\n' 'a656e8a56c9f9d1e91a70508b34e99f48f247e72e3838b9a0af8b4fc68654417' "$1"
+    fi
+    ;;
+  */stage/scripts/styledash_shops.py)
+    printf '%s  %s\n' '23d6f7c2a53bbca3fec06e1f25ff1a7bdb6632ced0751daea51eaa4df532fda0' "$1"
+    ;;
+  */catalog_normalization.py)
+    printf '%s  %s\n' '985c456840dfe67175b68fbbb7fd33d6cd3795d002affca08467eeed8dec76c0' "$1"
+    ;;
+  */styledash_shops.py)
+    printf '%s  %s\n' 'e81f41d78b759b223d5a60a07df034fd2aac27d5edc57d137a46e8951b2f8f86' "$1"
+    ;;
+  *)
+    # The fixture only needs stable protected-file fingerprints. Calling the
+    # host sha256sum here would recurse through this mock under Git Bash.
+    printf '%s  %s\n' '0000000000000000000000000000000000000000000000000000000000000000' "$1"
+    ;;
+esac
+'''
+        self.write(mock_bin / "sha256sum", sha256sum_mock, True)
         self.write(
             mock_bin / "python3",
             '#!/usr/bin/env bash\necho sqlite_integrity=ok\necho sqlite_foreign_key_errors=0\n',
@@ -166,7 +194,11 @@ printf '%s' "$status"
         return home, stage, mock_bin
 
     def run_deploy(
-        self, home: Path, stage: Path, mock_bin: Path, fail_homepage: bool = False
+        self,
+        home: Path,
+        stage: Path,
+        mock_bin: Path,
+        fail_homepage: bool = False,
     ) -> subprocess.CompletedProcess[str]:
         env = os.environ.copy()
         # Git for Windows converts a native HOME path at Bash startup. Passing
@@ -175,23 +207,40 @@ printf '%s' "$status"
         env["HOME"] = str(home)
         if fail_homepage:
             env["MOCK_HOMEPAGE_FAILURE"] = "1"
-        return subprocess.run(
-            [
-                self.bash,
-                "-c",
-                'export PATH="$1:/usr/bin:/bin:$PATH"; deploy="$2"; stage="$3"; '
-                'set -- "$stage"; source "$deploy"',
-                "surgical-release-test",
-                bash_path(mock_bin),
-                bash_path(DEPLOY),
-                bash_path(stage),
-            ],
-            check=False,
-            capture_output=True,
-            text=True,
-            timeout=30,
-            env=env,
-        )
+        command = [
+            self.bash,
+            "-c",
+            'export PATH="$1:/usr/bin:/bin:$PATH"; deploy="$2"; stage="$3"; '
+            'set -- "$stage"; source "$deploy"',
+            "surgical-release-test",
+            bash_path(mock_bin),
+            bash_path(DEPLOY),
+            bash_path(stage),
+        ]
+        # Git Bash can leave a grandchild holding a captured pipe even after
+        # the deploy shell exits. File-backed output preserves assertions and
+        # keeps the real 30-second timeout meaningful.
+        with tempfile.TemporaryDirectory() as output_directory:
+            stdout_path = Path(output_directory) / "stdout.log"
+            stderr_path = Path(output_directory) / "stderr.log"
+            with stdout_path.open("w", encoding="utf-8") as stdout, stderr_path.open(
+                "w", encoding="utf-8"
+            ) as stderr:
+                completed = subprocess.run(
+                    command,
+                    check=False,
+                    stdout=stdout,
+                    stderr=stderr,
+                    text=True,
+                    timeout=30,
+                    env=env,
+                )
+            return subprocess.CompletedProcess(
+                command,
+                completed.returncode,
+                stdout_path.read_text(encoding="utf-8"),
+                stderr_path.read_text(encoding="utf-8"),
+            )
 
     def test_pre_mutation_backup_uses_staged_helper_not_installed_helper(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
@@ -211,6 +260,12 @@ printf '%s' "$status"
             self.assertIn("new_public_pid=303", result.stdout)
             self.assertEqual((home / "server" / "serve.py").read_text(), "new-public-server\n")
             self.assertEqual((home / "admin" / "serve.py").read_text(), "new-admin-server\n")
+            for location in (home / "server", home / "admin"):
+                self.assertEqual(
+                    (location / "catalog_normalization.py").read_text(),
+                    "new-normalization\n",
+                )
+                self.assertEqual((location / "styledash_shops.py").read_text(), "new-shops\n")
             self.assertTrue((home / "server" / "assets" / "new.js").is_file())
             self.assertEqual(
                 (home / "admin" / "admin" / "index.html").read_text(), "old-admin-index\n"
@@ -255,6 +310,10 @@ printf '%s' "$status"
                 (home / "server" / "styledash_shops.py").read_text(),
                 "shops-preserved\n",
             )
+            self.assertEqual(
+                (home / "server" / "catalog_normalization.py").read_text(),
+                "normalization-preserved\n",
+            )
 
 
     def test_empty_firebase_config_is_rejected_before_mutation(self) -> None:
@@ -270,6 +329,19 @@ printf '%s' "$status"
             self.assertEqual((home / "server" / "index.html").read_text(), "old-frontend\n")
             self.assertTrue((home / "server" / "assets" / "old.js").is_file())
             self.assertFalse((home / "server" / "assets" / "new.js").exists())
+
+    def test_tampered_staged_v4y035_module_is_rejected_before_backup_or_mutation(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            home, stage, mock_bin = self.fixture(Path(temporary))
+            self.write(
+                stage / "scripts" / "catalog_normalization.py",
+                "tampered-stage-module\n",
+            )
+            result = self.run_deploy(home, stage, mock_bin)
+            self.assertNotEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertIn("staged module has an unexpected hash", result.stderr)
+            self.assertEqual((home / "server" / "serve.py").read_text(), "old-public-server\n")
+            self.assertTrue((home / "server" / "assets" / "old.js").is_file())
 
 
 if __name__ == "__main__":

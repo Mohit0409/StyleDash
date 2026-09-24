@@ -56,14 +56,10 @@ class SurgicalCombinedReleaseTests(unittest.TestCase):
         self.assertIn('PRAGMA integrity_check', self.script)
         self.assertIn('PRAGMA foreign_key_check', self.script)
 
-    def test_unrelated_live_category_and_configuration_files_are_hash_guarded(self) -> None:
+    def test_unrelated_live_configuration_is_hash_guarded_and_v4y035_modules_are_pinned(self) -> None:
         for protected in (
             '"$PUBLIC_DIR/styledash_security.py"',
-            '"$PUBLIC_DIR/catalog_normalization.py"',
-            '"$PUBLIC_DIR/styledash_shops.py"',
             '"$ADMIN_DIR/styledash_security.py"',
-            '"$ADMIN_DIR/catalog_normalization.py"',
-            '"$ADMIN_DIR/styledash_shops.py"',
             '"$ADMIN_DIR/admin/index.html"',
             '"$ADMIN_DIR/admin/admin.js"',
             '"$DATA_ROOT/catalog.json"',
@@ -73,15 +69,25 @@ class SurgicalCombinedReleaseTests(unittest.TestCase):
         ):
             self.assertIn(protected, self.script)
         self.assertIn('protected_file_hashes=unchanged', self.script)
-        self.assertNotIn(
-            'install -m 600 "$STAGE/scripts/styledash_security.py"', self.script
-        )
-        self.assertNotIn(
-            'install -m 600 "$STAGE/scripts/catalog_normalization.py"', self.script
-        )
-        self.assertNotIn(
-            'install -m 600 "$STAGE/scripts/styledash_shops.py"', self.script
-        )
+        self.assertIn('assert_approved_module_baseline', self.script)
+        self.assertIn('assert_approved_stage_modules', self.script)
+        self.assertIn('approved V4Y-035 module has an unexpected live hash', self.script)
+        self.assertIn('approved V4Y-035 staged module has an unexpected hash', self.script)
+        self.assertIn('approved_category_module_baseline=verified', self.script)
+        self.assertIn('approved_category_stage_modules=verified', self.script)
+        self.assertIn('approved_category_modules=installed', self.script)
+        self.assertIn('approved_category_modules=restored', self.script)
+        self.assertIn('install -m 600 "$STAGE/scripts/catalog_normalization.py"', self.script)
+        self.assertIn('install -m 600 "$STAGE/scripts/styledash_shops.py"', self.script)
+        self.assertNotIn('install -m 600 "$STAGE/scripts/styledash_security.py"', self.script)
+        baseline = self.script.index('assert_approved_module_baseline', self.script.index('database_check\nassert_approved_module_baseline'))
+        stage = self.script.index('assert_approved_stage_modules', self.script.index('assert_approved_module_baseline\nassert_approved_stage_modules'))
+        backup = self.script.index('bash "$STAGE/scripts/termux/backup-styledash-data"')
+        mutation = self.script.index('MUTATION_STARTED=1')
+        self.assertLess(baseline, backup)
+        self.assertLess(baseline, mutation)
+        self.assertLess(stage, backup)
+        self.assertLess(stage, mutation)
 
         self.assertNotIn(
             'install -m 600 "$STAGE/server/admin/index.html"', self.script
