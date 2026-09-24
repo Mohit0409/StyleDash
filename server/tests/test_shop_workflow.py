@@ -816,6 +816,10 @@ class ShopWorkflowTests(unittest.TestCase):
             self.store.admin_transition_product("admin-a", product["id"], target)
         public = self.store.list_published_products()[0]
         self.assertEqual((public["subcategory"], public["deliveryType"], public["expressDelivery"]), ("Sliders", "express", True))
+        self.assertIn("puma slider for men", public["tags"])
+        self.assertIn("normalized seller shop", public["tags"])
+        self.assertIn("sliders", public["tags"])
+        self.assertNotEqual(public["tags"], ["local-shop"])
         payment_product = self.store.payment_catalog_products()[0]
         self.assertEqual((payment_product["deliveryType"], payment_product["expressDelivery"]), ("express", True))
 

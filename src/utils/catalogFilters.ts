@@ -31,16 +31,23 @@ const matchesSearch = (product: Product, searchQuery: string): boolean => {
   );
 };
 
+const equalCatalogueValue = (left: string | undefined, right: string): boolean =>
+  left?.trim().localeCompare(right.trim(), undefined, { sensitivity: 'base' }) === 0;
+
 export const matchesCatalogueProduct = (
   product: Product,
   filters: CatalogueFilterState,
   options: MatchOptions = {},
 ): boolean => {
   if (product.active !== true) return false;
-  if (filters.department !== 'all' && product.department !== filters.department) return false;
-  if (!options.ignoreCategory && filters.category !== 'all' && product.category !== filters.category) return false;
-  if (filters.subcategory !== 'all' && product.subcategory !== filters.subcategory) return false;
-  if (!options.ignoreBrand && filters.brand !== 'all' && product.brand !== filters.brand) return false;
+  if (filters.department !== 'all' && !equalCatalogueValue(product.department, filters.department)) return false;
+  if (!options.ignoreCategory && filters.category !== 'all' && !equalCatalogueValue(product.category, filters.category)) return false;
+  if (
+    filters.subcategory !== 'all'
+    && !equalCatalogueValue(product.subcategory, filters.subcategory)
+    && !product.tags.some(tag => equalCatalogueValue(tag, filters.subcategory))
+  ) return false;
+  if (!options.ignoreBrand && filters.brand !== 'all' && !equalCatalogueValue(product.brand, filters.brand)) return false;
   if (
     !options.ignoreSize
     && filters.size !== 'all'

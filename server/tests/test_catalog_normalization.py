@@ -2,6 +2,7 @@ import unittest
 
 from scripts.catalog_normalization import (
     PRODUCT_CATEGORIES,
+    build_product_tags,
     normalize_brand,
     normalize_delivery_type,
     normalize_department,
@@ -153,6 +154,56 @@ class CatalogNormalizationTests(unittest.TestCase):
         self.assertEqual(normalize_delivery_type(None), 'normal')
         with self.assertRaises(SecurityError):
             normalize_delivery_type('super-fast')
+
+    def test_live_subcategory_aliases_are_canonicalized(self) -> None:
+        aliases = {
+            'Sneaker': 'Sneakers',
+            'Sport Shoes': 'Sports Shoes',
+            'FlipFlop': 'Slippers & Flip-Flops',
+            'Sleepers': 'Slippers & Flip-Flops',
+            'Slides': 'Sliders',
+            'Watch2': 'Watches',
+            'Accesories': 'Accessories',
+            'Skincare': 'Skin Care',
+        }
+        for source, expected in aliases.items():
+            with self.subTest(source=source):
+                self.assertEqual(
+                    normalize_subcategory(source, name='Catalogue Product', category='Footwear'),
+                    expected,
+                )
+
+    def test_missing_subcategories_are_inferred_for_supported_categories(self) -> None:
+        self.assertEqual(
+            normalize_subcategory(None, name='Classic Cotton Shirt', category='Clothing & Fashion'),
+            'Shirts',
+        )
+        self.assertEqual(
+            normalize_subcategory(None, name='Rose Gold Watch', category='Accessories'),
+            'Watches',
+        )
+        self.assertEqual(
+            normalize_subcategory(None, name='Wireless Earbuds', category='Electronics'),
+            'Audio',
+        )
+
+    def test_public_product_tags_are_useful_bounded_and_deduplicated(self) -> None:
+        tags = build_product_tags(
+            name='Puma Slider for Men',
+            brand='Puma',
+            store_name='Goutam Shoes',
+            department='men',
+            category='Footwear',
+            subcategory='Sliders',
+        )
+        self.assertIn('local-shop', tags)
+        self.assertIn('puma slider for men', tags)
+        self.assertIn('goutam shoes', tags)
+        self.assertIn('footwear', tags)
+        self.assertIn('sliders', tags)
+        self.assertIn('slides', tags)
+        self.assertEqual(len(tags), len(set(tags)))
+        self.assertLessEqual(len(tags), 24)
 
 
 if __name__ == '__main__':

@@ -24,12 +24,12 @@ except ModuleNotFoundError:  # Repository test import path.
 
 try:
     from catalog_normalization import (
-        CANONICAL_DEPARTMENTS, PRODUCT_CATEGORIES, normalize_brand, normalize_delivery_type,
+        CANONICAL_DEPARTMENTS, PRODUCT_CATEGORIES, build_product_tags, normalize_brand, normalize_delivery_type,
         normalize_department, normalize_product_category, normalize_size_label, normalize_subcategory,
     )
 except ModuleNotFoundError:
     from scripts.catalog_normalization import (
-        CANONICAL_DEPARTMENTS, PRODUCT_CATEGORIES, normalize_brand, normalize_delivery_type,
+        CANONICAL_DEPARTMENTS, PRODUCT_CATEGORIES, build_product_tags, normalize_brand, normalize_delivery_type,
         normalize_department, normalize_product_category, normalize_size_label, normalize_subcategory,
     )
 
@@ -2710,6 +2710,17 @@ class ShopWorkflow:
         attributes = json.loads(row["attributes_json"])
         attributes.pop("hsnCode", None)
         attributes.pop("gstRate", None)
+        subcategory = normalize_subcategory(
+            attributes.get("subcategory"), name=row["name"], category=row["category"]
+        )
+        tags = build_product_tags(
+            name=row["name"],
+            brand=row["brand"],
+            store_name=row["shop_name"],
+            department=row["department"],
+            category=row["category"],
+            subcategory=subcategory,
+        )
         price = _customer_price_paise(row["price_paise"]) / 100
         original_price = _customer_price_paise(row["original_price_paise"]) / 100
         discount = (
@@ -2740,7 +2751,7 @@ class ShopWorkflow:
             "brand": row["brand"] or row["shop_name"],
             "department": row["department"],
             "category": row["category"],
-            "subcategory": attributes.get("subcategory"),
+            "subcategory": subcategory,
             "deliveryType": attributes.get("deliveryType", "normal"),
             "optionMode": attributes.get("optionMode"),
             "shortDescription": row["description"][:180],
@@ -2755,7 +2766,7 @@ class ShopWorkflow:
             "rating": 0,
             "reviewCount": 0,
             "variants": variants,
-            "tags": ["local-shop"],
+            "tags": tags,
             "badge": "Local Shop",
             "newArrival": True,
             "trending": False,
