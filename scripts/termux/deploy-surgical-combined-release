@@ -45,9 +45,18 @@ required_stage_files=(
   "scripts/termux-spa-server.py"
   "scripts/termux-admin-server.py"
   "scripts/styledash_reviews.py"
+  "scripts/catalog_normalization.py"
+  "scripts/styledash_shops.py"
   "scripts/termux/backup-styledash-data"
   "scripts/termux/start-styledash-cloudflare"
 )
+
+# V4Y-035 deliberately reconciles the verified, live-only category and tag
+# behavior into source. These are the exact pre-release hashes observed on
+# both the public and private runtime copies. Refuse the release if a newer
+# live change exists rather than overwriting it.
+EXPECTED_LIVE_CATALOG_NORMALIZATION_SHA256="985c456840dfe67175b68fbbb7fd33d6cd3795d002affca08467eeed8dec76c0"
+EXPECTED_LIVE_STYLEDASH_SHOPS_SHA256="e81f41d78b759b223d5a60a07df034fd2aac27d5edc57d137a46e8951b2f8f86"
 
 for relative in "${required_stage_files[@]}"; do
   if [ ! -f "$STAGE/$relative" ]; then
@@ -206,11 +215,7 @@ write_protected_hashes() {
   : > "$output"
   protected_paths=(
     "$PUBLIC_DIR/styledash_security.py"
-    "$PUBLIC_DIR/catalog_normalization.py"
-    "$PUBLIC_DIR/styledash_shops.py"
     "$ADMIN_DIR/styledash_security.py"
-    "$ADMIN_DIR/catalog_normalization.py"
-    "$ADMIN_DIR/styledash_shops.py"
     "$ADMIN_DIR/admin/index.html"
     "$ADMIN_DIR/admin/admin.js"
     "$DATA_ROOT/catalog.json"
@@ -225,6 +230,65 @@ write_protected_hashes() {
     fi
     printf '%s  %s\n' "$(sha256sum "$protected_path" | awk '{print $1}')" "$protected_path" >> "$output"
   done
+}
+
+assert_approved_module_baseline() {
+  approved_modules=(
+    "$PUBLIC_DIR/catalog_normalization.py:$EXPECTED_LIVE_CATALOG_NORMALIZATION_SHA256"
+    "$PUBLIC_DIR/styledash_shops.py:$EXPECTED_LIVE_STYLEDASH_SHOPS_SHA256"
+    "$ADMIN_DIR/catalog_normalization.py:$EXPECTED_LIVE_CATALOG_NORMALIZATION_SHA256"
+    "$ADMIN_DIR/styledash_shops.py:$EXPECTED_LIVE_STYLEDASH_SHOPS_SHA256"
+  )
+  for approved_module in "${approved_modules[@]}"; do
+    module_path="${approved_module%%:*}"
+    expected_sha256="${approved_module##*:}"
+    if [ ! -f "$module_path" ]; then
+      echo "approved V4Y-035 module is missing: $module_path" >&2
+      return 1
+    fi
+    actual_sha256="$(sha256sum "$module_path" | awk '{print $1}')"
+    if [ "$actual_sha256" != "$expected_sha256" ]; then
+      echo "approved V4Y-035 module has an unexpected live hash: $module_path (expected $expected_sha256, found $actual_sha256)" >&2
+      return 1
+    fi
+  done
+  printf 'approved_category_module_baseline=verified\n'
+}
+
+assert_approved_modules_installed() {
+  approved_installations=(
+    "$STAGE/scripts/catalog_normalization.py:$PUBLIC_DIR/catalog_normalization.py"
+    "$STAGE/scripts/styledash_shops.py:$PUBLIC_DIR/styledash_shops.py"
+    "$STAGE/scripts/catalog_normalization.py:$ADMIN_DIR/catalog_normalization.py"
+    "$STAGE/scripts/styledash_shops.py:$ADMIN_DIR/styledash_shops.py"
+  )
+  for approved_installation in "${approved_installations[@]}"; do
+    source_path="${approved_installation%%:*}"
+    target_path="${approved_installation##*:}"
+    if ! cmp -s "$source_path" "$target_path"; then
+      echo "approved V4Y-035 module did not match staged source: $target_path" >&2
+      return 1
+    fi
+  done
+  printf 'approved_category_modules=installed\n'
+}
+
+assert_approved_modules_restored() {
+  approved_restores=(
+    "$ROLLBACK/public/runtime/catalog_normalization.py:$PUBLIC_DIR/catalog_normalization.py"
+    "$ROLLBACK/public/runtime/styledash_shops.py:$PUBLIC_DIR/styledash_shops.py"
+    "$ROLLBACK/admin/runtime/catalog_normalization.py:$ADMIN_DIR/catalog_normalization.py"
+    "$ROLLBACK/admin/runtime/styledash_shops.py:$ADMIN_DIR/styledash_shops.py"
+  )
+  for approved_restore in "${approved_restores[@]}"; do
+    snapshot_path="${approved_restore%%:*}"
+    target_path="${approved_restore##*:}"
+    if ! cmp -s "$snapshot_path" "$target_path"; then
+      echo "approved V4Y-035 module was not restored: $target_path" >&2
+      return 1
+    fi
+  done
+  printf 'approved_category_modules=restored\n'
 }
 
 assert_protected_unchanged() {
@@ -251,6 +315,7 @@ verify_runtime_acceptance() {
   fi
   database_check
   assert_protected_unchanged
+  assert_approved_modules_installed
 }
 
 restore_frontend() {
@@ -282,9 +347,13 @@ rollback_release() {
 
   restore_file "$ROLLBACK/public/runtime/serve.py" "$PUBLIC_DIR/serve.py" || rollback_failed=1
   restore_file "$ROLLBACK/public/runtime/styledash_reviews.py" "$PUBLIC_DIR/styledash_reviews.py" || rollback_failed=1
+  restore_file "$ROLLBACK/public/runtime/catalog_normalization.py" "$PUBLIC_DIR/catalog_normalization.py" || rollback_failed=1
+  restore_file "$ROLLBACK/public/runtime/styledash_shops.py" "$PUBLIC_DIR/styledash_shops.py" || rollback_failed=1
   restore_frontend || rollback_failed=1
   restore_file "$ROLLBACK/admin/runtime/serve.py" "$ADMIN_DIR/serve.py" || rollback_failed=1
   restore_file "$ROLLBACK/admin/runtime/styledash_reviews.py" "$ADMIN_DIR/styledash_reviews.py" || rollback_failed=1
+  restore_file "$ROLLBACK/admin/runtime/catalog_normalization.py" "$ADMIN_DIR/catalog_normalization.py" || rollback_failed=1
+  restore_file "$ROLLBACK/admin/runtime/styledash_shops.py" "$ADMIN_DIR/styledash_shops.py" || rollback_failed=1
   restore_file "$ROLLBACK/ops/backup-styledash-data" "$HOME/bin/backup-styledash-data" || rollback_failed=1
   restore_file "$ROLLBACK/ops/start-styledash-cloudflare" "$HOME/bin/start-styledash-cloudflare" || rollback_failed=1
 
@@ -296,6 +365,7 @@ rollback_release() {
   assert_status 404 "http://127.0.0.1:8080/api/admin/me" || rollback_failed=1
   database_check || rollback_failed=1
   assert_protected_unchanged || rollback_failed=1
+  assert_approved_modules_restored || rollback_failed=1
   set -e
   if [ "$rollback_failed" -ne 0 ]; then
     echo "automatic rollback was incomplete; manual recovery required from $ROLLBACK" >&2
@@ -344,6 +414,7 @@ assert_status 200 "http://127.0.0.1:8080/api/health"
 assert_status 404 "http://127.0.0.1:8080/admin"
 assert_status 404 "http://127.0.0.1:8080/api/admin/me"
 database_check
+assert_approved_module_baseline
 
 # The supported backup command performs SQLite online backup, integrity/FK
 # verification, and configured primary/secondary replication. No code is
@@ -360,8 +431,12 @@ mkdir -p \
 
 snapshot_file "$PUBLIC_DIR/serve.py" "$ROLLBACK/public/runtime/serve.py"
 snapshot_file "$PUBLIC_DIR/styledash_reviews.py" "$ROLLBACK/public/runtime/styledash_reviews.py"
+snapshot_file "$PUBLIC_DIR/catalog_normalization.py" "$ROLLBACK/public/runtime/catalog_normalization.py"
+snapshot_file "$PUBLIC_DIR/styledash_shops.py" "$ROLLBACK/public/runtime/styledash_shops.py"
 snapshot_file "$ADMIN_DIR/serve.py" "$ROLLBACK/admin/runtime/serve.py"
 snapshot_file "$ADMIN_DIR/styledash_reviews.py" "$ROLLBACK/admin/runtime/styledash_reviews.py"
+snapshot_file "$ADMIN_DIR/catalog_normalization.py" "$ROLLBACK/admin/runtime/catalog_normalization.py"
+snapshot_file "$ADMIN_DIR/styledash_shops.py" "$ROLLBACK/admin/runtime/styledash_shops.py"
 snapshot_file "$HOME/bin/backup-styledash-data" "$ROLLBACK/ops/backup-styledash-data"
 snapshot_file "$HOME/bin/start-styledash-cloudflare" "$ROLLBACK/ops/start-styledash-cloudflare"
 
@@ -393,19 +468,25 @@ rm -f -- "$PUBLIC_PID_FILE" "$ADMIN_PID_FILE"
 styledash_wait_for_port_release 8080 "StyleDash public service"
 styledash_wait_for_port_release 8081 "StyleDash administrator service"
 
-# Exact reviewed application write set. Category/security/shop rule modules,
-# authoritative configuration, secrets, payments, orders, and the database are
-# deliberately not copied here.
+# Exact reviewed application write set. V4Y-035 is the sole exception to the
+# normal category/module preservation rule: its four copies were pinned to
+# verified pre-release hashes and are snapshotted above. Security, all other
+# configuration, secrets, payments, orders, and the database are not copied.
 rm -rf -- "$PUBLIC_DIR/assets"
 cp -a -- "$STAGE/dist/." "$PUBLIC_DIR/"
 install -m 755 "$STAGE/scripts/termux-spa-server.py" "$PUBLIC_DIR/serve.py"
 install -m 600 "$STAGE/scripts/styledash_reviews.py" "$PUBLIC_DIR/styledash_reviews.py"
+install -m 600 "$STAGE/scripts/catalog_normalization.py" "$PUBLIC_DIR/catalog_normalization.py"
+install -m 600 "$STAGE/scripts/styledash_shops.py" "$PUBLIC_DIR/styledash_shops.py"
 install -m 600 "$STAGE/scripts/termux-admin-server.py" "$ADMIN_DIR/serve.py"
 install -m 600 "$STAGE/scripts/styledash_reviews.py" "$ADMIN_DIR/styledash_reviews.py"
+install -m 600 "$STAGE/scripts/catalog_normalization.py" "$ADMIN_DIR/catalog_normalization.py"
+install -m 600 "$STAGE/scripts/styledash_shops.py" "$ADMIN_DIR/styledash_shops.py"
 install -m 755 "$STAGE/scripts/termux/backup-styledash-data" "$HOME/bin/backup-styledash-data"
 install -m 700 "$STAGE/scripts/termux/start-styledash-cloudflare" "$HOME/bin/start-styledash-cloudflare"
 
 assert_protected_unchanged
+assert_approved_modules_installed
 "$HOME/bin/start-styledash"
 "$HOME/bin/start-styledash-admin"
 NEW_PUBLIC_PID="$(styledash_read_pid_file "$PUBLIC_PID_FILE")"

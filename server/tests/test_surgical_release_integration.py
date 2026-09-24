@@ -137,6 +137,8 @@ styledash_cmdline() { echo "cloudflared tunnel run --protocol http2 --token-file
             stage / "scripts" / "termux-spa-server.py": "new-public-server\n",
             stage / "scripts" / "termux-admin-server.py": "new-admin-server\n",
             stage / "scripts" / "styledash_reviews.py": "new-reviews\n",
+            stage / "scripts" / "catalog_normalization.py": "new-normalization\n",
+            stage / "scripts" / "styledash_shops.py": "new-shops\n",
             stage / "scripts" / "termux" / "backup-styledash-data": "#!/usr/bin/env bash\necho staged-backup\n",
             stage / "scripts" / "termux" / "start-styledash-cloudflare": "#!/usr/bin/env bash\ncloudflared tunnel run --protocol http2 --token-file token\n",
         }
@@ -158,6 +160,22 @@ esac
 printf '%s' "$status"
 '''
         self.write(mock_bin / "curl", curl_mock, True)
+        sha256sum_mock = r'''#!/usr/bin/env bash
+case "$1" in
+  */catalog_normalization.py)
+    printf '%s  %s\n' '985c456840dfe67175b68fbbb7fd33d6cd3795d002affca08467eeed8dec76c0' "$1"
+    ;;
+  */styledash_shops.py)
+    printf '%s  %s\n' 'e81f41d78b759b223d5a60a07df034fd2aac27d5edc57d137a46e8951b2f8f86' "$1"
+    ;;
+  *)
+    # The fixture only needs stable protected-file fingerprints. Calling the
+    # host sha256sum here would recurse through this mock under Git Bash.
+    printf '%s  %s\n' '0000000000000000000000000000000000000000000000000000000000000000' "$1"
+    ;;
+esac
+'''
+        self.write(mock_bin / "sha256sum", sha256sum_mock, True)
         self.write(
             mock_bin / "python3",
             '#!/usr/bin/env bash\necho sqlite_integrity=ok\necho sqlite_foreign_key_errors=0\n',
@@ -166,7 +184,11 @@ printf '%s' "$status"
         return home, stage, mock_bin
 
     def run_deploy(
-        self, home: Path, stage: Path, mock_bin: Path, fail_homepage: bool = False
+        self,
+        home: Path,
+        stage: Path,
+        mock_bin: Path,
+        fail_homepage: bool = False,
     ) -> subprocess.CompletedProcess[str]:
         env = os.environ.copy()
         # Git for Windows converts a native HOME path at Bash startup. Passing
@@ -211,6 +233,12 @@ printf '%s' "$status"
             self.assertIn("new_public_pid=303", result.stdout)
             self.assertEqual((home / "server" / "serve.py").read_text(), "new-public-server\n")
             self.assertEqual((home / "admin" / "serve.py").read_text(), "new-admin-server\n")
+            for location in (home / "server", home / "admin"):
+                self.assertEqual(
+                    (location / "catalog_normalization.py").read_text(),
+                    "new-normalization\n",
+                )
+                self.assertEqual((location / "styledash_shops.py").read_text(), "new-shops\n")
             self.assertTrue((home / "server" / "assets" / "new.js").is_file())
             self.assertEqual(
                 (home / "admin" / "admin" / "index.html").read_text(), "old-admin-index\n"
@@ -254,6 +282,10 @@ printf '%s' "$status"
             self.assertEqual(
                 (home / "server" / "styledash_shops.py").read_text(),
                 "shops-preserved\n",
+            )
+            self.assertEqual(
+                (home / "server" / "catalog_normalization.py").read_text(),
+                "normalization-preserved\n",
             )
 
 
