@@ -162,6 +162,16 @@ printf '%s' "$status"
         self.write(mock_bin / "curl", curl_mock, True)
         sha256sum_mock = r'''#!/usr/bin/env bash
 case "$1" in
+  */stage/scripts/catalog_normalization.py)
+    if grep -Fq 'tampered-stage-module' "$1"; then
+      printf '%s  %s\n' '1111111111111111111111111111111111111111111111111111111111111111' "$1"
+    else
+      printf '%s  %s\n' 'a656e8a56c9f9d1e91a70508b34e99f48f247e72e3838b9a0af8b4fc68654417' "$1"
+    fi
+    ;;
+  */stage/scripts/styledash_shops.py)
+    printf '%s  %s\n' '23d6f7c2a53bbca3fec06e1f25ff1a7bdb6632ced0751daea51eaa4df532fda0' "$1"
+    ;;
   */catalog_normalization.py)
     printf '%s  %s\n' '985c456840dfe67175b68fbbb7fd33d6cd3795d002affca08467eeed8dec76c0' "$1"
     ;;
@@ -197,23 +207,40 @@ esac
         env["HOME"] = str(home)
         if fail_homepage:
             env["MOCK_HOMEPAGE_FAILURE"] = "1"
-        return subprocess.run(
-            [
-                self.bash,
-                "-c",
-                'export PATH="$1:/usr/bin:/bin:$PATH"; deploy="$2"; stage="$3"; '
-                'set -- "$stage"; source "$deploy"',
-                "surgical-release-test",
-                bash_path(mock_bin),
-                bash_path(DEPLOY),
-                bash_path(stage),
-            ],
-            check=False,
-            capture_output=True,
-            text=True,
-            timeout=30,
-            env=env,
-        )
+        command = [
+            self.bash,
+            "-c",
+            'export PATH="$1:/usr/bin:/bin:$PATH"; deploy="$2"; stage="$3"; '
+            'set -- "$stage"; source "$deploy"',
+            "surgical-release-test",
+            bash_path(mock_bin),
+            bash_path(DEPLOY),
+            bash_path(stage),
+        ]
+        # Git Bash can leave a grandchild holding a captured pipe even after
+        # the deploy shell exits. File-backed output preserves assertions and
+        # keeps the real 30-second timeout meaningful.
+        with tempfile.TemporaryDirectory() as output_directory:
+            stdout_path = Path(output_directory) / "stdout.log"
+            stderr_path = Path(output_directory) / "stderr.log"
+            with stdout_path.open("w", encoding="utf-8") as stdout, stderr_path.open(
+                "w", encoding="utf-8"
+            ) as stderr:
+                completed = subprocess.run(
+                    command,
+                    check=False,
+                    stdout=stdout,
+                    stderr=stderr,
+                    text=True,
+                    timeout=30,
+                    env=env,
+                )
+            return subprocess.CompletedProcess(
+                command,
+                completed.returncode,
+                stdout_path.read_text(encoding="utf-8"),
+                stderr_path.read_text(encoding="utf-8"),
+            )
 
     def test_pre_mutation_backup_uses_staged_helper_not_installed_helper(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
@@ -302,6 +329,19 @@ esac
             self.assertEqual((home / "server" / "index.html").read_text(), "old-frontend\n")
             self.assertTrue((home / "server" / "assets" / "old.js").is_file())
             self.assertFalse((home / "server" / "assets" / "new.js").exists())
+
+    def test_tampered_staged_v4y035_module_is_rejected_before_backup_or_mutation(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            home, stage, mock_bin = self.fixture(Path(temporary))
+            self.write(
+                stage / "scripts" / "catalog_normalization.py",
+                "tampered-stage-module\n",
+            )
+            result = self.run_deploy(home, stage, mock_bin)
+            self.assertNotEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertIn("staged module has an unexpected hash", result.stderr)
+            self.assertEqual((home / "server" / "serve.py").read_text(), "old-public-server\n")
+            self.assertTrue((home / "server" / "assets" / "old.js").is_file())
 
 
 if __name__ == "__main__":

@@ -57,6 +57,8 @@ required_stage_files=(
 # live change exists rather than overwriting it.
 EXPECTED_LIVE_CATALOG_NORMALIZATION_SHA256="985c456840dfe67175b68fbbb7fd33d6cd3795d002affca08467eeed8dec76c0"
 EXPECTED_LIVE_STYLEDASH_SHOPS_SHA256="e81f41d78b759b223d5a60a07df034fd2aac27d5edc57d137a46e8951b2f8f86"
+EXPECTED_STAGE_CATALOG_NORMALIZATION_SHA256="a656e8a56c9f9d1e91a70508b34e99f48f247e72e3838b9a0af8b4fc68654417"
+EXPECTED_STAGE_STYLEDASH_SHOPS_SHA256="23d6f7c2a53bbca3fec06e1f25ff1a7bdb6632ced0751daea51eaa4df532fda0"
 
 for relative in "${required_stage_files[@]}"; do
   if [ ! -f "$STAGE/$relative" ]; then
@@ -255,6 +257,23 @@ assert_approved_module_baseline() {
   printf 'approved_category_module_baseline=verified\n'
 }
 
+assert_approved_stage_modules() {
+  approved_stage_modules=(
+    "$STAGE/scripts/catalog_normalization.py:$EXPECTED_STAGE_CATALOG_NORMALIZATION_SHA256"
+    "$STAGE/scripts/styledash_shops.py:$EXPECTED_STAGE_STYLEDASH_SHOPS_SHA256"
+  )
+  for approved_stage_module in "${approved_stage_modules[@]}"; do
+    module_path="${approved_stage_module%%:*}"
+    expected_sha256="${approved_stage_module##*:}"
+    actual_sha256="$(sha256sum "$module_path" | awk '{print $1}')"
+    if [ "$actual_sha256" != "$expected_sha256" ]; then
+      echo "approved V4Y-035 staged module has an unexpected hash: $module_path" >&2
+      return 1
+    fi
+  done
+  printf 'approved_category_stage_modules=verified\n'
+}
+
 assert_approved_modules_installed() {
   approved_installations=(
     "$STAGE/scripts/catalog_normalization.py:$PUBLIC_DIR/catalog_normalization.py"
@@ -415,6 +434,7 @@ assert_status 404 "http://127.0.0.1:8080/admin"
 assert_status 404 "http://127.0.0.1:8080/api/admin/me"
 database_check
 assert_approved_module_baseline
+assert_approved_stage_modules
 
 # The supported backup command performs SQLite online backup, integrity/FK
 # verification, and configured primary/secondary replication. No code is
