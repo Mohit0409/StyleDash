@@ -770,6 +770,34 @@ class AdminStoreTests(unittest.TestCase):
         self.assertEqual((listed["name"], listed["status"]), ("New Empty Inventory Shop", "ACTIVE"))
         self.assertFalse(any(row.get("storeId") == shop["id"] for row in snapshot["inventory"]))
 
+    def test_new_shop_product_automatically_appears_in_inventory(self):
+        app = ADMIN_SERVER.AdminApplication(
+            self.database, self.key, ROOT / "server/payment-data/catalog.json",
+            ROOT / "server/payment-data/settings.json", self.root / "data-inventory-auto-products",
+        )
+        owner = app.identity.create_customer_account(self.admin["id"], {
+            "name": "Automatic Inventory Owner", "email": "automatic-inventory@example.test",
+            "phone": "9876543288", "password": "TempPass8!",
+        })
+        shop = app.shops.admin_create_application(self.admin["id"], owner["id"], {
+            "shopName": "Automatic Inventory Shop", "ownerName": "Automatic Inventory Owner",
+            "category": "Clothing & Fashion", "description": "A shop whose products must appear automatically in inventory.",
+            "address": "13 Main Market Road", "city": "Neemuch", "state": "Madhya Pradesh", "pincode": "458441",
+        })
+        product = app.shops.admin_create_product(self.admin["id"], shop["id"], {
+            "name": "Healthy Stock Product", "description": "Healthy-stock product used to verify automatic inventory linkage.",
+            "brand": "Local", "department": "unisex", "category": "Clothing & Fashion",
+            "pricePaise": 79900, "originalPricePaise": 99900,
+            "variants": [{"size": "M", "inventory": 9}], "colourName": "Black",
+            "colourHex": "#000000", "imageUrls": ["https://images.example.test/automatic-inventory.jpg"], "attributes": {},
+        })
+
+        snapshot = app.inventory_snapshot(self.admin["id"])
+        row = next(item for item in snapshot["inventory"] if item["productId"] == product["id"])
+        self.assertEqual(row["storeId"], shop["id"])
+        self.assertEqual(row["storeName"], "Automatic Inventory Shop")
+        self.assertEqual(row["stock"], 9)
+
     def test_paid_order_reconciliation_can_trigger_low_stock_notification(self):
         app = ADMIN_SERVER.AdminApplication(
             self.database,
@@ -903,6 +931,7 @@ class AdminStoreTests(unittest.TestCase):
         self.assertIn("Shop application filters", admin_ui)
         self.assertIn("Product change request filters", admin_ui)
         self.assertIn("Inventory filters", admin_ui)
+        self.assertIn("inventory:{stock:'all',category:'all',department:'all',shop:'all',brand:'all'}", admin_ui)
         self.assertIn("New verified-purchase reviews stay private until approved", admin_ui)
         self.assertIn("/api/admin/store-reviews", admin_ui)
         self.assertIn('width="48" height="48"', admin_ui)

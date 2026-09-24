@@ -12,7 +12,7 @@ let adminFilters = {
   vendors:{status:'all',category:'all'},
   'shop-products':{status:'all',category:'all'},
   'shop-product-requests':{status:'all',action:'all'},
-  inventory:{stock:'attention',category:'all',department:'all',shop:'all',brand:'all'},
+  inventory:{stock:'all',category:'all',department:'all',shop:'all',brand:'all'},
   customers:{status:'all'},
   'payment-alerts':{status:'all',type:'all'},
   audit:{result:'all',target:'all',action:'all'},
