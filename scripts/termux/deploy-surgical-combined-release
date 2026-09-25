@@ -52,14 +52,15 @@ required_stage_files=(
   "scripts/termux/start-styledash-cloudflare"
 )
 
-# This release preserves the verified V4Y-035 category/tag runtime while
-# replacing styledash_shops.py with the commission/MRP correction. These are
-# the exact current-live and staged hashes for the public and private runtime
-# copies. Refuse the release if a newer live change exists.
+# This release preserves the verified category/tag runtime while replacing
+# styledash_shops.py with the Local Stores product-count metadata used by the
+# storefront ranking fix. These are the exact current-live and staged hashes
+# for the public and private runtime copies. Refuse the release if a newer live
+# change exists.
 EXPECTED_LIVE_CATALOG_NORMALIZATION_SHA256="a656e8a56c9f9d1e91a70508b34e99f48f247e72e3838b9a0af8b4fc68654417"
-EXPECTED_LIVE_STYLEDASH_SHOPS_SHA256="23d6f7c2a53bbca3fec06e1f25ff1a7bdb6632ced0751daea51eaa4df532fda0"
+EXPECTED_LIVE_STYLEDASH_SHOPS_SHA256="a78f30d94376dca74c9f8dbb048990906f448768c541ab1b5cc5124466d8587e"
 EXPECTED_STAGE_CATALOG_NORMALIZATION_SHA256="a656e8a56c9f9d1e91a70508b34e99f48f247e72e3838b9a0af8b4fc68654417"
-EXPECTED_STAGE_STYLEDASH_SHOPS_SHA256="a78f30d94376dca74c9f8dbb048990906f448768c541ab1b5cc5124466d8587e"
+EXPECTED_STAGE_STYLEDASH_SHOPS_SHA256="9ff8f119fa0223994b64f2b29ad5ecda6189dfaf27339bff1a309ebb2de8ff06"
 
 for relative in "${required_stage_files[@]}"; do
   if [ ! -f "$STAGE/$relative" ]; then
