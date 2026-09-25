@@ -1506,7 +1506,7 @@ class AdminHttpTests(unittest.TestCase):
         status, uploaded, _ = self.request("/api/admin/product-images", {"fileName":"product1.png","contentType":"image/png","dataBase64":base64.b64encode(png).decode()}, headers={"X-CSRF-Token":csrf}, method="POST")
         self.assertEqual(status,201); image_path=uploaded["image"]["url"]
 
-        direct_product={"applicationId":application["id"],"name":"Uploaded Image Shoe","description":"Product created with private admin uploaded image.","brand":"Local","department":"unisex","category":"Footwear","pricePaise":90000,"originalPricePaise":90000,"variants":[{"size":"8","inventory":5}],"colourName":"Blue","imageUrls":[image_path],"attributes":{}}
+        direct_product={"applicationId":application["id"],"name":"Uploaded Image Shoe","description":"Product created with private admin uploaded image.","brand":"Local","department":"unisex","category":"Footwear","pricePaise":90000,"originalPricePaise":120000,"variants":[{"size":"8","inventory":5}],"colourName":"Blue","imageUrls":[image_path],"attributes":{}}
         status, created, _ = self.request("/api/admin/shop-products", direct_product, headers={"X-CSRF-Token":csrf}, method="POST")
         self.assertEqual(status,201); self.assertEqual(created["product"]["imageUrls"],[image_path])
         https_product={**direct_product,"name":"HTTPS Compatibility Shoe","imageUrls":["https://example.test/shoe.jpg"]}
@@ -1514,7 +1514,7 @@ class AdminHttpTests(unittest.TestCase):
         self.assertEqual(status,201); self.assertEqual(https_created["product"]["imageUrls"],["https://example.test/shoe.jpg"])
 
         before={product["id"]:product for product in shops.admin_list_products(admin_id)}
-        csv_text='name,description,brand,department,category,price,originalPrice,variants,colourName,colourHex,imageFile,imageUrls\nMapped Campus,Campus sports shoe,Campus,unisex,Footwear,1720,1720,"6:5, 7:5",Multi,,product1.png,\nDirect URL Shoe,Direct URL compatibility,JQR,unisex,Footwear,1350,1350,"8:5, 9:5",Olive,,,https://example.test/direct.jpg\n'
+        csv_text='name,description,brand,department,category,price,originalPrice,variants,colourName,colourHex,imageFile,imageUrls\nMapped Campus,Campus sports shoe,Campus,unisex,Footwear,1720,2500,"6:5, 7:5",Multi,,product1.png,\nDirect URL Shoe,Direct URL compatibility,JQR,unisex,Footwear,1350,2000,"8:5, 9:5",Olive,,,https://example.test/direct.jpg\n'
         status, bulk, _ = self.request("/api/admin/shop-products/bulk", {"applicationId":application["id"],"csvText":csv_text,"images":{"product1.png":image_path}}, headers={"X-CSRF-Token":csrf}, method="POST")
         self.assertEqual((status,bulk["created"]),(201,2))
         by_name={product["name"]:product for product in bulk["products"]}
@@ -1523,7 +1523,7 @@ class AdminHttpTests(unittest.TestCase):
 
         fifteen_header = "name,description,brand,department,category,price,originalPrice,variants,colourName,colourHex,imageFile,imageUrls"
         fifteen_rows = [
-            f'Bulk Shoe {index},Bulk shoe {index},Brand,unisex,Footwear,1099,1099,"6:5, 7:5",Color {index},,product{index}.png,'
+            f'Bulk Shoe {index},Bulk shoe {index},Brand,unisex,Footwear,1099,2000,"6:5, 7:5",Color {index},,product{index}.png,'
             for index in range(1, 16)
         ]
         fifteen_csv = "\n".join([fifteen_header, *fifteen_rows]) + "\n"

@@ -1,8 +1,9 @@
 #!/data/data/com.termux/files/usr/bin/bash
 # Deploy only the reviewed Vibe4You combined-release write set.
 #
-# This intentionally does not use deploy-payment-release: production contains
-# newer live-only category rules that a full-tree copy would overwrite.
+# This intentionally does not use deploy-payment-release: the approved release
+# must preserve production-only Admin/configuration/security/payment state and
+# replace only the explicitly pinned surgical write set.
 set -Eeuo pipefail
 
 if [ "$#" -ne 1 ] || [ ! -d "$1" ]; then
@@ -51,14 +52,14 @@ required_stage_files=(
   "scripts/termux/start-styledash-cloudflare"
 )
 
-# V4Y-035 deliberately reconciles the verified, live-only category and tag
-# behavior into source. These are the exact pre-release hashes observed on
-# both the public and private runtime copies. Refuse the release if a newer
-# live change exists rather than overwriting it.
-EXPECTED_LIVE_CATALOG_NORMALIZATION_SHA256="985c456840dfe67175b68fbbb7fd33d6cd3795d002affca08467eeed8dec76c0"
-EXPECTED_LIVE_STYLEDASH_SHOPS_SHA256="e81f41d78b759b223d5a60a07df034fd2aac27d5edc57d137a46e8951b2f8f86"
+# This release preserves the verified V4Y-035 category/tag runtime while
+# replacing styledash_shops.py with the commission/MRP correction. These are
+# the exact current-live and staged hashes for the public and private runtime
+# copies. Refuse the release if a newer live change exists.
+EXPECTED_LIVE_CATALOG_NORMALIZATION_SHA256="a656e8a56c9f9d1e91a70508b34e99f48f247e72e3838b9a0af8b4fc68654417"
+EXPECTED_LIVE_STYLEDASH_SHOPS_SHA256="23d6f7c2a53bbca3fec06e1f25ff1a7bdb6632ced0751daea51eaa4df532fda0"
 EXPECTED_STAGE_CATALOG_NORMALIZATION_SHA256="a656e8a56c9f9d1e91a70508b34e99f48f247e72e3838b9a0af8b4fc68654417"
-EXPECTED_STAGE_STYLEDASH_SHOPS_SHA256="23d6f7c2a53bbca3fec06e1f25ff1a7bdb6632ced0751daea51eaa4df532fda0"
+EXPECTED_STAGE_STYLEDASH_SHOPS_SHA256="a78f30d94376dca74c9f8dbb048990906f448768c541ab1b5cc5124466d8587e"
 
 for relative in "${required_stage_files[@]}"; do
   if [ ! -f "$STAGE/$relative" ]; then
@@ -245,12 +246,12 @@ assert_approved_module_baseline() {
     module_path="${approved_module%%:*}"
     expected_sha256="${approved_module##*:}"
     if [ ! -f "$module_path" ]; then
-      echo "approved V4Y-035 module is missing: $module_path" >&2
+      echo "approved category/shop module is missing: $module_path" >&2
       return 1
     fi
     actual_sha256="$(sha256sum "$module_path" | awk '{print $1}')"
     if [ "$actual_sha256" != "$expected_sha256" ]; then
-      echo "approved V4Y-035 module has an unexpected live hash: $module_path (expected $expected_sha256, found $actual_sha256)" >&2
+      echo "approved category/shop module has an unexpected live hash: $module_path (expected $expected_sha256, found $actual_sha256)" >&2
       return 1
     fi
   done
@@ -267,7 +268,7 @@ assert_approved_stage_modules() {
     expected_sha256="${approved_stage_module##*:}"
     actual_sha256="$(sha256sum "$module_path" | awk '{print $1}')"
     if [ "$actual_sha256" != "$expected_sha256" ]; then
-      echo "approved V4Y-035 staged module has an unexpected hash: $module_path" >&2
+      echo "approved category/shop staged module has an unexpected hash: $module_path" >&2
       return 1
     fi
   done
@@ -285,7 +286,7 @@ assert_approved_modules_installed() {
     source_path="${approved_installation%%:*}"
     target_path="${approved_installation##*:}"
     if ! cmp -s "$source_path" "$target_path"; then
-      echo "approved V4Y-035 module did not match staged source: $target_path" >&2
+      echo "approved category/shop module did not match staged source: $target_path" >&2
       return 1
     fi
   done
@@ -303,7 +304,7 @@ assert_approved_modules_restored() {
     snapshot_path="${approved_restore%%:*}"
     target_path="${approved_restore##*:}"
     if ! cmp -s "$snapshot_path" "$target_path"; then
-      echo "approved V4Y-035 module was not restored: $target_path" >&2
+      echo "approved category/shop module was not restored: $target_path" >&2
       return 1
     fi
   done
@@ -488,10 +489,10 @@ rm -f -- "$PUBLIC_PID_FILE" "$ADMIN_PID_FILE"
 styledash_wait_for_port_release 8080 "StyleDash public service"
 styledash_wait_for_port_release 8081 "StyleDash administrator service"
 
-# Exact reviewed application write set. V4Y-035 is the sole exception to the
-# normal category/module preservation rule: its four copies were pinned to
-# verified pre-release hashes and are snapshotted above. Security, all other
-# configuration, secrets, payments, orders, and the database are not copied.
+# Exact reviewed application write set. The category/shop runtime modules are
+# release-pinned to verified current-live and staged hashes and are snapshotted
+# above. Security, all other configuration, secrets, payments, orders, and the
+# database are not copied.
 rm -rf -- "$PUBLIC_DIR/assets"
 cp -a -- "$STAGE/dist/." "$PUBLIC_DIR/"
 install -m 755 "$STAGE/scripts/termux-spa-server.py" "$PUBLIC_DIR/serve.py"

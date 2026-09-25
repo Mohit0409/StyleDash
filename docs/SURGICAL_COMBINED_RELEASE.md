@@ -1,10 +1,10 @@
 # Surgical Combined Release Procedure
 
-This procedure exists because the normal `deploy-payment-release` command
-copies the complete staged runtime. Production currently contains newer
-category-rule files that are intentionally outside the combined lag, review,
-storefront, and backup-tool release. A full-tree deployment would overwrite
-those live files.
+This procedure exists for reviewed releases that must update only the
+approved storefront/runtime write set while preserving production-only Admin,
+configuration, security, payment, order, and database state. The release pins
+both the current live runtime hashes and the exact staged replacement hashes so
+an unexpected live change blocks deployment before mutation.
 
 ## Supported command
 
@@ -24,20 +24,26 @@ The surgical command can replace only:
 
 - `~/server/serve.py`
 - `~/server/styledash_reviews.py`
+- `~/server/catalog_normalization.py`
+- `~/server/styledash_shops.py`
 - the customer frontend files from `dist/`
 - `~/admin/serve.py`
 - `~/admin/styledash_reviews.py`
+- `~/admin/catalog_normalization.py`
+- `~/admin/styledash_shops.py`
 - `~/bin/backup-styledash-data`
 - `~/bin/start-styledash-cloudflare`
 
-It does not copy the stage's category, security, shop-rule, catalogue,
-settings, delivery-zone, secret, payment, order, or database files.
+It does not copy the stage's security, catalogue, settings, delivery-zone,
+secret, payment, order, or database files. `catalog_normalization.py` and
+`styledash_shops.py` are the only category/shop runtime modules in the write
+set, and both their current-live and staged SHA-256 values must match the
+release-specific pins before mutation.
 
-Before mutation it records SHA-256 values for both public and private copies
-of `styledash_security.py`, `catalog_normalization.py`, and
-`styledash_shops.py`, the live private Admin `index.html` and `admin.js`, plus
-authoritative catalogue/settings/delivery-zone configuration and `secrets.env`.
-The same hashes must match after the copy and after any automatic rollback.
+Before mutation it records SHA-256 values for protected public/private
+`styledash_security.py`, the live private Admin `index.html` and `admin.js`,
+authoritative catalogue/settings/delivery-zone configuration, and `secrets.env`.
+Those protected hashes must remain unchanged after the copy and after rollback.
 
 The private Admin frontend is deliberately preserved in this release because
 production contains live-only Admin hotfixes that are not yet reconciled into Git.
@@ -93,5 +99,12 @@ real Razorpay Live payment.
 
 ## Current status
 
+For the commission/MRP release, the verified current live runtime is:
+
+- `catalog_normalization.py`: `a656e8a56c9f9d1e91a70508b34e99f48f247e72e3838b9a0af8b4fc68654417`
+- `styledash_shops.py`: `23d6f7c2a53bbca3fec06e1f25ff1a7bdb6632ced0751daea51eaa4df532fda0`
+
+The staged `styledash_shops.py` replacement must be
+`a78f30d94376dca74c9f8dbb048990906f448768c541ab1b5cc5124466d8587e`.
 This procedure being present in source does not mean it has been run in
 production. Production deployment remains a separate human-approved action.

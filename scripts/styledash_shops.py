@@ -1245,10 +1245,11 @@ class ShopWorkflow:
             original_price = price
         if isinstance(price, bool) or not isinstance(price, int) or not 100 <= price <= 100_000_000:
             raise SecurityError(400, "Enter a valid product price.", "invalid_product")
+        customer_price = _customer_price_paise(price)
         if (
             isinstance(original_price, bool)
             or not isinstance(original_price, int)
-            or not price <= original_price <= 100_000_000
+            or not customer_price <= original_price <= 100_000_000
         ):
             raise SecurityError(400, "Enter a valid original price.", "invalid_product")
 
@@ -2722,7 +2723,9 @@ class ShopWorkflow:
             subcategory=subcategory,
         )
         price = _customer_price_paise(row["price_paise"]) / 100
-        original_price = _customer_price_paise(row["original_price_paise"]) / 100
+        # MRP is set by the shop owner.  Commission is charged only on the
+        # shop's selling price, never on the MRP/reference price.
+        original_price = row["original_price_paise"] / 100
         discount = (
             round((original_price - price) * 100 / original_price)
             if original_price > price
@@ -2785,7 +2788,14 @@ class ShopWorkflow:
 
     def list_published_products(self, limit: int | None = None) -> list[dict[str, Any]]:
         """Return all customer-safe published Product DTOs unless a limit is explicitly requested."""
-        return [self._public_product(row) for row in self._published_rows(limit)]
+        # Legacy records can predate the MRP validation below.  Do not expose
+        # an item whose commission-inclusive price would exceed its owner-set
+        # MRP; an owner or administrator must correct it before it can sell.
+        return [
+            self._public_product(row)
+            for row in self._published_rows(limit)
+            if _customer_price_paise(row["price_paise"]) <= row["original_price_paise"]
+        ]
 
     def payment_catalog_products(self, limit: int = 5000) -> list[dict[str, Any]]:
         """Return minimal records compatible with PaymentService.products.
@@ -2832,7 +2842,11 @@ class ShopWorkflow:
                     "expressDelivery": delivery_type in {"express", "both"},
                     "images": images,
                     "thumbnail": images[0] if images else None,
-                    "active": row["status"] == "PUBLISHED" and row["shop_status"] == "ACTIVE",
+                    "active": (
+                        row["status"] == "PUBLISHED"
+                        and row["shop_status"] == "ACTIVE"
+                        and _customer_price_paise(row["price_paise"]) <= row["original_price_paise"]
+                    ),
                     "price": price,
                     "tryAtHomeAvailable": bool(row["try_at_home_enabled"]) if "try_at_home_enabled" in row.keys() else False,
                     "exchangeAvailable": bool(row["exchange_available"]) if "exchange_available" in row.keys() else False,

@@ -56,7 +56,7 @@ class SurgicalCombinedReleaseTests(unittest.TestCase):
         self.assertIn('PRAGMA integrity_check', self.script)
         self.assertIn('PRAGMA foreign_key_check', self.script)
 
-    def test_unrelated_live_configuration_is_hash_guarded_and_v4y035_modules_are_pinned(self) -> None:
+    def test_unrelated_live_configuration_is_hash_guarded_and_release_modules_are_pinned(self) -> None:
         for protected in (
             '"$PUBLIC_DIR/styledash_security.py"',
             '"$ADMIN_DIR/styledash_security.py"',
@@ -71,8 +71,8 @@ class SurgicalCombinedReleaseTests(unittest.TestCase):
         self.assertIn('protected_file_hashes=unchanged', self.script)
         self.assertIn('assert_approved_module_baseline', self.script)
         self.assertIn('assert_approved_stage_modules', self.script)
-        self.assertIn('approved V4Y-035 module has an unexpected live hash', self.script)
-        self.assertIn('approved V4Y-035 staged module has an unexpected hash', self.script)
+        self.assertIn('approved category/shop module has an unexpected live hash', self.script)
+        self.assertIn('approved category/shop staged module has an unexpected hash', self.script)
         self.assertIn('approved_category_module_baseline=verified', self.script)
         self.assertIn('approved_category_stage_modules=verified', self.script)
         self.assertIn('approved_category_modules=installed', self.script)
