@@ -13,19 +13,13 @@ import { useAuth } from '../context/AuthContext';
 import { CONFIG } from '../config';
 import { SellerProducts } from '../components/SellerProducts';
 import { StoreBranding } from '../components/StoreBranding';
-
-const CATEGORIES = [
-  'Clothing & Fashion',
-  'Footwear',
-  'Electronics',
-  'Home & Living',
-  'General Store',
-] as const;
+import { STORE_CATEGORIES } from '../data/categories';
+import { storeCategoryOptions } from '../utils/storeCategories';
 
 const EMPTY_DRAFT: ShopApplicationDraft = {
   shopName: '',
   ownerName: '',
-  category: CATEGORIES[0],
+  category: STORE_CATEGORIES[0],
   description: '',
   address: '',
   city: CONFIG.SERVICE_CITY,
@@ -68,7 +62,7 @@ const STATUS_CONTENT: Record<ShopApplicationStatus, { title: string; description
 const draftFromApplication = (application: ShopApplication): ShopApplicationDraft => ({
   shopName: application.shopName || '',
   ownerName: application.ownerName || '',
-  category: application.category || CATEGORIES[0],
+  category: application.category || STORE_CATEGORIES[0],
   description: application.description || '',
   address: application.address || '',
   city: application.city || CONFIG.SERVICE_CITY,
@@ -260,7 +254,7 @@ export const VendorOnboarding: React.FC = () => {
             </label>
             <label className="font-bold">Category
               <select value={draft.category} onChange={event => setField('category', event.target.value)} className="mt-1 w-full p-3 rounded-xl border dark:bg-neutral-800">
-                {CATEGORIES.map(category => <option key={category} value={category}>{category}</option>)}
+                {storeCategoryOptions(draft.category).map(category => <option key={category} value={category}>{category}</option>)}
               </select>
             </label>
             <label className="font-bold">Pincode
