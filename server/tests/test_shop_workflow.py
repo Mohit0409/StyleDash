@@ -490,6 +490,36 @@ class ShopWorkflowTests(unittest.TestCase):
         )
         self.assertEqual(self.store.get_application("missing-user"), None)
 
+    def test_active_store_product_count_uses_customer_visible_published_products(self) -> None:
+        first_shop = self.create_active_shop("user-a", "Product Heavy Shop")
+        second_shop = self.create_active_shop("user-b", "Newer Light Shop")
+
+        def publish(user_id: str, name: str) -> dict:
+            product = self.store.create_product_draft(
+                user_id, self.complete_product(name)
+            )
+            self.store.submit_product(user_id, product["id"])
+            for target in ("UNDER_REVIEW", "APPROVED", "PUBLISHED"):
+                product = self.store.admin_transition_product(
+                    "admin-a", product["id"], target
+                )
+            return product
+
+        publish("user-a", "Visible Product One")
+        publish("user-a", "Visible Product Two")
+        publish("user-b", "Visible Product Three")
+        hidden_legacy = publish("user-b", "Hidden Legacy Product")
+
+        with self.store.connect() as db:
+            db.execute(
+                "UPDATE shop_product_submissions SET original_price_paise=? WHERE id=?",
+                (100, hidden_legacy["id"]),
+            )
+
+        stores = {item["id"]: item for item in self.store.list_active_stores()}
+        self.assertEqual(stores[first_shop["id"]]["productCount"], 2)
+        self.assertEqual(stores[second_shop["id"]]["productCount"], 1)
+
     def test_only_admin_can_publish_and_public_requires_active_shop(self) -> None:
         application = self.create_active_shop("user-a", "Publishing Shop")
         image_less = self.store.create_product_draft(

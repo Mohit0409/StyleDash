@@ -6,6 +6,7 @@ import { StoreImage } from '../components/StoreImage';
 import { vendorRepository } from '../repositories/vendorRepository';
 import { VendorStore } from '../types';
 import { CONFIG } from '../config';
+import { rankStoresByProductCount } from '../utils/storeRanking';
 
 export const Stores: React.FC = () => {
   const [stores, setStores] = useState<VendorStore[]>([]);
@@ -14,7 +15,11 @@ export const Stores: React.FC = () => {
   useEffect(() => {
     let active = true;
     vendorRepository.getAllStores()
-      .then(s => { if (active) setStores(s.filter(item => item.approved && item.active)); })
+      .then(s => {
+        if (active) {
+          setStores(rankStoresByProductCount(s.filter(item => item.approved && item.active)));
+        }
+      })
       .catch(() => { if (active) setStores([]); })
       .finally(() => { if (active) setLoading(false); });
     return () => { active = false; };

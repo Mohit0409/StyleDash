@@ -2672,6 +2672,19 @@ class ShopWorkflow:
                 """,
                 (safe_limit,),
             ).fetchall()
+            published_products = db.execute(
+                """
+                SELECT application_id,price_paise,original_price_paise
+                  FROM shop_product_submissions
+                 WHERE status='PUBLISHED'
+                """
+            ).fetchall()
+        product_counts: dict[str, int] = {}
+        for product in published_products:
+            if _customer_price_paise(product["price_paise"]) > product["original_price_paise"]:
+                continue
+            application_id = product["application_id"]
+            product_counts[application_id] = product_counts.get(application_id, 0) + 1
         stores: list[dict[str, Any]] = []
         for row in rows:
             images = json.loads(row["image_urls_json"]) if row["image_urls_json"] else []
@@ -2684,6 +2697,7 @@ class ShopWorkflow:
                 "deliveryMinutes": 60,
                 "bannerImage": row["banner_image_url"] or image,
                 "logoImage": row["logo_image_url"] or image,
+                "productCount": product_counts.get(row["id"], 0),
                 "active": True, "approved": True, "createdAt": row["created_at"],
             })
         return stores
