@@ -33,6 +33,11 @@ except ModuleNotFoundError:
         normalize_department, normalize_product_category, normalize_size_label, normalize_subcategory,
     )
 
+try:
+    from store_categories import STORE_CATEGORIES
+except ModuleNotFoundError:  # Repository test import path.
+    from scripts.store_categories import STORE_CATEGORIES
+
 
 APPLICATION_STATUSES = (
     "DRAFT",
@@ -57,15 +62,7 @@ PRODUCT_CHANGE_ADMIN_TRANSITIONS = {
     "SUBMITTED": {"UNDER_REVIEW"},
     "UNDER_REVIEW": {"APPROVED", "REJECTED"},
 }
-ALLOWED_CATEGORIES = {
-    "Clothing & Fashion",
-    "Footwear",
-    "Accessories",
-    "Beauty & Personal Care",
-    "Electronics",
-    "Gifts",
-    "Home & Living",
-}
+ALLOWED_CATEGORIES = STORE_CATEGORIES
 APPLICATION_ADMIN_TRANSITIONS = {
     "SUBMITTED": {"UNDER_REVIEW"},
     "UNDER_REVIEW": {"APPROVED", "REJECTED"},
@@ -133,6 +130,46 @@ def _commission_rate_basis_points(price_paise: int) -> int:
 def _customer_price_paise(price_paise: int) -> int:
     rate = _commission_rate_basis_points(price_paise)
     return price_paise + ((price_paise * rate + 5_000) // 10_000)
+
+
+_SIMILAR_GENERIC_TAGS = {"local-shop"}
+
+
+def _similar_product_score(
+    current: dict[str, Any], candidate: dict[str, Any]
+) -> int:
+    """Deterministic relevance score for Similar Products ranking."""
+    score = 0
+    subcategory = str(current.get("subcategory") or "").strip()
+    if subcategory and subcategory.casefold() == str(
+        candidate.get("subcategory") or ""
+    ).strip().casefold():
+        score += 100
+    if current.get("category") and current.get("category") == candidate.get("category"):
+        score += 50
+    if current.get("department") and current.get("department") == candidate.get(
+        "department"
+    ):
+        score += 25
+    brand = str(current.get("brand") or "").strip()
+    if brand and brand.casefold() == str(candidate.get("brand") or "").strip().casefold():
+        score += 10
+    current_tags = {
+        str(tag).casefold() for tag in current.get("tags") or []
+    } - _SIMILAR_GENERIC_TAGS
+    candidate_tags = {
+        str(tag).casefold() for tag in candidate.get("tags") or []
+    } - _SIMILAR_GENERIC_TAGS
+    score += min(len(current_tags & candidate_tags), 5) * 4
+    current_price = float(current.get("price") or 0)
+    candidate_price = float(candidate.get("price") or 0)
+    if current_price > 0 and candidate_price > 0:
+        ratio = candidate_price / current_price
+        if 0.8 <= ratio <= 1.25:
+            score += 10
+        elif 0.5 <= ratio <= 2.0:
+            score += 5
+    return score
 
 
 def _optional_text(value: Any, label: str, maximum: int) -> str | None:
@@ -293,6 +330,7 @@ class ShopWorkflow:
             self._migrate_product_try_at_home(db)
             self._migrate_product_exchange(db)
             self._migrate_product_change_summaries(db)
+            self._migrate_catalog_version(db)
             integrity = [row[0] for row in db.execute("PRAGMA integrity_check").fetchall()]
             if integrity != ["ok"]:
                 raise RuntimeError("Shop migration failed SQLite integrity validation")
@@ -697,6 +735,48 @@ class ShopWorkflow:
         except Exception:
             db.rollback()
             raise
+
+    @staticmethod
+    def _migrate_catalog_version(db: sqlite3.Connection) -> None:
+        """Track catalogue-affecting writes with a monotonic version counter.
+
+        Triggers catch every insert/update/delete from any process (public
+        server, private admin server, scripts) so the public runtime can skip
+        full catalogue rebuilds when nothing changed.
+        """
+        now = iso(utc_now())
+        db.execute("BEGIN IMMEDIATE")
+        try:
+            db.execute(
+                "CREATE TABLE IF NOT EXISTS shop_catalog_meta("
+                "key TEXT PRIMARY KEY,value INTEGER NOT NULL)"
+            )
+            db.execute(
+                "INSERT OR IGNORE INTO shop_catalog_meta(key,value) VALUES('product_version',0)"
+            )
+            for table in ("shop_product_submissions", "vendor_applications"):
+                for action in ("insert", "update", "delete"):
+                    db.execute(
+                        f"CREATE TRIGGER IF NOT EXISTS shop_catalog_version_{table}_{action} "
+                        f"AFTER {action.upper()} ON {table} "
+                        "BEGIN "
+                        "UPDATE shop_catalog_meta SET value=value+1 WHERE key='product_version'; "
+                        "END"
+                    )
+            if db.execute("SELECT 1 FROM shop_schema_migrations WHERE version=10").fetchone() is None:
+                db.execute("INSERT INTO shop_schema_migrations(version,applied_at) VALUES(10,?)", (now,))
+            db.commit()
+        except Exception:
+            db.rollback()
+            raise
+
+    def catalog_version(self) -> int:
+        """Monotonic counter bumped by every catalogue-affecting DB write."""
+        with self.connect() as db:
+            row = db.execute(
+                "SELECT value FROM shop_catalog_meta WHERE key='product_version'"
+            ).fetchone()
+        return int(row[0]) if row else 0
 
     @staticmethod
     def _application_payload(
@@ -2700,21 +2780,26 @@ class ShopWorkflow:
             })
         return stores
 
-    def _published_rows(self, limit: int | None = None) -> list[sqlite3.Row]:
+    def _published_rows(
+        self, limit: int | None = None, application_id: str | None = None
+    ) -> list[sqlite3.Row]:
         query = """
                 SELECT p.*,a.shop_name
                   FROM shop_product_submissions p
                   JOIN vendor_applications a ON a.id=p.application_id
                  WHERE p.status='PUBLISHED' AND a.status='ACTIVE'
-                 ORDER BY p.published_at DESC
                 """
-        params: tuple[Any, ...] = ()
+        params_list: list[Any] = []
+        if application_id is not None:
+            query += " AND p.application_id=?"
+            params_list.append(application_id)
+        query += " ORDER BY p.published_at DESC"
         if limit is not None:
             safe_limit = max(1, min(limit, 10_000))
             query += " LIMIT ?"
-            params = (safe_limit,)
+            params_list.append(safe_limit)
         with self.connect() as db:
-            rows = db.execute(query, params).fetchall()
+            rows = db.execute(query, tuple(params_list)).fetchall()
         return rows
 
     @staticmethod
@@ -2804,6 +2889,82 @@ class ShopWorkflow:
         # Preserve those already-published catalogue records instead of hiding
         # them; new/edited products are still validated before publication.
         return [self._public_product(row) for row in self._published_rows(limit)]
+
+    def list_store_published_products(self, application_id: Any) -> list[dict[str, Any]]:
+        """Return public products for one ACTIVE store."""
+        if not isinstance(application_id, str) or not application_id.strip() or len(application_id) > 128:
+            raise SecurityError(400, "Invalid store request.", "invalid_store_request")
+        return [
+            self._public_product(row)
+            for row in self._published_rows(application_id=application_id.strip())
+        ]
+
+    def get_published_product(self, slug_or_id: Any) -> dict[str, Any]:
+        """Return one public product by slug or id."""
+        if not isinstance(slug_or_id, str) or not slug_or_id.strip() or len(slug_or_id) > 128:
+            raise SecurityError(400, "Invalid product request.", "invalid_product_request")
+        wanted = slug_or_id.strip()
+        with self.connect() as db:
+            row = db.execute(
+                """
+                SELECT p.*,a.shop_name
+                  FROM shop_product_submissions p
+                  JOIN vendor_applications a ON a.id=p.application_id
+                 WHERE p.status='PUBLISHED' AND a.status='ACTIVE'
+                   AND (p.slug=? OR p.id=?)
+                 LIMIT 1
+                """,
+                (wanted, wanted),
+            ).fetchone()
+        if row is None:
+            raise SecurityError(404, "Product not found.", "product_not_found")
+        return self._public_product(row)
+
+    def list_similar_products(
+        self, slug_or_id: Any, limit: int = 8
+    ) -> list[dict[str, Any]]:
+        """Ranked similar products for a public product detail page.
+
+        Ranking prefers close taxonomy matches first (subcategory, then
+        category, then department), then brand, shared curated tags, and
+        price proximity.  The pool itself is the public catalogue, so
+        unpublished products and products of suspended shops are excluded by
+        construction.  Results are deduplicated, never contain the current
+        product, and fall back to the newest broader catalogue entries when a
+        subcategory is sparse.  Ordering is fully deterministic for tests.
+        """
+        if not isinstance(slug_or_id, str) or not slug_or_id.strip():
+            raise SecurityError(400, "Invalid product request.", "invalid_product_request")
+        wanted = slug_or_id.strip()
+        products = self.list_published_products()
+        current = next(
+            (
+                product
+                for product in products
+                if product["slug"] == wanted or product["id"] == wanted
+            ),
+            None,
+        )
+        if current is None:
+            raise SecurityError(404, "Product not found.", "product_not_found")
+        safe_limit = max(1, min(int(limit), 24))
+        seen = {current["id"]}
+        ranked: list[tuple[int, int, str, str, dict[str, Any]]] = []
+        for position, product in enumerate(products):
+            if product["id"] in seen:
+                continue
+            seen.add(product["id"])
+            ranked.append(
+                (
+                    -_similar_product_score(current, product),
+                    position,
+                    str(product.get("name") or "").casefold(),
+                    str(product["id"]),
+                    product,
+                )
+            )
+        ranked.sort(key=lambda item: (item[0], item[1], item[2], item[3]))
+        return [item[4] for item in ranked[:safe_limit]]
 
     def payment_catalog_products(self, limit: int = 5000) -> list[dict[str, Any]]:
         """Return minimal records compatible with PaymentService.products.

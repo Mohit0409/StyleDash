@@ -104,7 +104,7 @@ def _homepage_sort_key(product: dict[str, Any]) -> tuple:
     return (score, created, str(product.get("name") or ""))
 
 
-def _homepage_product_candidates(products: list[dict[str, Any]], per_section: int = 5) -> list[dict[str, Any]]:
+def _homepage_product_candidates(products: list[dict[str, Any]], per_section: int = 10) -> list[dict[str, Any]]:
     active = [product for product in products if product.get("active") is True]
     definitions = (
         lambda p: p.get("category") == "Clothing & Fashion",
@@ -122,19 +122,34 @@ def _homepage_product_candidates(products: list[dict[str, Any]], per_section: in
         lambda p: True,
     )
     selected: dict[str, dict[str, Any]] = {}
+    # Sort once; every section shares the same ordering key, so filter the
+    # pre-sorted list instead of re-sorting per section.
+    ordered = sorted(active, key=_homepage_sort_key, reverse=True)
     for matches in definitions:
+        candidates = [p for p in ordered if matches(p)]
+        # Prefer store diversity (max 2 per store), then top up without that
+        # cap so a section still reaches `per_section` whenever that many
+        # eligible candidates exist.
+        section_choices: list[dict[str, Any]] = []
+        chosen_ids: set[str] = set()
         store_counts: dict[str, int] = defaultdict(int)
-        candidates = sorted((p for p in active if matches(p)), key=_homepage_sort_key, reverse=True)
-        chosen = 0
-        for product in candidates:
-            store = str(product.get("vendorId") or product.get("storeSlug") or "")
-            if store_counts[store] >= 2:
-                continue
-            selected[str(product["id"])] = product
-            store_counts[store] += 1
-            chosen += 1
-            if chosen >= per_section:
+        for allow_repeat_store in (False, True):
+            for product in candidates:
+                product_id = str(product["id"])
+                if product_id in chosen_ids:
+                    continue
+                store = str(product.get("vendorId") or product.get("storeSlug") or "")
+                if not allow_repeat_store and store_counts[store] >= 2:
+                    continue
+                section_choices.append(product)
+                chosen_ids.add(product_id)
+                store_counts[store] += 1
+                if len(section_choices) >= per_section:
+                    break
+            if len(section_choices) >= per_section:
                 break
+        for product in section_choices:
+            selected[str(product["id"])] = product
     return list(selected.values())
 
 
@@ -724,7 +739,9 @@ class PaymentService:
         settings = json.loads(settings_path.read_text(encoding="utf-8"))
         self._products_lock = threading.RLock()
         self._static_products = {item["id"]: item for item in catalog}
+        self._dynamic_products: dict[str, dict[str, Any]] = {}
         self.products = dict(self._static_products)
+        self._products_catalog_version: int | None = None
         self.settings = settings
         self.ordering_enabled = (
             ordering_enabled
@@ -800,12 +817,41 @@ class PaymentService:
         All shop submissions remain in the authoritative map. Non-published or
         suspended entries are retained with active=false so historic order
         inventory can still be finalized or released safely.
+
+        The expensive full rebuild only runs when the catalogue version
+        (bumped by DB triggers on every catalogue-affecting write, from any
+        process) actually changed; otherwise the cached dynamic map is merged
+        over the (small, in-memory) static catalogue again. This keeps static
+        catalogue overrides effective while replacing a full product-table
+        scan and JSON re-parse with a single-row counter read.
         """
-        dynamic = self.shops.payment_catalog_products() if self.shops is not None else []
+        if self.shops is None:
+            with self._products_lock:
+                self.products = dict(self._static_products)
+            return
+        with self._products_lock:
+            cached_version = self._products_catalog_version
+            cached_dynamic = self._dynamic_products
+        current_version = self.shops.catalog_version()
+        if cached_version is not None and cached_version == current_version:
+            snapshot = dict(self._static_products)
+            snapshot.update(cached_dynamic)
+            with self._products_lock:
+                self.products = snapshot
+            return
+        dynamic = self.shops.payment_catalog_products()
+        dynamic_map = {product["id"]: product for product in dynamic}
         snapshot = dict(self._static_products)
-        snapshot.update({product["id"]: product for product in dynamic})
+        snapshot.update(dynamic_map)
         with self._products_lock:
             self.products = snapshot
+            self._dynamic_products = dynamic_map
+            self._products_catalog_version = current_version
+
+    def invalidate_shop_products(self) -> None:
+        """Force the next refresh to rebuild (e.g. after local catalogue writes)."""
+        with self._products_lock:
+            self._products_catalog_version = None
 
     def product_snapshot(self) -> dict[str, dict[str, Any]]:
         with self._products_lock:
@@ -2674,6 +2720,17 @@ class StyleDashRequestHandler(SimpleHTTPRequestHandler):
         if not head_only:
             self.wfile.write(encoded)
 
+    def _with_live_inventory(self, products: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        live_inventory = self.payment_service.shop_inventory_snapshot(
+            [product["id"] for product in products]
+        )
+        for product in products:
+            for variant in product.get("variants", []):
+                stock = live_inventory.get(variant["id"])
+                if stock is not None:
+                    variant["stock"] = stock
+        return products
+
     def _binary_response(self, status: int, body: bytes, content_type: str, headers: dict[str, str] | None = None) -> None:
         self.send_response(status)
         self.send_header("Content-Type", content_type)
@@ -3057,18 +3114,46 @@ class StyleDashRequestHandler(SimpleHTTPRequestHandler):
                 return
             if path == "/api/shop-products/published":
                 self._rate_limit(path, 60)
-                products = self._shops().list_published_products()
-                live_inventory = self.payment_service.shop_inventory_snapshot(
-                    [product["id"] for product in products]
-                )
-                for product in products:
-                    for variant in product.get("variants", []):
-                        stock = live_inventory.get(variant["id"])
-                        if stock is not None:
-                            variant["stock"] = stock
+                query = parse_qs(parsed.query, keep_blank_values=True)
+                slug_values = query.get("slug", [])
+                store_values = query.get("vendorId", [])
+                if len(slug_values) > 1 or len(store_values) > 1 or (slug_values and store_values):
+                    raise ApiError(HTTPStatus.BAD_REQUEST, "Invalid catalogue request.", "invalid_catalogue_request")
+                if slug_values:
+                    product = self._with_live_inventory(
+                        [self._shops().get_published_product(slug_values[0])]
+                    )[0]
+                    self._json_response(HTTPStatus.OK, {"success": True, "product": product})
+                    return
+                if store_values:
+                    store_products = self._with_live_inventory(
+                        self._shops().list_store_published_products(store_values[0])
+                    )
+                    self._json_response(HTTPStatus.OK, {"success": True, "products": store_products})
+                    return
+                products = self._with_live_inventory(self._shops().list_published_products())
                 self._json_response(
                     HTTPStatus.OK,
                     {"success": True, "products": products},
+                )
+                return
+            if path == "/api/shop-products/similar":
+                self._rate_limit(path, 120)
+                query = parse_qs(parsed.query, keep_blank_values=True)
+                slug_values = query.get("slug", [])
+                limit_values = query.get("limit", [])
+                if len(slug_values) != 1 or len(limit_values) > 1:
+                    raise ApiError(HTTPStatus.BAD_REQUEST, "Invalid similar products request.", "invalid_similar_request")
+                limit = 8
+                if limit_values:
+                    try:
+                        limit = int(limit_values[0])
+                    except ValueError:
+                        raise ApiError(HTTPStatus.BAD_REQUEST, "Invalid similar products request.", "invalid_similar_request") from None
+                similar = self._shops().list_similar_products(slug_values[0], limit)
+                self._json_response(
+                    HTTPStatus.OK,
+                    {"success": True, "products": [_homepage_product_projection(product) for product in similar]},
                 )
                 return
             if path == f"/api/payment-test-product/{PAYMENT_TEST_PRODUCT_SLUG}":

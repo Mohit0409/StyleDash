@@ -24,5 +24,16 @@ export const canAddVariantToCart = async (variantId: string, fetcher: typeof fet
   }
 };
 
+// One batched product-level request instead of one request per variant.
+export const canAddVariantsToCart = async (productId: string, variantIds: string[], fetcher: typeof fetch = fetch): Promise<boolean> => {
+  try {
+    const { availability } = await inventoryRepository.getAvailabilityForProducts([productId], fetcher);
+    const available = new Set(availability.filter(item => item.available === true).map(item => item.variantId));
+    return variantIds.every(variantId => available.has(variantId));
+  } catch {
+    return false;
+  }
+};
+
 export const canIncreaseCartQuantity = (variantId: string, fetcher: typeof fetch = fetch): Promise<boolean> =>
   canAddVariantToCart(variantId, fetcher);

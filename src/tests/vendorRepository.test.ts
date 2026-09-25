@@ -22,6 +22,8 @@ describe('vendor repository', () => {
   });
 
   it('fails closed when the active-store API is unavailable', async () => {
+    // Travel past the 15 s response cache so this call really hits the API.
+    vi.spyOn(Date, 'now').mockReturnValue(Date.now() + 60_000);
     vi.spyOn(publicStoreApi, 'active').mockRejectedValue(new Error('offline'));
     await expect(vendorRepository.getAllStores()).resolves.toEqual([]);
   });

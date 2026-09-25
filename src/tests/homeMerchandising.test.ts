@@ -73,7 +73,7 @@ describe('homepage merchandising', () => {
   });
 
 
-  it('avoids repeats across promotional rows while category rows remain complete', () => {
+  it('fills promotional rows from eligible repeats only when fresh candidates run out', () => {
     const products = [
       product('feature', { newArrival: true, trending: true, price: 399 }),
       product('new', { newArrival: true }),
@@ -83,13 +83,38 @@ describe('homepage merchandising', () => {
       product('accessory', { category: 'Accessories' }),
       product('beauty', { category: 'Beauty & Personal Care' }),
     ];
-    const categoryIds = new Set(['clothing', 'footwear', 'accessories', 'beauty', 'electronics', 'gifts', 'home']);
-    const promotionalIds = buildHomepageSections(products, 2, saturday)
-      .filter(section => !categoryIds.has(section.id))
-      .flatMap(section => section.products.map(item => item.id));
-    expect(promotionalIds.length - new Set(promotionalIds).size).toBeLessThanOrEqual(1);
+    const sections = buildHomepageSections(products, 4, saturday);
+    const express = sections.find(section => section.id === 'express');
+    expect(express?.products).toHaveLength(4);
+    expect(new Set(express?.products.map(item => item.id)).size).toBe(4);
+    // Trending has only two eligible candidates, so both are returned.
+    expect(sections.find(section => section.id === 'trending')?.products).toHaveLength(2);
     expect(buildHomepageSections(products, 2, saturday).find(section => section.id === 'accessories')?.products).toHaveLength(1);
     expect(buildHomepageSections(products, 2, saturday).find(section => section.id === 'beauty')?.products).toHaveLength(1);
+  });
+
+  it('fills every rail with ten unique products when ten eligible candidates exist', () => {
+    const catalogue = Array.from({ length: 14 }, (_, index) => product(`fresh-${index}`, {
+      newArrival: true,
+      category: index % 2 ? 'Footwear' : 'Clothing & Fashion',
+    }));
+    const sections = buildHomepageSections(catalogue, 10, monday);
+    const fresh = sections.find(section => section.id === 'new');
+    expect(fresh?.products).toHaveLength(10);
+    expect(new Set(fresh?.products.map(item => item.id)).size).toBe(10);
+    const clothing = sections.find(section => section.id === 'clothing');
+    expect(clothing?.products).toHaveLength(7);
+    expect(new Set(clothing?.products.map(item => item.id)).size).toBe(7);
+  });
+
+  it('returns all eligible candidates when fewer than ten exist and never injects ineligible products', () => {
+    const catalogue = [
+      ...Array.from({ length: 4 }, (_, index) => product(`gift-${index}`, { category: 'Gifts' })),
+      product('hidden', { category: 'Gifts', active: false }),
+    ];
+    const sections = buildHomepageSections(catalogue, 10, monday);
+    const gifts = sections.find(section => section.id === 'gifts');
+    expect(gifts?.products.map(item => item.id)).toEqual(['gift-0', 'gift-1', 'gift-2', 'gift-3']);
   });
 
   it('uses excluded Top Picks only as fallback when a category would otherwise disappear', () => {
