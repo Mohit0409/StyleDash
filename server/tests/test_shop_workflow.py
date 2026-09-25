@@ -987,6 +987,66 @@ class ShopWorkflowTests(unittest.TestCase):
             self.assertNotIn("commissionPaise", public)
             self.assertNotIn("customerPricePaise", public)
             self.assertEqual(public["price"], customer_price / 100)
+            # MRP remains precisely what the shop owner supplied; only the
+            # customer selling price includes the hidden commission.
+            self.assertEqual(public["originalPrice"], payload["originalPricePaise"] / 100)
+
+    def test_payment_catalogue_applies_commission_only_to_selling_price(self) -> None:
+        self.create_active_shop("user-a", "Checkout Commission Shop")
+        payload = self.complete_product("Commissioned Selling Price")
+        payload["pricePaise"] = 50_000
+        payload["originalPricePaise"] = 75_000
+        product = self.store.create_product_draft("user-a", payload)
+        product = self.store.submit_product("user-a", product["id"])
+        for target in ("UNDER_REVIEW", "APPROVED", "PUBLISHED"):
+            product = self.store.admin_transition_product("admin-a", product["id"], target)
+
+        public = next(item for item in self.store.list_published_products() if item["id"] == product["id"])
+        payment_product = next(item for item in self.store.payment_catalog_products() if item["id"] == product["id"])
+
+        self.assertEqual(public["price"], 540)
+        self.assertEqual(public["originalPrice"], 750)
+        self.assertEqual(payment_product["price"], 540)
+
+    def test_owner_mrp_must_cover_customer_selling_price_after_commission(self) -> None:
+        self.create_active_shop("user-a", "MRP Validation Shop")
+        payload = self.complete_product("MRP Validation Product")
+        payload["pricePaise"] = 50_000
+        payload["originalPricePaise"] = 53_999
+
+        self.assert_error(
+            "invalid_product",
+            lambda: self.store.create_product_draft("user-a", payload),
+        )
+
+        payload["originalPricePaise"] = 54_000
+        product = self.store.create_product_draft("user-a", payload)
+        self.assertEqual(product["originalPricePaise"], 54_000)
+
+    def test_legacy_product_below_final_customer_price_is_not_sellable(self) -> None:
+        self.create_active_shop("user-a", "Legacy MRP Protection Shop")
+        payload = self.complete_product("Legacy MRP Product")
+        payload["pricePaise"] = 50_000
+        payload["originalPricePaise"] = 54_000
+        product = self.store.create_product_draft("user-a", payload)
+        product = self.store.submit_product("user-a", product["id"])
+        for target in ("UNDER_REVIEW", "APPROVED", "PUBLISHED"):
+            product = self.store.admin_transition_product("admin-a", product["id"], target)
+        with self.store.connect() as db:
+            db.execute(
+                "UPDATE shop_product_submissions SET original_price_paise=? WHERE id=?",
+                (50_000, product["id"]),
+            )
+            db.commit()
+
+        self.assertNotIn(
+            product["id"],
+            {item["id"] for item in self.store.list_published_products()},
+        )
+        payment_product = next(
+            item for item in self.store.payment_catalog_products() if item["id"] == product["id"]
+        )
+        self.assertFalse(payment_product["active"])
 
 
 if __name__ == "__main__":

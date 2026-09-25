@@ -34,7 +34,7 @@ const ProductThumbnail: React.FC<{ imageUrls: string[]; name: string }> = ({ ima
   return <img src={source} alt={name} width={48} height={48} onError={() => setImageIndex(index => index + 1)} className="h-12 w-12 shrink-0 rounded-md border bg-neutral-50 object-contain object-center p-0.5 dark:border-neutral-700 dark:bg-neutral-800" loading="lazy" referrerPolicy="no-referrer" />;
 };
 
-interface ProductFormState {
+export interface ProductFormState {
   name: string;
   description: string;
   brand: string;
@@ -89,16 +89,15 @@ const toForm = (product: SellerProduct): ProductFormState => {
   };
 };
 
-const toPayload = (form: ProductFormState): SellerProductDraft => {
+export const toPayload = (form: ProductFormState): SellerProductDraft => {
   const pricePaise = Math.round(Number(form.price) * 100);
-  const originalPricePaise = form.originalPrice
-    ? Math.round(Number(form.originalPrice) * 100)
-    : pricePaise;
+  const originalPricePaise = Math.round(Number(form.originalPrice) * 100);
   if (
     !Number.isSafeInteger(pricePaise) || pricePaise < 100
-    || !Number.isSafeInteger(originalPricePaise) || originalPricePaise < pricePaise
+    || !Number.isSafeInteger(originalPricePaise)
+    || originalPricePaise < pricePaise
   ) {
-    throw new Error('Enter valid price values.');
+    throw new Error('Enter a valid original/MRP price.');
   }
   const variants = form.variants.map(variant => ({
     ...(variant.id ? { id: variant.id } : {}),
@@ -438,6 +437,10 @@ export const SellerProducts: React.FC = () => {
     draft: products.filter(product => productView(product) === 'draft').length,
     review: products.filter(product => productView(product) === 'review').length,
   };
+  const enteredPricePaise = Math.round(Number(form.price) * 100);
+  const minimumOriginalPrice = Number.isSafeInteger(enteredPricePaise) && enteredPricePaise >= 100
+    ? enteredPricePaise / 100
+    : 1;
 
   return (
     <section className="space-y-5 rounded-3xl border border-neutral-200 bg-white p-6 dark:border-neutral-800 dark:bg-neutral-900" aria-labelledby="seller-products-heading">
@@ -480,7 +483,7 @@ export const SellerProducts: React.FC = () => {
             <label className="font-bold">Subcategory <span className="font-normal text-neutral-500">(optional; inferred when clear)</span><input maxLength={100} value={form.subcategory} onChange={event => updateForm('subcategory', event.target.value)} placeholder="e.g. Sneakers or Earrings" className="mt-1 w-full rounded-xl border p-3 dark:bg-neutral-800" /></label>
             <div className="rounded-xl border p-3 dark:border-neutral-700"><p className="font-bold">Delivery schedule</p><p className="mt-1 text-neutral-500">Same Day Delivery Monday-Friday. Same Day + Express Delivery Saturday-Sunday for every product.</p></div>
             <label className="font-bold">Price (INR)<input required type="number" min="1" step="0.01" value={form.price} onChange={event => updateForm('price', event.target.value)} className="mt-1 w-full rounded-xl border p-3 dark:bg-neutral-800" /></label>
-            <label className="font-bold">Original price (INR)<input type="number" min="1" step="0.01" value={form.originalPrice} onChange={event => updateForm('originalPrice', event.target.value)} className="mt-1 w-full rounded-xl border p-3 dark:bg-neutral-800" /></label>
+            <label className="font-bold">Original price (INR)<input required type="number" min={minimumOriginalPrice} step="0.01" value={form.originalPrice} onChange={event => updateForm('originalPrice', event.target.value)} className="mt-1 w-full rounded-xl border p-3 dark:bg-neutral-800" /></label>
             <div className="sm:col-span-2 space-y-2">
               <div className="flex items-center justify-between gap-3">
                 <span className="font-bold">{formMode === 'change' ? 'Sizes and inventory' : 'Sizes and stock'}</span>
