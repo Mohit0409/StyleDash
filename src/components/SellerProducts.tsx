@@ -10,7 +10,9 @@ import {
   shopProductApi,
 } from '../services/businessApi';
 
-const CATEGORIES = ['Clothing & Fashion', 'Footwear', 'Accessories', 'Beauty & Personal Care', 'Electronics', 'Home & Living', 'General Store'];
+import { CATEGORY_DISPLAY_ORDER } from '../data/categories';
+
+const CATEGORIES = CATEGORY_DISPLAY_ORDER;
 const DEPARTMENTS = ['men', 'women', 'kids', 'unisex'] as const;
 const INTERNAL_PRODUCT_IMAGE = /^\/media\/product-images\/[0-9a-f]{32}\.(?:webp|jpg|png)$/;
 
@@ -34,6 +36,15 @@ const ProductThumbnail: React.FC<{ imageUrls: string[]; name: string }> = ({ ima
   return <img src={source} alt={name} width={48} height={48} onError={() => setImageIndex(index => index + 1)} className="h-12 w-12 shrink-0 rounded-md border bg-neutral-50 object-contain object-center p-0.5 dark:border-neutral-700 dark:bg-neutral-800" loading="lazy" referrerPolicy="no-referrer" />;
 };
 
+export interface ColourFormState {
+  colourName: string;
+  colourHex: string;
+  imageMode: 'links' | 'upload';
+  imageUrls: string;
+  uploadedImageUrls: string[];
+  variants: Array<{ id?: string; size: string; inventory: string }>;
+}
+
 export interface ProductFormState {
   name: string;
   description: string;
@@ -44,27 +55,54 @@ export interface ProductFormState {
   deliveryType: 'normal' | 'express' | 'both';
   price: string;
   originalPrice: string;
-  variants: Array<{ id?: string; size: string; inventory: string }>;
-  colourName: string;
-  colourHex: string;
-  imageMode: 'links' | 'upload';
-  imageUrls: string;
-  uploadedImageUrls: string[];
+  // Multiple colours live inside one product, mirroring the private admin
+  // colourVariants schema; a single-colour product keeps the legacy payload.
+  colours: ColourFormState[];
   material: string;
   tryAtHomeEnabled: boolean;
   exchangeAvailable: boolean;
 }
 
+const EMPTY_COLOUR: ColourFormState = {
+  colourName: '', colourHex: '', imageMode: 'links', imageUrls: '', uploadedImageUrls: [],
+  variants: [{ size: '', inventory: '0' }],
+};
+
 const EMPTY_FORM: ProductFormState = {
   name: '', description: '', brand: '', department: 'unisex', category: CATEGORIES[0], subcategory: '', deliveryType: 'normal',
-  price: '', originalPrice: '', variants: [{ size: '', inventory: '0' }], colourName: '', colourHex: '',
-  imageMode: 'links', imageUrls: '', uploadedImageUrls: [], material: '', tryAtHomeEnabled: false, exchangeAvailable: false,
+  price: '', originalPrice: '', colours: [EMPTY_COLOUR], material: '', tryAtHomeEnabled: false, exchangeAvailable: false,
+};
+
+const colourToForm = (
+  imageUrls: string[],
+  colourName: string,
+  colourHex: string | undefined,
+  sizes: Array<{ id?: string; size: string; inventory: number }>,
+): ColourFormState => {
+  const uploadedImages = imageUrls.filter(value => INTERNAL_PRODUCT_IMAGE.test(value));
+  const linkedImages = imageUrls.filter(value => !INTERNAL_PRODUCT_IMAGE.test(value));
+  const imageMode: ColourFormState['imageMode'] = uploadedImages.length > 0 ? 'upload' : 'links';
+  return {
+    colourName,
+    colourHex: colourHex || '',
+    imageMode,
+    imageUrls: linkedImages.join('\n'),
+    uploadedImageUrls: imageMode === 'upload' ? uploadedImages : [],
+    variants: sizes.map(variant => ({ id: variant.id, size: variant.size, inventory: String(variant.inventory) })),
+  };
 };
 
 const toForm = (product: SellerProduct): ProductFormState => {
-  const uploadedImages = product.imageUrls.filter(value => INTERNAL_PRODUCT_IMAGE.test(value));
-  const linkedImages = product.imageUrls.filter(value => !INTERNAL_PRODUCT_IMAGE.test(value));
-  const imageMode: ProductFormState['imageMode'] = uploadedImages.length > 0 ? 'upload' : 'links';
+  const colours = product.colourVariants && product.colourVariants.length
+    ? product.colourVariants.map(group => colourToForm(group.imageUrls, group.colourName, group.colourHex, group.sizes))
+    : [colourToForm(
+      product.imageUrls,
+      product.colourName,
+      product.colourHex,
+      product.variants?.length
+        ? product.variants
+        : [{ size: product.size, inventory: product.inventory }],
+    )];
   return {
     name: product.name,
     description: product.description,
@@ -75,18 +113,48 @@ const toForm = (product: SellerProduct): ProductFormState => {
     deliveryType: 'normal',
     price: (product.pricePaise / 100).toFixed(2),
     originalPrice: (product.originalPricePaise / 100).toFixed(2),
-    variants: product.variants?.length
-      ? product.variants.map(variant => ({ id: variant.id, size: variant.size, inventory: String(variant.inventory) }))
-      : [{ size: product.size, inventory: String(product.inventory) }],
-    colourName: product.colourName,
-    colourHex: product.colourHex || '',
-    imageMode,
-    imageUrls: linkedImages.join('\n'),
-    uploadedImageUrls: imageMode === 'upload' ? uploadedImages : [],
+    colours,
     material: product.attributes.material || '',
     tryAtHomeEnabled: product.tryAtHomeEnabled === true,
     exchangeAvailable: product.exchangeAvailable === true,
   };
+};
+
+const normalizeColourGroup = (colour: ColourFormState) => {
+  const colourName = colour.colourName.trim();
+  if (!colourName) throw new Error('Every colour needs a colour name.');
+  if (colourName.length > 80) throw new Error('Colour names must be 80 characters or fewer.');
+  const colourHex = colour.colourHex.trim();
+  if (colourHex && !/^#[0-9A-Fa-f]{6}$/.test(colourHex)) throw new Error(`Enter a valid hex colour like #000000 for ${colourName}.`);
+  const sizes = colour.variants.map(variant => ({
+    ...(variant.id ? { id: variant.id } : {}),
+    size: variant.size.trim(),
+    inventory: Number(variant.inventory),
+  }));
+  const normalizedSizes = sizes.map(variant => variant.size.toLocaleLowerCase());
+  if (
+    sizes.length < 1 || sizes.length > 20
+    || sizes.some(variant => !variant.size || variant.size.length > 40)
+    || sizes.some(variant => !Number.isSafeInteger(variant.inventory) || variant.inventory < 0 || variant.inventory > 100_000)
+    || new Set(normalizedSizes).size !== sizes.length
+  ) {
+    if (sizes.length < 1) throw new Error(`Add at least one size for ${colourName}.`);
+    if (sizes.some(variant => !variant.size)) throw new Error('Every size row needs a size name.');
+    if (sizes.some(variant => variant.size.length > 40)) throw new Error('Size names must be 40 characters or fewer.');
+    if (sizes.some(variant => !Number.isSafeInteger(variant.inventory) || variant.inventory < 0 || variant.inventory > 100_000)) throw new Error('Stock for every size must be a whole number from 0 to 100000.');
+    throw new Error(`Each size can appear only once for ${colourName}. Remove or rename the duplicate size.`);
+  }
+  const imageUrls = colour.imageMode === 'links'
+    ? colour.imageUrls.split(/\r?\n/).map(value => value.trim()).filter(Boolean)
+    : colour.uploadedImageUrls;
+  if (colour.imageMode === 'links') {
+    if (imageUrls.length < 1 || imageUrls.length > 8 || imageUrls.some(value => !validExternalImageLink(value))) {
+      throw new Error(`Add 1-8 direct HTTPS image links for ${colourName}. Webpage (.html) links are not images.`);
+    }
+  } else if (imageUrls.length < 1 || imageUrls.length > 8 || imageUrls.some(value => !validImageReference(value))) {
+    throw new Error(`Upload 1-8 product images for ${colourName}.`);
+  }
+  return { colourName, colourHex: colourHex || undefined, imageUrls, sizes };
 };
 
 export const toPayload = (form: ProductFormState): SellerProductDraft => {
@@ -99,54 +167,50 @@ export const toPayload = (form: ProductFormState): SellerProductDraft => {
   ) {
     throw new Error('Enter a valid original/MRP price.');
   }
-  const variants = form.variants.map(variant => ({
-    ...(variant.id ? { id: variant.id } : {}),
-    size: variant.size.trim(),
-    inventory: Number(variant.inventory),
-  }));
-  const normalizedSizes = variants.map(variant => variant.size.toLocaleLowerCase());
-  if (
-    variants.length < 1 || variants.length > 20
-    || variants.some(variant => !variant.size || variant.size.length > 40)
-    || variants.some(variant => !Number.isSafeInteger(variant.inventory) || variant.inventory < 0 || variant.inventory > 100_000)
-    || new Set(normalizedSizes).size !== variants.length
-    || variants.reduce((total, variant) => total + variant.inventory, 0) > 100_000
-  ) {
-    if (variants.length < 1) throw new Error('Add at least one size.');
-    if (variants.length > 20) throw new Error('A product can have at most 20 sizes.');
-    if (variants.some(variant => !variant.size)) throw new Error('Every size row needs a size name.');
-    if (variants.some(variant => variant.size.length > 40)) throw new Error('Size names must be 40 characters or fewer.');
-    if (variants.some(variant => !Number.isSafeInteger(variant.inventory) || variant.inventory < 0 || variant.inventory > 100_000)) throw new Error('Stock for every size must be a whole number from 0 to 100000.');
-    if (new Set(normalizedSizes).size !== variants.length) throw new Error('Each size can appear only once. Remove or rename the duplicate size.');
-    throw new Error('Total stock across all sizes cannot exceed 100000.');
+  const colours = form.colours.map(normalizeColourGroup);
+  if (colours.length < 1) throw new Error('Add at least one colour.');
+  if (colours.length > 20) throw new Error('A product can have at most 20 colours.');
+  const colourNames = colours.map(colour => colour.colourName.toLocaleLowerCase());
+  if (new Set(colourNames).size !== colours.length) {
+    throw new Error('Each colour can appear only once. Remove or rename the duplicate colour.');
   }
-  const imageUrls = form.imageMode === 'links'
-    ? form.imageUrls.split(/\r?\n/).map(value => value.trim()).filter(Boolean)
-    : form.uploadedImageUrls;
-  if (form.imageMode === 'links') {
-    if (imageUrls.length < 1 || imageUrls.length > 8 || imageUrls.some(value => !validExternalImageLink(value))) {
-      throw new Error('Add 1-8 direct HTTPS image links. Webpage (.html) links are not images.');
-    }
-  } else if (imageUrls.length < 1 || imageUrls.length > 8 || imageUrls.some(value => !validImageReference(value))) {
-    throw new Error('Upload 1-8 product images.');
-  }
-  return {
+  const totalVariants = colours.reduce((total, colour) => total + colour.sizes.length, 0);
+  if (totalVariants > 20) throw new Error('A product can have at most 20 size and colour combinations.');
+  const totalStock = colours.reduce(
+    (total, colour) => total + colour.sizes.reduce((sum, variant) => sum + variant.inventory, 0), 0,
+  );
+  if (totalStock > 100_000) throw new Error('Total stock across all sizes cannot exceed 100000.');
+  const base = {
     name: form.name.trim(),
     description: form.description.trim(),
     brand: form.brand.trim() || undefined,
     department: form.department,
     category: form.category,
     subcategory: form.subcategory.trim() || undefined,
-    deliveryType: 'normal',
+    deliveryType: 'normal' as const,
     pricePaise,
     originalPricePaise,
-    variants,
-    colourName: form.colourName.trim(),
-    colourHex: form.colourHex.trim() || undefined,
-    imageUrls,
-    attributes: form.material.trim() ? { material: form.material.trim() } : {},
+    attributes: (form.material.trim() ? { material: form.material.trim() } : {}) as Record<string, string>,
     tryAtHomeEnabled: form.tryAtHomeEnabled,
     exchangeAvailable: form.exchangeAvailable,
+  };
+  const [first] = colours;
+  if (colours.length === 1) {
+    // Single-colour products keep the established legacy payload shape.
+    return {
+      ...base,
+      variants: first.sizes,
+      colourName: first.colourName,
+      colourHex: first.colourHex,
+      imageUrls: first.imageUrls,
+    };
+  }
+  return {
+    ...base,
+    colourVariants: colours,
+    colourName: first.colourName,
+    colourHex: first.colourHex,
+    imageUrls: first.imageUrls,
   };
 };
 
@@ -160,7 +224,12 @@ const toChangePayload = (payload: SellerProductDraft): SellerProductChangeDraft 
   deliveryType: payload.deliveryType,
   pricePaise: payload.pricePaise,
   originalPricePaise: payload.originalPricePaise,
-  variants: payload.variants,
+  // Reviewed listing-change requests keep the legacy flat variant list so
+  // existing variant identities (and therefore per-colour metadata stored
+  // server-side) survive approval unchanged.
+  variants: payload.colourVariants
+    ? payload.colourVariants.flatMap(colour => colour.sizes)
+    : payload.variants,
   colourName: payload.colourName,
   colourHex: payload.colourHex,
   imageUrls: payload.imageUrls,
@@ -223,21 +292,33 @@ export const SellerProducts: React.FC = () => {
     setForm(current => ({ ...current, [field]: value }));
   };
 
-  const updateVariant = (index: number, field: 'size' | 'inventory', value: string) => {
+  const updateColour = (colourIndex: number, field: 'colourName' | 'colourHex', value: string) => {
     setForm(current => ({
       ...current,
-      variants: current.variants.map((variant, position) => position === index ? { ...variant, [field]: value } : variant),
+      colours: current.colours.map((colour, position) => position === colourIndex ? { ...colour, [field]: value } : colour),
     }));
   };
 
-  const addVariant = () => setForm(current => ({
+  const updateVariant = (colourIndex: number, index: number, field: 'size' | 'inventory', value: string) => {
+    setForm(current => ({
+      ...current,
+      colours: current.colours.map((colour, position) => position === colourIndex
+        ? { ...colour, variants: colour.variants.map((variant, row) => row === index ? { ...variant, [field]: value } : variant) }
+        : colour),
+    }));
+  };
+
+  const addVariant = (colourIndex: number) => setForm(current => ({
     ...current,
-    variants: [...current.variants, { size: '', inventory: '0' }],
+    colours: current.colours.map((colour, position) => position === colourIndex
+      ? { ...colour, variants: [...colour.variants, { size: '', inventory: '0' }] }
+      : colour),
   }));
 
-  const removeVariant = (index: number) => {
-    const variant = form.variants[index];
-    if (!variant || form.variants.length === 1) return;
+  const removeVariant = (colourIndex: number, index: number) => {
+    const colour = form.colours[colourIndex];
+    const variant = colour?.variants[index];
+    if (!colour || !variant || colour.variants.length === 1) return;
     if (formMode === 'change' && variant.id && Number(variant.inventory) !== 0) {
       setError(`Set stock for size ${variant.size} to 0 using its Stock button before removing it.`);
       return;
@@ -245,7 +326,27 @@ export const SellerProducts: React.FC = () => {
     setError('');
     setForm(current => ({
       ...current,
-      variants: current.variants.filter((_, position) => position !== index),
+      colours: current.colours.map((item, position) => position === colourIndex
+        ? { ...item, variants: item.variants.filter((_, row) => row !== index) }
+        : item),
+    }));
+  };
+
+  const addColour = () => setForm(current => ({
+    ...current,
+    colours: [...current.colours, { ...EMPTY_COLOUR, variants: [{ size: '', inventory: '0' }] }],
+  }));
+
+  const removeColour = (colourIndex: number) => {
+    if (form.colours.length === 1) return;
+    if (formMode === 'change') {
+      setError('Colour changes for a live listing are reviewed by the administrator. Ask support or create a new draft for structural colour changes.');
+      return;
+    }
+    setError('');
+    setForm(current => ({
+      ...current,
+      colours: current.colours.filter((_, position) => position !== colourIndex),
     }));
   };
 
@@ -262,7 +363,11 @@ export const SellerProducts: React.FC = () => {
     setEditingId(product.id);
     setFormMode('draft');
     const draftForm = toForm(product);
-    draftForm.variants = draftForm.variants.map(({ size, inventory }) => ({ size, inventory }));
+    // Draft edits re-key rows server-side; only reviewed listing changes keep ids.
+    draftForm.colours = draftForm.colours.map(colour => ({
+      ...colour,
+      variants: colour.variants.map(({ size, inventory }) => ({ size, inventory })),
+    }));
     setForm(draftForm);
     setFormOpen(true);
     setError('');
@@ -278,11 +383,11 @@ export const SellerProducts: React.FC = () => {
     setMessage('');
   };
 
-  const uploadImages = async (files: FileList | null) => {
+  const uploadImages = async (colourIndex: number, files: FileList | null) => {
     if (!files?.length) return;
-    const existing = form.uploadedImageUrls;
+    const existing = form.colours[colourIndex]?.uploadedImageUrls ?? [];
     if (existing.length + files.length > 8) {
-      setError('A product can have at most 8 images.');
+      setError('Each colour can have at most 8 images.');
       return;
     }
     setUploadBusy(true);
@@ -303,7 +408,9 @@ export const SellerProducts: React.FC = () => {
       }
       setForm(current => ({
         ...current,
-        uploadedImageUrls: [...current.uploadedImageUrls, ...uploaded],
+        colours: current.colours.map((colour, position) => position === colourIndex
+          ? { ...colour, uploadedImageUrls: [...colour.uploadedImageUrls, ...uploaded] }
+          : colour),
       }));
       setMessage(`${uploaded.length} image${uploaded.length === 1 ? '' : 's'} optimized and uploaded. Drag order is controlled with the arrow buttons below; image 1 is the main product image.`);
     } catch (cause) {
@@ -314,26 +421,35 @@ export const SellerProducts: React.FC = () => {
     }
   };
 
-  const setImageMode = (imageMode: ProductFormState['imageMode']) => {
-    setForm(current => ({ ...current, imageMode }));
+  const setImageMode = (colourIndex: number, imageMode: ColourFormState['imageMode']) => {
+    setForm(current => ({
+      ...current,
+      colours: current.colours.map((colour, position) => position === colourIndex ? { ...colour, imageMode } : colour),
+    }));
     setError('');
     setMessage('');
   };
 
-  const moveUploadedImage = (index: number, direction: -1 | 1) => {
-    setForm(current => {
-      const target = index + direction;
-      if (target < 0 || target >= current.uploadedImageUrls.length) return current;
-      const uploadedImageUrls = [...current.uploadedImageUrls];
-      [uploadedImageUrls[index], uploadedImageUrls[target]] = [uploadedImageUrls[target], uploadedImageUrls[index]];
-      return { ...current, uploadedImageUrls };
-    });
-  };
-
-  const removeUploadedImage = (index: number) => {
+  const moveUploadedImage = (colourIndex: number, index: number, direction: -1 | 1) => {
     setForm(current => ({
       ...current,
-      uploadedImageUrls: current.uploadedImageUrls.filter((_, position) => position !== index),
+      colours: current.colours.map((colour, position) => {
+        if (position !== colourIndex) return colour;
+        const target = index + direction;
+        if (target < 0 || target >= colour.uploadedImageUrls.length) return colour;
+        const uploadedImageUrls = [...colour.uploadedImageUrls];
+        [uploadedImageUrls[index], uploadedImageUrls[target]] = [uploadedImageUrls[target], uploadedImageUrls[index]];
+        return { ...colour, uploadedImageUrls };
+      }),
+    }));
+  };
+
+  const removeUploadedImage = (colourIndex: number, index: number) => {
+    setForm(current => ({
+      ...current,
+      colours: current.colours.map((colour, position) => position === colourIndex
+        ? { ...colour, uploadedImageUrls: colour.uploadedImageUrls.filter((_, row) => row !== index) }
+        : colour),
     }));
   };
 
@@ -484,73 +600,95 @@ export const SellerProducts: React.FC = () => {
             <div className="rounded-xl border p-3 dark:border-neutral-700"><p className="font-bold">Delivery schedule</p><p className="mt-1 text-neutral-500">Same Day Delivery Monday-Friday. Same Day + Express Delivery Saturday-Sunday for every product.</p></div>
             <label className="font-bold">Price (INR)<input required type="number" min="1" step="0.01" value={form.price} onChange={event => updateForm('price', event.target.value)} className="mt-1 w-full rounded-xl border p-3 dark:bg-neutral-800" /></label>
             <label className="font-bold">Original price (INR)<input required type="number" min={minimumOriginalPrice} step="0.01" value={form.originalPrice} onChange={event => updateForm('originalPrice', event.target.value)} className="mt-1 w-full rounded-xl border p-3 dark:bg-neutral-800" /></label>
-            <div className="sm:col-span-2 space-y-2">
+            <div className="sm:col-span-2 space-y-3">
               <div className="flex items-center justify-between gap-3">
-                <span className="font-bold">{formMode === 'change' ? 'Sizes and inventory' : 'Sizes and stock'}</span>
-                <button type="button" onClick={addVariant} disabled={form.variants.length >= 20} className="rounded-lg border px-3 py-1.5 font-bold disabled:opacity-50">+ Add size</button>
+                <span className="font-bold">{formMode === 'change' ? 'Colours, sizes and inventory' : 'Colours, sizes and stock'}</span>
+                {formMode !== 'change' && (
+                  <button type="button" onClick={addColour} disabled={form.colours.length >= 20} className="rounded-lg border px-3 py-1.5 font-bold disabled:opacity-50">+ Add colour</button>
+                )}
               </div>
               <p className="text-neutral-500">{formMode === 'change'
-                ? 'Add new sizes anytime. To remove a published size, first set its live stock to 0 using the Stock button, then remove the row here. Existing published size names are locked to protect historical orders.'
-                : 'Add one row per size. Stock is tracked separately for every size, and draft size names can be edited freely.'}</p>
-              <div className="space-y-2">
-                {form.variants.map((variant, index) => {
-                  const existingPublishedVariant = formMode === 'change' && Boolean(variant.id);
-                  return <div key={variant.id || index} className="grid grid-cols-[1fr_1fr_auto] gap-2">
-                    <input aria-label={`Size ${index + 1}`} required maxLength={40} readOnly={existingPublishedVariant} title={existingPublishedVariant ? 'Published size names are locked. Remove this zero-stock size and add the corrected size instead.' : undefined} value={variant.size} onChange={event => { if (!existingPublishedVariant) updateVariant(index, 'size', event.target.value); }} placeholder="Size, e.g. S or XL" className="w-full rounded-xl border p-3 read-only:bg-neutral-100 read-only:text-neutral-500 dark:bg-neutral-800 dark:read-only:bg-neutral-900" />
-                    <input aria-label={`Stock for size ${variant.size || index + 1}`} title={existingPublishedVariant ? 'Use the Stock button on the product card to change live stock.' : undefined} required type="number" min="0" max="100000" step="1" readOnly={existingPublishedVariant} value={variant.inventory} onChange={event => { if (!existingPublishedVariant) updateVariant(index, 'inventory', event.target.value); }} placeholder="Stock" className="w-full rounded-xl border p-3 read-only:bg-neutral-100 read-only:text-neutral-500 dark:bg-neutral-800 dark:read-only:bg-neutral-900" />
-                    <button type="button" disabled={form.variants.length === 1} onClick={() => removeVariant(index)} className="rounded-xl border px-3 font-bold text-red-600 disabled:opacity-30" aria-label={`Remove size ${variant.size || index + 1}`}>×</button>
-                  </div>;
-                })}
-              </div>
+                ? 'Add new sizes anytime. To remove a published size, first set its live stock to 0 using the Stock button, then remove the row here. Existing published size names are locked to protect historical orders. Colour changes to a live listing are reviewed by the administrator.'
+                : 'One product can offer multiple colours: add one colour card per colour, each with its own images, sizes and stock.'}</p>
+              {form.colours.map((colour, colourIndex) => {
+                const firstColour = colourIndex === 0;
+                const colourLabel = firstColour ? 'Colour' : `Colour ${colourIndex + 1}`;
+                return (
+                <section key={colourIndex} aria-label={form.colours.length > 1 ? colourLabel : undefined} className="space-y-3 rounded-2xl border border-neutral-200 p-3 dark:border-neutral-700">
+                  <div className="flex items-center justify-between gap-3">
+                    <p className="font-bold">{colourLabel}</p>
+                    {form.colours.length > 1 && formMode !== 'change' && (
+                      <button type="button" onClick={() => removeColour(colourIndex)} aria-label={`Remove ${colourLabel.toLowerCase()}`} className="rounded-lg border px-3 py-1 font-bold text-red-600">Remove colour</button>
+                    )}
+                  </div>
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <label className="font-bold">{firstColour ? 'Colour name' : `${colourLabel} name`}<input required minLength={1} maxLength={80} value={colour.colourName} onChange={event => updateColour(colourIndex, 'colourName', event.target.value)} className="mt-1 w-full rounded-xl border p-3 dark:bg-neutral-800" /></label>
+                    <label className="font-bold">{firstColour ? 'Colour hex' : `${colourLabel} hex`} <span className="font-normal text-neutral-500">(optional)</span><input pattern="#[0-9A-Fa-f]{6}" placeholder="#000000" value={colour.colourHex} onChange={event => updateColour(colourIndex, 'colourHex', event.target.value)} className="mt-1 w-full rounded-xl border p-3 dark:bg-neutral-800" /></label>
+                  </div>
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between gap-3">
+                      <span className="text-[11px] font-bold text-neutral-500">{formMode === 'change' ? 'Sizes and inventory' : 'Sizes and stock'}</span>
+                      <button type="button" onClick={() => addVariant(colourIndex)} disabled={colour.variants.length >= 20} className="rounded-lg border px-3 py-1.5 font-bold disabled:opacity-50">{firstColour ? '+ Add size' : `+ Add size to ${colourLabel.toLowerCase()}`}</button>
+                    </div>
+                    {colour.variants.map((variant, index) => {
+                      const existingPublishedVariant = formMode === 'change' && Boolean(variant.id);
+                      return <div key={variant.id || index} className="grid grid-cols-[1fr_1fr_auto] gap-2">
+                        <input aria-label={firstColour ? `Size ${index + 1}` : `${colourLabel} size ${index + 1}`} required maxLength={40} readOnly={existingPublishedVariant} title={existingPublishedVariant ? 'Published size names are locked. Remove this zero-stock size and add the corrected size instead.' : undefined} value={variant.size} onChange={event => { if (!existingPublishedVariant) updateVariant(colourIndex, index, 'size', event.target.value); }} placeholder="Size, e.g. S or XL" className="w-full rounded-xl border p-3 read-only:bg-neutral-100 read-only:text-neutral-500 dark:bg-neutral-800 dark:read-only:bg-neutral-900" />
+                        <input aria-label={`Stock for size ${variant.size || index + 1}`} title={existingPublishedVariant ? 'Use the Stock button on the product card to change live stock.' : undefined} required type="number" min="0" max="100000" step="1" readOnly={existingPublishedVariant} value={variant.inventory} onChange={event => { if (!existingPublishedVariant) updateVariant(colourIndex, index, 'inventory', event.target.value); }} placeholder="Stock" className="w-full rounded-xl border p-3 read-only:bg-neutral-100 read-only:text-neutral-500 dark:bg-neutral-800 dark:read-only:bg-neutral-900" />
+                        <button type="button" disabled={colour.variants.length === 1} onClick={() => removeVariant(colourIndex, index)} className="rounded-xl border px-3 font-bold text-red-600 disabled:opacity-30" aria-label={`Remove size ${variant.size || index + 1}`}>×</button>
+                      </div>;
+                    })}
+                  </div>
+                  <fieldset className="space-y-3 rounded-xl border border-neutral-200 p-3 dark:border-neutral-700">
+                    <legend className="px-1 font-bold">{firstColour ? 'Product images' : `${colourLabel} images`}</legend>
+                    {firstColour && <p className="text-[11px] text-neutral-500">Choose one method per colour: use direct image links or upload product images. Only the selected method is submitted.</p>}
+                    <div className="grid grid-cols-2 gap-2" role="radiogroup" aria-label={firstColour ? 'Product image source' : `${colourLabel} image source`}>
+                      <button type="button" role="radio" aria-checked={colour.imageMode === 'links'} onClick={() => setImageMode(colourIndex, 'links')} className={`rounded-xl border px-3 py-2.5 font-bold ${colour.imageMode === 'links' ? 'border-neutral-950 bg-neutral-950 text-white dark:border-lime-400 dark:bg-lime-400 dark:text-neutral-950' : ''}`}>{firstColour ? 'Image link' : `${colourLabel} image link`}</button>
+                      <button type="button" role="radio" aria-checked={colour.imageMode === 'upload'} onClick={() => setImageMode(colourIndex, 'upload')} className={`rounded-xl border px-3 py-2.5 font-bold ${colour.imageMode === 'upload' ? 'border-neutral-950 bg-neutral-950 text-white dark:border-lime-400 dark:bg-lime-400 dark:text-neutral-950' : ''}`}>{firstColour ? 'Image upload' : `${colourLabel} image upload`}</button>
+                    </div>
+                    {colour.imageMode === 'links' ? (
+                      <label className="block font-bold">Direct HTTPS image links <span className="font-normal text-neutral-500">(one per line, 1-8)</span><textarea aria-label={firstColour ? 'HTTPS image URLs' : `${colourLabel} HTTPS image URLs`} rows={3} value={colour.imageUrls} onChange={event => setForm(current => ({ ...current, colours: current.colours.map((item, position) => position === colourIndex ? { ...item, imageUrls: event.target.value } : item) }))} placeholder="https://example.com/product.jpg" className="mt-1 w-full rounded-xl border p-3 dark:bg-neutral-800" /><span className="mt-1 block text-[11px] font-normal text-neutral-500">Each link must open the image itself, not a webpage such as a .html product/gallery page.</span></label>
+                    ) : (
+                      <div className="space-y-3">
+                        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                          <div>
+                            <p className="font-bold">{firstColour ? 'Upload product images' : `Upload ${colourLabel.toLowerCase()} images`}</p>
+                            <p className="text-[11px] text-neutral-500">JPEG, PNG or WebP. Images are resized to max 1600 px and compressed to WebP, targeting about 350 KB with a 500 KB hard limit.</p>
+                          </div>
+                          <label className="inline-flex cursor-pointer items-center justify-center rounded-xl border px-4 py-2.5 font-bold">
+                            {uploadBusy ? 'Optimizing...' : 'Choose images'}
+                            <input aria-label={firstColour ? 'Upload product images' : `Upload ${colourLabel.toLowerCase()} images`} type="file" multiple accept="image/jpeg,image/png,image/webp" disabled={busy || uploadBusy} onChange={event => { void uploadImages(colourIndex, event.target.files); event.currentTarget.value = ''; }} className="sr-only" />
+                          </label>
+                        </div>
+                        {colour.uploadedImageUrls.length > 0 ? (
+                          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                            {colour.uploadedImageUrls.map((value, index) => (
+                              <div key={`${value}-${index}`} className="rounded-xl border p-2 dark:border-neutral-700">
+                                <div className="relative">
+                                  <img src={value} alt={firstColour ? `Uploaded product image ${index + 1} preview` : `${colourLabel} uploaded image ${index + 1} preview`} loading="lazy" className="aspect-square w-full rounded-lg border object-cover" />
+                                  {index === 0 && <span className="absolute bottom-1 left-1 rounded-md bg-neutral-950/90 px-1.5 py-0.5 text-[9px] font-black text-white">MAIN</span>}
+                                </div>
+                                <div className="mt-2 grid grid-cols-3 gap-1">
+                                  <button type="button" disabled={index === 0} onClick={() => moveUploadedImage(colourIndex, index, -1)} aria-label={firstColour ? `Move uploaded image ${index + 1} left` : `Move ${colourLabel.toLowerCase()} image ${index + 1} left`} className="rounded-lg border py-1 font-black disabled:opacity-30">←</button>
+                                  <button type="button" disabled={index === colour.uploadedImageUrls.length - 1} onClick={() => moveUploadedImage(colourIndex, index, 1)} aria-label={firstColour ? `Move uploaded image ${index + 1} right` : `Move ${colourLabel.toLowerCase()} image ${index + 1} right`} className="rounded-lg border py-1 font-black disabled:opacity-30">→</button>
+                                  <button type="button" onClick={() => removeUploadedImage(colourIndex, index)} aria-label={firstColour ? `Remove uploaded image ${index + 1}` : `Remove ${colourLabel.toLowerCase()} image ${index + 1}`} className="rounded-lg border py-1 font-black text-red-600">×</button>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        ) : <p className="text-[11px] text-neutral-500">No images uploaded yet.</p>}
+                      </div>
+                    )}
+                  </fieldset>
+                </section>
+                );
+              })}
             </div>
-            <label className="font-bold">Colour name<input required minLength={1} maxLength={80} value={form.colourName} onChange={event => updateForm('colourName', event.target.value)} className="mt-1 w-full rounded-xl border p-3 dark:bg-neutral-800" /></label>
-            <label className="font-bold">Colour hex <span className="font-normal text-neutral-500">(optional)</span><input pattern="#[0-9A-Fa-f]{6}" placeholder="#000000" value={form.colourHex} onChange={event => updateForm('colourHex', event.target.value)} className="mt-1 w-full rounded-xl border p-3 dark:bg-neutral-800" /></label>
             <label className="font-bold">Material <span className="font-normal text-neutral-500">(optional)</span><input maxLength={200} value={form.material} onChange={event => updateForm('material', event.target.value)} className="mt-1 w-full rounded-xl border p-3 dark:bg-neutral-800" /></label>
             <label className="sm:col-span-2 flex gap-2 rounded-xl border border-lime-200 bg-lime-50 p-3 font-bold text-neutral-800 dark:border-lime-900 dark:bg-lime-950/20 dark:text-neutral-100"><input type="checkbox" checked={form.tryAtHomeEnabled} onChange={event => setForm(current => ({ ...current, tryAtHomeEnabled: event.target.checked }))} className="mt-0.5 accent-lime-600" /> Offer Try at Home: customer may receive two sizes, has 15 minutes to choose, pays ₹50 service fee and ₹50 more if late.</label>
             <label className="sm:col-span-2 flex gap-2 rounded-xl border border-sky-200 bg-sky-50 p-3 font-bold text-neutral-800 dark:border-sky-900 dark:bg-sky-950/20 dark:text-neutral-100"><input type="checkbox" checked={form.exchangeAvailable} onChange={event => setForm(current => ({ ...current, exchangeAvailable: event.target.checked }))} className="mt-0.5 accent-sky-600" /> Offer size exchange: eligible customers may exchange for another available size after paying the ₹50 exchange fee.</label>
             <label className="font-bold sm:col-span-2">Description<textarea required minLength={10} maxLength={2000} rows={3} value={form.description} onChange={event => updateForm('description', event.target.value)} className="mt-1 w-full rounded-xl border p-3 dark:bg-neutral-800" /></label>
-            <fieldset className="sm:col-span-2 space-y-3 rounded-xl border border-neutral-200 p-3 dark:border-neutral-700">
-              <legend className="px-1 font-bold">Product images</legend>
-              <p className="text-[11px] text-neutral-500">Choose one method: use direct image links or upload product images. Only the selected method is submitted.</p>
-              <div className="grid grid-cols-2 gap-2" role="radiogroup" aria-label="Product image source">
-                <button type="button" role="radio" aria-checked={form.imageMode === 'links'} onClick={() => setImageMode('links')} className={`rounded-xl border px-3 py-2.5 font-bold ${form.imageMode === 'links' ? 'border-neutral-950 bg-neutral-950 text-white dark:border-lime-400 dark:bg-lime-400 dark:text-neutral-950' : ''}`}>Image link</button>
-                <button type="button" role="radio" aria-checked={form.imageMode === 'upload'} onClick={() => setImageMode('upload')} className={`rounded-xl border px-3 py-2.5 font-bold ${form.imageMode === 'upload' ? 'border-neutral-950 bg-neutral-950 text-white dark:border-lime-400 dark:bg-lime-400 dark:text-neutral-950' : ''}`}>Image upload</button>
-              </div>
-              {form.imageMode === 'links' ? (
-                <label className="block font-bold">Direct HTTPS image links <span className="font-normal text-neutral-500">(one per line, 1-8)</span><textarea aria-label="HTTPS image URLs" rows={3} value={form.imageUrls} onChange={event => updateForm('imageUrls', event.target.value)} placeholder="https://example.com/product.jpg" className="mt-1 w-full rounded-xl border p-3 dark:bg-neutral-800" /><span className="mt-1 block text-[11px] font-normal text-neutral-500">Each link must open the image itself, not a webpage such as a .html product/gallery page.</span></label>
-              ) : (
-                <div className="space-y-3">
-                  <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                    <div>
-                      <p className="font-bold">Upload product images</p>
-                      <p className="text-[11px] text-neutral-500">JPEG, PNG or WebP. Images are resized to max 1600 px and compressed to WebP, targeting about 350 KB with a 500 KB hard limit.</p>
-                    </div>
-                    <label className="inline-flex cursor-pointer items-center justify-center rounded-xl border px-4 py-2.5 font-bold">
-                      {uploadBusy ? 'Optimizing...' : 'Choose images'}
-                      <input aria-label="Upload product images" type="file" multiple accept="image/jpeg,image/png,image/webp" disabled={busy || uploadBusy} onChange={event => { void uploadImages(event.target.files); event.currentTarget.value = ''; }} className="sr-only" />
-                    </label>
-                  </div>
-                  {uploadProgress && <p role="status" className="text-[11px] font-bold text-neutral-700 dark:text-neutral-200">{uploadProgress}</p>}
-                  {form.uploadedImageUrls.length > 0 ? (
-                    <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-                      {form.uploadedImageUrls.map((value, index) => (
-                        <div key={`${value}-${index}`} className="rounded-xl border p-2 dark:border-neutral-700">
-                          <div className="relative">
-                            <img src={value} alt={`Uploaded product image ${index + 1} preview`} loading="lazy" className="aspect-square w-full rounded-lg border object-cover" />
-                            {index === 0 && <span className="absolute bottom-1 left-1 rounded-md bg-neutral-950/90 px-1.5 py-0.5 text-[9px] font-black text-white">MAIN</span>}
-                          </div>
-                          <div className="mt-2 grid grid-cols-3 gap-1">
-                            <button type="button" disabled={index === 0} onClick={() => moveUploadedImage(index, -1)} aria-label={`Move uploaded image ${index + 1} left`} className="rounded-lg border py-1 font-black disabled:opacity-30">←</button>
-                            <button type="button" disabled={index === form.uploadedImageUrls.length - 1} onClick={() => moveUploadedImage(index, 1)} aria-label={`Move uploaded image ${index + 1} right`} className="rounded-lg border py-1 font-black disabled:opacity-30">→</button>
-                            <button type="button" onClick={() => removeUploadedImage(index)} aria-label={`Remove uploaded image ${index + 1}`} className="rounded-lg border py-1 font-black text-red-600">×</button>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  ) : <p className="text-[11px] text-neutral-500">No images uploaded yet.</p>}
-                </div>
-              )}
-            </fieldset>
+            {uploadProgress && <p role="status" className="sm:col-span-2 text-[11px] font-bold text-neutral-700 dark:text-neutral-200">{uploadProgress}</p>}
           </div>
           <div className="flex justify-end gap-3">
             <button type="button" onClick={() => setFormOpen(false)} className="rounded-xl border px-4 py-2.5 text-xs font-bold">Cancel</button>
@@ -573,7 +711,7 @@ export const SellerProducts: React.FC = () => {
                   <div className="min-w-0">
                     <p className="text-xs font-black uppercase tracking-wider text-neutral-500">{productStateLabel(product)}</p>
                   <h3 className="font-black">{product.name}</h3>
-                  <p className="text-xs text-neutral-500">₹{(product.pricePaise / 100).toFixed(2)} · {product.colourName} · Total stock: {product.inventory}</p>
+                  <p className="text-xs text-neutral-500">₹{(product.pricePaise / 100).toFixed(2)} · {(product.colourVariants && product.colourVariants.length > 1 ? product.colourVariants.map(colour => colour.colourName).join(', ') : product.colourName)} · Total stock: {product.inventory}</p>
                   {product.tryAtHomeEnabled && <p className="mt-1 text-xs font-bold text-lime-700">Try at Home enabled</p>}
                   {product.exchangeAvailable && <p className="mt-1 text-xs font-bold text-sky-700">Size exchange enabled (₹50)</p>}
                   <div className="mt-2 flex flex-wrap gap-1.5">{product.variants.map(variant => <span key={variant.id} className="rounded-lg bg-neutral-100 px-2 py-1 text-[11px] font-bold dark:bg-neutral-800">{variant.size}: {variant.inventory}</span>)}</div>

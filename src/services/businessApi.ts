@@ -119,6 +119,15 @@ export const shopProductApi = {
   async published(): Promise<Product[]> {
     return (await apiFetch<{ success: true; products: Product[] }>('/api/shop-products/published')).products;
   },
+  async detail(slug: string): Promise<Product> {
+    return (await apiFetch<{ success: true; product: Product }>(`/api/shop-products/published?slug=${encodeURIComponent(slug)}`)).product;
+  },
+  async storeProducts(vendorId: string): Promise<Product[]> {
+    return (await apiFetch<{ success: true; products: Product[] }>(`/api/shop-products/published?vendorId=${encodeURIComponent(vendorId)}`)).products;
+  },
+  async similar(slug: string, limit = 8): Promise<Product[]> {
+    return (await apiFetch<{ success: true; products: Product[] }>(`/api/shop-products/similar?slug=${encodeURIComponent(slug)}&limit=${limit}`)).products;
+  },
   async mine(): Promise<SellerProduct[]> {
     return (await apiFetch<{ success: true; products: SellerProduct[] }>('/api/shop-products')).products;
   },
@@ -158,6 +167,22 @@ export interface SellerProductVariantDraft {
 
 export interface SellerProductVariant extends SellerProductVariantDraft {
   id: string;
+  colourName?: string;
+  colourHex?: string;
+  imageUrls?: string[];
+}
+
+/**
+ * One colour group of a multi-colour product. Mirrors the private-admin
+ * schema; the backend accepts the same `colourVariants` payload for seller
+ * drafts, so colours live inside a single product rather than as duplicates.
+ */
+export interface SellerProductColourGroup {
+  id?: string;
+  colourName: string;
+  colourHex?: string;
+  imageUrls: string[];
+  sizes: Array<SellerProductVariantDraft & { id?: string }>;
 }
 
 export interface SellerProductDraft {
@@ -171,6 +196,7 @@ export interface SellerProductDraft {
   pricePaise: number;
   originalPricePaise: number;
   variants?: SellerProductVariantDraft[];
+  colourVariants?: SellerProductColourGroup[];
   inventory?: number;
   size?: string;
   colourName: string;
@@ -188,6 +214,7 @@ export interface SellerProduct extends Omit<SellerProductDraft, 'variants' | 'in
   inventory: number;
   size: string;
   variants: SellerProductVariant[];
+  colourVariants?: SellerProductColourGroup[];
   status: SellerProductStatus;
   rejectionReason?: string | null;
   createdAt: string;
