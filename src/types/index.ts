@@ -101,6 +101,7 @@ export interface VendorStore {
   logoImage?: string;
   description: string;
   totalSales?: number;
+  productCount?: number;
   active: boolean;
   approved: boolean;
   createdAt: string;
