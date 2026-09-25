@@ -170,13 +170,13 @@ case "$1" in
     fi
     ;;
   */stage/scripts/styledash_shops.py)
-    printf '%s  %s\n' 'a78f30d94376dca74c9f8dbb048990906f448768c541ab1b5cc5124466d8587e' "$1"
+    printf '%s  %s\n' '9ff8f119fa0223994b64f2b29ad5ecda6189dfaf27339bff1a309ebb2de8ff06' "$1"
     ;;
   */catalog_normalization.py)
     printf '%s  %s\n' 'a656e8a56c9f9d1e91a70508b34e99f48f247e72e3838b9a0af8b4fc68654417' "$1"
     ;;
   */styledash_shops.py)
-    printf '%s  %s\n' '23d6f7c2a53bbca3fec06e1f25ff1a7bdb6632ced0751daea51eaa4df532fda0' "$1"
+    printf '%s  %s\n' 'a78f30d94376dca74c9f8dbb048990906f448768c541ab1b5cc5124466d8587e' "$1"
     ;;
   *)
     # The fixture only needs stable protected-file fingerprints. Calling the
