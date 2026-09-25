@@ -490,7 +490,7 @@ class ShopWorkflowTests(unittest.TestCase):
         )
         self.assertEqual(self.store.get_application("missing-user"), None)
 
-    def test_active_store_product_count_uses_customer_visible_published_products(self) -> None:
+    def test_active_store_product_count_includes_all_published_products(self) -> None:
         first_shop = self.create_active_shop("user-a", "Product Heavy Shop")
         second_shop = self.create_active_shop("user-b", "Newer Light Shop")
 
@@ -508,17 +508,17 @@ class ShopWorkflowTests(unittest.TestCase):
         publish("user-a", "Visible Product One")
         publish("user-a", "Visible Product Two")
         publish("user-b", "Visible Product Three")
-        hidden_legacy = publish("user-b", "Hidden Legacy Product")
+        legacy_product = publish("user-b", "Legacy Published Product")
 
         with self.store.connect() as db:
             db.execute(
                 "UPDATE shop_product_submissions SET original_price_paise=? WHERE id=?",
-                (100, hidden_legacy["id"]),
+                (100, legacy_product["id"]),
             )
 
         stores = {item["id"]: item for item in self.store.list_active_stores()}
         self.assertEqual(stores[first_shop["id"]]["productCount"], 2)
-        self.assertEqual(stores[second_shop["id"]]["productCount"], 1)
+        self.assertEqual(stores[second_shop["id"]]["productCount"], 2)
 
     def test_only_admin_can_publish_and_public_requires_active_shop(self) -> None:
         application = self.create_active_shop("user-a", "Publishing Shop")
@@ -1053,8 +1053,8 @@ class ShopWorkflowTests(unittest.TestCase):
         product = self.store.create_product_draft("user-a", payload)
         self.assertEqual(product["originalPricePaise"], 54_000)
 
-    def test_legacy_product_below_final_customer_price_is_not_sellable(self) -> None:
-        self.create_active_shop("user-a", "Legacy MRP Protection Shop")
+    def test_legacy_published_product_below_final_customer_price_remains_visible(self) -> None:
+        self.create_active_shop("user-a", "Legacy MRP Preservation Shop")
         payload = self.complete_product("Legacy MRP Product")
         payload["pricePaise"] = 50_000
         payload["originalPricePaise"] = 54_000
@@ -1069,14 +1069,15 @@ class ShopWorkflowTests(unittest.TestCase):
             )
             db.commit()
 
-        self.assertNotIn(
-            product["id"],
-            {item["id"] for item in self.store.list_published_products()},
+        public_product = next(
+            item for item in self.store.list_published_products() if item["id"] == product["id"]
         )
+        self.assertEqual(public_product["price"], 540)
+        self.assertEqual(public_product["originalPrice"], 500)
         payment_product = next(
             item for item in self.store.payment_catalog_products() if item["id"] == product["id"]
         )
-        self.assertFalse(payment_product["active"])
+        self.assertTrue(payment_product["active"])
 
 
 if __name__ == "__main__":

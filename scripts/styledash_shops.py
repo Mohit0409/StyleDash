@@ -2681,8 +2681,6 @@ class ShopWorkflow:
             ).fetchall()
         product_counts: dict[str, int] = {}
         for product in published_products:
-            if _customer_price_paise(product["price_paise"]) > product["original_price_paise"]:
-                continue
             application_id = product["application_id"]
             product_counts[application_id] = product_counts.get(application_id, 0) + 1
         stores: list[dict[str, Any]] = []
@@ -2801,15 +2799,11 @@ class ShopWorkflow:
         }
 
     def list_published_products(self, limit: int | None = None) -> list[dict[str, Any]]:
-        """Return all customer-safe published Product DTOs unless a limit is explicitly requested."""
-        # Legacy records can predate the MRP validation below.  Do not expose
-        # an item whose commission-inclusive price would exceed its owner-set
-        # MRP; an owner or administrator must correct it before it can sell.
-        return [
-            self._public_product(row)
-            for row in self._published_rows(limit)
-            if _customer_price_paise(row["price_paise"]) <= row["original_price_paise"]
-        ]
+        """Return all published Product DTOs unless a limit is explicitly requested."""
+        # Historical products may predate the current MRP validation rule.
+        # Preserve those already-published catalogue records instead of hiding
+        # them; new/edited products are still validated before publication.
+        return [self._public_product(row) for row in self._published_rows(limit)]
 
     def payment_catalog_products(self, limit: int = 5000) -> list[dict[str, Any]]:
         """Return minimal records compatible with PaymentService.products.
@@ -2859,7 +2853,6 @@ class ShopWorkflow:
                     "active": (
                         row["status"] == "PUBLISHED"
                         and row["shop_status"] == "ACTIVE"
-                        and _customer_price_paise(row["price_paise"]) <= row["original_price_paise"]
                     ),
                     "price": price,
                     "tryAtHomeAvailable": bool(row["try_at_home_enabled"]) if "try_at_home_enabled" in row.keys() else False,
