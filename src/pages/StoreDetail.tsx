@@ -23,8 +23,8 @@ export const StoreDetail: React.FC = () => {
     vendorRepository.getStoreBySlug(slug).then(s => {
       setStore(s);
       if (s) {
-        productRepository.getAllProducts().then(all => {
-          setProducts(all.filter(p => p.vendorId === s.id || p.storeSlug === s.slug));
+        productRepository.getStoreProducts(s).then(items => {
+          setProducts(items);
           setLoading(false);
         });
       } else {

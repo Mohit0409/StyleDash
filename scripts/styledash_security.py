@@ -17,6 +17,11 @@ from argon2 import PasswordHasher, Type
 from argon2.exceptions import InvalidHashError, VerifyMismatchError
 from cryptography.fernet import Fernet
 
+try:
+    from store_categories import STORE_CATEGORIES
+except ModuleNotFoundError:  # Repository test import path.
+    from scripts.store_categories import STORE_CATEGORIES
+
 
 COOKIE_NAME = "__Host-styledash_session"
 EMAIL_PATTERN = re.compile(r"^[^\s@]+@[^\s@]+\.[^\s@]+$")
@@ -1158,9 +1163,8 @@ class SecurityStore:
             return dict(order)
 
     def create_vendor_application(self, user_id: str, payload: dict[str, Any]) -> dict[str, Any]:
-        allowed_categories = {"Clothing & Fashion", "Footwear", "Accessories", "Beauty & Personal Care", "Electronics", "Gifts", "Home & Living"}
         category = payload.get("category")
-        if category not in allowed_categories:
+        if category not in STORE_CATEGORIES:
             raise SecurityError(400, "Invalid store category.", "invalid_vendor_application")
         values = {
             "shop_name": clean_text(payload.get("storeName"), "store name", 2, 100),

@@ -10,6 +10,7 @@ from scripts.catalog_normalization import (
     normalize_size_label,
     normalize_subcategory,
 )
+from scripts.store_categories import STORE_CATEGORIES
 from scripts.styledash_security import SecurityError
 from scripts.styledash_shops import ALLOWED_CATEGORIES
 
@@ -98,6 +99,7 @@ class CatalogNormalizationTests(unittest.TestCase):
         }
         self.assertEqual(PRODUCT_CATEGORIES, expected)
         self.assertEqual(ALLOWED_CATEGORIES, expected)
+        self.assertEqual(set(STORE_CATEGORIES), expected)
         self.assertNotIn('General Store', PRODUCT_CATEGORIES)
         self.assertNotIn('General Store', ALLOWED_CATEGORIES)
         self.assertEqual(

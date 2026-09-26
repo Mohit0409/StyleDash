@@ -1,4 +1,9 @@
+import type { STORE_CATEGORIES } from '../data/categories';
+
 export type Department = 'men' | 'women' | 'kids' | 'unisex' | 'footwear' | 'accessories';
+
+/** Canonical store categories; the validated list comes from src/data/categories.ts. */
+export type StoreCategory = (typeof STORE_CATEGORIES)[number];
 
 export interface ProductVariant {
   id: string;
@@ -90,7 +95,7 @@ export interface VendorStore {
   ownerName?: string;
   email?: string;
   phone?: string;
-  category: 'Clothing & Fashion' | 'Footwear' | 'Electronics' | 'Home & Living' | 'General Store';
+  category: StoreCategory;
   address: string;
   pincode: string;
   city: string;

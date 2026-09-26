@@ -3,6 +3,7 @@ import { inventoryRepository } from './inventoryRepository';
 import { shopProductApi } from '../services/businessApi';
 import { reviewApi, ReviewSummary } from '../services/reviewApi';
 import { selectHomepageCandidates } from '../utils/homeMerchandising';
+import { rankSimilarProducts } from '../utils/similarProducts';
 
 const PUBLISHED_SHOP_CACHE_MS = 15_000;
 const PRODUCT_IMAGE_FALLBACK = '/product-placeholder.svg';
@@ -180,7 +181,7 @@ const applyReviewSummaries = (products: Product[], summaries: Record<string, Rev
   }));
 
 const selectHomepageProducts = (products: Product[]): Product[] =>
-  selectHomepageCandidates(products, 5);
+  selectHomepageCandidates(products, 10);
 
 const withHomepageAvailability = async (products: Product[]): Promise<Product[]> => {
   try {
@@ -227,8 +228,40 @@ export const productRepository = {
     return applyReviewSummaries(availableProducts, summaries);
   },
 
+  async getStoreProducts(store: { id: string; slug: string }): Promise<Product[]> {
+    // Server-first per-store catalogue avoids downloading every published
+    // product to render one store page; falls back to catalogue filtering.
+    try {
+      const products = (await shopProductApi.storeProducts(store.id)).map(normalizeStoreMetadata);
+      return withHomepageAvailability(products.filter(product => product.active === true));
+    } catch {
+      const all = await this.getAllProducts();
+      return all.filter(p => p.vendorId === store.id || p.storeSlug === store.slug);
+    }
+  },
+
   async getProductBySlug(slug: string): Promise<Product | null> {
-    const products = await this.getAllProducts();
-    return products.find(p => p.slug === slug || p.id === slug) || null;
+    // Server-first: a single-product fetch avoids downloading the whole
+    // catalogue for one detail page. Falls back to the merged catalogue so
+    // the local demo fixture and rolling deployments keep working.
+    try {
+      const product = normalizeStoreMetadata(await shopProductApi.detail(slug));
+      const [enriched] = await withHomepageAvailability([product]);
+      return enriched;
+    } catch {
+      const products = await this.getAllProducts();
+      return products.find(p => p.slug === slug || p.id === slug) || null;
+    }
+  },
+
+  async getSimilarProducts(product: Product, limit = 8): Promise<Product[]> {
+    // Server ranking is authoritative; a deterministic local mirror keeps the
+    // section working if the endpoint is unavailable during rolling deploys.
+    try {
+      const products = (await shopProductApi.similar(product.slug, limit)).map(normalizeStoreMetadata);
+      return withHomepageAvailability(products);
+    } catch {
+      return rankSimilarProducts(product, await getCatalogue(), limit);
+    }
   }
 };

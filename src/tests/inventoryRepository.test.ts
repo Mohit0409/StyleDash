@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { productRepository } from '../repositories/productRepository';
-import { canAddVariantToCart, canIncreaseCartQuantity, inventoryRepository } from '../repositories/inventoryRepository';
+import { canAddVariantsToCart, canAddVariantToCart, canIncreaseCartQuantity, inventoryRepository } from '../repositories/inventoryRepository';
 
 const response = (availability: unknown, status = 200) => new Response(JSON.stringify({ success: true, availability }), {
   status,
@@ -101,7 +101,13 @@ describe('authoritative inventory repository', () => {
   it('refreshes displayed availability when server stock changes', async () => {
     let availabilityRequest = 0;
     const fetcher = vi.fn<typeof fetch>(async input => {
-      if (String(input) === '/api/shop-products/published') return productsResponse();
+      const url = String(input);
+      if (url === '/api/shop-products/published') return productsResponse();
+      if (url.startsWith('/api/shop-products/')) {
+        return new Response(JSON.stringify({ success: false, error: 'Not found.', code: 'product_not_found' }), {
+          status: 404, headers: { 'Content-Type': 'application/json' },
+        });
+      }
       availabilityRequest += 1;
       return response([{ productId: 'sd-prod-001', variantId: 'sd-prod-001-var-2', available: availabilityRequest === 1 }]);
     });
@@ -218,6 +224,23 @@ describe('authoritative inventory repository', () => {
 
     await expect(canAddVariantToCart('sd-prod-001-var-2', unavailable)).resolves.toBe(false);
     await expect(canAddVariantToCart('sd-prod-001-var-2', offline)).resolves.toBe(false);
+  });
+
+  it('checks multiple try-at-home variants in one batched request', async () => {
+    const fetcher = vi.fn<typeof fetch>(async () => response([
+      { productId: 'sd-prod-001', variantId: 'sd-prod-001-var-1', available: true },
+      { productId: 'sd-prod-001', variantId: 'sd-prod-001-var-2', available: false },
+    ]));
+    await expect(canAddVariantsToCart('sd-prod-001', ['sd-prod-001-var-1', 'sd-prod-001-var-2'], fetcher)).resolves.toBe(false);
+    expect(fetcher).toHaveBeenCalledTimes(1);
+    expect(String(fetcher.mock.calls[0][0])).toBe('/api/inventory/availability?productId=sd-prod-001');
+    const allAvailable = vi.fn<typeof fetch>(async () => response([
+      { productId: 'sd-prod-001', variantId: 'sd-prod-001-var-1', available: true },
+      { productId: 'sd-prod-001', variantId: 'sd-prod-001-var-2', available: true },
+    ]));
+    await expect(canAddVariantsToCart('sd-prod-001', ['sd-prod-001-var-1', 'sd-prod-001-var-2'], allAvailable)).resolves.toBe(true);
+    const offline = vi.fn<typeof fetch>().mockRejectedValue(new TypeError('offline'));
+    await expect(canAddVariantsToCart('sd-prod-001', ['sd-prod-001-var-1'], offline)).resolves.toBe(false);
   });
 
   it('prevents cart quantity increases for unavailable variants or an unavailable server', async () => {

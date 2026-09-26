@@ -2,6 +2,26 @@
 
 Canonical cross-chat coordination file: `C:\movieXsuggestion\MyProject\VIBE4YOU_DEV_COORDINATION.md`
 
+## Five-issue release branch — 2026-09-25
+
+- Branch: `release/vibe4you-five-issues`, based on `3224d4181af24ae63f4b5b7e8dd73b511c6b991e`.
+- Canonical store categories are exactly the seven product categories shared
+  by `scripts/store_categories.py` (backend) and `src/data/categories.ts`
+  (`STORE_CATEGORIES`, frontend): Clothing & Fashion, Footwear, Accessories,
+  Beauty & Personal Care, Electronics, Gifts, Home & Living. "General Store"
+  is NOT a valid store category; the 2026-09-14 note below is superseded.
+  Backend tests lock this in (`test_catalog_normalization.py`,
+  `test_security.py`).
+- Seller products now support multiple colours per product via the same
+  `colourVariants` schema the private admin uses (one product, per-colour
+  images/sizes/stock). Structural colour changes to LIVE listings still go
+  through the admin-reviewed change-request path.
+- Public catalogue endpoints gained `?slug=` (single product), `?vendorId=`
+  (one store) on `/api/shop-products/published`, and
+  `/api/shop-products/similar?slug=`, plus a DB-trigger catalogue version
+  (`shop_catalog_meta.product_version`, migration v10) so the public server
+  only rebuilds its in-memory product snapshot when the catalogue changes.
+
 ## Admin store category + popup form UX ? 2026-09-14
 
 - Branch: `agent/admin-store-modal-ux`, based on `87f4fc4302ba659a5d27e391323a3d158cc4532f`.

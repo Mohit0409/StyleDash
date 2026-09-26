@@ -25,6 +25,7 @@ test('lower homepage uses bounded merchandising rows with View All links', async
     ['accessories', 'Accessories', '/products?category=Accessories'],
   ] as const;
 
+  const rowCounts = new Map<string, number>();
   for (const [id, title, href] of expected) {
     const row = merchandising.locator(`[data-home-section="${id}"]`);
     await expect(merchandising.getByRole('heading', { name: title, exact: true })).toBeVisible();
@@ -32,14 +33,18 @@ test('lower homepage uses bounded merchandising rows with View All links', async
     await expect(viewAll).toBeVisible();
     const productLinks = row.locator('a[href^="/product/"]');
     const uniqueProducts = new Set(await productLinks.evaluateAll(nodes => nodes.map(node => node.getAttribute('href'))));
-    expect(uniqueProducts.size).toBeLessThanOrEqual(5);
+    expect(uniqueProducts.size).toBeLessThanOrEqual(10);
     expect(uniqueProducts.size).toBeGreaterThan(0);
+    rowCounts.set(id, uniqueProducts.size);
   }
+  // Weekend Express matches every eligible product, so it must render the
+  // full ten-card rail whenever at least ten eligible products exist.
+  expect(rowCounts.get('express')).toBe(10);
 
   const beauty = merchandising.locator('[data-home-section="beauty"]');
   if (await beauty.count()) {
     const beautyLinks = beauty.locator('a[href^="/product/"]');
-    expect(new Set(await beautyLinks.evaluateAll(nodes => nodes.map(node => node.getAttribute('href')))).size).toBeLessThanOrEqual(5);
+    expect(new Set(await beautyLinks.evaluateAll(nodes => nodes.map(node => node.getAttribute('href')))).size).toBeLessThanOrEqual(10);
   }
 
   const stores = merchandising.locator('[data-home-section="stores"]');

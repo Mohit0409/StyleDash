@@ -108,7 +108,7 @@ export const selectHomepageCandidates = (products: Product[], perSection = 8, da
 
 export const buildHomepageSections = (
   products: Product[],
-  limit = 5,
+  limit = 10,
   date = new Date(),
   fallbackProducts: Product[] = [],
 ): HomeMerchSection[] => {
@@ -117,17 +117,27 @@ export const buildHomepageSections = (
     const categorySection = CATEGORY_SECTION_IDS.has(definition.id);
     const unused = (product: Product) => categorySection || !usedProductIds.has(product.id);
     const candidates = sectionCandidates(products, definition);
-    const primary = candidates
-      .filter(unused)
-      .slice(0, limit);
     const fallbackCandidates = sectionCandidates(fallbackProducts, definition);
-    const chosen = primary.length > 0
-      ? primary
-      : categorySection
-        ? fallbackCandidates.slice(0, limit)
-        : candidates.slice(0, 1).length > 0
-          ? candidates.slice(0, 1)
-          : fallbackCandidates.slice(0, 1);
+    // Fill each rail with up to `limit` unique eligible products: prefer
+    // products not used by earlier promotional rows, then top up from the
+    // remaining eligible candidates so a section reaches the limit whenever
+    // enough eligible products exist. Products are never duplicated within a
+    // section.
+    let chosen: Product[];
+    if (candidates.length === 0) {
+      chosen = (categorySection ? fallbackCandidates.slice(0, limit) : fallbackCandidates.slice(0, 1));
+    } else {
+      const primary = candidates.filter(unused).slice(0, limit);
+      if (primary.length >= limit || categorySection) {
+        chosen = categorySection ? candidates.slice(0, limit) : primary;
+      } else {
+        const chosenIds = new Set(primary.map(product => product.id));
+        const topUp = candidates
+          .filter(product => !chosenIds.has(product.id))
+          .slice(0, limit - primary.length);
+        chosen = [...primary, ...topUp];
+      }
+    }
     if (!categorySection) chosen.forEach(product => usedProductIds.add(product.id));
     return { ...definition, products: chosen };
   }).filter(section => section.products.length > 0);

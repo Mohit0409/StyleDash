@@ -76,6 +76,33 @@ class HomepageProjectionCandidateTests(unittest.TestCase):
                 1,
             )
 
+    def test_homepage_candidates_fill_ten_per_section_after_store_diversity(self) -> None:
+        # Twelve eligible products from only two stores: the two-per-store
+        # diversity cap yields 4, then the top-up pass completes the rail so
+        # sections contain 10 whenever 10 eligible candidates exist.
+        products = [
+            {
+                "id": f"shoe-{index}",
+                "name": f"Sneaker {index}",
+                "active": True,
+                "category": "Footwear",
+                "department": "men",
+                "vendorId": f"store-{index % 2}",
+                "createdAt": f"2026-09-{index + 1:02d}T00:00:00Z",
+                "featured": False,
+                "trending": False,
+                "newArrival": False,
+                "rating": 0,
+                "reviewCount": 0,
+                "price": 999,
+            }
+            for index in range(12)
+        ]
+        selected = SERVER._homepage_product_candidates(products)
+        self.assertEqual(len(selected), 10)
+        self.assertEqual(len({product["id"] for product in selected}), 10)
+        self.assertEqual({product["category"] for product in selected}, {"Footwear"})
+
 
 class FakeGateway:
 
@@ -2148,6 +2175,32 @@ class HttpApiTests(unittest.TestCase):
         else:
             os.environ["STYLEDASH_TRUST_LOOPBACK_PROXY"] = self.previous_trust_loopback_proxy
         self.temporary.cleanup()
+
+    def test_catalogue_refresh_reuses_snapshot_until_database_changes(self) -> None:
+        # First refresh builds the snapshot; further catalogue/availability
+        # requests only read the cheap version counter instead of rescanning
+        # and re-parsing the full product table.
+        self.service.refresh_shop_products()
+        shops = self.service.shops
+        with patch.object(shops, "payment_catalog_products", wraps=shops.payment_catalog_products) as rebuild:
+            status, _payload, _headers = self.get_json("/api/shop-products/published")
+            self.assertEqual(status, 200)
+
+            status, availability, _headers = self.get_json("/api/inventory/availability?productId=sd-prod-001")
+            self.assertEqual(status, 200)
+            self.assertTrue(availability["success"])
+            self.assertEqual(rebuild.call_count, 0)
+
+        # A catalogue write (trigger-driven version bump, e.g. from the admin
+        # process) forces exactly one rebuild on the next refresh.
+        with shops.connect() as db:
+            db.execute(
+                "UPDATE shop_catalog_meta SET value=value+1 WHERE key='product_version'"
+            )
+            db.commit()
+        with patch.object(shops, "payment_catalog_products", wraps=shops.payment_catalog_products) as rebuilt:
+            self.service.refresh_shop_products()
+            self.assertEqual(rebuilt.call_count, 1)
 
     def test_health_and_security_headers(self) -> None:
         with urllib.request.urlopen(f"{self.base_url}/api/health") as response:

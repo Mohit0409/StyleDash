@@ -40,9 +40,12 @@ export const ProductDetail: React.FC = () => {
 
   useEffect(() => {
     if (!slug) return;
+    let cancelled = false;
     setLoading(true);
-    productRepository.getAllProducts().then(all => {
-      const p = all.find(item => item.slug === slug || item.id === slug) || null;
+    setRelatedProducts([]);
+    (async () => {
+      const p = await productRepository.getProductBySlug(slug);
+      if (cancelled) return;
       if (p) {
         setProduct(p);
         setSelectedImage(p.images[0] || p.thumbnail);
@@ -51,10 +54,16 @@ export const ProductDetail: React.FC = () => {
           setSelectedSize(firstInStock.size);
           setSelectedColour(firstInStock.colourName);
         }
+      } else {
+        setProduct(null);
       }
-      setRelatedProducts(all.filter(item => item.id !== p?.id).slice(0, 4));
       setLoading(false);
-    });
+      if (p) {
+        const related = await productRepository.getSimilarProducts(p);
+        if (!cancelled) setRelatedProducts(related.slice(0, 4));
+      }
+    })();
+    return () => { cancelled = true; };
   }, [slug]);
 
   useEffect(() => {
@@ -235,7 +244,7 @@ export const ProductDetail: React.FC = () => {
                   selectedImage === img ? 'border-lime-500 scale-105 shadow-md' : 'border-transparent opacity-70'
                 }`}
               >
-                <img src={img} alt={`${product.name} ${idx + 1}`} className="h-full w-full object-contain object-center p-1" />
+                <img src={img} alt={`${product.name} ${idx + 1}`} loading="lazy" decoding="async" className="h-full w-full object-contain object-center p-1" />
               </button>
             ))}
           </div>

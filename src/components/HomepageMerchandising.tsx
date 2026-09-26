@@ -27,7 +27,7 @@ const storeRailClass = 'flex w-full snap-x snap-mandatory gap-4 overflow-x-auto 
 const storeCardClass = 'group flex h-[23rem] basis-[82%] shrink-0 snap-start flex-col overflow-hidden rounded-2xl border border-neutral-200 bg-white shadow-sm transition hover:-translate-y-0.5 hover:shadow-lg dark:border-neutral-800 dark:bg-neutral-900 sm:basis-[47%] md:basis-[31%] lg:basis-[24%]';
 
 export const HomepageMerchandising: React.FC<HomepageMerchandisingProps> = ({ products, fallbackProducts = [], loading }) => {
-  const sections = useMemo(() => buildHomepageSections(products, 5, new Date(), fallbackProducts), [products, fallbackProducts]);
+  const sections = useMemo(() => buildHomepageSections(products, 10, new Date(), fallbackProducts), [products, fallbackProducts]);
   const [stores, setStores] = useState<VendorStore[]>([]);
   const storesRailRef = useRef<HTMLDivElement>(null);
 

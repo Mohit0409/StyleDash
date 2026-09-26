@@ -130,6 +130,105 @@ test('approved shop owner can draft and submit but cannot publish a product', as
 });
 
 
+test('approved shop owner can draft a multi-colour product and reopen it without losing colours', async ({ page }) => {
+  let createPayload: Record<string, unknown> | null = null;
+  let product: Record<string, unknown> | null = null;
+
+  await page.route('**/api/**', async route => {
+    const request = route.request();
+    const path = new URL(request.url()).pathname;
+    const method = request.method();
+    const json = (body: unknown, status = 200) => route.fulfill({ status, contentType: 'application/json', body: JSON.stringify(body) });
+
+    if (path === '/api/auth/me') {
+      await json({ success: true, csrfToken: 'csrf-e2e', user: { uid: 'seller-1', name: 'Seller E2E', email: 'seller@example.test', role: 'customer' } });
+      return;
+    }
+    if (path === '/api/vendor-applications/me' && method === 'GET') {
+      await json({ success: true, application: {
+        id: 'shop-1', status: 'ACTIVE', shopName: 'E2E Active Shop', ownerName: 'Seller E2E',
+        registeredEmail: 'seller@example.test', category: 'Clothing & Fashion', description: 'Active test shop',
+        address: 'Main market', city: 'Neemuch', state: 'Madhya Pradesh', pincode: '458441',
+        createdAt: '2026-08-20T00:00:00Z', updatedAt: '2026-08-20T00:00:00Z',
+      } });
+      return;
+    }
+    if (path === '/api/shop-products' && method === 'GET') {
+      await json({ success: true, products: product ? [product] : [] });
+      return;
+    }
+    if (path === '/api/shop-product-requests' && method === 'GET') {
+      await json({ success: true, requests: [] });
+      return;
+    }
+    if (path === '/api/shop-products' && method === 'POST') {
+      createPayload = request.postDataJSON() as Record<string, unknown>;
+      const colourVariants = (createPayload.colourVariants as Array<Record<string, unknown>>).map((colour, colourIndex) => ({
+        id: `colour-${colourIndex}`,
+        colourName: colour.colourName,
+        colourHex: colour.colourHex,
+        imageUrls: colour.imageUrls,
+        sizes: (colour.sizes as Array<Record<string, unknown>>).map((size, sizeIndex) => ({
+          id: `shopprod_multi-var-${colourIndex * 10 + sizeIndex + 1}`,
+          size: size.size,
+          inventory: size.inventory,
+        })),
+      }));
+      product = {
+        ...createPayload,
+        id: 'shopprod_multi', slug: 'local-product-multi', applicationId: 'shop-1',
+        colourVariants,
+        variants: colourVariants.flatMap(colour => (colour.sizes as Array<Record<string, unknown>>).map(size => ({
+          ...size, colourName: colour.colourName, colourHex: colour.colourHex, imageUrls: colour.imageUrls,
+        }))),
+        inventory: colourVariants.flatMap(colour => colour.sizes as Array<Record<string,unknown>>).reduce((total, size) => total + Number(size.inventory), 0),
+        size: 'M, L', status: 'DRAFT', createdAt: '2026-08-20T00:00:00Z', updatedAt: '2026-08-20T00:00:00Z',
+      };
+      await json({ success: true, product }, 201);
+      return;
+    }
+    await json({ success: false, error: 'Unexpected mocked API request.' }, 500);
+  });
+
+  await page.goto('/partner');
+  await page.getByRole('button', { name: 'New Product Draft' }).click();
+  await page.getByLabel('Product name').fill('Two Tone Kurta');
+  await page.getByLabel('Description').fill('A kurta available in two colours.');
+  await page.getByLabel('Price (INR)', { exact: true }).fill('700');
+  await page.getByLabel('Original price (INR)').fill('800');
+  await page.getByLabel('Colour name').fill('Blue');
+  await page.getByPlaceholder('Size, e.g. S or XL').fill('M');
+  await page.getByPlaceholder('Stock').fill('4');
+  await page.getByLabel('HTTPS image URLs').fill('https://images.example.test/kurta-blue.jpg');
+
+  await page.getByRole('button', { name: '+ Add colour' }).click();
+  await page.getByLabel('Colour 2 name').fill('Red');
+  await page.getByLabel('Colour 2 hex').fill('#FF0000');
+  await page.getByPlaceholder('Size, e.g. S or XL').nth(1).fill('L');
+  await page.getByPlaceholder('Stock').nth(1).fill('2');
+  await page.getByLabel('Colour 2 HTTPS image URLs').fill('https://images.example.test/kurta-red.jpg');
+  await page.getByRole('button', { name: 'Save Product Draft' }).click();
+
+  expect(createPayload?.colourVariants).toEqual([
+    { colourName: 'Blue', colourHex: undefined, imageUrls: ['https://images.example.test/kurta-blue.jpg'], sizes: [{ size: 'M', inventory: 4 }] },
+    { colourName: 'Red', colourHex: '#FF0000', imageUrls: ['https://images.example.test/kurta-red.jpg'], sizes: [{ size: 'L', inventory: 2 }] },
+  ]);
+  expect(createPayload).not.toHaveProperty('variants');
+
+  // Reopening the draft restores both colour cards with sizes, stock and images.
+  const draftCard = page.getByRole('article').filter({ has: page.getByRole('heading', { name: 'Two Tone Kurta' }) });
+  await expect(draftCard.getByText(/Blue, Red/)).toBeVisible();
+  await draftCard.getByRole('button', { name: 'Edit', exact: true }).click();
+  await expect(page.getByLabel('Colour name')).toHaveValue('Blue');
+  await expect(page.getByLabel('Colour 2 name')).toHaveValue('Red');
+  await expect(page.getByLabel('Colour 2 hex')).toHaveValue('#FF0000');
+  await expect(page.getByLabel('Colour 2 HTTPS image URLs')).toHaveValue('https://images.example.test/kurta-red.jpg');
+  await expect(page.getByPlaceholder('Size, e.g. S or XL').nth(1)).toHaveValue('L');
+  await expect(page.getByPlaceholder('Stock').nth(1)).toHaveValue('2');
+  await page.getByRole('button', { name: 'Cancel', exact: true }).click();
+});
+
+
 test('published seller can update stock and submit edit or unpublish requests without direct publish powers', async ({ page }) => {
   let requests: Array<Record<string, unknown>> = [];
   let editPayload: Record<string, unknown> | null = null;

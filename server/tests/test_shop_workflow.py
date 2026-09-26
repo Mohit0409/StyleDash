@@ -173,7 +173,7 @@ class ShopWorkflowTests(unittest.TestCase):
                 [row[0] for row in db.execute(
                     "SELECT version FROM shop_schema_migrations ORDER BY version"
                 )],
-                [1, 2, 3, 4, 5, 6, 7, 8, 9],
+                [1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
             )
             self.assertEqual(db.execute("PRAGMA integrity_check").fetchone()[0], "ok")
             self.assertEqual(db.execute("PRAGMA foreign_key_check").fetchall(), [])
@@ -277,7 +277,7 @@ class ShopWorkflowTests(unittest.TestCase):
         db = sqlite3.connect(concurrent_path)
         self.assertEqual(
             db.execute("SELECT version,COUNT(*) FROM shop_schema_migrations GROUP BY version").fetchall(),
-            [(1, 1), (2, 1), (3, 1), (4, 1), (5, 1), (6, 1), (7, 1), (8, 1), (9, 1)],
+            [(1, 1), (2, 1), (3, 1), (4, 1), (5, 1), (6, 1), (7, 1), (8, 1), (9, 1), (10, 1)],
         )
         self.assertEqual(db.execute("PRAGMA integrity_check").fetchone()[0], "ok")
         self.assertEqual(db.execute("PRAGMA foreign_key_check").fetchall(), [])
@@ -1078,6 +1078,138 @@ class ShopWorkflowTests(unittest.TestCase):
             item for item in self.store.payment_catalog_products() if item["id"] == product["id"]
         )
         self.assertTrue(payment_product["active"])
+
+
+    def test_catalog_version_tracks_product_and_shop_writes(self) -> None:
+        initial = self.store.catalog_version()
+        application = self.create_active_shop("user-a", "Versioned Shop")
+        after_shop = self.store.catalog_version()
+        self.assertGreater(after_shop, initial)
+        product = self._publish("user-a", self.complete_product("Versioned Kurta"))
+        after_product = self.store.catalog_version()
+        self.assertGreater(after_product, after_shop)
+        self.assertEqual(self.store.list_similar_products(product["slug"]), [])
+        self.store.admin_transition_application("admin-a", application["id"], "SUSPENDED")
+        self.assertGreater(self.store.catalog_version(), after_product)
+        self.assertEqual(
+            [item["id"] for item in self.store.list_store_published_products("missing")],
+            [],
+        )
+
+    def _publish(self, user_id: str, payload: dict) -> dict:
+        product = self.store.create_product_draft(user_id, payload)
+        self.store.submit_product(user_id, product["id"])
+        for target in ("UNDER_REVIEW", "APPROVED", "PUBLISHED"):
+            product = self.store.admin_transition_product(
+                "admin-a", product["id"], target
+            )
+        return product
+
+    @staticmethod
+    def _footwear_payload(name: str, description: str, **overrides) -> dict:
+        payload = {
+            "name": name,
+            "description": description,
+            "brand": "Campus",
+            "department": "men",
+            "category": "Footwear",
+            "pricePaise": 100_000,
+            "originalPricePaise": 120_000,
+            "inventory": 5,
+            "imageUrls": ["https://images.example.test/shoe.jpg"],
+            "attributes": {"material": "Mesh"},
+            "size": "9",
+            "colourName": "Black",
+        }
+        payload.update(overrides)
+        return payload
+
+    def test_similar_products_ranking_fallback_and_exclusions(self) -> None:
+        shop_a = self.create_active_shop("user-a", "Similar Shop A")
+        shop_b = self.create_active_shop("user-b", "Similar Shop B")
+        current = self._publish("user-a", self._footwear_payload(
+            "Campus Sprint Sneakers",
+            "Comfort running sneakers for daily wear.",
+            subcategory="Sneakers",
+        ))
+        close_match = self._publish("user-a", self._footwear_payload(
+            "Walk Max Sneakers",
+            "Lightweight lace up sneakers for the gym.",
+            subcategory="Sneakers",
+            brand="Sparx",
+        ))
+        same_category = self._publish("user-a", self._footwear_payload(
+            "Classic Suede Loafers",
+            "Soft suede loafers for office wear.",
+            subcategory="Loafers",
+        ))
+        other_category = self._publish("user-b", {
+            **self.complete_product("Handloom Festive Kurta"),
+        })
+        draft_only = self.store.create_product_draft("user-b", self._footwear_payload(
+            "Unpublished Runner Sneakers",
+            "Unpublished draft sneakers excluded from public results.",
+            subcategory="Sneakers",
+        ))
+
+        similar = self.store.list_similar_products(current["slug"])
+        ids = [item["id"] for item in similar]
+        self.assertNotIn(current["id"], ids)
+        self.assertEqual(len(ids), len(set(ids)))
+        self.assertNotIn(draft_only["id"], ids)
+        self.assertEqual(ids[0], close_match["id"])
+        self.assertEqual(ids[1], same_category["id"])
+        self.assertIn(other_category["id"], ids)
+
+        # A sparse subcategory still falls back to broader catalogue matches.
+        only_loafer = self._publish("user-a", self._footwear_payload(
+            "Metro Slipon Loafers",
+            "Everyday suede loafers with cushioned sole.",
+            subcategory="Loafers",
+            brand="Walkmate",
+        ))
+        loafer_similar = self.store.list_similar_products(only_loafer["slug"], 3)
+        self.assertEqual(len(loafer_similar), 3)
+        loafer_ids = [item["id"] for item in loafer_similar]
+        self.assertEqual(loafer_ids[0], same_category["id"])
+        self.assertNotIn(only_loafer["id"], loafer_ids)
+
+        # Products of a suspended shop are never recommended.
+        self.store.admin_transition_application("admin-a", shop_b["id"], "SUSPENDED")
+        after_suspend = self.store.list_similar_products(current["slug"])
+        self.assertNotIn(other_category["id"], [item["id"] for item in after_suspend])
+        self.store.admin_transition_application("admin-a", shop_b["id"], "ACTIVE")
+
+        # Unknown products and malformed lookups fail deterministically.
+        self.assert_error(
+            "product_not_found",
+            lambda: self.store.list_similar_products("missing-slug"),
+        )
+        self.assert_error(
+            "invalid_product_request",
+            lambda: self.store.list_similar_products(""),
+        )
+        self.assert_error(
+            "invalid_product_request",
+            lambda: self.store.get_published_product(123),
+        )
+        self.assert_error(
+            "product_not_found",
+            lambda: self.store.get_published_product("missing-slug"),
+        )
+        fetched = self.store.get_published_product(current["slug"])
+        self.assertEqual(fetched["id"], current["id"])
+        store_products = self.store.list_store_published_products(shop_a["id"])
+        store_ids = {item["id"] for item in store_products}
+        self.assertEqual(
+            store_ids,
+            {current["id"], close_match["id"], same_category["id"], only_loafer["id"]},
+        )
+        self.assertNotIn(other_category["id"], store_ids)
+        self.assert_error(
+            "invalid_store_request",
+            lambda: self.store.list_store_published_products(""),
+        )
 
 
 if __name__ == "__main__":

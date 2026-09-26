@@ -2,7 +2,7 @@ import React, { createContext, useContext, useEffect, useRef, useState } from 'r
 import { Product, CartItem, Coupon } from '../types';
 import { trackEvent } from '../services/analytics';
 import { calculateCartTotals } from './cartTotals';
-import { canAddVariantToCart, canIncreaseCartQuantity } from '../repositories/inventoryRepository';
+import { canAddVariantsToCart, canAddVariantToCart, canIncreaseCartQuantity } from '../repositories/inventoryRepository';
 import { cartExpressEligibility, isExpressDeliveryAvailable } from '../utils/delivery';
 import { accountCartRepository, LOCAL_CART_KEY } from '../repositories/accountCartRepository';
 import { useAuth } from './AuthContext';
@@ -248,8 +248,8 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (variants.some(variant => !variant)) return false;
     const [first, second] = variants;
     if (!first || !second || first.size === second.size || first.colourName !== second.colourName) return false;
-    const available = await Promise.all(variantIds.map(variantId => canAddVariantToCart(variantId)));
-    if (!available.every(Boolean)) return false;
+    const available = await canAddVariantsToCart(product.id, variantIds);
+    if (!available) return false;
     const primary = variants[0]!;
     const lineId = `${product.id}:try:${[...variantIds].sort().join(':')}`;
     setItems(previous => previous.some(item => item.lineId === lineId) ? previous : [...previous, {

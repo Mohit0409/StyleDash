@@ -39,7 +39,7 @@ export const Home: React.FC = () => {
 
   const topPicks = [...products]
     .sort((first, second) => Number(second.trending) - Number(first.trending) || second.rating - first.rating || second.reviewCount - first.reviewCount)
-    .slice(0, 8);
+    .slice(0, 10);
   const topPickIds = new Set(topPicks.map(product => product.id));
   const merchandisingProducts = products.filter(product => !topPickIds.has(product.id));
 
