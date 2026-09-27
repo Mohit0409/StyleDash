@@ -368,6 +368,9 @@ class VibeDeploymentV2Tests(unittest.TestCase):
         runner = (ROOT / "scripts" / "termux" / "vibe_deploy.py").read_text(encoding="utf-8")
         self.assertIn("nohup setsid", shell)
         self.assertIn("EXISTING_TRANSACTION=YES", shell)
+        self.assertIn("child_ready", shell)
+        self.assertIn('"$LOCK_DIR/ready"', shell)
+        self.assertIn("parent_pid", shell)
         for path in ("/backups", "/backups/deployment-probe", "/logs/deployment-probe", "/admin/", "/.env", "/secrets.env"):
             self.assertIn(path, runner)
         self.assertIn("CANONICAL_ORIGIN = \"https://vibe4you.in\"", runner)

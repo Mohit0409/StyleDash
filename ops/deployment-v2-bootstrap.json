@@ -35,6 +35,13 @@
     "bin/start-styledash-cloudflare": "36741beae8abc6a6c3178afa0fd50c4c022b83d13c8252b53aa9e3b72a8299c5",
     "bin/start-styledash": "1d096bd34b3c6f01bf3c9954d15217880c10f3fe607f305338c3e62677634e70",
     "bin/start-styledash-admin": "00e450ae456a88ca57f1f1b56e3664ef7d6238119d93d2784612d8827db02016",
+    "bin/start-styledash-stack": "70c29ec46f6b7c0c9d8013bb80279fa72b9dcd1859ad3872d192c84b692a2e77",
+    "bin/start-styledash-ngrok": "655e96f5dff6d57e0c58f1729b1c432eb11c183cccbe519951651ca63c7d81ff",
+    "bin/start-styledash-tunnel": "0573498480ab146b2d615c8b10d241c090d19b8d8c7c6a20d1dc875cb6fa2b86",
+    "bin/start-styledash-cloudflare-rollback": "467975b58ff01668c339f089a8944a2ca316feeea74b01be9458c0b95beb8144",
+    "bin/stop-styledash-ngrok": "48d3223e68aa366c593347f139e964af2a95dcebde8a8b64d1cfd83476fceb61",
+    ".termux/boot/start-styledash": "87e2da66ed0496ed515919faec6b519cd1750a157c33d84e57dcc267cfb58ae4",
+    "bin/styledash-health": "8742c43b1f95d8aeaafb6c9cd8348ad81290807c7e8de9761a0afa792e47e312",
     "bin/verify-styledash-processes": "de74c7592e27183cc81d87036eb27d0921d61458ca9e67bf3623e6e3d9659ac6",
     "bin/styledash-process-lib": "de517d7b151cd158d36396c2ca4c4e49eba3b269d45cf063f65cea4826908bfa"
   }

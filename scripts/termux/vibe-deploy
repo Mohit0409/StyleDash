@@ -66,7 +66,7 @@ fi
 lock_transferred=0
 cleanup_launcher_lock() {
   if [ "$lock_transferred" -eq 0 ]; then
-    rm -f -- "$LOCK_DIR/pid"
+    rm -f -- "$LOCK_DIR/pid" "$LOCK_DIR/ready"
     rmdir -- "$LOCK_DIR" 2>/dev/null || true
   fi
 }
@@ -83,23 +83,39 @@ detached_body='set -u
 runner="$1"
 artifact="$2"
 lock="$3"
-cleanup() { rm -f -- "$lock/pid"; rmdir -- "$lock" 2>/dev/null || true; }
+parent_pid="$4"
+cleanup() { rm -f -- "$lock/pid" "$lock/ready"; rmdir -- "$lock" 2>/dev/null || true; }
 trap cleanup EXIT INT TERM HUP
-printf "%s\n" "$$" > "$lock/pid"
+# Never claim a lock after the foreground launcher disappeared. This prevents a
+# stale-lock cleanup from handing the same directory to two transactions.
+[ -d "$lock" ] && [ "$(cat "$lock/pid" 2>/dev/null || true)" = "$parent_pid" ] && kill -0 "$parent_pid" 2>/dev/null || exit 75
+printf "%s\n" "$$" > "$lock/.pid.$$"
+mv -f -- "$lock/.pid.$$" "$lock/pid"
 chmod 600 "$lock/pid"
+printf "%s\n" "$$" > "$lock/ready"
+chmod 600 "$lock/ready"
 python3 "$runner" --run "$artifact" --resume'
 
 # setsid + nohup disconnect stdin/stdout/stderr and the controlling session.
 # The server-side process therefore survives a Windows SSH/network drop.
 if command -v setsid >/dev/null 2>&1; then
-  nohup setsid bash -c "$detached_body" vibe-deploy-detached "$PYTHON_RUNNER" "$artifact" "$LOCK_DIR" </dev/null >>"$log" 2>&1 &
+  nohup setsid bash -c "$detached_body" vibe-deploy-detached "$PYTHON_RUNNER" "$artifact" "$LOCK_DIR" "$$" </dev/null >>"$log" 2>&1 &
 else
-  nohup bash -c "$detached_body" vibe-deploy-detached "$PYTHON_RUNNER" "$artifact" "$LOCK_DIR" </dev/null >>"$log" 2>&1 &
+  nohup bash -c "$detached_body" vibe-deploy-detached "$PYTHON_RUNNER" "$artifact" "$LOCK_DIR" "$$" </dev/null >>"$log" 2>&1 &
 fi
 launcher_pid=$!
-# The detached process replaces the launcher's PID after it starts. Leave the
-# parent PID in place until then, so a second invocation sees an active lock.
 chmod 600 "$log" 2>/dev/null || true
+child_ready=0
+for _ in $(seq 1 50); do
+  child_pid="$(cat "$LOCK_DIR/ready" 2>/dev/null || true)"
+  case "$child_pid" in ''|*[!0-9]*) child_pid='' ;; esac
+  if [ -n "$child_pid" ] && [ "$(cat "$LOCK_DIR/pid" 2>/dev/null || true)" = "$child_pid" ] && kill -0 "$child_pid" 2>/dev/null; then
+    child_ready=1
+    break
+  fi
+  sleep 0.1
+done
+[ "$child_ready" -eq 1 ] || { echo "detached deployment runner did not acknowledge its lock" >&2; exit 1; }
 lock_transferred=1
 trap - EXIT INT TERM HUP
 echo "DETACHED=YES"
