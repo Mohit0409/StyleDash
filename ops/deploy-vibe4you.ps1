@@ -81,7 +81,7 @@ try {
         throw "CI_NOT_GREEN: $RequiredCheck has not passed for exact SHA $ReleaseSha."
     }
     $CiRunUrl = [string]$Required[0].details_url
-    if ($CiRunUrl -notmatch '/actions/runs/(\d+)/') { throw 'Required CI run URL is invalid.' }
+    if ($CiRunUrl -notmatch '/actions/runs/(\d+)(?:/|$)') { throw 'Required CI run URL is invalid.' }
     $CiRunId = $Matches[1]
     $RunJson = & gh api -H 'Accept: application/vnd.github+json' "repos/$Repository/actions/runs/$CiRunId"
     if ($LASTEXITCODE -ne 0) { throw 'Required GitHub Actions run evidence could not be loaded.' }
