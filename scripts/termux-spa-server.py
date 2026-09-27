@@ -320,12 +320,14 @@ SECURITY_POLICY = (
     "base-uri 'self'; object-src 'none'; frame-ancestors 'self'; "
     "script-src 'self' https://checkout.razorpay.com https://*.razorpay.com "
     "https://apis.google.com https://www.gstatic.com https://www.google.com https://www.recaptcha.net "
-    "https://static.cloudflareinsights.com; "
+    "https://static.cloudflareinsights.com https://www.googletagmanager.com https://connect.facebook.net; "
     "style-src 'self' 'unsafe-inline' https://*.razorpay.com; "
     "img-src 'self' data: https:; font-src 'self' data: https:; "
     "connect-src 'self' https://api.razorpay.com https://*.razorpay.com "
     "https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://www.googleapis.com "
-    "https://*.firebaseio.com wss://*.firebaseio.com https://cloudflareinsights.com; "
+    "https://*.firebaseio.com wss://*.firebaseio.com https://cloudflareinsights.com "
+    "https://www.google-analytics.com https://analytics.google.com https://region1.google-analytics.com "
+    "https://www.facebook.com; "
     "frame-src https://api.razorpay.com https://checkout.razorpay.com https://*.razorpay.com "
     "https://accounts.google.com https://*.firebaseapp.com https://www.google.com https://www.recaptcha.net; "
     "form-action 'self' https://api.razorpay.com https://*.razorpay.com"
@@ -3885,7 +3887,8 @@ class StyleDashRequestHandler(SimpleHTTPRequestHandler):
         decoded = unquote(path).replace("\\", "/")
         lowered = ("/" + posixpath.normpath(decoded).lstrip("/")).casefold()
         return (
-            lowered.startswith(("/backups/", "/logs/", "/.config/", "/admin", "/api/admin/", "/api/internal-admin/", "/admin-api/"))
+            lowered in ("/backups", "/logs")
+            or lowered.startswith(("/backups/", "/logs/", "/.config/", "/admin", "/api/admin/", "/api/internal-admin/", "/admin-api/"))
             or lowered.startswith(("/tools/", "/payment-data/"))
             or lowered in ("/.env", "/secrets.env", "/styledash.db", "/firebase-service-account.json", "/serve.py", "/styledash_security.py")
             or lowered.endswith((".db", ".db-wal", ".db-shm", ".log", ".py", ".pyc"))

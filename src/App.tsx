@@ -7,6 +7,7 @@ import { WishlistProvider } from './context/WishlistContext';
 import { ToastProvider } from './context/ToastContext';
 import { MainLayout } from './layouts/MainLayout';
 import { ProtectedRoute } from './components/ProtectedRoute';
+import { AnalyticsConsent, AnalyticsRouteTracker } from './components/AnalyticsConsent';
 
 const Home = lazy(() => import('./pages/Home').then(m => ({ default: m.Home })));
 const Products = lazy(() => import('./pages/Products').then(m => ({ default: m.Products })));
@@ -34,6 +35,8 @@ const PaymentTestProduct = lazy(() => import('./pages/PaymentTestProduct').then(
 export const App: React.FC = () => {
   return (
     <BrowserRouter>
+      <AnalyticsRouteTracker />
+      <AnalyticsConsent />
       <ThemeProvider>
         <AuthProvider>
           <CartProvider>

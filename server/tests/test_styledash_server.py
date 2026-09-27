@@ -2176,6 +2176,22 @@ class HttpApiTests(unittest.TestCase):
             os.environ["STYLEDASH_TRUST_LOOPBACK_PROXY"] = self.previous_trust_loopback_proxy
         self.temporary.cleanup()
 
+    def test_sensitive_backup_and_log_roots_do_not_fall_through_to_spa(self) -> None:
+        for private_path in (
+            "/backups", "/backups/", "/backups/example",
+            "/logs", "/logs/", "/logs/example.log",
+            "/styledash.db", "/.env", "/secrets.env", "/database.db",
+            "/admin", "/api/admin/orders",
+        ):
+            with self.assertRaises(urllib.error.HTTPError) as caught:
+                urllib.request.urlopen(f"{self.base_url}{private_path}")
+            self.assertEqual(caught.exception.code, 404, private_path)
+            caught.exception.close()
+
+        with urllib.request.urlopen(f"{self.base_url}/unrelated-public-route") as response:
+            self.assertEqual(response.status, 200)
+            self.assertIn(b"Vibe4You", response.read())
+
     def test_catalogue_refresh_reuses_snapshot_until_database_changes(self) -> None:
         # First refresh builds the snapshot; further catalogue/availability
         # requests only read the cheap version counter instead of rescanning
@@ -2217,6 +2233,10 @@ class HttpApiTests(unittest.TestCase):
             self.assertIn("checkout.razorpay.com", policy)
             self.assertIn("https://static.cloudflareinsights.com", policy)
             self.assertIn("https://cloudflareinsights.com", policy)
+            self.assertIn("https://www.googletagmanager.com", policy)
+            self.assertIn("https://www.google-analytics.com", policy)
+            self.assertIn("https://connect.facebook.net", policy)
+            self.assertIn("https://www.facebook.com", policy)
 
     def test_process_identity_header_is_localhost_only(self) -> None:
         port = self.server.server_address[1]
