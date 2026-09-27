@@ -170,13 +170,21 @@ case "$1" in
     fi
     ;;
   */stage/scripts/styledash_shops.py)
-    printf '%s  %s\n' '2d652415a0ca199b8927e856a4b19049a572c79c7af3c041d162ca97dce5a784' "$1"
+    if grep -Fq 'tampered-stage-shops-module' "$1"; then
+      printf '%s  %s\n' '1111111111111111111111111111111111111111111111111111111111111111' "$1"
+    else
+      printf '%s  %s\n' '008786d321b7adeac11308b636cd89c3ab64cb406555486298347aa96c978750' "$1"
+    fi
     ;;
   */catalog_normalization.py)
     printf '%s  %s\n' 'a656e8a56c9f9d1e91a70508b34e99f48f247e72e3838b9a0af8b4fc68654417' "$1"
     ;;
   */styledash_shops.py)
-    printf '%s  %s\n' '9ff8f119fa0223994b64f2b29ad5ecda6189dfaf27339bff1a309ebb2de8ff06' "$1"
+    if grep -Fq 'unapproved-live-shops-module' "$1"; then
+      printf '%s  %s\n' '1111111111111111111111111111111111111111111111111111111111111111' "$1"
+    else
+      printf '%s  %s\n' '008786d321b7adeac11308b636cd89c3ab64cb406555486298347aa96c978750' "$1"
+    fi
     ;;
   *)
     # The fixture only needs stable protected-file fingerprints. Calling the
@@ -340,6 +348,26 @@ esac
             result = self.run_deploy(home, stage, mock_bin)
             self.assertNotEqual(result.returncode, 0, result.stdout + result.stderr)
             self.assertIn("staged module has an unexpected hash", result.stderr)
+            self.assertEqual((home / "server" / "serve.py").read_text(), "old-public-server\n")
+            self.assertTrue((home / "server" / "assets" / "old.js").is_file())
+
+    def test_unapproved_live_shops_module_is_rejected_before_backup_or_mutation(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            home, stage, mock_bin = self.fixture(Path(temporary))
+            self.write(home / "server" / "styledash_shops.py", "unapproved-live-shops-module\n")
+            result = self.run_deploy(home, stage, mock_bin)
+            self.assertNotEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertIn("approved category/shop module has an unexpected live hash", result.stderr)
+            self.assertEqual((home / "server" / "serve.py").read_text(), "old-public-server\n")
+            self.assertTrue((home / "server" / "assets" / "old.js").is_file())
+
+    def test_unapproved_staged_shops_module_is_rejected_before_backup_or_mutation(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            home, stage, mock_bin = self.fixture(Path(temporary))
+            self.write(stage / "scripts" / "styledash_shops.py", "tampered-stage-shops-module\n")
+            result = self.run_deploy(home, stage, mock_bin)
+            self.assertNotEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertIn("approved category/shop staged module has an unexpected hash", result.stderr)
             self.assertEqual((home / "server" / "serve.py").read_text(), "old-public-server\n")
             self.assertTrue((home / "server" / "assets" / "old.js").is_file())
 
