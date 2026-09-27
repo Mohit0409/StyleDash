@@ -77,6 +77,14 @@ class SurgicalCombinedReleaseTests(unittest.TestCase):
         self.assertIn('approved_category_stage_modules=verified', self.script)
         self.assertIn('approved_category_modules=installed', self.script)
         self.assertIn('approved_category_modules=restored', self.script)
+        self.assertIn(
+            'EXPECTED_LIVE_STYLEDASH_SHOPS_SHA256="008786d321b7adeac11308b636cd89c3ab64cb406555486298347aa96c978750"',
+            self.script,
+        )
+        self.assertIn(
+            'EXPECTED_STAGE_STYLEDASH_SHOPS_SHA256="008786d321b7adeac11308b636cd89c3ab64cb406555486298347aa96c978750"',
+            self.script,
+        )
         self.assertIn('install -m 600 "$STAGE/scripts/catalog_normalization.py"', self.script)
         self.assertIn('install -m 600 "$STAGE/scripts/styledash_shops.py"', self.script)
         self.assertNotIn('install -m 600 "$STAGE/scripts/styledash_security.py"', self.script)
