@@ -24,9 +24,10 @@ To deploy an already merged, exact approved main SHA instead, run:
 ```
 
 The wrapper refuses a SHA not merged into `origin/main`, a missing/failed exact
-SHA CI gate, incomplete production Firebase public values, or a missing local
-SSH identity. It uses `git archive`, so a dirty root worktree is not cleaned,
-stashed, reset, or used as deployment input.
+SHA CI gate, a CI run/job not bound to `.github/workflows/ci.yml`, a release
+secret-scan finding, incomplete production Firebase public values, or a missing
+local SSH identity. It uses `git archive`, so a dirty root worktree is not
+cleaned, stashed, reset, or used as deployment input.
 
 The wrapper builds a fresh immutable artifact from that SHA, checks its
 allowlisted contents and SHA-256, uploads it, and asks the Termux runner to
@@ -52,9 +53,9 @@ PRODUCTION_MUTATED       NO
 ```
 
 `-Status` reads the private transaction state. `-Resume` reuses the same
-release/artifact transaction. If its fresh pre-mutation backup already passed,
-it is not started again. A changed SHA, artifact checksum, live baseline, or
-failed preflight invalidates the transaction and stops safely.
+release/artifact transaction but always makes a new pre-mutation backup before
+any retry. A changed SHA, artifact checksum, live baseline, or failed preflight
+invalidates the transaction and stops safely.
 
 ## What the Termux transaction does
 
@@ -90,6 +91,14 @@ the audited `780cde2…` runtime hashes and the retained approved analytics
 frontend tree in `ops/deployment-v2-bootstrap.json`. Later transactions match
 the last successful private deployment manifest. Unexplained managed-file drift
 fails before backup.
+
+The artifact has an exact member allowlist: the built frontend and every
+public/admin Python module and service-control script needed by the runtime.
+It rejects extra payload files and scans the release inputs for private-key,
+GitHub/AWS-token, Razorpay secret/webhook, SMTP-password, and TOTP-key
+assignments. Dependency changes or new runtime entry points require an
+intentional write-set expansion and fresh review; the command does not claim a
+package-install or infrastructure migration it did not perform.
 
 After preflight, exactly one fresh existing-format backup runs. Its stages are
 reported as `BACKUP_LOCAL`, `BACKUP_PRIMARY_COPY`, `BACKUP_PRIMARY_VERIFY`,

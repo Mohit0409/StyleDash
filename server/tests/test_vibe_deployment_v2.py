@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import io
 import importlib.util
 import json
 import os
@@ -110,6 +111,8 @@ class VibeDeploymentV2Tests(unittest.TestCase):
             "dist/robots.txt": "User-agent: *\n",
             "dist/assets/index-fixture.js": 'const firebaseConfig={apiKey:"fixture-api",authDomain:"fixture.firebaseapp.com",projectId:"fixture-project",appId:"fixture-app"};const ids="G-FIXTURE 123456789";\n',
         }
+        for relative in BUILDER.FILE_TARGETS:
+            files.setdefault(relative, "# fixture runtime source\n")
         for relative, text in files.items():
             self.write(source / relative, text, "/termux/" in relative)
         return source
@@ -129,26 +132,15 @@ class VibeDeploymentV2Tests(unittest.TestCase):
         for name in ("index.html", "favicon.svg", "manifest.json", "product-placeholder.svg", "robots.txt"):
             (home / "server" / name).write_bytes((source / "dist" / name).read_bytes())
         (home / "server" / "assets" / "index-fixture.js").write_bytes((source / "dist" / "assets" / "index-fixture.js").read_bytes())
-        mapping = {
-            "scripts/termux-spa-server.py": ["server/serve.py"],
-            "scripts/termux-admin-server.py": ["admin/serve.py"],
-            "scripts/styledash_reviews.py": ["server/styledash_reviews.py", "admin/styledash_reviews.py"],
-            "scripts/catalog_normalization.py": ["server/catalog_normalization.py", "admin/catalog_normalization.py"],
-            "scripts/styledash_shops.py": ["server/styledash_shops.py", "admin/styledash_shops.py"],
-            "scripts/termux/backup-styledash-data": ["bin/backup-styledash-data"],
-            "scripts/termux/start-styledash-cloudflare": ["bin/start-styledash-cloudflare"],
-            "scripts/termux/styledash-process-lib": ["bin/styledash-process-lib"],
-        }
         managed: dict[str, str] = {}
-        for relative, targets in mapping.items():
+        for relative, targets in BUILDER.FILE_TARGETS.items():
             for target in targets:
+                target = target[0]
                 target_path = home / target
                 target_path.parent.mkdir(parents=True, exist_ok=True)
                 target_path.write_bytes((source / relative).read_bytes())
                 managed[target] = self.sha(target_path)
         for relative in (
-            "server/styledash_security.py",
-            "admin/styledash_security.py",
             "admin/admin/index.html",
             "admin/admin/admin.js",
             ".local/share/styledash/catalog.json",
@@ -212,6 +204,41 @@ class VibeDeploymentV2Tests(unittest.TestCase):
             self.assertEqual(parsed.metadata["ci"]["requiredCheck"], "StyleDash Required CI")
             self.assertTrue((stage / "payload" / "dist" / "assets" / "index-fixture.js").is_file())
 
+    def test_runner_requires_the_builder_complete_runtime_mapping(self) -> None:
+        expected = {
+            (source, target)
+            for source, targets in BUILDER.FILE_TARGETS.items()
+            for target, _ in targets
+        }
+        self.assertEqual(expected, RUNNER.EXPECTED_MANAGED_MAPPINGS)
+
+    def test_existing_staging_is_revalidated_without_being_recreated(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            artifact, home = self.build_artifact(Path(temporary))
+            first = RUNNER.Artifact(artifact, home / ".local" / "share" / "styledash" / "deployments")
+            stage = first.extract()
+            marker = stage / "owner-transaction-marker"
+            marker.write_text("keep\n", encoding="utf-8")
+            second = RUNNER.Artifact(artifact, home / ".local" / "share" / "styledash" / "deployments")
+            self.assertEqual(second.extract(), stage)
+            self.assertTrue(marker.exists())
+
+    def test_unexpected_benign_artifact_member_is_rejected_before_extraction(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            artifact, home = self.build_artifact(Path(temporary))
+            replacement = artifact.with_name("replacement.tar.gz")
+            with tarfile.open(artifact, "r:gz") as source, tarfile.open(replacement, "w:gz") as output:
+                for member in source.getmembers():
+                    data = source.extractfile(member).read() if member.isfile() else None
+                    output.addfile(member, io.BytesIO(data) if data is not None else None)
+                extra = tarfile.TarInfo("payload/harmless.txt")
+                extra.size = 2
+                output.addfile(extra, io.BytesIO(b"ok"))
+            replacement.replace(artifact)
+            artifact.with_suffix(".gz.sha256").write_text(f"{self.sha(artifact)}  {artifact.name}\n", encoding="ascii")
+            with self.assertRaisesRegex(RUNNER.DeployError, "exact deployment allowlist"):
+                RUNNER.Artifact(artifact, home / ".local" / "share" / "styledash" / "deployments").extract()
+
     def test_secret_bearing_artifact_is_rejected_before_extraction(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
@@ -225,6 +252,28 @@ class VibeDeploymentV2Tests(unittest.TestCase):
             parsed = RUNNER.Artifact(artifact, root / "deployments")
             with self.assertRaisesRegex(RUNNER.DeployError, "forbidden"):
                 parsed.extract()
+
+    def test_builder_secret_scan_rejects_runtime_secret_assignment(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            source = self.make_source(root)
+            self.make_home(root, source)
+            (source / "scripts" / "styledash_mail.py").write_text("SMTP_PASSWORD=not-allowed\\n", encoding="utf-8")
+            old = dict(os.environ)
+            os.environ.update({
+                "VITE_FIREBASE_API_KEY": "fixture-api", "VITE_FIREBASE_AUTH_DOMAIN": "fixture.firebaseapp.com",
+                "VITE_FIREBASE_PROJECT_ID": "fixture-project", "VITE_FIREBASE_APP_ID": "fixture-app",
+            })
+            try:
+                with self.assertRaisesRegex(SystemExit, "secret scan"):
+                    BUILDER.build(argparse.Namespace(
+                        source=str(source), output=str(root / "unsafe.tar.gz"), release_sha="a" * 40,
+                        repository="Mohit0409/StyleDash", ci_run_id="123",
+                        ci_url="https://github.com/Mohit0409/StyleDash/actions/runs/123",
+                        created_at="2026-09-27T00:00:00Z", pull_request=[]
+                    ))
+            finally:
+                os.environ.clear(); os.environ.update(old)
 
     def make_deployment(self, root: Path) -> FixtureDeployment:
         artifact, home = self.build_artifact(root)
@@ -272,6 +321,14 @@ class VibeDeploymentV2Tests(unittest.TestCase):
             self.assertEqual(FixtureDeployment.mutation_calls, 0)
             self.assertFalse(deployment.state["productionMutated"])
 
+    def test_resume_never_reuses_a_previous_backup(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            deployment = self.make_deployment(Path(temporary))
+            deployment.initialize()
+            deployment.save_state("PREFLIGHT_PASS", backupPassed=True, backupTimestamp="old-backup")
+            self.assertEqual(deployment.backup(), "20260927T000000Z")
+            self.assertEqual(FixtureDeployment.backup_calls, 1)
+
     def test_pass_writes_current_and_immutable_history_manifest(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             deployment = self.make_deployment(Path(temporary))
@@ -302,6 +359,9 @@ class VibeDeploymentV2Tests(unittest.TestCase):
         self.assertNotIn("git clean", script.lower())
         self.assertIn("merge-base --is-ancestor", script)
         self.assertIn("CI_NOT_GREEN", script)
+        self.assertIn("actions/runs/$CiRunId", script)
+        self.assertIn(".github/workflows/ci.yml", script)
+        self.assertIn("actions/runs/$CiRunId/jobs", script)
 
     def test_detached_runner_and_sensitive_routes_are_explicit(self) -> None:
         shell = (ROOT / "scripts" / "termux" / "vibe-deploy").read_text(encoding="utf-8")

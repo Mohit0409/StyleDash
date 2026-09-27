@@ -10,6 +10,7 @@ import io
 import json
 import os
 import tarfile
+import re
 from pathlib import Path, PurePosixPath
 
 
@@ -17,10 +18,30 @@ PROCEDURE_VERSION = 2
 FILE_TARGETS = {
     "scripts/termux-spa-server.py": [("server/serve.py", 0o755)],
     "scripts/termux-admin-server.py": [("admin/serve.py", 0o600)],
+    "scripts/styledash_admin.py": [("admin/styledash_admin.py", 0o600)],
+    "scripts/styledash_security.py": [
+        ("server/styledash_security.py", 0o600),
+        ("admin/styledash_security.py", 0o600),
+    ],
     "scripts/styledash_reviews.py": [
         ("server/styledash_reviews.py", 0o600),
         ("admin/styledash_reviews.py", 0o600),
     ],
+    "scripts/styledash_delivery_zone.py": [
+        ("server/styledash_delivery_zone.py", 0o600),
+        ("admin/styledash_delivery_zone.py", 0o600),
+    ],
+    "scripts/styledash_delivery_zone_store.py": [
+        ("server/styledash_delivery_zone_store.py", 0o600),
+        ("admin/styledash_delivery_zone_store.py", 0o600),
+    ],
+    "scripts/styledash_mail.py": [("server/styledash_mail.py", 0o600)],
+    "scripts/styledash_notify.py": [
+        ("server/styledash_notify.py", 0o600),
+        ("admin/styledash_notify.py", 0o600),
+    ],
+    "scripts/styledash_firebase.py": [("server/styledash_firebase.py", 0o600)],
+    "scripts/receipt_pdf.py": [("server/receipt_pdf.py", 0o600)],
     "scripts/catalog_normalization.py": [
         ("server/catalog_normalization.py", 0o600),
         ("admin/catalog_normalization.py", 0o600),
@@ -31,6 +52,9 @@ FILE_TARGETS = {
     ],
     "scripts/termux/backup-styledash-data": [("bin/backup-styledash-data", 0o755)],
     "scripts/termux/start-styledash-cloudflare": [("bin/start-styledash-cloudflare", 0o700)],
+    "scripts/termux/start-styledash": [("bin/start-styledash", 0o700)],
+    "scripts/termux/start-styledash-admin": [("bin/start-styledash-admin", 0o700)],
+    "scripts/termux/verify-styledash-processes": [("bin/verify-styledash-processes", 0o700)],
     "scripts/termux/styledash-process-lib": [("bin/styledash-process-lib", 0o755)],
     "scripts/termux/vibe-deploy": [("bin/vibe-deploy", 0o700)],
     "scripts/termux/vibe_deploy.py": [("bin/vibe_deploy.py", 0o600)],
@@ -43,6 +67,14 @@ FRONTEND_TOP_LEVEL = {
     "product-placeholder.svg",
     "robots.txt",
 }
+SECRET_VALUE_PATTERNS = (
+    re.compile(rb"-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----"),
+    re.compile(rb"gh[pousr]_[A-Za-z0-9_]{30,}"),
+    re.compile(rb"AKIA[0-9A-Z]{16}"),
+    re.compile(
+        rb"(?im)^\s*(?:export\s+)?(?:RAZORPAY_(?:LIVE|TEST)_(?:KEY_SECRET|WEBHOOK_SECRET)|SMTP_PASSWORD|STYLEDASH_TOTP_ENCRYPTION_KEY)\s*=\s*[^$\s#\"']"
+    ),
+)
 
 
 def sha256_file(path: Path) -> str:
@@ -51,6 +83,11 @@ def sha256_file(path: Path) -> str:
         for block in iter(lambda: handle.read(1024 * 1024), b""):
             digest.update(block)
     return digest.hexdigest()
+
+
+def reject_secret_material(name: str, data: bytes) -> None:
+    if any(pattern.search(data) for pattern in SECRET_VALUE_PATTERNS):
+        raise SystemExit(f"release secret scan failed: {name}")
 
 
 def frontend_files(source: Path) -> list[Path]:
@@ -133,6 +170,7 @@ def build(args: argparse.Namespace) -> tuple[Path, Path]:
         if not path.is_file() or path.is_symlink():
             raise SystemExit(f"required artifact file is missing or linked: {relative}")
         data = path.read_bytes()
+        reject_secret_material(relative, data)
         digest = hashlib.sha256(data).hexdigest()
         payload.append((f"payload/{relative}", data, max(mode for _, mode in targets)))
         for target, mode in targets:
@@ -144,7 +182,9 @@ def build(args: argparse.Namespace) -> tuple[Path, Path]:
         path = source / relative
         if not path.is_file() or path.is_symlink():
             raise SystemExit(f"required artifact metadata is missing: {relative}")
-        payload.append((f"payload/{relative}", path.read_bytes(), 0o600))
+        data = path.read_bytes()
+        reject_secret_material(relative, data)
+        payload.append((f"payload/{relative}", data, 0o600))
 
     dist_files = frontend_files(source)
     frontend_entries, frontend_hash = tree_manifest(source / "dist", dist_files)

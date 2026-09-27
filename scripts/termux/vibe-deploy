@@ -44,10 +44,8 @@ case "$mode" in
   *) usage ;;
 esac
 
-# Run the complete non-mutating preflight in the operator's foreground. This
-# guarantees an immediate, concise refusal before any backup is detached.
-python3 "$PYTHON_RUNNER" --preflight-only "$artifact"
-
+# Lock before preflight: an overlapping invocation must not even recreate the
+# deterministic staging directory while the owner transaction is active.
 if ! mkdir "$LOCK_DIR" 2>/dev/null; then
   lock_pid="$(cat "$LOCK_DIR/pid" 2>/dev/null || true)"
   case "$lock_pid" in
@@ -65,6 +63,20 @@ if ! mkdir "$LOCK_DIR" 2>/dev/null; then
   }
   mkdir "$LOCK_DIR"
 fi
+lock_transferred=0
+cleanup_launcher_lock() {
+  if [ "$lock_transferred" -eq 0 ]; then
+    rm -f -- "$LOCK_DIR/pid"
+    rmdir -- "$LOCK_DIR" 2>/dev/null || true
+  fi
+}
+trap cleanup_launcher_lock EXIT INT TERM HUP
+printf '%s\n' "$$" > "$LOCK_DIR/pid"
+chmod 600 "$LOCK_DIR/pid"
+
+# Run the complete non-mutating preflight in the operator's foreground. This
+# guarantees an immediate, concise refusal before any backup is detached.
+python3 "$PYTHON_RUNNER" --preflight-only "$artifact"
 
 log="$LOG_DIR/vibe-deploy-launcher-$(date -u +%Y%m%dT%H%M%SZ).log"
 detached_body='set -u
@@ -85,8 +97,11 @@ else
   nohup bash -c "$detached_body" vibe-deploy-detached "$PYTHON_RUNNER" "$artifact" "$LOCK_DIR" </dev/null >>"$log" 2>&1 &
 fi
 launcher_pid=$!
-printf '%s\n' "$launcher_pid" > "$LOCK_DIR/pid"
-chmod 600 "$LOCK_DIR/pid" "$log" 2>/dev/null || true
+# The detached process replaces the launcher's PID after it starts. Leave the
+# parent PID in place until then, so a second invocation sees an active lock.
+chmod 600 "$log" 2>/dev/null || true
+lock_transferred=1
+trap - EXIT INT TERM HUP
 echo "DETACHED=YES"
 echo "SERVER_JOB_PID=$launcher_pid"
 echo "STATUS_COMMAND=vibe-deploy --status"

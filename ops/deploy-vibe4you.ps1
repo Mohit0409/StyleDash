@@ -83,6 +83,16 @@ try {
     $CiRunUrl = [string]$Required[0].details_url
     if ($CiRunUrl -notmatch '/actions/runs/(\d+)/') { throw 'Required CI run URL is invalid.' }
     $CiRunId = $Matches[1]
+    $RunJson = & gh api -H 'Accept: application/vnd.github+json' "repos/$Repository/actions/runs/$CiRunId"
+    if ($LASTEXITCODE -ne 0) { throw 'Required GitHub Actions run evidence could not be loaded.' }
+    $Run = $RunJson | ConvertFrom-Json
+    if ($Run.head_sha -ne $ReleaseSha -or $Run.name -ne 'Vibe4You CI' -or $Run.path -ne '.github/workflows/ci.yml' -or $Run.status -ne 'completed' -or $Run.conclusion -ne 'success') {
+        throw 'CI_NOT_GREEN: required workflow identity or exact-SHA run evidence is invalid.'
+    }
+    $JobsJson = & gh api -H 'Accept: application/vnd.github+json' "repos/$Repository/actions/runs/$CiRunId/jobs"
+    if ($LASTEXITCODE -ne 0) { throw 'Required GitHub Actions job evidence could not be loaded.' }
+    $RequiredJob = @((($JobsJson | ConvertFrom-Json).jobs) | Where-Object { $_.name -eq $RequiredCheck -and $_.status -eq 'completed' -and $_.conclusion -eq 'success' })
+    if ($RequiredJob.Count -ne 1) { throw 'CI_NOT_GREEN: required workflow job did not pass exactly once.' }
     $CommitTimestamp = (& git show -s --format=%cI $ReleaseSha).Trim()
     if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($CommitTimestamp)) {
         throw 'Could not determine the immutable release commit timestamp.'

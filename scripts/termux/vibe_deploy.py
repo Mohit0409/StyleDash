@@ -30,6 +30,8 @@ SENSITIVE_PATHS = (
     "/admin",
     "/admin/",
     "/api/admin/deployment-probe",
+    "/api/admin/me",
+    "/api/admin/orders",
     "/backups",
     "/backups/",
     "/backups/deployment-probe",
@@ -42,8 +44,6 @@ SENSITIVE_PATHS = (
     "/database.db",
 )
 PROTECTED_FILES = (
-    "server/styledash_security.py",
-    "admin/styledash_security.py",
     "admin/admin/index.html",
     "admin/admin/admin.js",
     ".local/share/styledash/catalog.json",
@@ -63,7 +63,53 @@ SECRET_PATTERNS = (
     re.compile(rb"-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----"),
     re.compile(rb"gh[pousr]_[A-Za-z0-9_]{30,}"),
     re.compile(rb"AKIA[0-9A-Z]{16}"),
+    re.compile(
+        rb"(?im)^\s*(?:export\s+)?(?:RAZORPAY_(?:LIVE|TEST)_(?:KEY_SECRET|WEBHOOK_SECRET)|SMTP_PASSWORD|STYLEDASH_TOTP_ENCRYPTION_KEY)\s*=\s*[^$\s#\"']"
+    ),
 )
+EXPECTED_PAYLOAD_SOURCES = {
+    "scripts/termux-spa-server.py",
+    "scripts/termux-admin-server.py",
+    "scripts/styledash_admin.py",
+    "scripts/styledash_security.py",
+    "scripts/styledash_reviews.py",
+    "scripts/styledash_delivery_zone.py",
+    "scripts/styledash_delivery_zone_store.py",
+    "scripts/styledash_mail.py",
+    "scripts/styledash_notify.py",
+    "scripts/styledash_firebase.py",
+    "scripts/receipt_pdf.py",
+    "scripts/catalog_normalization.py",
+    "scripts/styledash_shops.py",
+    "scripts/termux/backup-styledash-data",
+    "scripts/termux/start-styledash-cloudflare",
+    "scripts/termux/start-styledash",
+    "scripts/termux/start-styledash-admin",
+    "scripts/termux/verify-styledash-processes",
+    "scripts/termux/styledash-process-lib",
+    "scripts/termux/vibe-deploy",
+    "scripts/termux/vibe_deploy.py",
+}
+EXPECTED_EXTRA_FILES = {"ops/deployment-v2-bootstrap.json"}
+EXPECTED_MANAGED_MAPPINGS = {
+    ("scripts/termux-spa-server.py", "server/serve.py"), ("scripts/termux-admin-server.py", "admin/serve.py"),
+    ("scripts/styledash_admin.py", "admin/styledash_admin.py"),
+    ("scripts/styledash_security.py", "server/styledash_security.py"), ("scripts/styledash_security.py", "admin/styledash_security.py"),
+    ("scripts/styledash_reviews.py", "server/styledash_reviews.py"), ("scripts/styledash_reviews.py", "admin/styledash_reviews.py"),
+    ("scripts/styledash_delivery_zone.py", "server/styledash_delivery_zone.py"), ("scripts/styledash_delivery_zone.py", "admin/styledash_delivery_zone.py"),
+    ("scripts/styledash_delivery_zone_store.py", "server/styledash_delivery_zone_store.py"), ("scripts/styledash_delivery_zone_store.py", "admin/styledash_delivery_zone_store.py"),
+    ("scripts/styledash_mail.py", "server/styledash_mail.py"),
+    ("scripts/styledash_notify.py", "server/styledash_notify.py"), ("scripts/styledash_notify.py", "admin/styledash_notify.py"),
+    ("scripts/styledash_firebase.py", "server/styledash_firebase.py"), ("scripts/receipt_pdf.py", "server/receipt_pdf.py"),
+    ("scripts/catalog_normalization.py", "server/catalog_normalization.py"), ("scripts/catalog_normalization.py", "admin/catalog_normalization.py"),
+    ("scripts/styledash_shops.py", "server/styledash_shops.py"), ("scripts/styledash_shops.py", "admin/styledash_shops.py"),
+    ("scripts/termux/backup-styledash-data", "bin/backup-styledash-data"),
+    ("scripts/termux/start-styledash-cloudflare", "bin/start-styledash-cloudflare"),
+    ("scripts/termux/start-styledash", "bin/start-styledash"), ("scripts/termux/start-styledash-admin", "bin/start-styledash-admin"),
+    ("scripts/termux/verify-styledash-processes", "bin/verify-styledash-processes"),
+    ("scripts/termux/styledash-process-lib", "bin/styledash-process-lib"),
+    ("scripts/termux/vibe-deploy", "bin/vibe-deploy"), ("scripts/termux/vibe_deploy.py", "bin/vibe_deploy.py"),
+}
 
 
 class DeployError(RuntimeError):
@@ -138,7 +184,7 @@ class Artifact:
             raise DeployError("artifact SHA-256 mismatch")
         self.sha256 = actual
 
-    def validate_members(self) -> None:
+    def validate_members(self) -> set[str]:
         seen: set[str] = set()
         with tarfile.open(self.archive, "r:gz") as archive:
             for member in archive.getmembers():
@@ -162,26 +208,45 @@ class Artifact:
                         raise DeployError(f"artifact contains secret-like material: {member.name}")
         if "deployment-v2.json" not in seen:
             raise DeployError("artifact provenance metadata is missing")
+        return seen
+
+    def expected_members(self) -> set[str]:
+        frontend = self.metadata.get("frontend") or {}
+        files = frontend.get("files")
+        if not isinstance(files, list):
+            raise DeployError("artifact frontend file manifest is invalid")
+        expected = {"deployment-v2.json"}
+        expected.update(f"payload/{source}" for source in EXPECTED_PAYLOAD_SOURCES | EXPECTED_EXTRA_FILES)
+        for entry in files:
+            relative = PurePosixPath(str((entry or {}).get("path", "")))
+            if relative.is_absolute() or not relative.parts or ".." in relative.parts:
+                raise DeployError("artifact frontend member path is unsafe")
+            expected.add(f"payload/dist/{relative.as_posix()}")
+        return expected
 
     def extract(self) -> Path:
         self.validate_checksum()
-        self.validate_members()
+        members = self.validate_members()
         with tarfile.open(self.archive, "r:gz") as archive:
             metadata_member = archive.getmember("deployment-v2.json")
             handle = archive.extractfile(metadata_member)
             if handle is None:
                 raise DeployError("artifact metadata is unreadable")
             self.metadata = json.load(handle)
+        if members != self.expected_members():
+            raise DeployError("artifact member is outside the exact deployment allowlist")
         release = str(self.metadata.get("releaseSha", ""))
         if not re.fullmatch(r"[0-9a-f]{40}", release):
             raise DeployError("artifact release SHA is invalid")
         transaction = f"{release[:12]}-{self.sha256[:12]}"
         stage = self.deployments_root / "staging" / transaction
         if stage.exists():
-            shutil.rmtree(stage)
-        stage.mkdir(parents=True, mode=0o700)
-        with tarfile.open(self.archive, "r:gz") as archive:
-            archive.extractall(stage, filter="data")
+            if stage.is_symlink() or not stage.is_dir():
+                raise DeployError("existing deployment staging path is unsafe")
+        else:
+            stage.mkdir(parents=True, mode=0o700)
+            with tarfile.open(self.archive, "r:gz") as archive:
+                archive.extractall(stage, filter="data")
         self.stage = stage
         self.validate_extracted()
         return stage
@@ -199,6 +264,13 @@ class Artifact:
             or not str(ci.get("url", "")).startswith("https://github.com/Mohit0409/StyleDash/actions/runs/")
         ):
             raise DeployError("required exact-SHA GitHub CI evidence is missing")
+        mappings = {
+            (str(entry.get("source", "")), str(entry.get("target", "")))
+            for entry in self.metadata.get("managedFiles", [])
+            if isinstance(entry, dict)
+        }
+        if mappings != EXPECTED_MANAGED_MAPPINGS or len(mappings) != len(self.metadata.get("managedFiles", [])):
+            raise DeployError("artifact managed-file mapping is not the approved complete runtime scope")
         for entry in self.metadata.get("managedFiles", []):
             source = self.stage / "payload" / str(entry.get("source", ""))
             target = PurePosixPath(str(entry.get("target", "")))
@@ -466,9 +538,6 @@ class Deployment:
         return previous
 
     def backup(self) -> str:
-        if self.state.get("backupPassed"):
-            self.log("existing successful backup reused for identical transaction")
-            return str(self.state.get("backupTimestamp", ""))
         assert self.transaction_dir is not None and self.stage is not None
         progress = self.transaction_dir / "backup-progress"
         marker = self.run_dir / "styledash-last-local-backup"
