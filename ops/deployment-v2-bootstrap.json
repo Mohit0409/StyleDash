@@ -1,0 +1,26 @@
+{
+  "schemaVersion": 1,
+  "deployedCommit": "780cde2aca46fc21a02eaa480e55c8060820df94",
+  "approvedRuntimeCommit": "780cde2aca46fc21a02eaa480e55c8060820df94",
+  "frontendSourceCommit": "a843109448111020931adf8eee2b9e57a7419612",
+  "frontendTreeSha256": "e7ae64903b43017a222b3167ae41567ae152a51a1d049018f42105287987c7cb",
+  "frontendFileCount": 53,
+  "provenance": {
+    "deploymentPullRequest": "https://github.com/Mohit0409/StyleDash/pull/114",
+    "requiredCiRun": "https://github.com/Mohit0409/StyleDash/actions/runs/36310008014",
+    "artifactEvidence": "PR #114 records artifact-to-public/admin byte comparisons PASS; the live frontend was independently matched byte-for-byte to the retained approved a843109 build during the deployment-v2 audit."
+  },
+  "managedFiles": {
+    "server/serve.py": "467a36511b4c6cd202218efa0baaef39fe371c76292f6bf7f4c2d6e7171929e5",
+    "server/styledash_reviews.py": "4631b52a790b3f2c6ff61b3201af5fbf5377b54d1b26a2fa1a2038702881b2f2",
+    "server/catalog_normalization.py": "a656e8a56c9f9d1e91a70508b34e99f48f247e72e3838b9a0af8b4fc68654417",
+    "server/styledash_shops.py": "008786d321b7adeac11308b636cd89c3ab64cb406555486298347aa96c978750",
+    "admin/serve.py": "40a869561394a32d24320dc751482f10ebae1ba4843f1efc4884e687bad2359b",
+    "admin/styledash_reviews.py": "4631b52a790b3f2c6ff61b3201af5fbf5377b54d1b26a2fa1a2038702881b2f2",
+    "admin/catalog_normalization.py": "a656e8a56c9f9d1e91a70508b34e99f48f247e72e3838b9a0af8b4fc68654417",
+    "admin/styledash_shops.py": "008786d321b7adeac11308b636cd89c3ab64cb406555486298347aa96c978750",
+    "bin/backup-styledash-data": "326a879a9d6c328bebbbf7948760fd881e96f184b38a850cc8bdc4f055b10459",
+    "bin/start-styledash-cloudflare": "36741beae8abc6a6c3178afa0fd50c4c022b83d13c8252b53aa9e3b72a8299c5",
+    "bin/styledash-process-lib": "de517d7b151cd158d36396c2ca4c4e49eba3b269d45cf063f65cea4826908bfa"
+  }
+}

@@ -1,0 +1,93 @@
+#!/data/data/com.termux/files/usr/bin/bash
+# Owner-safe detached entry point for Vibe4You deployment transactions.
+set -euo pipefail
+umask 077
+
+HOME_ROOT="${STYLEDASH_DEPLOY_HOME:-$HOME}"
+DEPLOY_ROOT="$HOME_ROOT/.local/share/styledash/deployments"
+RUN_DIR="$HOME_ROOT/run"
+LOG_DIR="$HOME_ROOT/logs"
+LOCK_DIR="$RUN_DIR/vibe-deploy.lock"
+SCRIPT_DIR="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd -P)"
+PYTHON_RUNNER="$SCRIPT_DIR/vibe_deploy.py"
+
+usage() {
+  echo "usage: vibe-deploy --preflight-only ARTIFACT | --deploy ARTIFACT | --resume ARTIFACT | --status" >&2
+  exit 2
+}
+
+[ -f "$PYTHON_RUNNER" ] || {
+  echo "vibe-deploy Python runner is missing" >&2
+  exit 1
+}
+
+mkdir -p "$DEPLOY_ROOT" "$RUN_DIR" "$LOG_DIR"
+chmod 700 "$DEPLOY_ROOT" "$RUN_DIR" "$LOG_DIR"
+
+if [ "${1:-}" = "--status" ] && [ "$#" -eq 1 ]; then
+  exec python3 "$PYTHON_RUNNER" --status
+fi
+
+mode="${1:-}"
+artifact="${2:-}"
+[ "$#" -eq 2 ] || usage
+[ -f "$artifact" ] && [ -f "$artifact.sha256" ] || {
+  echo "artifact or checksum is missing: $artifact" >&2
+  exit 1
+}
+
+case "$mode" in
+  --preflight-only)
+    exec python3 "$PYTHON_RUNNER" --preflight-only "$artifact"
+    ;;
+  --deploy|--resume) ;;
+  *) usage ;;
+esac
+
+# Run the complete non-mutating preflight in the operator's foreground. This
+# guarantees an immediate, concise refusal before any backup is detached.
+python3 "$PYTHON_RUNNER" --preflight-only "$artifact"
+
+if ! mkdir "$LOCK_DIR" 2>/dev/null; then
+  lock_pid="$(cat "$LOCK_DIR/pid" 2>/dev/null || true)"
+  case "$lock_pid" in
+    ''|*[!0-9]*) lock_pid='' ;;
+  esac
+  if [ -n "$lock_pid" ] && kill -0 "$lock_pid" 2>/dev/null; then
+    echo "EXISTING_TRANSACTION=YES"
+    python3 "$PYTHON_RUNNER" --status
+    exit 0
+  fi
+  rm -f -- "$LOCK_DIR/pid"
+  rmdir -- "$LOCK_DIR" 2>/dev/null || {
+    echo "stale deployment lock could not be removed safely" >&2
+    exit 75
+  }
+  mkdir "$LOCK_DIR"
+fi
+
+log="$LOG_DIR/vibe-deploy-launcher-$(date -u +%Y%m%dT%H%M%SZ).log"
+detached_body='set -u
+runner="$1"
+artifact="$2"
+lock="$3"
+cleanup() { rm -f -- "$lock/pid"; rmdir -- "$lock" 2>/dev/null || true; }
+trap cleanup EXIT INT TERM HUP
+printf "%s\n" "$$" > "$lock/pid"
+chmod 600 "$lock/pid"
+python3 "$runner" --run "$artifact" --resume'
+
+# setsid + nohup disconnect stdin/stdout/stderr and the controlling session.
+# The server-side process therefore survives a Windows SSH/network drop.
+if command -v setsid >/dev/null 2>&1; then
+  nohup setsid bash -c "$detached_body" vibe-deploy-detached "$PYTHON_RUNNER" "$artifact" "$LOCK_DIR" </dev/null >>"$log" 2>&1 &
+else
+  nohup bash -c "$detached_body" vibe-deploy-detached "$PYTHON_RUNNER" "$artifact" "$LOCK_DIR" </dev/null >>"$log" 2>&1 &
+fi
+launcher_pid=$!
+printf '%s\n' "$launcher_pid" > "$LOCK_DIR/pid"
+chmod 600 "$LOCK_DIR/pid" "$log" 2>/dev/null || true
+echo "DETACHED=YES"
+echo "SERVER_JOB_PID=$launcher_pid"
+echo "STATUS_COMMAND=vibe-deploy --status"
+echo "LOG=$log"
