@@ -42,6 +42,8 @@
     "bin/stop-styledash-ngrok": "48d3223e68aa366c593347f139e964af2a95dcebde8a8b64d1cfd83476fceb61",
     ".termux/boot/start-styledash": "87e2da66ed0496ed515919faec6b519cd1750a157c33d84e57dcc267cfb58ae4",
     "bin/styledash-health": "8742c43b1f95d8aeaafb6c9cd8348ad81290807c7e8de9761a0afa792e47e312",
+    "bin/backup-styledash-recovery": "598aee44c7f16c8df8f69f092d6a081b4f57bea0ac34b0578bc14d9814a1b080",
+    "bin/styledash-notify": "d7078d14edb3398b228e20341c96f253644d2dfde61f4d3835c608f2853c111d",
     "bin/verify-styledash-processes": "de74c7592e27183cc81d87036eb27d0921d61458ca9e67bf3623e6e3d9659ac6",
     "bin/styledash-process-lib": "de517d7b151cd158d36396c2ca4c4e49eba3b269d45cf063f65cea4826908bfa"
   }

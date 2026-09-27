@@ -61,6 +61,8 @@ FILE_TARGETS = {
     "scripts/termux/stop-styledash-ngrok": [("bin/stop-styledash-ngrok", 0o700)],
     "scripts/termux/boot-start-styledash": [(".termux/boot/start-styledash", 0o700)],
     "scripts/termux/styledash-health": [("bin/styledash-health", 0o700)],
+    "scripts/termux/backup-styledash-recovery": [("bin/backup-styledash-recovery", 0o700)],
+    "scripts/termux/styledash-notify": [("bin/styledash-notify", 0o700)],
     "scripts/termux/verify-styledash-processes": [("bin/verify-styledash-processes", 0o700)],
     "scripts/termux/styledash-process-lib": [("bin/styledash-process-lib", 0o755)],
     "scripts/termux/vibe-deploy": [("bin/vibe-deploy", 0o700)],

@@ -10,6 +10,7 @@ import sqlite3
 import tarfile
 import tempfile
 import unittest
+from unittest import mock
 from pathlib import Path
 
 
@@ -341,14 +342,44 @@ class VibeDeploymentV2Tests(unittest.TestCase):
             self.assertEqual(len(list(deployment.history_dir.glob("*.json"))), 1)
             self.assertEqual(FixtureDeployment.backup_calls, 1)
 
+    def test_history_record_cannot_be_replaced(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            deployment = self.make_deployment(Path(temporary))
+            deployment.run()
+            with mock.patch.object(RUNNER, "utc_now", return_value="2026-09-27T00:00:00Z"):
+                deployment.write_success("780cde2aca46fc21a02eaa480e55c8060820df94", "backup-a")
+                with self.assertRaisesRegex(RUNNER.DeployError, "immutable deployment history"):
+                    deployment.write_success("780cde2aca46fc21a02eaa480e55c8060820df94", "backup-b")
+
     def test_runtime_acceptance_failure_rolls_back_exact_prior_managed_files(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             deployment = self.make_deployment(Path(temporary))
-            before = (deployment.home / "server" / "serve.py").read_bytes()
+            deployment.initialize()
+            before = {
+                str(entry["target"]): (deployment.home / str(entry["target"])).read_bytes()
+                for entry in deployment.artifact.metadata["managedFiles"]
+            }
+            before_frontend = {
+                path.relative_to(deployment.home / "server").as_posix(): path.read_bytes()
+                for path in (deployment.home / "server").rglob("*") if path.is_file() and (path.name in {"index.html", "favicon.svg", "manifest.json", "product-placeholder.svg", "robots.txt"} or "assets" in path.parts)
+            }
             deployment.fail_smoke = True
+            previous = deployment.preflight()
+            backup = deployment.backup()
+            deployment.snapshot()
+            deployment.mutate()
             with self.assertRaises(RUNNER.DeployError):
-                deployment.run()
-            self.assertEqual((deployment.home / "server" / "serve.py").read_bytes(), before)
+                deployment.smoke()
+            deployment.rollback()
+            self.assertEqual(previous, "780cde2aca46fc21a02eaa480e55c8060820df94")
+            self.assertEqual(backup, "20260927T000000Z")
+            for target, contents in before.items():
+                self.assertEqual((deployment.home / target).read_bytes(), contents, target)
+            after_frontend = {
+                path.relative_to(deployment.home / "server").as_posix(): path.read_bytes()
+                for path in (deployment.home / "server").rglob("*") if path.is_file() and (path.name in {"index.html", "favicon.svg", "manifest.json", "product-placeholder.svg", "robots.txt"} or "assets" in path.parts)
+            }
+            self.assertEqual(after_frontend, before_frontend)
             self.assertEqual(deployment.state["automaticRollback"], "PASS")
             self.assertFalse((deployment.home / "server" / "assets").is_symlink())
 
@@ -371,6 +402,7 @@ class VibeDeploymentV2Tests(unittest.TestCase):
         self.assertIn("child_ready", shell)
         self.assertIn('"$LOCK_DIR/ready"', shell)
         self.assertIn("parent_pid", shell)
+        self.assertIn('= "$$"', shell)
         for path in ("/backups", "/backups/deployment-probe", "/logs/deployment-probe", "/admin/", "/.env", "/secrets.env"):
             self.assertIn(path, runner)
         self.assertIn("CANONICAL_ORIGIN = \"https://vibe4you.in\"", runner)

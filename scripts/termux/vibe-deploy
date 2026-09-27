@@ -65,7 +65,9 @@ if ! mkdir "$LOCK_DIR" 2>/dev/null; then
 fi
 lock_transferred=0
 cleanup_launcher_lock() {
-  if [ "$lock_transferred" -eq 0 ]; then
+  # A child may have atomically claimed this lock just before the foreground
+  # shell receives HUP. Never remove a lock whose PID is no longer ours.
+  if [ "$lock_transferred" -eq 0 ] && [ "$(cat "$LOCK_DIR/pid" 2>/dev/null || true)" = "$$" ]; then
     rm -f -- "$LOCK_DIR/pid" "$LOCK_DIR/ready"
     rmdir -- "$LOCK_DIR" 2>/dev/null || true
   fi

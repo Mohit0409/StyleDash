@@ -92,6 +92,8 @@ EXPECTED_PAYLOAD_SOURCES = {
     "scripts/termux/stop-styledash-ngrok",
     "scripts/termux/boot-start-styledash",
     "scripts/termux/styledash-health",
+    "scripts/termux/backup-styledash-recovery",
+    "scripts/termux/styledash-notify",
     "scripts/termux/verify-styledash-processes",
     "scripts/termux/styledash-process-lib",
     "scripts/termux/vibe-deploy",
@@ -117,6 +119,7 @@ EXPECTED_MANAGED_MAPPINGS = {
     ("scripts/termux/start-styledash-tunnel", "bin/start-styledash-tunnel"), ("scripts/termux/start-styledash-cloudflare-rollback", "bin/start-styledash-cloudflare-rollback"),
     ("scripts/termux/stop-styledash-ngrok", "bin/stop-styledash-ngrok"), ("scripts/termux/boot-start-styledash", ".termux/boot/start-styledash"),
     ("scripts/termux/styledash-health", "bin/styledash-health"),
+    ("scripts/termux/backup-styledash-recovery", "bin/backup-styledash-recovery"), ("scripts/termux/styledash-notify", "bin/styledash-notify"),
     ("scripts/termux/verify-styledash-processes", "bin/verify-styledash-processes"),
     ("scripts/termux/styledash-process-lib", "bin/styledash-process-lib"),
     ("scripts/termux/vibe-deploy", "bin/vibe-deploy"), ("scripts/termux/vibe_deploy.py", "bin/vibe_deploy.py"),
@@ -759,6 +762,8 @@ styledash_watchdog_start "{self.home}/bin/styledash-health" "{self.home}/run/sty
             "result": "PASS",
         }
         history = self.history_dir / f"{timestamp.replace(':', '').replace('-', '')}-{release[:12]}.json"
+        if history.exists():
+            raise DeployError("immutable deployment history record already exists")
         atomic_json(history, manifest)
         atomic_json(self.current_manifest, manifest)
         record = self.records_dir / f"{timestamp[:10]}-{release[:12]}.md"
