@@ -24,6 +24,16 @@ export const Privacy = () => (
     </section>
 
     <section className="space-y-2">
+      <h2 className="font-black">Analytics and advertising measurement</h2>
+      <p className="text-sm text-neutral-600">
+        If you choose to allow analytics, Vibe4You uses Google Analytics to understand visits and page usage and Meta Pixel to measure visits for advertising attribution. These providers may receive device, browser, approximate location, referral, and page-view information and may set cookies. Vibe4You does not intentionally send names, email addresses, phone numbers, delivery addresses, payment details, order identifiers, or password-reset links. Query strings and URL fragments are excluded from page-view tracking.
+      </p>
+      <p className="text-sm text-neutral-600">
+        Both trackers remain off unless you select “Allow analytics.” You can change or withdraw your choice at any time using “Analytics Preferences” in the website footer. Necessary account and security storage is not affected by this choice.
+      </p>
+    </section>
+
+    <section className="space-y-2">
       <h2 className="font-black">How information is used</h2>
       <p className="text-sm text-neutral-600">
         Information is used to provide account access, validate serviceability

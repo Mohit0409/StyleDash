@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { ShieldCheck, RefreshCw, Zap } from 'lucide-react';
 import { CONFIG } from '../config';
 import { BrandWordmark } from './BrandWordmark';
+import { ANALYTICS_PREFERENCES_EVENT } from '../services/analytics';
 
 export const Footer: React.FC = () => {
   return (
@@ -79,6 +80,7 @@ export const Footer: React.FC = () => {
               <li><Link to="/help" className="hover:text-lime-400">Help &amp; Support</Link></li>
               <li><Link to="/returns" className="hover:text-lime-400">Returns &amp; Size Exchange</Link></li>
               <li><Link to="/privacy" className="hover:text-lime-400">Privacy Policy</Link></li>
+              <li><button type="button" onClick={() => window.dispatchEvent(new Event(ANALYTICS_PREFERENCES_EVENT))} className="hover:text-lime-400">Analytics Preferences</button></li>
               <li><Link to="/terms" className="hover:text-lime-400">Terms of Service</Link></li>
             </ul>
           </div>

@@ -10,6 +10,11 @@ export const CONFIG = {
   EXPRESS_DELIVERY_FEE: 80,
   TAX_RATE: 0.05, // 5% GST
 
+  ANALYTICS: {
+    GOOGLE_MEASUREMENT_ID: import.meta.env.VITE_GA_MEASUREMENT_ID?.trim() || '',
+    META_PIXEL_ID: import.meta.env.VITE_META_PIXEL_ID?.trim() || '4725510931060051',
+  },
+
   // Current operating details for the limited-area launch.
   // Keep these centralized so the proprietor/grievance contacts can be changed once.
   LEGAL: {
