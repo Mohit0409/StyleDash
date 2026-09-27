@@ -3887,7 +3887,8 @@ class StyleDashRequestHandler(SimpleHTTPRequestHandler):
         decoded = unquote(path).replace("\\", "/")
         lowered = ("/" + posixpath.normpath(decoded).lstrip("/")).casefold()
         return (
-            lowered.startswith(("/backups/", "/logs/", "/.config/", "/admin", "/api/admin/", "/api/internal-admin/", "/admin-api/"))
+            lowered in ("/backups", "/logs")
+            or lowered.startswith(("/backups/", "/logs/", "/.config/", "/admin", "/api/admin/", "/api/internal-admin/", "/admin-api/"))
             or lowered.startswith(("/tools/", "/payment-data/"))
             or lowered in ("/.env", "/secrets.env", "/styledash.db", "/firebase-service-account.json", "/serve.py", "/styledash_security.py")
             or lowered.endswith((".db", ".db-wal", ".db-shm", ".log", ".py", ".pyc"))
