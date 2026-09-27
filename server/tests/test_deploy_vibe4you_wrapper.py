@@ -3,6 +3,7 @@ from __future__ import annotations
 import subprocess
 import tempfile
 import unittest
+import os
 from pathlib import Path
 
 
@@ -10,6 +11,7 @@ ROOT = Path(__file__).resolve().parents[2]
 WRAPPER = ROOT / "ops" / "deploy-vibe4you.ps1"
 
 
+@unittest.skipUnless(os.name == "nt", "deployment wrapper behavioral harness requires Windows PowerShell")
 class DeployVibe4YouWrapperGateTests(unittest.TestCase):
     def run_gate(self, scenario: str) -> subprocess.CompletedProcess[str]:
         with tempfile.TemporaryDirectory() as temporary:
