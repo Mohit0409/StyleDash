@@ -2,9 +2,10 @@ import { CONFIG } from '../config';
 
 export type AnalyticsConsent = 'accepted' | 'declined' | null;
 type GoogleTag = (...args: unknown[]) => void;
+type GoogleTagCommand = IArguments | unknown[];
 type MetaPixel = ((...args: unknown[]) => void) & { callMethod?: (...args: unknown[]) => void; loaded: boolean; push: MetaPixel; queue: unknown[][]; version: string };
 
-declare global { interface Window { dataLayer?: unknown[][]; gtag?: GoogleTag; fbq?: MetaPixel; _fbq?: MetaPixel; } }
+declare global { interface Window { dataLayer?: GoogleTagCommand[]; gtag?: GoogleTag; fbq?: MetaPixel; _fbq?: MetaPixel; } }
 
 export const ANALYTICS_CONSENT_STORAGE_KEY = 'vibe4you_analytics_consent_v1';
 export const ANALYTICS_PREFERENCES_EVENT = 'vibe4you:open-analytics-preferences';
@@ -29,7 +30,13 @@ const initializeGoogleAnalytics = () => {
   const measurementId = CONFIG.ANALYTICS.GOOGLE_MEASUREMENT_ID;
   if (!GOOGLE_ID_PATTERN.test(measurementId)) return;
   window.dataLayer = window.dataLayer || [];
-  window.gtag = window.gtag || ((...args: unknown[]) => window.dataLayer?.push(args));
+  // gtag's Consent Mode parser requires the standard `arguments` object, not
+  // a rest-parameter Array. The latter accepts config/event commands but
+  // silently ignores consent commands, preventing GA4 collection.
+  window.gtag = window.gtag || function gtag() {
+    // eslint-disable-next-line prefer-rest-params -- Google requires the actual arguments object.
+    window.dataLayer?.push(arguments);
+  };
   if (googleInitialized) { window.gtag('consent', 'update', { analytics_storage: 'granted' }); return; }
   window.gtag('consent', 'default', { analytics_storage: 'denied', ad_storage: 'denied', ad_user_data: 'denied', ad_personalization: 'denied' });
   window.gtag('consent', 'update', { analytics_storage: 'granted', ad_storage: 'denied', ad_user_data: 'denied', ad_personalization: 'denied' });
