@@ -17,7 +17,7 @@ test('loads both trackers after consent and removes their cookies on withdrawal'
   const collectionRequests: string[] = [];
   await page.route('https://www.googletagmanager.com/**', async route => {
     trackerRequests.push(route.request().url());
-    await route.fulfill({ status: 200, contentType: 'text/javascript', body: `document.cookie='_ga=e2e; path=/';(()=>{const l=window.dataLayer||[],s=a=>{if(a[0]==='event')fetch('https://www.google-analytics.com/g/collect?en='+encodeURIComponent(a[1]))};l.forEach(s);const p=l.push.bind(l);l.push=(...x)=>{x.forEach(s);return p(...x)}})();` });
+    await route.fulfill({ status: 200, contentType: 'text/javascript', body: `document.cookie='_ga=e2e; path=/';(()=>{const l=window.dataLayer||[];let c=false,s=a=>{if(Object.prototype.toString.call(a)==='[object Arguments]'&&a[0]==='consent'&&a[1]==='update'&&a[2]?.analytics_storage==='granted')c=true;if(c&&a[0]==='event')fetch('https://www.google-analytics.com/g/collect?en='+encodeURIComponent(a[1]))};l.forEach(s);const p=l.push.bind(l);l.push=(...x)=>{x.forEach(s);return p(...x)}})();` });
   });
   await page.route('https://connect.facebook.net/**', async route => {
     trackerRequests.push(route.request().url());
