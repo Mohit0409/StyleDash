@@ -276,3 +276,23 @@ markers did advance, and automatically restores the old files if any check fails
 
 This candidate must pass PR CI before installation. Installing it does not deploy
 application code and does not restart the public, admin, or Cloudflare services.
+## Reboot recovery incident — 2026-10-01
+
+A real Ubuntu reboot occurred at approximately 10:13 UTC (15:43 IST). The reboot exposed
+a stale startup artifact manifest: public and admin entered restart loops and the public
+site returned HTTP 502 because `server/index.html` had legitimately changed after PR #119
+while `.migration/artifact-files-remediated.sha256` still contained the prior hash.
+
+Only `server/index.html` mismatched. A candidate manifest changing only that hash passed
+the complete manifest verification before installation. The original manifest was preserved
+as `.migration/artifact-files-remediated.sha256.before-index-refresh-20261001T104656Z`.
+
+After repair, public/admin/Cloudflare/backup timer/healthcheck timer were active, local
+health returned 200, external public and health returned 200, admin returned 302 through
+the access layer, sensitive public paths remained 404, health monitoring returned PASS,
+and systemd reported zero failed units.
+
+This reboot attempt is not counted as a clean reboot-recovery PASS because operator repair
+was required. A second controlled reboot is still required. Future Ubuntu release procedures
+must reseal and verify the startup artifact manifest whenever a covered deployed file changes.
+See `docs/operations/vibe4you-ubuntu-reboot-manifest-incident.md`.
