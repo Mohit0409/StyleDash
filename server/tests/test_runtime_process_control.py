@@ -20,6 +20,7 @@ SHELL_FILES = [
     ROOT / "scripts" / "termux" / "rollback-payment-release",
     ROOT / "scripts" / "termux" / "styledash-health",
     ROOT / "scripts" / "termux" / "verify-styledash-processes",
+    ROOT / "scripts" / "termux" / "vibe-deploy",
 ]
 
 def find_bash() -> str | None:
