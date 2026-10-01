@@ -36,7 +36,7 @@ check_hash() {
   fi
 }
 
-check_hash "6d5267ec6bd21db3788a7a748787a8f6de39a28ccb321516c9a064d395c8771f" "$CANDIDATE/vibe4you_healthcheck.py"
+check_hash "a730a4b395f2c05d26c3cff91562770de65a846bcd88614e0b0319c80cc4c59b" "$CANDIDATE/vibe4you_healthcheck.py"
 check_hash "a2bc55ee2fde610ff2fe729e0223181f07b35753569a2fd3d488e76983bf156c" "$CANDIDATE/vibe4you_ops_alert.py"
 check_hash "80115132c427ba5f6caaace39afe7789e5ddb886f2cb579b7c73e7a6e677791a" "$CANDIDATE/systemd/vibe4you-healthcheck.service"
 check_hash "1b14dc1daf29cce1e57c1ff87bb6ad38ca0a1b320b2c3293889068d0bcdc5932" "$CANDIDATE/systemd/vibe4you-healthcheck.timer"

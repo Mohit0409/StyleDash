@@ -87,7 +87,7 @@ def marker_age_seconds(stamp: str) -> int:
 
 
 def sqlite_integrity(path: Path) -> str:
-    uri = path.resolve().as_uri() + "?mode=ro"
+    uri = path.resolve().as_uri() + "?mode=ro&immutable=1"
     connection = sqlite3.connect(uri, uri=True)
     try:
         return str(connection.execute("PRAGMA integrity_check").fetchone()[0])
