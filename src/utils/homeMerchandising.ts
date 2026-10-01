@@ -124,12 +124,19 @@ export const buildHomepageSections = (
     // enough eligible products exist. Products are never duplicated within a
     // section.
     let chosen: Product[];
-    if (candidates.length === 0) {
-      chosen = (categorySection ? fallbackCandidates.slice(0, limit) : fallbackCandidates.slice(0, 1));
+    if (categorySection) {
+      const merged = new Map<string, Product>();
+      for (const product of [...candidates, ...fallbackCandidates]) {
+        if (!merged.has(product.id)) merged.set(product.id, product);
+        if (merged.size >= limit) break;
+      }
+      chosen = [...merged.values()];
+    } else if (candidates.length === 0) {
+      chosen = fallbackCandidates.slice(0, 1);
     } else {
       const primary = candidates.filter(unused).slice(0, limit);
-      if (primary.length >= limit || categorySection) {
-        chosen = categorySection ? candidates.slice(0, limit) : primary;
+      if (primary.length >= limit) {
+        chosen = primary;
       } else {
         const chosenIds = new Set(primary.map(product => product.id));
         const topUp = candidates
