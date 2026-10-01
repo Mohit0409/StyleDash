@@ -86,6 +86,9 @@ test('active owner uploads, saves, reloads, and removes store branding', async (
     return void await json({ success: false, error: `Unexpected ${method} ${path}` }, 500);
   });
 
+  await page.addInitScript(() => {
+    Object.defineProperty(window, 'createImageBitmap', { value: undefined, configurable: true });
+  });
   await page.goto('/partner');
   const branding = page.getByRole('region', { name: 'Store branding' });
   await expect(branding).toBeVisible();
@@ -95,7 +98,9 @@ test('active owner uploads, saves, reloads, and removes store branding', async (
   await expect(branding.getByText('Choose a square image')).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Product submissions' })).toBeVisible();
 
-  await branding.getByLabel('Upload store cover image').setInputFiles({
+  const coverInput = branding.getByLabel('Upload store cover image');
+  await expect(coverInput).toHaveAttribute('accept', /image\/heic/);
+  await coverInput.setInputFiles({
     name: 'cover.png', mimeType: 'image/png', buffer: ONE_PIXEL_PNG,
   });
   await expect(branding.getByAltText('Store cover preview')).toBeVisible();
@@ -201,7 +206,7 @@ test('branding UI fails safely for unapproved owners and invalid or failed uploa
   await branding.getByLabel('Upload store cover image').setInputFiles({
     name: 'notes.txt', mimeType: 'text/plain', buffer: Buffer.from('not an image'),
   });
-  await expect(branding.getByRole('alert')).toContainText('Choose a JPEG, PNG or WebP image.');
+  await expect(branding.getByRole('alert')).toContainText('Choose a JPEG, PNG, WebP, HEIC or HEIF image.');
   expect(uploadAttempts).toBe(0);
 
   await branding.getByLabel('Upload store cover image').setInputFiles({
