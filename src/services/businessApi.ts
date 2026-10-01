@@ -63,6 +63,8 @@ export interface ShopApplication {
   businessInformation?: string | null;
   bannerImage?: string | null;
   logoImage?: string | null;
+  allIndiaDeliveryEnabled?: boolean;
+  allIndiaShippingPayer?: 'shop' | 'customer';
   rejectionReason?: string | null;
   createdAt: string;
   updatedAt: string;
@@ -101,8 +103,80 @@ export const vendorApplicationApi = {
   async updateBranding(payload: StoreBrandingDraft): Promise<ShopApplication> {
     return (await apiJson<{ success: true; application: ShopApplication }>('/api/vendor-applications/me/branding', 'PATCH', payload)).application;
   },
+  async updateDeliverySettings(payload: { allIndiaDeliveryEnabled: boolean; allIndiaShippingPayer: 'shop' | 'customer' }): Promise<ShopApplication> {
+    return (await apiJson<{ success: true; application: ShopApplication }>('/api/vendor-applications/me/delivery-settings', 'PATCH', payload)).application;
+  },
   async uploadBrandingImage(payload: { fileName: string; contentType: string; dataBase64: string }): Promise<StoreBrandingImageUpload> {
     return (await apiJson<{ success: true; image: StoreBrandingImageUpload }>('/api/shop-branding-images', 'POST', payload)).image;
+  },
+};
+
+export interface MediatorOrderItem {
+  productId: string;
+  productName: string;
+  productSlug: string;
+  variantId: string;
+  sku: string;
+  size: string;
+  colourName: string;
+  quantity: number;
+  unitPrice: number;
+  lineTotal: number;
+  storeId: string;
+  storeName?: string;
+  storeSlug?: string;
+  imageUrl?: string;
+}
+
+export interface MediatorOrderAddress {
+  name: string;
+  phone: string;
+  street: string;
+  city: string;
+  state: string;
+  pincode: string;
+}
+
+export interface MediatorOrder {
+  id: string;
+  shopId: string;
+  shopName: string;
+  items: MediatorOrderItem[];
+  address: MediatorOrderAddress;
+  merchandiseTotal: number;
+  shippingPayer: 'shop' | 'customer';
+  status: 'NEW' | 'CONTACTED' | 'CLOSED' | 'CANCELLED';
+  createdAt: string;
+  updatedAt: string;
+}
+
+export const mediatorOrderApi = {
+  async place(
+    payload: {
+      items: Array<{ productId: string; variantId: string; quantity: number }>;
+      address: MediatorOrderAddress;
+    },
+    idempotencyKey: string,
+  ): Promise<{ idempotent: boolean; order: MediatorOrder }> {
+    const response = await apiFetch<{ success: true; idempotent: boolean; order: MediatorOrder }>(
+      '/api/mediator-orders',
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Idempotency-Key': idempotencyKey },
+        body: JSON.stringify(payload),
+      },
+    );
+    return { idempotent: response.idempotent, order: response.order };
+  },
+  async one(id: string): Promise<MediatorOrder> {
+    return (await apiFetch<{ success: true; order: MediatorOrder }>(
+      `/api/mediator-orders/${encodeURIComponent(id)}`,
+    )).order;
+  },
+  async sellerMine(): Promise<MediatorOrder[]> {
+    return (await apiFetch<{ success: true; orders: MediatorOrder[] }>(
+      '/api/shop-mediator-orders',
+    )).orders;
   },
 };
 

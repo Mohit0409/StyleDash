@@ -2476,6 +2476,267 @@ class HttpApiTests(unittest.TestCase):
         with response:
             return response.status, json.load(response), response.headers
 
+    def test_all_india_mediator_order_is_isolated_from_local_checkout_and_inventory(self) -> None:
+        status, seller_registered, seller_headers = self.post_json(
+            "/api/auth/register",
+            {
+                "name": "All India Seller",
+                "email": "all-india-seller@example.test",
+                "password": "very secure all india seller password 123",
+                "phone": "9876543290",
+            },
+        )
+        self.assertEqual(status, 201)
+        seller_id = seller_registered["user"]["id"]
+        seller_auth = {
+            "Cookie": seller_headers["Set-Cookie"].split(";", 1)[0],
+            "X-CSRF-Token": seller_registered["csrfToken"],
+            "Origin": "https://styledash.test",
+        }
+
+        application = self.service.shops.create_draft(
+            seller_id,
+            {
+                "shopName": "India Shipping Shop",
+                "ownerName": "All India Seller",
+                "category": "Clothing & Fashion",
+                "description": "A shop used to verify isolated All India mediator orders.",
+                "address": "12 Main Market Road",
+                "city": "Neemuch",
+                "state": "Madhya Pradesh",
+                "pincode": "458441",
+            },
+        )
+        self.service.shops.submit_application(seller_id)
+        with self.service.security.connect() as db:
+            db.execute(
+                "CREATE TABLE IF NOT EXISTS admin_users("
+                "id TEXT PRIMARY KEY,is_active INTEGER NOT NULL DEFAULT 1)"
+            )
+            db.execute(
+                "INSERT OR IGNORE INTO admin_users(id,is_active) VALUES('all-india-admin',1)"
+            )
+            db.commit()
+        for target in ("UNDER_REVIEW", "APPROVED", "ACTIVE"):
+            application = self.service.shops.admin_transition_application(
+                "all-india-admin", application["id"], target
+            )
+
+        product = self.service.shops.create_product_draft(
+            seller_id,
+            {
+                "name": "Mediator Cotton Shirt",
+                "description": "A published shirt for All India mediator order integration coverage.",
+                "brand": "Mediator Test",
+                "department": "men",
+                "category": "Clothing & Fashion",
+                "pricePaise": 50000,
+                "originalPricePaise": 70000,
+                "inventory": 5,
+                "size": "M",
+                "colourName": "Black",
+                "imageUrls": ["https://images.example.test/mediator-shirt.jpg"],
+                "attributes": {"material": "Cotton"},
+            },
+        )
+        self.service.shops.submit_product(seller_id, product["id"])
+        for target in ("UNDER_REVIEW", "APPROVED", "PUBLISHED"):
+            product = self.service.shops.admin_transition_product(
+                "all-india-admin", product["id"], target
+            )
+        self.service.refresh_shop_products()
+
+        before_public = self.service.shops.get_published_product(product["id"])
+        self.assertFalse(before_public["allIndiaDeliveryAvailable"])
+
+        status, missing_csrf, _headers = self.patch_json(
+            "/api/vendor-applications/me/delivery-settings",
+            {
+                "allIndiaDeliveryEnabled": True,
+                "allIndiaShippingPayer": "customer",
+            },
+            {"Cookie": seller_auth["Cookie"], "Origin": "https://styledash.test"},
+        )
+        self.assertEqual((status, missing_csrf["code"]), (403, "csrf_failed"))
+
+        status, settings_response, _headers = self.patch_json(
+            "/api/vendor-applications/me/delivery-settings",
+            {
+                "allIndiaDeliveryEnabled": True,
+                "allIndiaShippingPayer": "customer",
+            },
+            seller_auth,
+        )
+        self.assertEqual(status, 200)
+        self.assertTrue(settings_response["application"]["allIndiaDeliveryEnabled"])
+        self.assertEqual(settings_response["application"]["allIndiaShippingPayer"], "customer")
+
+        status, public_response, _headers = self.get_json(
+            f"/api/shop-products/published?slug={urllib.parse.quote(product['slug'])}"
+        )
+        self.assertEqual(status, 200)
+        public_product = public_response["product"]
+        self.assertTrue(public_product["allIndiaDeliveryAvailable"])
+        self.assertEqual(public_product["allIndiaShippingPayer"], "customer")
+        variant_id = public_product["variants"][0]["id"]
+
+        status, customer_registered, customer_headers = self.post_json(
+            "/api/auth/register",
+            {
+                "name": "All India Customer",
+                "email": "all-india-customer@example.test",
+                "password": "very secure all india customer password 123",
+                "phone": "9876543291",
+            },
+        )
+        self.assertEqual(status, 201)
+        customer_auth = {
+            "Cookie": customer_headers["Set-Cookie"].split(";", 1)[0],
+            "X-CSRF-Token": customer_registered["csrfToken"],
+            "Origin": "https://styledash.test",
+            "Idempotency-Key": "all-india-http-001",
+        }
+        mediator_payload = {
+            "items": [{
+                "productId": product["id"],
+                "variantId": variant_id,
+                "quantity": 1,
+            }],
+            "address": {
+                "name": "All India Customer",
+                "phone": "9876543291",
+                "street": "21 Pink City Market Road",
+                "city": "Jaipur",
+                "state": "Rajasthan",
+                "pincode": "302001",
+            },
+        }
+
+        status, anonymous, _headers = self.post_json(
+            "/api/mediator-orders",
+            mediator_payload,
+            {"Idempotency-Key": "anonymous-mediator-001"},
+        )
+        self.assertEqual((status, anonymous["code"]), (401, "authentication_required"))
+
+        status, no_csrf, _headers = self.post_json(
+            "/api/mediator-orders",
+            mediator_payload,
+            {
+                "Cookie": customer_auth["Cookie"],
+                "Origin": "https://styledash.test",
+                "Idempotency-Key": "missing-csrf-mediator-001",
+            },
+        )
+        self.assertEqual((status, no_csrf["code"]), (403, "csrf_failed"))
+
+        self.service.refresh_shop_products()
+        payment_product = self.service.product_snapshot()[product["id"]]
+        payment_variant = next(
+            item for item in payment_product["variants"] if item["id"] == variant_id
+        )
+        with self.service.store.lock:
+            normal_orders_before = len(self.service.store.state["orders"])
+            inventory_before = self.service._inventory(
+                self.service.store.state, payment_variant
+            )
+        gateway_calls_before = len(self.gateway.calls)
+
+        with patch.object(SERVER, "owner_notifier") as notifier_factory:
+            status, placed, _headers = self.post_json(
+                "/api/mediator-orders", mediator_payload, customer_auth
+            )
+            self.assertEqual(status, 201)
+            self.assertTrue(placed["success"])
+            self.assertFalse(placed["idempotent"])
+            mediator_order = placed["order"]
+            self.assertTrue(mediator_order["id"].startswith("AIO-"))
+            self.assertEqual(mediator_order["address"]["city"], "Jaipur")
+            self.assertEqual(mediator_order["address"]["pincode"], "302001")
+            self.assertEqual(mediator_order["shippingPayer"], "customer")
+
+            duplicate_status, duplicate, _headers = self.post_json(
+                "/api/mediator-orders", mediator_payload, customer_auth
+            )
+            self.assertEqual(duplicate_status, 201)
+            self.assertTrue(duplicate["idempotent"])
+            self.assertEqual(duplicate["order"]["id"], mediator_order["id"])
+            self.assertEqual(notifier_factory.return_value.send.call_count, 1)
+
+            notification = notifier_factory.return_value.send.call_args.kwargs
+            visible = notification["title"] + "\n" + notification["message"]
+            self.assertIn(mediator_order["id"], visible)
+            self.assertNotIn(mediator_payload["address"]["street"], visible)
+            self.assertNotIn(mediator_payload["address"]["phone"], visible)
+
+        with self.service.store.lock:
+            self.assertEqual(len(self.service.store.state["orders"]), normal_orders_before)
+            self.assertNotIn(mediator_order["id"], self.service.store.state["orders"])
+            self.assertEqual(
+                self.service._inventory(self.service.store.state, payment_variant),
+                inventory_before,
+            )
+        self.assertEqual(len(self.gateway.calls), gateway_calls_before)
+
+        status, customer_copy, _headers = self.get_json(
+            f"/api/mediator-orders/{urllib.parse.quote(mediator_order['id'])}",
+            {"Cookie": customer_auth["Cookie"]},
+        )
+        self.assertEqual(status, 200)
+        self.assertEqual(customer_copy["order"]["id"], mediator_order["id"])
+
+        status, seller_cannot_read_customer_resource, _headers = self.get_json(
+            f"/api/mediator-orders/{urllib.parse.quote(mediator_order['id'])}",
+            {"Cookie": seller_auth["Cookie"]},
+        )
+        self.assertEqual(
+            (status, seller_cannot_read_customer_resource["code"]),
+            (404, "mediator_order_not_found"),
+        )
+
+        status, seller_orders, _headers = self.get_json(
+            "/api/shop-mediator-orders", {"Cookie": seller_auth["Cookie"]}
+        )
+        self.assertEqual(status, 200)
+        self.assertEqual(
+            [order["id"] for order in seller_orders["orders"]],
+            [mediator_order["id"]],
+        )
+
+        local_payload = {
+            "items": [{
+                "productId": product["id"],
+                "variantId": variant_id,
+                "quantity": 1,
+            }],
+            "address": {
+                "name": "All India Customer",
+                "phone": "9876543291",
+                "street": "22 Neemuch Local Road",
+                "city": "Neemuch",
+                "pincode": "458441",
+            },
+            "deliveryMethod": "standard",
+            "paymentMethod": "cod",
+            "couponCode": None,
+        }
+        local_headers = {
+            **customer_auth,
+            "Idempotency-Key": "local-after-mediator-001",
+        }
+        status, local_order, _headers = self.post_json(
+            "/api/place-cod-order", local_payload, local_headers
+        )
+        self.assertEqual(status, 201)
+        self.assertEqual(local_order["order"]["paymentMethod"], "cod")
+        with self.service.store.lock:
+            self.assertEqual(len(self.service.store.state["orders"]), normal_orders_before + 1)
+            self.assertEqual(
+                self.service._inventory(self.service.store.state, payment_variant),
+                inventory_before - 1,
+            )
+        self.assertEqual(len(self.gateway.calls), gateway_calls_before)
+
     def test_authentication_requires_and_records_current_terms_consent(self) -> None:
         registration = {
             "name": "Terms Customer",

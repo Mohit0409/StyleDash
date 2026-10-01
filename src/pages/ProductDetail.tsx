@@ -379,6 +379,11 @@ export const ProductDetail: React.FC = () => {
               <span>Dispatched from Neemuch Partner Boutique</span>
             </div>
             <p>Same Day Delivery is available to pincode 458441. Weekend Express is available at checkout on Saturday and Sunday.</p>
+            {product.allIndiaDeliveryAvailable && (
+              <p className="font-bold text-neutral-800 dark:text-neutral-200">
+                All India order requests are available for this shop. {product.allIndiaShippingPayer === 'shop' ? 'The shop pays the courier charge.' : 'The customer pays the courier charge after the shop confirms it.'}
+              </p>
+            )}
           </div>
 
           {/* Specifications */}

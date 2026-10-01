@@ -123,5 +123,81 @@ class SmtpPasswordResetSenderTests(unittest.TestCase):
             delivery_queue.dispatch("customer@example.test", "after-close-token", lambda: failures.append("after-close"))
 
 
+class SmtpTransactionalSenderTests(unittest.TestCase):
+    @staticmethod
+    def configuration() -> dict[str, str]:
+        return {
+            "STYLEDASH_SMTP_HOST": "smtp.example.test",
+            "STYLEDASH_SMTP_PORT": "587",
+            "STYLEDASH_SMTP_USERNAME": "mailer@example.test",
+            "STYLEDASH_SMTP_PASSWORD": "not-a-real-test-secret",
+            "STYLEDASH_PASSWORD_RESET_FROM": "mailer@example.test",
+        }
+
+    def test_transactional_sender_uses_private_tls_smtp_and_validates_subject(self) -> None:
+        connections: list[FakeSmtp] = []
+
+        def smtp_factory(*args, **kwargs) -> FakeSmtp:
+            connection = FakeSmtp(*args, **kwargs)
+            connections.append(connection)
+            return connection
+
+        sender = MAIL.SmtpTransactionalSender.from_environment(
+            self.configuration(), smtp_factory=smtp_factory
+        )
+        assert sender is not None
+        sender(
+            "owner@example.test",
+            "Vibe4You All India order AIO-1",
+            "Customer and delivery details are available for this order.",
+        )
+
+        self.assertEqual(len(connections), 1)
+        connection = connections[0]
+        self.assertEqual(connection.ehlo_calls, 2)
+        self.assertIsNotNone(connection.tls_context)
+        self.assertEqual(
+            connection.login_values,
+            ("mailer@example.test", "not-a-real-test-secret"),
+        )
+        self.assertTrue(connection.quit_called)
+        message = connection.messages[0]
+        self.assertEqual(message["From"], "Vibe4You Orders <mailer@example.test>")
+        self.assertEqual(message["To"], "owner@example.test")
+        self.assertEqual(message["Subject"], "Vibe4You All India order AIO-1")
+        self.assertIn("delivery details", message.get_content())
+
+        with self.assertRaises(ValueError):
+            sender(
+                "owner@example.test",
+                "Safe subject\r\nBcc: victim@example.test",
+                "body",
+            )
+
+    def test_transactional_configuration_fails_closed_and_queue_drains(self) -> None:
+        self.assertIsNone(MAIL.SmtpTransactionalSender.from_environment({}))
+        partial = self.configuration()
+        partial.pop("STYLEDASH_SMTP_PASSWORD")
+        with self.assertRaises(MAIL.SmtpConfigurationError):
+            MAIL.SmtpTransactionalSender.from_environment(partial)
+
+        deliveries = []
+        queue = MAIL.TransactionalMailQueue(
+            lambda recipient, subject, body: deliveries.append(
+                (recipient, subject, body)
+            ),
+            max_pending=1,
+        )
+        queue.dispatch("owner@example.test", "Order AIO-1", "Order body")
+        queue.close()
+        self.assertEqual(
+            deliveries,
+            [("owner@example.test", "Order AIO-1", "Order body")],
+        )
+        with self.assertRaises(RuntimeError):
+            queue.dispatch("owner@example.test", "Order AIO-2", "After close")
+
+
+
 if __name__ == "__main__":
     unittest.main()
