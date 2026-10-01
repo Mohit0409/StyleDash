@@ -202,3 +202,49 @@ Before calling the migration fully operationally hardened:
 - Do not overwrite the proven production backup script from an unreviewed repository copy.
 - Do not use the dirty root worktree for production release work.
 - Do not modify Gravity Fitness, Need For Strength, Universal Gym, or unrelated projects as part of Vibe4You operations.
+## Monitoring installation result — 2026-10-01
+
+Monitoring has now been installed on the Ubuntu production host.
+
+Installation sequence:
+- the first one-shot healthcheck failed safely before the timer was enabled
+- failure reason: latest_backup_db_unreadable
+- root cause: SQLite read-only integrity verification needed immutable mode under the hardened service sandbox
+- fix: open the backup database using mode=ro&immutable=1
+- repair commit: 863ab6c
+- repaired healthcheck passed
+- healthcheck timer is enabled and active
+- two consecutive healthcheck executions returned VIBE4YOU_HEALTH=PASS
+- the initial failure triggered the operations notification path and logged VIBE4YOU_OPS_ALERT=SENT
+- public, admin, Cloudflare, and the existing backup timer remained active throughout
+
+Current healthcheck cadence:
+- OnBootSec: 3 minutes
+- OnUnitActiveSec: 5 minutes
+- RandomizedDelaySec: 30 seconds
+- Persistent: true
+
+The initial test failure consumed the alert helper's one-hour duplicate-alert throttle for the same event. Health checks continue to run and log during that window; notification throttling expires automatically.
+
+The monitoring repair created/preserved rollback material under:
+- /var/backups/vibe4you-production/pre-monitoring-20261001T050230Z
+
+Do not remove that rollback material during the migration safety period.
+
+## Updated remaining gates
+
+Completed:
+- Ubuntu backup implementation preserved in Git
+- isolated restore from Windows secondary proven
+- SQLite restore integrity proven
+- product-image count proven
+- service/disk/backup/database monitoring installed
+- operations notification delivery proven
+- healthcheck timer enabled and passing
+
+Still outstanding:
+1. Observe at least one normal scheduled production backup while monitoring is active.
+2. Perform a controlled Ubuntu reboot in an approved maintenance window.
+3. After reboot, verify public, admin, Cloudflare, backup timer, monitoring timer, external routes, and sensitive-path blocking.
+4. Finalize this handover after reboot recovery is proven.
+5. Only then begin the old Android host decommissioning decision.
