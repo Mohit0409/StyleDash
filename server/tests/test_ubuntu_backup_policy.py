@@ -84,6 +84,15 @@ class UbuntuDeploymentBackupPolicyTests(unittest.TestCase):
             self.ops,
         )
 
+    def test_privileged_wrapper_changes_to_safe_working_directory_before_runuser(self):
+        block_start = self.ops.index('  backup-deployment)')
+        block_end = self.ops.index('    ;;', block_start)
+        block = self.ops[block_start:block_end]
+        self.assertLess(
+            block.index('    cd /'),
+            block.index('    runuser -u vibe4you -- "$script" --deployment'),
+        )
+
     def test_installer_hashes_are_pinned_to_exact_candidate_files(self):
         self.assertIn(
             'EXPECTED_CANDIDATE_BACKUP_SHA256="{}"'.format(sha256(BACKUP)),

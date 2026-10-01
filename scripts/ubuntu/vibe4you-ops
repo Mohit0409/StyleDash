@@ -49,6 +49,7 @@ case "${1:-}" in
       echo "A scheduled/full Vibe4You backup is already running; deployment backup refused" >&2
       exit 75
     fi
+    cd /
     runuser -u vibe4you -- "$script" --deployment
     ;;
   backup-enable)
