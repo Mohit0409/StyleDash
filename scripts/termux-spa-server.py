@@ -58,9 +58,9 @@ except ModuleNotFoundError:  # Repository test import path.
     from scripts.styledash_reviews import ReviewWorkflow
 
 try:
-    from styledash_mail import PasswordResetDeliveryQueue, SmtpPasswordResetSender
+    from styledash_mail import (PasswordResetDeliveryQueue, SmtpPasswordResetSender, SmtpTransactionalSender, TransactionalMailQueue)
 except ModuleNotFoundError:  # Repository test import path.
-    from scripts.styledash_mail import PasswordResetDeliveryQueue, SmtpPasswordResetSender
+    from scripts.styledash_mail import (PasswordResetDeliveryQueue, SmtpPasswordResetSender, SmtpTransactionalSender, TransactionalMailQueue)
 
 try:
     from styledash_notify import mask_email, mask_phone, owner_notifier
@@ -1194,6 +1194,205 @@ class PaymentService:
                 "deliveryZoneName": serviceability.get("zoneName"),
             })
         return trusted
+
+    def _validate_all_india_address(self, payload: dict[str, Any]) -> dict[str, Any]:
+        address = payload.get("address")
+        if not isinstance(address, dict):
+            raise ApiError(
+                HTTPStatus.UNPROCESSABLE_ENTITY,
+                "Delivery address is required.",
+                "invalid_customer",
+            )
+        pincode = address.get("pincode")
+        if not _is_six_ascii_digits(pincode):
+            raise ApiError(
+                HTTPStatus.UNPROCESSABLE_ENTITY,
+                "Enter a valid 6-digit delivery pincode.",
+                "invalid_pincode",
+            )
+        phone = _clean_string(address.get("phone"), "phone number", 10, 16)
+        if not all(character.isdigit() or character in "+ -" for character in phone):
+            raise ApiError(
+                HTTPStatus.UNPROCESSABLE_ENTITY,
+                "Invalid phone number.",
+                "invalid_customer",
+            )
+        return {
+            "name": _clean_string(address.get("name"), "name", 2, 80),
+            "phone": phone,
+            "street": _clean_string(address.get("street"), "street address", 5, 200),
+            "city": _clean_string(address.get("city"), "city", 2, 80),
+            "state": _clean_string(address.get("state"), "state", 2, 80),
+            "pincode": pincode,
+        }
+
+    def create_mediator_order(
+        self,
+        user_id: str,
+        payload: dict[str, Any],
+        idempotency_value: str | None,
+    ) -> dict[str, Any]:
+        """Create an isolated pan-India order request without payment or fulfillment."""
+        self._require_ordering_enabled()
+        if self.shops is None:
+            raise ApiError(
+                HTTPStatus.SERVICE_UNAVAILABLE,
+                "Shop ordering is unavailable.",
+                "shop_service_unavailable",
+            )
+        idempotency_key = self._idempotency_key(idempotency_value)
+        if idempotency_key is None:
+            raise ApiError(
+                HTTPStatus.BAD_REQUEST,
+                "An idempotency key is required.",
+                "invalid_idempotency_key",
+            )
+        if not isinstance(payload, dict) or set(payload) - {"items", "address"}:
+            raise ApiError(
+                HTTPStatus.UNPROCESSABLE_ENTITY,
+                "Invalid All India order request.",
+                "invalid_mediator_order",
+            )
+        items = payload.get("items")
+        if not isinstance(items, list) or not items or len(items) > 50:
+            raise ApiError(
+                HTTPStatus.UNPROCESSABLE_ENTITY,
+                "A non-empty cart is required.",
+                "invalid_cart",
+            )
+        address = self._validate_all_india_address(payload)
+        self.refresh_shop_products()
+        products = self.product_snapshot()
+        max_quantity = int(self.settings["maxQuantityPerItem"])
+        trusted_items: list[dict[str, Any]] = []
+        seen_variants: set[str] = set()
+        application_id: str | None = None
+        merchandise_total_paise = 0
+
+        with self.store.lock:
+            state = self.store.state
+            for item in items:
+                if not isinstance(item, dict) or set(item) - {"productId", "variantId", "quantity"}:
+                    raise ApiError(
+                        HTTPStatus.UNPROCESSABLE_ENTITY,
+                        "Invalid cart item.",
+                        "invalid_cart",
+                    )
+                product_id = item.get("productId")
+                variant_id = item.get("variantId")
+                quantity = item.get("quantity")
+                if not isinstance(product_id, str) or product_id not in products:
+                    raise ApiError(
+                        HTTPStatus.UNPROCESSABLE_ENTITY,
+                        "A product is unavailable.",
+                        "invalid_product",
+                    )
+                product = products[product_id]
+                vendor_id = product.get("vendorId")
+                if (
+                    not product.get("active")
+                    or not isinstance(vendor_id, str)
+                    or not vendor_id
+                    or product.get("allIndiaDeliveryAvailable") is not True
+                ):
+                    raise ApiError(
+                        HTTPStatus.UNPROCESSABLE_ENTITY,
+                        "All India delivery is not available for every item in this cart.",
+                        "all_india_delivery_unavailable",
+                    )
+                if application_id is None:
+                    application_id = vendor_id
+                elif vendor_id != application_id:
+                    raise ApiError(
+                        HTTPStatus.UNPROCESSABLE_ENTITY,
+                        "All India orders can contain products from only one shop.",
+                        "mixed_shop_mediator_order",
+                    )
+                variant = next(
+                    (
+                        candidate
+                        for candidate in product.get("variants", [])
+                        if candidate.get("id") == variant_id
+                        and candidate.get("active") is not False
+                    ),
+                    None,
+                )
+                if variant is None:
+                    raise ApiError(
+                        HTTPStatus.UNPROCESSABLE_ENTITY,
+                        "A product option is unavailable.",
+                        "invalid_variant",
+                    )
+                if (
+                    isinstance(quantity, bool)
+                    or not isinstance(quantity, int)
+                    or not 1 <= quantity <= max_quantity
+                ):
+                    raise ApiError(
+                        HTTPStatus.UNPROCESSABLE_ENTITY,
+                        "Invalid item quantity.",
+                        "invalid_quantity",
+                    )
+                if variant_id in seen_variants:
+                    raise ApiError(
+                        HTTPStatus.UNPROCESSABLE_ENTITY,
+                        "Duplicate cart item.",
+                        "invalid_cart",
+                    )
+                seen_variants.add(variant_id)
+                if self._inventory(state, variant) < quantity:
+                    raise ApiError(
+                        HTTPStatus.CONFLICT,
+                        f"{product['name']} is no longer available in the requested quantity.",
+                        "insufficient_stock",
+                    )
+                unit_price = _money(variant.get("price", product["price"]), "price")
+                unit_price_paise = int(
+                    (unit_price * Decimal("100")).quantize(
+                        Decimal("1"), rounding=ROUND_HALF_UP
+                    )
+                )
+                line_total_paise = unit_price_paise * quantity
+                merchandise_total_paise += line_total_paise
+                images = variant.get("images") or product.get("images") or []
+                image_url = product.get("thumbnail") or (images[0] if images else None)
+                trusted = {
+                    "productId": product_id,
+                    "productName": product["name"],
+                    "productSlug": product["slug"],
+                    "variantId": variant["id"],
+                    "sku": variant.get("sku") or "",
+                    "size": variant.get("size") or "",
+                    "colourName": variant.get("colourName") or "",
+                    "quantity": quantity,
+                    "unitPrice": unit_price_paise / 100,
+                    "lineTotal": line_total_paise / 100,
+                    "storeId": vendor_id,
+                    "storeName": product.get("storeName"),
+                    "storeSlug": product.get("storeSlug"),
+                }
+                if image_url:
+                    trusted["imageUrl"] = image_url
+                trusted_items.append(trusted)
+
+        if application_id is None:
+            raise ApiError(
+                HTTPStatus.UNPROCESSABLE_ENTITY,
+                "A shop is required for this order.",
+                "invalid_mediator_order",
+            )
+        try:
+            persisted = self.shops.create_mediator_order(
+                user_id,
+                application_id,
+                trusted_items,
+                address,
+                merchandise_total_paise,
+                idempotency_key,
+            )
+        except SecurityError as exc:
+            raise ApiError(exc.status, exc.message, exc.code) from None
+        return {"success": True, **persisted}
 
     def calculate_order(self, payload: dict[str, Any], now: datetime | None = None) -> dict[str, Any]:
         self.refresh_shop_products()
@@ -2674,6 +2873,7 @@ class StyleDashRequestHandler(SimpleHTTPRequestHandler):
     payment_service: PaymentService
     product_image_directory: Path
     review_workflow: ReviewWorkflow | None
+    transactional_mail_dispatcher: Callable[[str, str, str], None] | None = None
     rate_limiter = RateLimiter()
 
     def guess_type(self, path: str) -> str:
@@ -3239,6 +3439,32 @@ class StyleDashRequestHandler(SimpleHTTPRequestHandler):
                     {"success": True, "application": self._shops().get_application(user["id"])},
                 )
                 return
+            if path == "/api/shop-mediator-orders":
+                self._rate_limit(path, 60)
+                user, _session = self._current_user()
+                self._json_response(
+                    HTTPStatus.OK,
+                    {
+                        "success": True,
+                        "orders": self._shops().list_mediator_orders_for_seller(user["id"]),
+                    },
+                )
+                return
+            if path.startswith("/api/mediator-orders/"):
+                self._rate_limit("/api/mediator-orders", 60)
+                user, _session = self._current_user()
+                order_id = unquote(path.removeprefix("/api/mediator-orders/"))
+                if not order_id or "/" in order_id:
+                    raise SecurityError(
+                        404, "Order request not found.", "mediator_order_not_found"
+                    )
+                order = self._shops().get_mediator_order_for_customer(
+                    user["id"], order_id
+                )
+                self._json_response(
+                    HTTPStatus.OK, {"success": True, "order": order}
+                )
+                return
             if path == "/api/shop-products":
                 user, _session = self._current_user()
                 products = self._shops().list_products(user["id"])
@@ -3342,6 +3568,76 @@ class StyleDashRequestHandler(SimpleHTTPRequestHandler):
                 return
             if self._sensitive_path(path):
                 self._json_response(HTTPStatus.NOT_FOUND, {"success": False, "error": "Not found.", "code": "not_found"})
+                return
+            if path == "/api/mediator-orders":
+                self._rate_limit(path, 10)
+                user, _session = self._current_user()
+                self._csrf()
+                result = self.payment_service.create_mediator_order(
+                    user["id"],
+                    self._read_json(),
+                    self.headers.get("Idempotency-Key"),
+                )
+                if not result.get("idempotent"):
+                    order = result.get("order") or {}
+                    owner_notifier().send(
+                        event="all_india_mediator_order",
+                        title="New All India Vibe4You Order Request",
+                        message=(
+                            f"Order: {order.get('id') or '-'}\n"
+                            f"Shop: {' '.join(str(order.get('shopName') or '-').split())[:100]}\n"
+                            f"Merchandise: Rs {order.get('merchandiseTotal') or 0}\n"
+                            f"Shipping payer: {order.get('shippingPayer') or '-'}"
+                        ),
+                        priority=5,
+                        tags=["package"],
+                    )
+                    contact = self._shops().shop_notification_contact(
+                        str(order.get("shopId") or "")
+                    )
+                    if (
+                        contact
+                        and contact.get("email")
+                        and self.transactional_mail_dispatcher is not None
+                    ):
+                        address = order.get("address") or {}
+                        items_text = "\n".join(
+                            f"- {item.get('productName') or 'Product'} | "
+                            f"Size {item.get('size') or '-'} | "
+                            f"Colour {item.get('colourName') or '-'} | "
+                            f"Qty {item.get('quantity') or 0} | "
+                            f"Rs {item.get('lineTotal') or 0}"
+                            for item in order.get("items") or []
+                        )
+                        payer_text = (
+                            "Shop pays the delivery charge."
+                            if order.get("shippingPayer") == "shop"
+                            else "Customer pays the delivery charge; please confirm the charge with the customer."
+                        )
+                        body = (
+                            "A customer placed an All India order request through Vibe4You.\n\n"
+                            f"Order: {order.get('id') or '-'}\n"
+                            f"Shop: {contact.get('shopName') or '-'}\n"
+                            f"Merchandise total shown on Vibe4You: Rs {order.get('merchandiseTotal') or 0}\n"
+                            f"{payer_text}\n\n"
+                            f"Customer: {address.get('name') or '-'}\n"
+                            f"Phone: {address.get('phone') or '-'}\n"
+                            f"Address: {address.get('street') or '-'}, {address.get('city') or '-'}, "
+                            f"{address.get('state') or '-'} - {address.get('pincode') or '-'}\n\n"
+                            f"Items:\n{items_text}\n\n"
+                            "Vibe4You is acting only as the mediator for this All India order. "
+                            "Vibe4You has not collected payment or shipping charges. "
+                            "Please contact the customer to confirm availability, payment and shipping."
+                        )
+                        try:
+                            self.transactional_mail_dispatcher(
+                                str(contact["email"]),
+                                f"Vibe4You All India order {order.get('id') or ''}",
+                                body,
+                            )
+                        except Exception:
+                            pass
+                self._json_response(HTTPStatus.CREATED, result)
                 return
             if path == "/api/create-order":
                 self._rate_limit(path, 10)
@@ -3810,6 +4106,18 @@ class StyleDashRequestHandler(SimpleHTTPRequestHandler):
                 profile = self._security().update_profile(user["id"], self._read_json())
                 self._json_response(HTTPStatus.OK, {"success": True, "profile": profile})
                 return
+            if path == "/api/vendor-applications/me/delivery-settings":
+                self._rate_limit(path, 20)
+                user, _session = self._current_user()
+                self._csrf()
+                application = self._shops().update_delivery_settings(
+                    user["id"], self._read_json()
+                )
+                self.payment_service.refresh_shop_products()
+                self._json_response(
+                    HTTPStatus.OK, {"success": True, "application": application}
+                )
+                return
             if path == "/api/vendor-applications/me/branding":
                 self._rate_limit(path, 20)
                 user, _session = self._current_user()
@@ -3926,6 +4234,7 @@ def create_server(
     service: PaymentService | None = None,
 ) -> ThreadingHTTPServer:
     delivery_queue: PasswordResetDeliveryQueue | None = None
+    transactional_queue: TransactionalMailQueue | None = None
     if service is None:
         encryption_key = os.environ.get("STYLEDASH_TOTP_ENCRYPTION_KEY", "").strip()
         if not encryption_key:
@@ -3935,6 +4244,12 @@ def create_server(
         ).resolve()
         mailer = SmtpPasswordResetSender.from_environment()
         delivery_queue = PasswordResetDeliveryQueue(mailer) if mailer is not None else None
+        transactional_mailer = SmtpTransactionalSender.from_environment()
+        transactional_queue = (
+            TransactionalMailQueue(transactional_mailer)
+            if transactional_mailer is not None
+            else None
+        )
         security_store = SecurityStore(
             database_path,
             encryption_key,
@@ -3960,14 +4275,20 @@ def create_server(
     BoundStyleDashRequestHandler.review_workflow = (
         ReviewWorkflow(payment_service.security.path) if payment_service.security is not None else None
     )
+    BoundStyleDashRequestHandler.transactional_mail_dispatcher = (
+        transactional_queue.dispatch if transactional_queue is not None else None
+    )
     BoundStyleDashRequestHandler.rate_limiter = RateLimiter()
     handler = partial(BoundStyleDashRequestHandler, directory=str(directory))
     server = ThreadingHTTPServer((bind, port), handler)
-    if service is None and delivery_queue is not None:
+    if service is None and (delivery_queue is not None or transactional_queue is not None):
         original_server_close = server.server_close
 
         def close_server() -> None:
-            delivery_queue.close()
+            if delivery_queue is not None:
+                delivery_queue.close()
+            if transactional_queue is not None:
+                transactional_queue.close()
             original_server_close()
 
         server.server_close = close_server  # type: ignore[method-assign]

@@ -13,6 +13,8 @@ import { useAuth } from '../context/AuthContext';
 import { CONFIG } from '../config';
 import { SellerProducts } from '../components/SellerProducts';
 import { StoreBranding } from '../components/StoreBranding';
+import { ShopDeliverySettings } from '../components/ShopDeliverySettings';
+import { SellerMediatorOrders } from '../components/SellerMediatorOrders';
 import { STORE_CATEGORIES } from '../data/categories';
 import { storeCategoryOptions } from '../utils/storeCategories';
 
@@ -300,6 +302,8 @@ export const VendorOnboarding: React.FC = () => {
       {application && ['APPROVED', 'ACTIVE'].includes(application.status) && (
         <>
           <StoreBranding application={application} onChange={setApplication} />
+          <ShopDeliverySettings application={application} onChange={setApplication} />
+          {application.status === 'ACTIVE' && application.allIndiaDeliveryEnabled === true && <SellerMediatorOrders />}
           <SellerProducts />
         </>
       )}

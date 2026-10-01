@@ -70,6 +70,8 @@ export interface Product {
   trending?: boolean;
   featured?: boolean;
   expressDelivery?: boolean;
+  allIndiaDeliveryAvailable?: boolean;
+  allIndiaShippingPayer?: 'shop' | 'customer';
 
   estimatedDeliveryMinutes?: number;
   returnWindowDays: number;
@@ -107,6 +109,8 @@ export interface VendorStore {
   description: string;
   totalSales?: number;
   productCount?: number;
+  allIndiaDeliveryEnabled?: boolean;
+  allIndiaShippingPayer?: 'shop' | 'customer';
   active: boolean;
   approved: boolean;
   createdAt: string;

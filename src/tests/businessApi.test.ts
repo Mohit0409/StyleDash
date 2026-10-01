@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { clearCsrfToken, setCsrfToken } from '../services/apiClient';
-import { orderApi, publicStoreApi, shopProductApi, vendorApplicationApi } from '../services/businessApi';
+import { mediatorOrderApi, orderApi, publicStoreApi, shopProductApi, vendorApplicationApi } from '../services/businessApi';
 
 const application = {
   id: 'shop-1',
@@ -70,6 +70,77 @@ describe('Try at Home order API', () => {
     expect(JSON.parse(String((fetchSpy.mock.calls[1][1] as RequestInit).body))).toEqual({ itemIndex: 2, targetVariantId: 'variant-xl' });
   });
 });
+
+
+describe('All India mediator order API', () => {
+  afterEach(() => {
+    clearCsrfToken();
+    vi.restoreAllMocks();
+  });
+
+  it('places a CSRF-protected mediator request with a dedicated idempotency key', async () => {
+    setCsrfToken('csrf-mediator');
+    const order = {
+      id: 'AIO-20261001-ABC12345',
+      shopId: 'shop-1',
+      shopName: 'Test Shop',
+      items: [],
+      address: {
+        name: 'Customer',
+        phone: '9876543210',
+        street: '22 Market Road',
+        city: 'Jaipur',
+        state: 'Rajasthan',
+        pincode: '302001',
+      },
+      merchandiseTotal: 500,
+      shippingPayer: 'customer',
+      status: 'NEW',
+      createdAt: '2026-10-01T00:00:00Z',
+      updatedAt: '2026-10-01T00:00:00Z',
+    } as const;
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      jsonResponse({ success: true, idempotent: false, order }, 201),
+    );
+    const payload = {
+      items: [{ productId: 'product-1', variantId: 'variant-1', quantity: 1 }],
+      address: order.address,
+    };
+
+    await expect(mediatorOrderApi.place(payload, 'mediator-key-123')).resolves.toEqual({
+      idempotent: false,
+      order,
+    });
+    const [endpoint, init] = fetchSpy.mock.calls[0] as [RequestInfo | URL, RequestInit];
+    const headers = new Headers(init.headers);
+    expect(endpoint).toBe('/api/mediator-orders');
+    expect(init.method).toBe('POST');
+    expect(init.credentials).toBe('include');
+    expect(headers.get('X-CSRF-Token')).toBe('csrf-mediator');
+    expect(headers.get('Idempotency-Key')).toBe('mediator-key-123');
+    expect(JSON.parse(String(init.body))).toEqual(payload);
+  });
+
+  it('loads only customer-owned and seller-owned mediator endpoints', async () => {
+    const order = { id: 'AIO-1' };
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(async endpoint => (
+      String(endpoint) === '/api/shop-mediator-orders'
+        ? jsonResponse({ success: true, orders: [order] })
+        : jsonResponse({ success: true, order })
+    ));
+
+    await expect(mediatorOrderApi.one('AIO-1')).resolves.toEqual(order);
+    await expect(mediatorOrderApi.sellerMine()).resolves.toEqual([order]);
+    expect(fetchSpy.mock.calls.map(([endpoint]) => endpoint)).toEqual([
+      '/api/mediator-orders/AIO-1',
+      '/api/shop-mediator-orders',
+    ]);
+    for (const [, init] of fetchSpy.mock.calls as Array<[RequestInfo | URL, RequestInit]>) {
+      expect(init.credentials).toBe('include');
+    }
+  });
+});
+
 
 describe('seller product submission API', () => {
   afterEach(() => {
@@ -195,6 +266,33 @@ describe('shop application API', () => {
       expect(new Headers(init.headers).get('X-CSRF-Token')).toBe('csrf-branding-test');
       expect(init.credentials).toBe('include');
     }
+  });
+
+  it('updates All India delivery settings through the dedicated CSRF-protected endpoint', async () => {
+    setCsrfToken('csrf-all-india-settings');
+    const updated = {
+      ...application,
+      status: 'ACTIVE',
+      allIndiaDeliveryEnabled: true,
+      allIndiaShippingPayer: 'shop',
+    } as const;
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      jsonResponse({ success: true, application: updated }),
+    );
+
+    await expect(vendorApplicationApi.updateDeliverySettings({
+      allIndiaDeliveryEnabled: true,
+      allIndiaShippingPayer: 'shop',
+    })).resolves.toEqual(updated);
+    const [endpoint, init] = fetchSpy.mock.calls[0] as [RequestInfo | URL, RequestInit];
+    expect(endpoint).toBe('/api/vendor-applications/me/delivery-settings');
+    expect(init.method).toBe('PATCH');
+    expect(init.credentials).toBe('include');
+    expect(new Headers(init.headers).get('X-CSRF-Token')).toBe('csrf-all-india-settings');
+    expect(JSON.parse(String(init.body))).toEqual({
+      allIndiaDeliveryEnabled: true,
+      allIndiaShippingPayer: 'shop',
+    });
   });
 
   it('uses authenticated CSRF-protected transition endpoints for update and submit', async () => {

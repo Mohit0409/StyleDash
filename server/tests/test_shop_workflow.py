@@ -173,7 +173,7 @@ class ShopWorkflowTests(unittest.TestCase):
                 [row[0] for row in db.execute(
                     "SELECT version FROM shop_schema_migrations ORDER BY version"
                 )],
-                [1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
+                [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11],
             )
             self.assertEqual(db.execute("PRAGMA integrity_check").fetchone()[0], "ok")
             self.assertEqual(db.execute("PRAGMA foreign_key_check").fetchall(), [])
@@ -277,7 +277,7 @@ class ShopWorkflowTests(unittest.TestCase):
         db = sqlite3.connect(concurrent_path)
         self.assertEqual(
             db.execute("SELECT version,COUNT(*) FROM shop_schema_migrations GROUP BY version").fetchall(),
-            [(1, 1), (2, 1), (3, 1), (4, 1), (5, 1), (6, 1), (7, 1), (8, 1), (9, 1), (10, 1)],
+            [(1, 1), (2, 1), (3, 1), (4, 1), (5, 1), (6, 1), (7, 1), (8, 1), (9, 1), (10, 1), (11, 1)],
         )
         self.assertEqual(db.execute("PRAGMA integrity_check").fetchone()[0], "ok")
         self.assertEqual(db.execute("PRAGMA foreign_key_check").fetchall(), [])
@@ -1210,6 +1210,154 @@ class ShopWorkflowTests(unittest.TestCase):
             "invalid_store_request",
             lambda: self.store.list_store_published_products(""),
         )
+
+
+    def test_all_india_delivery_defaults_off_and_public_metadata_is_safe(self) -> None:
+        application = self.create_active_shop("user-a", "Pan India Shop")
+        current = self.store.get_application("user-a")
+        self.assertFalse(current["allIndiaDeliveryEnabled"])
+        self.assertEqual(current["allIndiaShippingPayer"], "customer")
+
+        product = self._publish("user-a", self.complete_product("Pan India Kurta"))
+        public_before = self.store.get_published_product(product["id"])
+        self.assertFalse(public_before["allIndiaDeliveryAvailable"])
+        self.assertEqual(public_before["allIndiaShippingPayer"], "customer")
+
+        updated = self.store.update_delivery_settings(
+            "user-a",
+            {"allIndiaDeliveryEnabled": True, "allIndiaShippingPayer": "shop"},
+        )
+        self.assertTrue(updated["allIndiaDeliveryEnabled"])
+        self.assertEqual(updated["allIndiaShippingPayer"], "shop")
+
+        public_after = self.store.get_published_product(product["id"])
+        self.assertTrue(public_after["allIndiaDeliveryAvailable"])
+        self.assertEqual(public_after["allIndiaShippingPayer"], "shop")
+        payment_product = next(
+            item for item in self.store.payment_catalog_products()
+            if item["id"] == product["id"]
+        )
+        self.assertTrue(payment_product["allIndiaDeliveryAvailable"])
+        self.assertEqual(payment_product["allIndiaShippingPayer"], "shop")
+        store = next(item for item in self.store.list_active_stores() if item["id"] == application["id"])
+        self.assertTrue(store["allIndiaDeliveryEnabled"])
+        self.assertEqual(store["allIndiaShippingPayer"], "shop")
+        self.assertNotIn("registeredEmail", store)
+        self.assertNotIn("registeredMobile", store)
+
+        with self.store.connect() as db:
+            columns = {row[1] for row in db.execute("PRAGMA table_info(vendor_applications)")}
+            tables = {row[0] for row in db.execute(
+                "SELECT name FROM sqlite_master WHERE type='table'"
+            )}
+            versions = {row[0] for row in db.execute("SELECT version FROM shop_schema_migrations")}
+        self.assertIn("all_india_delivery_enabled", columns)
+        self.assertIn("all_india_shipping_payer", columns)
+        self.assertIn("mediator_orders", tables)
+        self.assertIn(11, versions)
+
+    def test_all_india_delivery_settings_require_approved_shop_and_valid_payer(self) -> None:
+        draft = self.store.create_draft(
+            "user-a", self.complete_application("Settings Guard Shop")
+        )
+        self.assert_error(
+            "approved_shop_required",
+            lambda: self.store.update_delivery_settings(
+                "user-a",
+                {"allIndiaDeliveryEnabled": True, "allIndiaShippingPayer": "customer"},
+            ),
+        )
+        self.store.submit_application("user-a")
+        self.store.admin_transition_application("admin-a", draft["id"], "UNDER_REVIEW")
+        self.store.admin_transition_application("admin-a", draft["id"], "APPROVED")
+        self.assert_error(
+            "invalid_delivery_settings",
+            lambda: self.store.update_delivery_settings(
+                "user-a",
+                {"allIndiaDeliveryEnabled": True, "allIndiaShippingPayer": "platform"},
+            ),
+        )
+        self.assert_error(
+            "invalid_delivery_settings",
+            lambda: self.store.update_delivery_settings(
+                "user-a",
+                {"allIndiaDeliveryEnabled": "yes", "allIndiaShippingPayer": "shop"},
+            ),
+        )
+
+    def test_mediator_order_is_idempotent_and_enforces_customer_seller_ownership(self) -> None:
+        application = self.create_active_shop("user-a", "Mediator Shop")
+        self.store.update_delivery_settings(
+            "user-a",
+            {"allIndiaDeliveryEnabled": True, "allIndiaShippingPayer": "customer"},
+        )
+        product = self._publish("user-a", self.complete_product("Mediator Kurta"))
+        public = self.store.get_published_product(product["id"])
+        variant = public["variants"][0]
+        trusted_items = [{
+            "productId": public["id"],
+            "productName": public["name"],
+            "productSlug": public["slug"],
+            "variantId": variant["id"],
+            "sku": variant["sku"],
+            "size": variant["size"],
+            "colourName": variant["colourName"],
+            "quantity": 1,
+            "unitPrice": public["price"],
+            "lineTotal": public["price"],
+            "storeId": application["id"],
+            "storeName": application["shopName"],
+            "storeSlug": public["storeSlug"],
+        }]
+        address = {
+            "name": "Customer B",
+            "phone": "9876543211",
+            "street": "21 Customer Road",
+            "city": "Jaipur",
+            "state": "Rajasthan",
+            "pincode": "302001",
+        }
+        total_paise = int(round(public["price"] * 100))
+
+        first = self.store.create_mediator_order(
+            "user-b",
+            application["id"],
+            trusted_items,
+            address,
+            total_paise,
+            "mediator-test-key-001",
+        )
+        second = self.store.create_mediator_order(
+            "user-b",
+            application["id"],
+            trusted_items,
+            address,
+            total_paise,
+            "mediator-test-key-001",
+        )
+        self.assertFalse(first["idempotent"])
+        self.assertTrue(second["idempotent"])
+        self.assertEqual(first["order"]["id"], second["order"]["id"])
+        self.assertEqual(first["order"]["shippingPayer"], "customer")
+        self.assertEqual(first["order"]["address"]["city"], "Jaipur")
+
+        seller_orders = self.store.list_mediator_orders_for_seller("user-a")
+        self.assertEqual([order["id"] for order in seller_orders], [first["order"]["id"]])
+        self.assertEqual(self.store.list_mediator_orders_for_seller("user-b"), [])
+        customer_order = self.store.get_mediator_order_for_customer(
+            "user-b", first["order"]["id"]
+        )
+        self.assertEqual(customer_order["id"], first["order"]["id"])
+        self.assert_error(
+            "mediator_order_not_found",
+            lambda: self.store.get_mediator_order_for_customer(
+                "user-a", first["order"]["id"]
+            ),
+        )
+
+        contact = self.store.shop_notification_contact(application["id"])
+        self.assertEqual(contact["email"], "owner@example.test")
+        self.assertEqual(contact["shopName"], "Mediator Shop")
 
 
 if __name__ == "__main__":

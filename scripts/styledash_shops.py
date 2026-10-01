@@ -88,6 +88,7 @@ APPLICATION_PAYLOAD_FIELDS = {
     "pincode",
     "businessInformation",
 }
+ALL_INDIA_SHIPPING_PAYERS = {"shop", "customer"}
 PRODUCT_PAYLOAD_FIELDS = {
     "name",
     "description",
@@ -331,6 +332,7 @@ class ShopWorkflow:
             self._migrate_product_exchange(db)
             self._migrate_product_change_summaries(db)
             self._migrate_catalog_version(db)
+            self._migrate_all_india_mediator_orders(db)
             integrity = [row[0] for row in db.execute("PRAGMA integrity_check").fetchall()]
             if integrity != ["ok"]:
                 raise RuntimeError("Shop migration failed SQLite integrity validation")
@@ -770,6 +772,66 @@ class ShopWorkflow:
             db.rollback()
             raise
 
+    @staticmethod
+    def _migrate_all_india_mediator_orders(db: sqlite3.Connection) -> None:
+        """Add default-off pan-India shop settings and isolated mediator orders."""
+        now = iso(utc_now())
+        db.execute("BEGIN IMMEDIATE")
+        try:
+            columns = {row["name"] for row in db.execute(
+                "PRAGMA table_info(vendor_applications)"
+            ).fetchall()}
+            if "all_india_delivery_enabled" not in columns:
+                db.execute(
+                    "ALTER TABLE vendor_applications "
+                    "ADD COLUMN all_india_delivery_enabled INTEGER NOT NULL DEFAULT 0 "
+                    "CHECK(all_india_delivery_enabled IN (0,1))"
+                )
+            if "all_india_shipping_payer" not in columns:
+                db.execute(
+                    "ALTER TABLE vendor_applications "
+                    "ADD COLUMN all_india_shipping_payer TEXT NOT NULL DEFAULT 'customer' "
+                    "CHECK(all_india_shipping_payer IN ('shop','customer'))"
+                )
+            db.execute(
+                """
+                CREATE TABLE IF NOT EXISTS mediator_orders(
+                  id TEXT PRIMARY KEY,
+                  customer_user_id TEXT NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
+                  application_id TEXT NOT NULL REFERENCES vendor_applications(id) ON DELETE RESTRICT,
+                  idempotency_key TEXT NOT NULL,
+                  items_json TEXT NOT NULL,
+                  address_json TEXT NOT NULL,
+                  merchandise_total_paise INTEGER NOT NULL CHECK(merchandise_total_paise >= 0),
+                  shipping_payer TEXT NOT NULL CHECK(shipping_payer IN ('shop','customer')),
+                  status TEXT NOT NULL DEFAULT 'NEW'
+                    CHECK(status IN ('NEW','CONTACTED','CLOSED','CANCELLED')),
+                  created_at TEXT NOT NULL,
+                  updated_at TEXT NOT NULL,
+                  UNIQUE(customer_user_id,idempotency_key)
+                )
+                """
+            )
+            db.execute(
+                "CREATE INDEX IF NOT EXISTS mediator_orders_seller_idx "
+                "ON mediator_orders(application_id,created_at DESC)"
+            )
+            db.execute(
+                "CREATE INDEX IF NOT EXISTS mediator_orders_customer_idx "
+                "ON mediator_orders(customer_user_id,created_at DESC)"
+            )
+            if db.execute(
+                "SELECT 1 FROM shop_schema_migrations WHERE version=11"
+            ).fetchone() is None:
+                db.execute(
+                    "INSERT INTO shop_schema_migrations(version,applied_at) VALUES(11,?)",
+                    (now,),
+                )
+            db.commit()
+        except Exception:
+            db.rollback()
+            raise
+
     def catalog_version(self) -> int:
         """Monotonic counter bumped by every catalogue-affecting DB write."""
         with self.connect() as db:
@@ -875,6 +937,14 @@ class ShopWorkflow:
             "businessInformation": row["business_information"],
             "bannerImage": row["banner_image_url"],
             "logoImage": row["logo_image_url"],
+            "allIndiaDeliveryEnabled": (
+                bool(row["all_india_delivery_enabled"])
+                if "all_india_delivery_enabled" in row.keys() else False
+            ),
+            "allIndiaShippingPayer": (
+                row["all_india_shipping_payer"]
+                if "all_india_shipping_payer" in row.keys() else "customer"
+            ),
             "rejectionReason": row["rejection_reason"] if row["status"] == "REJECTED" else None,
             "createdAt": row["created_at"],
             "updatedAt": row["updated_at"],
@@ -898,6 +968,205 @@ class ShopWorkflow:
         with self.connect() as db:
             row = self._customer_application(db, user_id)
         return self._serialize_application(row) if row is not None else None
+
+    def update_delivery_settings(self, user_id: str, payload: dict[str, Any]) -> dict[str, Any]:
+        if not isinstance(payload, dict) or set(payload) != {
+            "allIndiaDeliveryEnabled", "allIndiaShippingPayer"
+        }:
+            raise SecurityError(
+                400, "Choose whether All India delivery is enabled and who pays shipping.",
+                "invalid_delivery_settings",
+            )
+        enabled = payload.get("allIndiaDeliveryEnabled")
+        payer = payload.get("allIndiaShippingPayer")
+        if not isinstance(enabled, bool) or payer not in ALL_INDIA_SHIPPING_PAYERS:
+            raise SecurityError(
+                400, "Invalid All India delivery settings.", "invalid_delivery_settings"
+            )
+        now = iso(utc_now())
+        with self.connect() as db:
+            db.execute("BEGIN IMMEDIATE")
+            current = self._customer_application(db, user_id)
+            if current is None:
+                db.rollback()
+                raise SecurityError(
+                    404, "Shop application not found.", "vendor_application_not_found"
+                )
+            if current["status"] not in {"APPROVED", "ACTIVE"}:
+                db.rollback()
+                raise SecurityError(
+                    409,
+                    "All India delivery can be configured after shop approval.",
+                    "approved_shop_required",
+                )
+            db.execute(
+                "UPDATE vendor_applications "
+                "SET all_india_delivery_enabled=?,all_india_shipping_payer=?,updated_at=? "
+                "WHERE id=? AND submitted_by_user_id=?",
+                (1 if enabled else 0, payer, now, current["id"], user_id),
+            )
+            db.commit()
+            row = db.execute(
+                "SELECT * FROM vendor_applications WHERE id=?", (current["id"],)
+            ).fetchone()
+        return self._serialize_application(row)
+
+    @staticmethod
+    def _serialize_mediator_order(row: sqlite3.Row) -> dict[str, Any]:
+        return {
+            "id": row["id"],
+            "shopId": row["application_id"],
+            "shopName": row["shop_name"],
+            "items": json.loads(row["items_json"]),
+            "address": json.loads(row["address_json"]),
+            "merchandiseTotal": row["merchandise_total_paise"] / 100,
+            "shippingPayer": row["shipping_payer"],
+            "status": row["status"],
+            "createdAt": row["created_at"],
+            "updatedAt": row["updated_at"],
+        }
+
+    def create_mediator_order(
+        self,
+        customer_user_id: str,
+        application_id: str,
+        trusted_items: list[dict[str, Any]],
+        address: dict[str, Any],
+        merchandise_total_paise: int,
+        idempotency_key: str,
+    ) -> dict[str, Any]:
+        now = iso(utc_now())
+        with self.connect() as db:
+            db.execute("BEGIN IMMEDIATE")
+            customer = db.execute(
+                "SELECT id,is_active FROM users WHERE id=?", (customer_user_id,)
+            ).fetchone()
+            if customer is None or not customer["is_active"]:
+                db.rollback()
+                raise SecurityError(403, "Customer account is unavailable.", "account_disabled")
+            existing = db.execute(
+                """
+                SELECT m.*,a.shop_name
+                  FROM mediator_orders m
+                  JOIN vendor_applications a ON a.id=m.application_id
+                 WHERE m.customer_user_id=? AND m.idempotency_key=?
+                """,
+                (customer_user_id, idempotency_key),
+            ).fetchone()
+            if existing is not None:
+                db.rollback()
+                return {"idempotent": True, "order": self._serialize_mediator_order(existing)}
+            application = db.execute(
+                "SELECT * FROM vendor_applications WHERE id=?", (application_id,)
+            ).fetchone()
+            if (
+                application is None
+                or application["status"] != "ACTIVE"
+                or not bool(application["all_india_delivery_enabled"])
+            ):
+                db.rollback()
+                raise SecurityError(
+                    409, "This shop is not accepting All India orders.",
+                    "all_india_delivery_unavailable",
+                )
+            for item in trusted_items:
+                product_id = item.get("productId")
+                published = db.execute(
+                    "SELECT 1 FROM shop_product_submissions "
+                    "WHERE id=? AND application_id=? AND status='PUBLISHED'",
+                    (product_id, application_id),
+                ).fetchone()
+                if published is None:
+                    db.rollback()
+                    raise SecurityError(
+                        409, "A product is no longer available from this shop.",
+                        "all_india_delivery_unavailable",
+                    )
+            order_id = "AIO-" + utc_now().strftime("%Y%m%d") + "-" + secrets.token_hex(4).upper()
+            payer = application["all_india_shipping_payer"]
+            db.execute(
+                """
+                INSERT INTO mediator_orders(
+                  id,customer_user_id,application_id,idempotency_key,items_json,
+                  address_json,merchandise_total_paise,shipping_payer,status,created_at,updated_at
+                ) VALUES(?,?,?,?,?,?,?,?,'NEW',?,?)
+                """,
+                (
+                    order_id,
+                    customer_user_id,
+                    application_id,
+                    idempotency_key,
+                    json.dumps(trusted_items, separators=(",", ":"), ensure_ascii=False),
+                    json.dumps(address, separators=(",", ":"), ensure_ascii=False),
+                    merchandise_total_paise,
+                    payer,
+                    now,
+                    now,
+                ),
+            )
+            db.commit()
+            row = db.execute(
+                """
+                SELECT m.*,a.shop_name
+                  FROM mediator_orders m
+                  JOIN vendor_applications a ON a.id=m.application_id
+                 WHERE m.id=?
+                """,
+                (order_id,),
+            ).fetchone()
+        return {"idempotent": False, "order": self._serialize_mediator_order(row)}
+
+    def get_mediator_order_for_customer(
+        self, customer_user_id: str, order_id: str
+    ) -> dict[str, Any]:
+        with self.connect() as db:
+            row = db.execute(
+                """
+                SELECT m.*,a.shop_name
+                  FROM mediator_orders m
+                  JOIN vendor_applications a ON a.id=m.application_id
+                 WHERE m.id=? AND m.customer_user_id=?
+                """,
+                (order_id, customer_user_id),
+            ).fetchone()
+        if row is None:
+            raise SecurityError(404, "Order request not found.", "mediator_order_not_found")
+        return self._serialize_mediator_order(row)
+
+    def list_mediator_orders_for_seller(self, seller_user_id: str) -> list[dict[str, Any]]:
+        with self.connect() as db:
+            rows = db.execute(
+                """
+                SELECT m.*,a.shop_name
+                  FROM mediator_orders m
+                  JOIN vendor_applications a ON a.id=m.application_id
+                 WHERE a.submitted_by_user_id=?
+                 ORDER BY m.created_at DESC
+                 LIMIT 500
+                """,
+                (seller_user_id,),
+            ).fetchall()
+        return [self._serialize_mediator_order(row) for row in rows]
+
+    def shop_notification_contact(self, application_id: str) -> dict[str, Any] | None:
+        with self.connect() as db:
+            row = db.execute(
+                "SELECT shop_name,owner_name,email,phone,status,all_india_delivery_enabled "
+                "FROM vendor_applications WHERE id=?",
+                (application_id,),
+            ).fetchone()
+        if (
+            row is None
+            or row["status"] != "ACTIVE"
+            or not bool(row["all_india_delivery_enabled"])
+        ):
+            return None
+        return {
+            "shopName": row["shop_name"],
+            "ownerName": row["owner_name"],
+            "email": row["email"],
+            "phone": row["phone"],
+        }
 
     def update_store_branding(self, user_id: str, payload: dict[str, Any]) -> dict[str, Any]:
         allowed = {"bannerImage", "logoImage"}
@@ -2742,6 +3011,7 @@ class ShopWorkflow:
                 """
                 SELECT a.id,a.shop_name,a.category,a.description,a.address,a.city,a.pincode,
                        a.banner_image_url,a.logo_image_url,a.created_at,a.updated_at,
+                       a.all_india_delivery_enabled,a.all_india_shipping_payer,
                        (SELECT p.image_urls_json FROM shop_product_submissions p
                          WHERE p.application_id=a.id AND p.status='PUBLISHED'
                          ORDER BY p.published_at DESC LIMIT 1) AS image_urls_json
@@ -2776,6 +3046,8 @@ class ShopWorkflow:
                 "bannerImage": row["banner_image_url"] or image,
                 "logoImage": row["logo_image_url"] or image,
                 "productCount": product_counts.get(row["id"], 0),
+                "allIndiaDeliveryEnabled": bool(row["all_india_delivery_enabled"]),
+                "allIndiaShippingPayer": row["all_india_shipping_payer"],
                 "active": True, "approved": True, "createdAt": row["created_at"],
             })
         return stores
@@ -2784,7 +3056,7 @@ class ShopWorkflow:
         self, limit: int | None = None, application_id: str | None = None
     ) -> list[sqlite3.Row]:
         query = """
-                SELECT p.*,a.shop_name
+                SELECT p.*,a.shop_name,a.all_india_delivery_enabled,a.all_india_shipping_payer
                   FROM shop_product_submissions p
                   JOIN vendor_applications a ON a.id=p.application_id
                  WHERE p.status='PUBLISHED' AND a.status='ACTIVE'
@@ -2875,6 +3147,8 @@ class ShopWorkflow:
             "returnWindowDays": EXCHANGE_WINDOW_DAYS if bool(row["exchange_available"]) else 0,
             "exchangeAvailable": bool(row["exchange_available"]) if "exchange_available" in row.keys() else False,
             "tryAtHomeAvailable": bool(row["try_at_home_enabled"]) if "try_at_home_enabled" in row.keys() else False,
+            "allIndiaDeliveryAvailable": bool(row["all_india_delivery_enabled"]),
+            "allIndiaShippingPayer": row["all_india_shipping_payer"],
             "vendorId": row["application_id"],
             "storeName": row["shop_name"],
             "storeSlug": store_slug,
@@ -2907,7 +3181,7 @@ class ShopWorkflow:
         with self.connect() as db:
             row = db.execute(
                 """
-                SELECT p.*,a.shop_name
+                SELECT p.*,a.shop_name,a.all_india_delivery_enabled,a.all_india_shipping_payer
                   FROM shop_product_submissions p
                   JOIN vendor_applications a ON a.id=p.application_id
                  WHERE p.status='PUBLISHED' AND a.status='ACTIVE'
@@ -2976,7 +3250,8 @@ class ShopWorkflow:
         with self.connect() as db:
             rows = db.execute(
                 """
-                SELECT p.*,a.status AS shop_status,a.shop_name
+                SELECT p.*,a.status AS shop_status,a.shop_name,
+                       a.all_india_delivery_enabled,a.all_india_shipping_payer
                   FROM shop_product_submissions p
                   JOIN vendor_applications a ON a.id=p.application_id
                  ORDER BY p.created_at
@@ -3009,6 +3284,8 @@ class ShopWorkflow:
                     "optionMode": attributes.get("optionMode"),
                     "deliveryType": delivery_type,
                     "expressDelivery": delivery_type in {"express", "both"},
+                    "allIndiaDeliveryAvailable": bool(row["all_india_delivery_enabled"]),
+                    "allIndiaShippingPayer": row["all_india_shipping_payer"],
                     "images": images,
                     "thumbnail": images[0] if images else None,
                     "active": (

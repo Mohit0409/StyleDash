@@ -167,6 +167,153 @@ class SmtpPasswordResetSender:
                 pass
 
 
+class SmtpTransactionalSender:
+    """TLS-only sender for non-secret transactional shop notifications."""
+
+    REQUIRED_VARIABLES = (
+        "STYLEDASH_SMTP_HOST",
+        "STYLEDASH_SMTP_PORT",
+        "STYLEDASH_SMTP_USERNAME",
+        "STYLEDASH_SMTP_PASSWORD",
+        "STYLEDASH_PASSWORD_RESET_FROM",
+    )
+
+    def __init__(
+        self,
+        host: str,
+        port: int,
+        username: str,
+        password: str,
+        from_address: str,
+        *,
+        smtp_factory: SmtpFactory = smtplib.SMTP,
+    ) -> None:
+        self.host = _validate_host(host)
+        if not 1 <= port <= 65535:
+            raise SmtpConfigurationError("Transactional SMTP configuration is invalid")
+        if _contains_control_characters(username) or _contains_control_characters(password):
+            raise SmtpConfigurationError("Transactional SMTP configuration is invalid")
+        self.port = port
+        self.username = username
+        self.password = password
+        self.from_address = _validate_email(from_address)
+        self.smtp_factory = smtp_factory
+
+    @classmethod
+    def from_environment(
+        cls,
+        environ: Mapping[str, str] | None = None,
+        *,
+        smtp_factory: SmtpFactory = smtplib.SMTP,
+    ) -> "SmtpTransactionalSender | None":
+        values = os.environ if environ is None else environ
+        configured = [name for name in cls.REQUIRED_VARIABLES if values.get(name)]
+        if not configured:
+            return None
+        if len(configured) != len(cls.REQUIRED_VARIABLES):
+            raise SmtpConfigurationError("Transactional SMTP configuration is incomplete")
+        try:
+            port = int(values["STYLEDASH_SMTP_PORT"], 10)
+        except (KeyError, ValueError) as exc:
+            raise SmtpConfigurationError("Transactional SMTP configuration is invalid") from exc
+        return cls(
+            values["STYLEDASH_SMTP_HOST"],
+            port,
+            values["STYLEDASH_SMTP_USERNAME"],
+            values["STYLEDASH_SMTP_PASSWORD"],
+            values["STYLEDASH_PASSWORD_RESET_FROM"],
+            smtp_factory=smtp_factory,
+        )
+
+    def __call__(self, recipient: str, subject: str, body: str) -> None:
+        if (
+            not isinstance(subject, str)
+            or not subject.strip()
+            or len(subject) > 180
+            or chr(13) in subject
+            or chr(10) in subject
+        ):
+            raise ValueError("Invalid transactional email subject")
+        if not isinstance(body, str) or not body.strip() or len(body) > 20000:
+            raise ValueError("Invalid transactional email body")
+        message = EmailMessage()
+        message["From"] = Address(
+            display_name="Vibe4You Orders", addr_spec=self.from_address
+        )
+        message["To"] = _validate_email(recipient)
+        message["Subject"] = subject.strip()
+        message.set_content(body)
+        client = self.smtp_factory(self.host, self.port, timeout=SMTP_TIMEOUT_SECONDS)
+        try:
+            client.ehlo()
+            client.starttls(context=ssl.create_default_context())
+            client.ehlo()
+            client.login(self.username, self.password)
+            client.send_message(message)
+        finally:
+            try:
+                client.quit()
+            except Exception:
+                pass
+
+
+class TransactionalMailQueue:
+    """Bounded best-effort queue for non-secret shop notifications."""
+
+    def __init__(
+        self,
+        sender: Callable[[str, str, str], None],
+        *,
+        max_pending: int = 100,
+    ) -> None:
+        if max_pending < 1:
+            raise ValueError("max_pending must be positive")
+        self._sender = sender
+        self._queue: queue.Queue[tuple[str, str, str] | object] = queue.Queue(
+            maxsize=max_pending
+        )
+        self._stop = object()
+        self._lock = threading.Lock()
+        self._closed = False
+        self._worker = threading.Thread(
+            target=self._run,
+            name="styledash-transactional-mail",
+            daemon=True,
+        )
+        self._worker.start()
+
+    def dispatch(self, recipient: str, subject: str, body: str) -> None:
+        with self._lock:
+            if self._closed:
+                raise RuntimeError("Transactional mail delivery is unavailable")
+            try:
+                self._queue.put_nowait((recipient, subject, body))
+            except queue.Full as exc:
+                raise RuntimeError("Transactional mail delivery is unavailable") from exc
+
+    def _run(self) -> None:
+        while True:
+            item = self._queue.get()
+            try:
+                if item is self._stop:
+                    return
+                recipient, subject, body = item
+                try:
+                    self._sender(recipient, subject, body)
+                except Exception:
+                    pass
+            finally:
+                self._queue.task_done()
+
+    def close(self) -> None:
+        with self._lock:
+            if self._closed:
+                return
+            self._closed = True
+        self._queue.put(self._stop)
+        self._worker.join()
+
+
 class PasswordResetDeliveryQueue:
     """Bounded, drainable in-memory password-reset delivery worker.
 
