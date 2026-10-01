@@ -117,12 +117,25 @@ describe('homepage merchandising', () => {
     expect(gifts?.products.map(item => item.id)).toEqual(['gift-0', 'gift-1', 'gift-2', 'gift-3']);
   });
 
-  it('uses excluded Top Picks only as fallback when a category would otherwise disappear', () => {
+  it('uses excluded Top Picks as fallback when a category would otherwise disappear', () => {
     const primary = [product('women-primary')];
     const fallbackAccessory = product('accessory-top-pick', { category: 'Accessories' });
     const sections = buildHomepageSections(primary, 5, monday, [fallbackAccessory]);
     const accessories = sections.find(section => section.id === 'accessories');
     expect(accessories?.products.map(item => item.id)).toEqual(['accessory-top-pick']);
+  });
+
+  it('tops category rails back up from excluded Top Picks when only a few primary products remain', () => {
+    const remaining = [product('clothing-primary')];
+    const fullCatalogue = [
+      ...remaining,
+      ...Array.from({ length: 10 }, (_, index) => product(`clothing-top-pick-${index}`)),
+    ];
+    const sections = buildHomepageSections(remaining, 10, monday, fullCatalogue);
+    const clothing = sections.find(section => section.id === 'clothing');
+    expect(clothing?.products).toHaveLength(10);
+    expect(new Set(clothing?.products.map(item => item.id)).size).toBe(10);
+    expect(clothing?.products[0]?.id).toBe('clothing-primary');
   });
 
   it('hides Express merchandising on weekdays and keeps active products represented on weekends', () => {
