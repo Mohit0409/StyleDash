@@ -3,15 +3,29 @@ set -euo pipefail
 export PATH="/opt/vibe4you-production/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 RCLONE_CONFIG_SOURCE="/etc/vibe4you-production/rclone.conf"
 
-LOCAL_ONLY=false
-if [ "${1:-}" = "--local-only" ]; then
-  LOCAL_ONLY=true
-  shift
-fi
+MODE="full"
+case "${1:-}" in
+  "")
+    ;;
+  --local-only)
+    MODE="local-only"
+    shift
+    ;;
+  --deployment)
+    MODE="deployment"
+    shift
+    ;;
+  *)
+    echo "usage: backup-styledash-data [--local-only|--deployment]" >&2
+    exit 2
+    ;;
+esac
 if [ "$#" -ne 0 ]; then
-  echo "usage: backup-styledash-data [--local-only]" >&2
+  echo "usage: backup-styledash-data [--local-only|--deployment]" >&2
   exit 2
 fi
+
+DEPLOYMENT_MAX_PRIMARY_AGE_SECONDS="${STYLEDASH_DEPLOYMENT_MAX_PRIMARY_AGE_SECONDS:-86400}"
 
 DATA_ROOT="/var/lib/vibe4you-production"
 BACKUP_ROOT="/var/backups/vibe4you-production/data"
@@ -77,6 +91,52 @@ enabled() {
   esac
 }
 
+assert_recent_primary_backup() {
+  local marker="$RUN_DIR/styledash-last-offdevice-backup"
+  local max_age="$DEPLOYMENT_MAX_PRIMARY_AGE_SECONDS"
+
+  case "$max_age" in
+    ''|*[!0-9]*)
+      echo "STYLEDASH_DEPLOYMENT_MAX_PRIMARY_AGE_SECONDS must be a positive integer" >&2
+      return 1
+      ;;
+  esac
+  if [ "$max_age" -le 0 ]; then
+    echo "STYLEDASH_DEPLOYMENT_MAX_PRIMARY_AGE_SECONDS must be greater than zero" >&2
+    return 1
+  fi
+  if [ ! -s "$marker" ]; then
+    echo "Deployment backup requires an existing verified primary off-device backup marker" >&2
+    return 1
+  fi
+
+  python3 - "$marker" "$max_age" <<'PY'
+from datetime import datetime, timezone
+from pathlib import Path
+import sys
+
+marker = Path(sys.argv[1])
+max_age = int(sys.argv[2])
+stamp = marker.read_text(encoding="utf-8").strip()
+try:
+    verified_at = datetime.strptime(stamp, "%Y%m%dT%H%M%SZ").replace(tzinfo=timezone.utc)
+except ValueError as exc:
+    raise SystemExit("Primary off-device backup marker has an invalid timestamp") from exc
+
+age = (datetime.now(timezone.utc) - verified_at).total_seconds()
+if age < -300:
+    raise SystemExit("Primary off-device backup marker is unexpectedly in the future")
+if age > max_age:
+    raise SystemExit(
+        f"Primary off-device backup is too old for deployment: "
+        f"{int(age)}s > {max_age}s"
+    )
+
+print(f"deployment_primary_backup_stamp={stamp}")
+print(f"deployment_primary_backup_age_seconds={max(0, int(age))}")
+PY
+}
+
 run_rclone() {
   if command -v ionice >/dev/null 2>&1; then
     nice -n 10 ionice -c 3 rclone --config "$RCLONE_CONFIG" --sftp-host-keys "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIK+p7tYUHoYIqoaggv94GcYFVakfoVpXan6uGTwDE+/q" "$@"
@@ -103,6 +163,10 @@ verify_remote() {
     sleep 10
   done
 }
+
+if [ "$MODE" = "deployment" ]; then
+  assert_recent_primary_backup
+fi
 
 stamp="$(date -u +%Y%m%dT%H%M%SZ)"
 target="$BACKUP_ROOT/$stamp"
@@ -173,7 +237,37 @@ PY
 printf '%s\n' "$stamp" > "$RUN_DIR/styledash-last-local-backup"
 chmod 600 "$RUN_DIR/styledash-last-local-backup"
 
-if [ "$LOCAL_ONLY" = false ]; then
+if [ "$MODE" = "deployment" ]; then
+  secondary="${STYLEDASH_BACKUP_REMOTE_SECONDARY:-}"
+  if [ -z "$secondary" ]; then
+    echo "Deployment backup requires STYLEDASH_BACKUP_REMOTE_SECONDARY" >&2
+    exit 1
+  fi
+  case "$secondary" in
+    *:*) ;;
+    *)
+      echo "STYLEDASH_BACKUP_REMOTE_SECONDARY must be an rclone remote:path" >&2
+      exit 1
+      ;;
+  esac
+  if ! command -v rclone >/dev/null 2>&1; then
+    echo "rclone is required for the deployment secondary backup" >&2
+    exit 1
+  fi
+
+  secondary_target="${secondary%/}/$stamp"
+  run_rclone copy "$target" "$secondary_target" \
+    --immutable \
+    --checksum \
+    --create-empty-src-dirs \
+    --transfers 4 --checkers 4 --contimeout 15s --timeout 60s --retries 2 --low-level-retries 2
+  verify_remote "$target" "$secondary_target" "Deployment secondary off-device backup"
+
+  printf '%s\n' "$stamp" > "$RUN_DIR/styledash-last-secondary-backup"
+  chmod 600 "$RUN_DIR/styledash-last-secondary-backup"
+  echo "Deployment Windows secondary backup verified: $stamp"
+  echo "Deployment backup skipped primary cloud upload; recent verified primary marker accepted"
+elif [ "$MODE" = "full" ]; then
   remote="${STYLEDASH_BACKUP_REMOTE:-}"
   require_remote="${STYLEDASH_REQUIRE_OFFDEVICE_BACKUP:-false}"
 

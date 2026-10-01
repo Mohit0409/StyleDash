@@ -50,3 +50,36 @@ The systemd files in scripts/ubuntu/systemd are candidates only and are not inst
 ## Outstanding production proof
 
 A controlled Ubuntu reboot is still required before claiming full reboot-recovery proof. Perform it only in an approved maintenance window, then re-check public/admin/tunnel services, the backup timer, external endpoints, and sensitive-path blocking.
+## Deployment backup mode
+
+The normal scheduled backup remains the full disaster-recovery path:
+
+1. create a fresh local Ubuntu snapshot;
+2. verify SQLite integrity;
+3. copy and fully verify the encrypted primary cloud backup;
+4. copy and fully verify the Windows secondary backup.
+
+For a reviewed production deployment, use the separate deployment mode:
+
+```bash
+sudo -n /usr/local/sbin/vibe4you-ops backup-deployment
+```
+
+Deployment mode:
+
+- requires the last successfully verified primary cloud backup marker to be no older than 24 hours by default;
+- creates a fresh local Ubuntu snapshot and runs the normal SQLite integrity check;
+- copies that fresh snapshot to the Windows secondary and performs the normal full download/check verification;
+- does not upload a new primary cloud snapshot;
+- does not alter the primary cloud success marker;
+- refuses to run while the normal scheduled/full backup service is active.
+
+The cloud freshness limit can be configured privately with
+`STYLEDASH_DEPLOYMENT_MAX_PRIMARY_AGE_SECONDS`. The default is 86400 seconds.
+Do not increase this threshold casually.
+
+If the cloud marker is missing or stale, deployment mode fails closed. Run or wait for
+a normal full backup instead of bypassing the requirement.
+
+The daily systemd timer continues to invoke the backup script without arguments, so
+scheduled backups continue to perform both off-device copies.

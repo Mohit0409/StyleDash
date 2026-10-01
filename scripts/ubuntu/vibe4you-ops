@@ -1,0 +1,69 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+case "${1:-}" in
+  status)
+    systemctl --no-pager --full status vibe4you-production-public.service vibe4you-production-admin.service vibe4you-cloudflared.service || true
+    ;;
+  restart-public)
+    systemctl restart vibe4you-production-public.service
+    ;;
+  restart-admin)
+    systemctl restart vibe4you-production-admin.service
+    ;;
+  restart-cloudflared)
+    systemctl restart vibe4you-cloudflared.service
+    ;;
+  backup-repair)
+    systemctl stop vibe4you-backup.timer || true
+    systemctl disable vibe4you-backup.timer || true
+    systemctl reset-failed vibe4you-backup.service || true
+    install -d -o root -g vibe4you -m 0750 /var/backups/vibe4you-production
+    install -d -o vibe4you -g vibe4you -m 0700 /var/backups/vibe4you-production/data
+    chown -R vibe4you:vibe4you /var/backups/vibe4you-production/data
+    find /var/backups/vibe4you-production/data -type d -exec chmod 700 {} +
+    find /var/backups/vibe4you-production/data -type f -exec chmod 600 {} +
+    chown root:vibe4you /etc/vibe4you-production/rclone.conf /etc/vibe4you-production/backup.env
+    chmod 0640 /etc/vibe4you-production/rclone.conf /etc/vibe4you-production/backup.env
+    script=/opt/vibe4you-production/bin/backup-styledash-data
+    cp -a "$script" "/var/backups/vibe4you-production/backup-styledash-data.before-permission-fix.$(date -u +%Y%m%dT%H%M%SZ)"
+    if ! grep -q 'BACKUP_TARGET_PERMISSIONS_NORMALIZED' "$script"; then
+      sed -i '/^[[:space:]]*chmod 700 "\$target\/product-images"$/a\  find "$target" -type d -exec chmod 700 {} +\n  find "$target" -type f -exec chmod 600 {} +\n  echo "BACKUP_TARGET_PERMISSIONS_NORMALIZED"' "$script"
+    fi
+    sed -i 's/\r$//' "$script"
+    bash -n "$script"
+    runuser -u vibe4you -- "$script" --local-only
+    echo BACKUP_REPAIR_LOCAL_TEST=PASS
+    ;;
+  backup-start)
+    systemctl reset-failed vibe4you-backup.service || true
+    systemctl start vibe4you-backup.service
+    ;;
+  backup-deployment)
+    script=/opt/vibe4you-production/bin/backup-styledash-data
+    if [ ! -x "$script" ]; then
+      echo "Vibe4You backup script is not executable" >&2
+      exit 1
+    fi
+    if systemctl is-active --quiet vibe4you-backup.service; then
+      echo "A scheduled/full Vibe4You backup is already running; deployment backup refused" >&2
+      exit 75
+    fi
+    runuser -u vibe4you -- "$script" --deployment
+    ;;
+  backup-enable)
+    systemctl enable --now vibe4you-backup.timer
+    ;;
+  backup-disable)
+    systemctl stop vibe4you-backup.timer || true
+    systemctl disable vibe4you-backup.timer || true
+    ;;
+  backup-status)
+    systemctl --no-pager --full status vibe4you-backup.service vibe4you-backup.timer || true
+    journalctl -u vibe4you-backup.service -n 80 --no-pager
+    ;;
+  *)
+    echo "Allowed: status restart-public restart-admin restart-cloudflared backup-repair backup-start backup-deployment backup-enable backup-disable backup-status" >&2
+    exit 64
+    ;;
+esac

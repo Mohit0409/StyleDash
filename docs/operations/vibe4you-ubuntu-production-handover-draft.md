@@ -127,7 +127,7 @@ Default candidate thresholds:
 - disk usage: alert at 85 percent
 - disk free: alert below 20 GiB
 
-A candidate ntfy-compatible alert helper and systemd health timer are also present in the branch. They are not installed on production.
+The ntfy-compatible alert helper and systemd health timer described above were installed on production on 2026-10-01; installation evidence is recorded later in this document.
 
 The alert helper:
 - is disabled unless explicitly configured
@@ -248,3 +248,31 @@ Still outstanding:
 3. After reboot, verify public, admin, Cloudflare, backup timer, monitoring timer, external routes, and sensitive-path blocking.
 4. Finalize this handover after reboot recovery is proven.
 5. Only then begin the old Android host decommissioning decision.
+## Deployment backup optimization - candidate policy
+
+Owner-approved direction: a normal production deployment should not wait for a new
+encrypted cloud upload when a recent verified cloud recovery point already exists.
+
+Candidate implementation on PR #117:
+
+- default/full backup behavior is unchanged;
+- deployment mode is explicit: `backup-styledash-data --deployment`;
+- privileged entry point: `sudo -n /usr/local/sbin/vibe4you-ops backup-deployment`;
+- default maximum age for the existing verified primary cloud marker: 24 hours;
+- a stale, missing, invalid, or future-dated primary marker blocks deployment mode;
+- a fresh local snapshot plus SQLite integrity check is still mandatory;
+- a fresh Windows secondary copy plus full verification is still mandatory;
+- the primary cloud copy is not uploaded or re-verified during deployment mode;
+- the primary cloud success marker must remain unchanged during the deployment backup;
+- the normal scheduled backup timer remains a full cloud + Windows backup;
+- deployment mode refuses to overlap an active full/scheduled backup.
+
+The guarded installer
+`scripts/ubuntu/install-vibe4you-deployment-backup-mode.sh` pins both the current
+production baselines and the reviewed candidate hashes. During installation it creates
+a rollback copy, installs the two candidate files, executes one real deployment-mode
+backup, proves that the cloud marker did not advance while the local and Windows
+markers did advance, and automatically restores the old files if any check fails.
+
+This candidate must pass PR CI before installation. Installing it does not deploy
+application code and does not restart the public, admin, or Cloudflare services.
