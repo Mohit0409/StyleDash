@@ -131,19 +131,26 @@ export const buildHomepageSections = (
         if (merged.size >= limit) break;
       }
       chosen = [...merged.values()];
-    } else if (candidates.length === 0) {
-      chosen = fallbackCandidates.slice(0, 1);
     } else {
-      const primary = candidates.filter(unused).slice(0, limit);
-      if (primary.length >= limit) {
-        chosen = primary;
-      } else {
-        const chosenIds = new Set(primary.map(product => product.id));
-        const topUp = candidates
-          .filter(product => !chosenIds.has(product.id))
-          .slice(0, limit - primary.length);
-        chosen = [...primary, ...topUp];
-      }
+      chosen = [];
+      const chosenIds = new Set<string>();
+      const appendUnique = (pool: Product[]) => {
+        for (const product of pool) {
+          if (chosenIds.has(product.id)) continue;
+          chosen.push(product);
+          chosenIds.add(product.id);
+          if (chosen.length >= limit) break;
+        }
+      };
+
+      // Prefer products not already used by earlier promotional rows, including
+      // eligible Top Picks from the full-catalogue fallback. Only reuse an
+      // earlier promotional product if there still are not enough unique
+      // eligible products to fill the rail.
+      appendUnique(candidates.filter(unused));
+      if (chosen.length < limit) appendUnique(fallbackCandidates.filter(unused));
+      if (chosen.length < limit) appendUnique(candidates);
+      if (chosen.length < limit) appendUnique(fallbackCandidates);
     }
     if (!categorySection) chosen.forEach(product => usedProductIds.add(product.id));
     return { ...definition, products: chosen };

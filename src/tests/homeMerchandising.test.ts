@@ -138,6 +138,19 @@ describe('homepage merchandising', () => {
     expect(clothing?.products[0]?.id).toBe('clothing-primary');
   });
 
+  it('tops promotional rails back up from excluded Top Picks when enough eligible products exist', () => {
+    const remaining = [product('men-primary', { department: 'men' })];
+    const fullCatalogue = [
+      ...remaining,
+      ...Array.from({ length: 10 }, (_, index) => product(`men-top-pick-${index}`, { department: 'men' })),
+    ];
+    const sections = buildHomepageSections(remaining, 10, monday, fullCatalogue);
+    const men = sections.find(section => section.id === 'men');
+    expect(men?.products).toHaveLength(10);
+    expect(new Set(men?.products.map(item => item.id)).size).toBe(10);
+    expect(men?.products[0]?.id).toBe('men-primary');
+  });
+
   it('hides Express merchandising on weekdays and keeps active products represented on weekends', () => {
     const normalStored = product('normal-stored', { deliveryType: 'normal', expressDelivery: false });
     expect(buildHomepageSections([normalStored], 5, monday).some(section => section.id === 'express')).toBe(false);
