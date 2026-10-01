@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { AlertTriangle, Boxes, Edit3, PackageMinus, PackagePlus, Search, Send } from 'lucide-react';
 import { ApiError } from '../services/apiClient';
-import { blobToBase64, prepareProductImage } from '../utils/productImage';
+import { blobToBase64, prepareProductImage, PRODUCT_IMAGE_ACCEPT } from '../utils/productImage';
 import {
   type SellerProduct,
   type SellerProductChangeDraft,
@@ -653,11 +653,11 @@ export const SellerProducts: React.FC = () => {
                         <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                           <div>
                             <p className="font-bold">{firstColour ? 'Upload product images' : `Upload ${colourLabel.toLowerCase()} images`}</p>
-                            <p className="text-[11px] text-neutral-500">JPEG, PNG or WebP. Images are resized to max 1600 px and compressed to WebP, targeting about 350 KB with a 500 KB hard limit.</p>
+                            <p className="text-[11px] text-neutral-500">JPEG, PNG, WebP, HEIC or HEIF. Images are resized to max 1600 px and compressed before upload, targeting about 350 KB with a 500 KB hard limit.</p>
                           </div>
                           <label className="inline-flex cursor-pointer items-center justify-center rounded-xl border px-4 py-2.5 font-bold">
                             {uploadBusy ? 'Optimizing...' : 'Choose images'}
-                            <input aria-label={firstColour ? 'Upload product images' : `Upload ${colourLabel.toLowerCase()} images`} type="file" multiple accept="image/jpeg,image/png,image/webp" disabled={busy || uploadBusy} onChange={event => { void uploadImages(colourIndex, event.target.files); event.currentTarget.value = ''; }} className="sr-only" />
+                            <input aria-label={firstColour ? 'Upload product images' : `Upload ${colourLabel.toLowerCase()} images`} type="file" multiple accept={PRODUCT_IMAGE_ACCEPT} disabled={busy || uploadBusy} onChange={event => { void uploadImages(colourIndex, event.target.files); event.currentTarget.value = ''; }} className="sr-only" />
                           </label>
                         </div>
                         {colour.uploadedImageUrls.length > 0 ? (

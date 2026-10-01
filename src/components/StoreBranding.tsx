@@ -5,7 +5,7 @@ import {
   type ShopApplication,
   vendorApplicationApi,
 } from '../services/businessApi';
-import { blobToBase64, prepareProductImage } from '../utils/productImage';
+import { blobToBase64, prepareProductImage, PRODUCT_IMAGE_ACCEPT } from '../utils/productImage';
 import { StoreImage } from './StoreImage';
 
 interface StoreBrandingProps {
@@ -91,7 +91,7 @@ export const StoreBranding: React.FC<StoreBrandingProps> = ({ application, onCha
           </div>
           <label className="inline-flex cursor-pointer items-center gap-2 rounded-xl border px-4 py-2.5 text-xs font-bold">
             <ImagePlus className="w-4" /> {uploading === 'banner' ? 'Preparing cover…' : bannerImage ? 'Replace Cover' : 'Upload Cover'}
-            <input aria-label="Upload store cover image" type="file" accept="image/jpeg,image/png,image/webp" disabled={busy} onChange={event => { void upload('banner', event.target.files); event.currentTarget.value = ''; }} className="sr-only" />
+            <input aria-label="Upload store cover image" type="file" accept={PRODUCT_IMAGE_ACCEPT} disabled={busy} onChange={event => { void upload('banner', event.target.files); event.currentTarget.value = ''; }} className="sr-only" />
           </label>
         </div>
         <div className="space-y-3">
@@ -107,11 +107,11 @@ export const StoreBranding: React.FC<StoreBrandingProps> = ({ application, onCha
           </div>
           <label className="inline-flex cursor-pointer items-center gap-2 rounded-xl border px-4 py-2.5 text-xs font-bold">
             <ImagePlus className="w-4" /> {uploading === 'logo' ? 'Preparing logo…' : logoImage ? 'Replace Logo' : 'Upload Logo'}
-            <input aria-label="Upload store logo image" type="file" accept="image/jpeg,image/png,image/webp" disabled={busy} onChange={event => { void upload('logo', event.target.files); event.currentTarget.value = ''; }} className="sr-only" />
+            <input aria-label="Upload store logo image" type="file" accept={PRODUCT_IMAGE_ACCEPT} disabled={busy} onChange={event => { void upload('logo', event.target.files); event.currentTarget.value = ''; }} className="sr-only" />
           </label>
         </div>
       </div>
-      <p className="text-[11px] text-neutral-500">JPEG, PNG or WebP. Vibe4You prepares the image automatically before upload.</p>
+      <p className="text-[11px] text-neutral-500">JPEG, PNG, WebP, HEIC or HEIF. Vibe4You prepares the image automatically before upload, including iPhone photos supported by the browser.</p>
       <div className="flex justify-end">
         <button type="button" onClick={() => void save()} disabled={busy} className="inline-flex items-center gap-2 rounded-xl bg-neutral-950 px-5 py-2.5 text-xs font-black text-white disabled:opacity-60 dark:bg-lime-400 dark:text-neutral-950"><Save className="w-4" /> {saving ? 'Saving…' : 'Save Store Branding'}</button>
       </div>
