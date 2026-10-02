@@ -158,7 +158,7 @@ function formDialog(title, fields, submitLabel='Continue') {
           visibleSizes.forEach((size,sizeIndex)=>{const row=document.createElement('div');row.className='variant-size-row';const [stockLabel,stockInput]=makeInput('Stock',String(size.inventory),'number');stockInput.min='0';stockInput.step='1';stockInput.oninput=()=>size.inventory=Number(stockInput.value);if(usesSize){const [sizeLabel,sizeInput]=makeInput(mode==='size'?'Size / volume':'Size',size.size);sizeInput.oninput=()=>size.size=sizeInput.value;row.append(sizeLabel,stockLabel);}else row.append(stockLabel);if(usesSize&&colour.sizes.length>1){const remove=document.createElement('button');remove.type='button';remove.className='danger';remove.textContent='Remove size';remove.onclick=()=>{colour.sizes.splice(sizeIndex,1);render();};row.appendChild(remove);}sizes.appendChild(row);});card.appendChild(sizes);
           if(usesSize){const addSize=document.createElement('button');addSize.type='button';addSize.className='secondary';addSize.textContent='+ Add size / volume';addSize.onclick=()=>{colour.sizes.push({size:'',inventory:0});render();};card.appendChild(addSize);}
           const images=document.createElement('div');images.className='image-tiles';colour.imageUrls.forEach((url,imageIndex)=>images.appendChild(tile(url,`Existing image ${imageIndex+1}`,()=>{colour.imageUrls.splice(imageIndex,1);render();},url.startsWith('/media/product-images/'))));colour.pendingFiles.forEach((entry,imageIndex)=>images.appendChild(tile(entry.preview,`Pending image ${imageIndex+1}`,()=>{colour.pendingFiles.splice(imageIndex,1);render();},true)));card.appendChild(images);
-          const uploadLabel=document.createElement('label');uploadLabel.textContent='Choose product images from this PC';const upload=document.createElement('input');upload.type='file';upload.accept='image/jpeg,image/png,image/webp';upload.multiple=true;upload.onchange=async()=>{try{await queueColourFiles(colour,upload.files);render();}catch(cause){byId('admin-dialog-error').textContent=cause.message;}finally{upload.value='';}};uploadLabel.appendChild(upload);card.appendChild(uploadLabel);
+          const uploadLabel=document.createElement('label');uploadLabel.textContent='Choose product images from this PC';const upload=document.createElement('input');upload.type='file';upload.accept=ADMIN_IMAGE_ACCEPT;upload.multiple=true;upload.onchange=async()=>{try{await queueColourFiles(colour,upload.files);render();}catch(cause){byId('admin-dialog-error').textContent=cause.message;}finally{upload.value='';}};uploadLabel.appendChild(upload);card.appendChild(uploadLabel);
           const [urlsLabel,urls]=makeInput('HTTPS image URLs (optional fallback)',colour.httpsDraft,'textarea');urls.oninput=()=>colour.httpsDraft=urls.value;card.appendChild(urlsLabel);
           if(usesColour&&colours.length>1){const removeColour=document.createElement('button');removeColour.type='button';removeColour.className='danger';removeColour.textContent='Remove colour / shade';removeColour.onclick=()=>{colours.splice(index,1);render();};card.appendChild(removeColour);}cards.appendChild(card);
         });};
@@ -200,10 +200,19 @@ function formDialog(title, fields, submitLabel='Continue') {
   });
 }
 
-const ADMIN_IMAGE_TYPES=new Set(['image/jpeg','image/png','image/webp']);
+const ADMIN_IMAGE_TYPES=new Set(['image/jpeg','image/png','image/webp','image/heic','image/heif']);
+const ADMIN_IMAGE_ACCEPT='image/jpeg,image/png,image/webp,image/heic,image/heif,.heic,.heif';
+const ADMIN_IMAGE_TARGET_BYTES=450*1024;
+const ADMIN_IMAGE_MAX_BYTES=500*1024;
+function adminImageType(file){
+  const direct=String(file?.type||'').trim().toLowerCase();
+  if(direct)return direct;
+  const extension=String(file?.name||'').split('.').pop()?.toLowerCase()||'';
+  return ({jpg:'image/jpeg',jpeg:'image/jpeg',png:'image/png',webp:'image/webp',heic:'image/heic',heif:'image/heif'})[extension]||'';
+}
 function validateAdminImageFile(file,prefix=''){
   if(!(file instanceof File)||file.size<=0)throw new Error(`${prefix}Invalid image file.`);
-  if(!ADMIN_IMAGE_TYPES.has(file.type))throw new Error(`${prefix}Unsupported image type. Choose JPG, PNG or WebP.`);
+  if(!ADMIN_IMAGE_TYPES.has(adminImageType(file)))throw new Error(`${prefix}Unsupported image type. Choose JPG, PNG, WebP, HEIC or HEIF.`);
   if(file.size>12*1024*1024)throw new Error(`${prefix}Image exceeds maximum allowed size of 12 MB before optimization.`);
 }
 function attachImagePreview(control,root){
@@ -212,11 +221,58 @@ function attachImagePreview(control,root){
     const meta=document.createElement('span');meta.className='image-preview-meta';meta.textContent=`${file.name} - ${Math.max(1,Math.round(file.size/1024))} KB`;const remove=document.createElement('button');remove.type='button';remove.className='image-preview-remove';remove.textContent='Remove';remove.onclick=event=>{event.preventDefault();event.stopPropagation();const transfer=new DataTransfer();Array.from(control.files||[]).forEach((candidate,candidateIndex)=>{if(candidateIndex!==index)transfer.items.add(candidate);});control.files=transfer.files;render();};card.append(image,meta,remove);root.appendChild(card);
   }};control.addEventListener('change',render);render();
 }
+async function decodeAdminImage(file){
+  if(typeof createImageBitmap==='function'){
+    try{
+      const bitmap=await createImageBitmap(file,{imageOrientation:'from-image'});
+      return {source:bitmap,width:bitmap.width,height:bitmap.height,close:()=>bitmap.close?.()};
+    }catch{}
+  }
+  const dataUrl=await new Promise((resolve,reject)=>{
+    const reader=new FileReader();
+    reader.onload=()=>typeof reader.result==='string'?resolve(reader.result):reject(new Error('Image decode failed.'));
+    reader.onerror=()=>reject(new Error('Image decode failed.'));
+    reader.readAsDataURL(file);
+  });
+  const image=await new Promise((resolve,reject)=>{
+    const candidate=new Image();
+    candidate.onload=()=>resolve(candidate);
+    candidate.onerror=()=>reject(new Error('Image decode failed.'));
+    candidate.src=dataUrl;
+  });
+  const width=image.naturalWidth||image.width;
+  const height=image.naturalHeight||image.height;
+  if(!width||!height)throw new Error('Image decode failed.');
+  return {source:image,width,height,close:()=>{}};
+}
 async function prepareAdminProductImage(file){
-  validateAdminImageFile(file);let bitmap;try{bitmap=await createImageBitmap(file,{imageOrientation:'from-image'});}catch{throw new Error(`Image ${file.name} could not be decoded.`);}
-  try{const fit=max=>{const scale=Math.min(1,max/Math.max(bitmap.width,bitmap.height));return {width:Math.max(1,Math.round(bitmap.width*scale)),height:Math.max(1,Math.round(bitmap.height*scale))};};let size=fit(1600);let canvas=document.createElement('canvas');canvas.width=size.width;canvas.height=size.height;canvas.getContext('2d').drawImage(bitmap,0,0,size.width,size.height);
-    const make=q=>new Promise((resolve,reject)=>canvas.toBlob(blob=>blob?resolve(blob):reject(new Error('Image compression failed.')),'image/webp',q));let blob=await make(.82);for(const q of [.72,.62,.52]){if(blob.size<=350*1024)break;blob=await make(q);}if(blob.size>500*1024){size=fit(1200);canvas=document.createElement('canvas');canvas.width=size.width;canvas.height=size.height;canvas.getContext('2d').drawImage(bitmap,0,0,size.width,size.height);blob=await new Promise((resolve,reject)=>canvas.toBlob(b=>b?resolve(b):reject(new Error('Image compression failed.')),'image/webp',.62));}if(blob.size>500*1024)throw new Error('Image is still too large after compression.');return blob;
-  }finally{bitmap.close();}
+  validateAdminImageFile(file);
+  let decoded;
+  try{decoded=await decodeAdminImage(file);}catch{throw new Error(`Image ${file.name} could not be decoded. On iPhone, choose it from Photos or export it as JPEG.`);}
+  try{
+    const fit=max=>{const scale=Math.min(1,max/Math.max(decoded.width,decoded.height));return {width:Math.max(1,Math.round(decoded.width*scale)),height:Math.max(1,Math.round(decoded.height*scale))};};
+    const render=max=>{const size=fit(max);const canvas=document.createElement('canvas');canvas.width=size.width;canvas.height=size.height;const context=canvas.getContext('2d');if(!context)throw new Error('Image compression failed.');context.drawImage(decoded.source,0,0,size.width,size.height);return canvas;};
+    const make=(canvas,quality)=>new Promise((resolve,reject)=>canvas.toBlob(blob=>blob?resolve(blob):reject(new Error('Image compression failed.')),'image/webp',quality));
+    const profiles=[
+      [1600,[.82,.72,.62,.52]],
+      [1400,[.62,.52,.44]],
+      [1200,[.56,.48,.40]],
+      [1000,[.50,.42,.34]],
+      [800,[.46,.38,.30]],
+      [640,[.42,.34,.28]],
+    ];
+    let smallest=null;
+    for(const [max,qualities] of profiles){
+      const canvas=render(max);
+      for(const quality of qualities){
+        const blob=await make(canvas,quality);
+        if(!smallest||blob.size<smallest.size)smallest=blob;
+        if(blob.size<=ADMIN_IMAGE_TARGET_BYTES)return blob;
+      }
+    }
+    if(smallest&&smallest.size<=ADMIN_IMAGE_MAX_BYTES)return smallest;
+    throw new Error('Image is still too large after compression.');
+  }finally{decoded?.close?.();}
 }
 async function blobBase64(blob){const bytes=new Uint8Array(await blob.arrayBuffer());let binary='';for(let i=0;i<bytes.length;i+=0x8000)binary+=String.fromCharCode(...bytes.subarray(i,i+0x8000));return btoa(binary);}
 async function uploadAdminProductImages(files,progressOffset=0,progressTotal=null){const urls=[];const total=progressTotal??files.length;for(const [index,file] of (files||[]).entries()){validateAdminImageFile(file);status(`Uploading ${file.name} (${progressOffset+index+1} of ${total})...`);const blob=await prepareAdminProductImage(file);const result=await api('/api/admin/product-images',{method:'POST',body:JSON.stringify({fileName:`${file.name.replace(/\.[^.]+$/,'').slice(0,80)||'product'}.webp`,contentType:'image/webp',dataBase64:await blobBase64(blob)})});urls.push(result.image.url);}return urls;}
@@ -259,8 +315,8 @@ async function createLocalStore(){
     {name:'state',label:'State',required:true,value:'Madhya Pradesh',maxLength:80},
     {name:'pincode',label:'Pincode',required:true,value:'458441',maxLength:6},
     {name:'businessInformation',label:'Business information (optional)',type:'textarea',maxLength:1000},
-    {name:'bannerUpload',label:'Store cover image (optional)',type:'file',accept:'image/jpeg,image/png,image/webp'},
-    {name:'logoUpload',label:'Store logo (optional)',type:'file',accept:'image/jpeg,image/png,image/webp'},
+    {name:'bannerUpload',label:'Store cover image (optional)',type:'file',accept:ADMIN_IMAGE_ACCEPT},
+    {name:'logoUpload',label:'Store logo (optional)',type:'file',accept:ADMIN_IMAGE_ACCEPT},
   ],'Create and activate store'); if(!values)return;
   const payload={ownerUserId:values.ownerUserId,shopName:values.shopName,ownerName:values.ownerName,category:values.category,description:values.description,address:values.address,city:values.city,state:values.state,pincode:values.pincode,businessInformation:values.businessInformation||undefined};
   if(values.bannerUpload instanceof File&&values.bannerUpload.size){payload.bannerImage=(await uploadAdminProductImages([values.bannerUpload]))[0];}
@@ -288,8 +344,8 @@ async function editStore(button){
     {name:'state',label:'State',required:true,value:item.state||'Madhya Pradesh',maxLength:80},
     {name:'pincode',label:'Pincode',required:true,value:item.pincode||'458441',maxLength:6},
     {name:'businessInformation',label:'Business information (optional)',type:'textarea',value:item.businessInformation||'',maxLength:1000},
-    {name:'bannerUpload',label:'Replace store cover (optional)',type:'file',accept:'image/jpeg,image/png,image/webp'},
-    {name:'logoUpload',label:'Replace store logo (optional)',type:'file',accept:'image/jpeg,image/png,image/webp'},
+    {name:'bannerUpload',label:'Replace store cover (optional)',type:'file',accept:ADMIN_IMAGE_ACCEPT},
+    {name:'logoUpload',label:'Replace store logo (optional)',type:'file',accept:ADMIN_IMAGE_ACCEPT},
   ],'Save Store Changes'); if(!values)return;
   const payload={shopName:values.shopName,ownerName:values.ownerName,category:values.category,description:values.description,address:values.address,city:values.city,state:values.state,pincode:values.pincode,businessInformation:values.businessInformation||undefined};
   if(values.bannerUpload instanceof File&&values.bannerUpload.size){payload.bannerImage=(await uploadAdminProductImages([values.bannerUpload]))[0];}
@@ -328,7 +384,7 @@ async function bulkUploadStoreProducts(){
   const values=await formDialog('Bulk upload products',[
     {name:'applicationId',label:'Publish products for',type:'select',required:true,options:applications.map(item=>({value:item.id,label:`${item.shopName} - ${item.ownerName}`}))},
     {name:'csv',label:'Product CSV',type:'file',accept:'.csv,text/csv',required:true,help:'Use imageFile values such as product1.jpg. Keep deliveryType as normal; the site automatically offers Normal Mon-Fri and Normal + Express Sat-Sun for every product.'},
-    {name:'imageFiles',label:'Select the local product images referenced by the CSV',type:'file',accept:'image/jpeg,image/png,image/webp',multiple:true,previewImages:true,help:'Filenames are matched exactly to imageFile. Images upload automatically before products are published.'},
+    {name:'imageFiles',label:'Select the local product images referenced by the CSV',type:'file',accept:ADMIN_IMAGE_ACCEPT,multiple:true,previewImages:true,help:'Filenames are matched exactly to imageFile. Images upload automatically before products are published.'},
   ],'Review import');if(!values)return;
   const csvFile=values.csv;if(!(csvFile instanceof File)||!csvFile.size)throw new Error('Choose a CSV file.');if(csvFile.size>1024*1024)throw new Error('CSV must be 1 MB or smaller.');const csvText=await csvFile.text();const plan=csvImageRequirements(csvText);const selected=selectedImageMap(values.imageFiles||[]);const requiredFiles=new Map();
   for(const requirement of plan.requirements){const file=selected.get(requirement.fileName);if(!file)throw new Error(`Row ${requirement.row}: Image file "${requirement.fileName}" was not selected.`);validateAdminImageFile(file,`Row ${requirement.row}: `);requiredFiles.set(requirement.fileName,file);}
