@@ -12,6 +12,7 @@ let adminFilters = {
   vendors:{status:'all',category:'all'},
   'shop-products':{status:'all',category:'all'},
   'shop-product-requests':{status:'all',action:'all'},
+  'outside-delivery':{status:'all'},
   inventory:{stock:'all',category:'all',department:'all',shop:'all',brand:'all'},
   customers:{status:'all'},
   'payment-alerts':{status:'all',type:'all'},
@@ -158,7 +159,7 @@ function formDialog(title, fields, submitLabel='Continue') {
           visibleSizes.forEach((size,sizeIndex)=>{const row=document.createElement('div');row.className='variant-size-row';const [stockLabel,stockInput]=makeInput('Stock',String(size.inventory),'number');stockInput.min='0';stockInput.step='1';stockInput.oninput=()=>size.inventory=Number(stockInput.value);if(usesSize){const [sizeLabel,sizeInput]=makeInput(mode==='size'?'Size / volume':'Size',size.size);sizeInput.oninput=()=>size.size=sizeInput.value;row.append(sizeLabel,stockLabel);}else row.append(stockLabel);if(usesSize&&colour.sizes.length>1){const remove=document.createElement('button');remove.type='button';remove.className='danger';remove.textContent='Remove size';remove.onclick=()=>{colour.sizes.splice(sizeIndex,1);render();};row.appendChild(remove);}sizes.appendChild(row);});card.appendChild(sizes);
           if(usesSize){const addSize=document.createElement('button');addSize.type='button';addSize.className='secondary';addSize.textContent='+ Add size / volume';addSize.onclick=()=>{colour.sizes.push({size:'',inventory:0});render();};card.appendChild(addSize);}
           const images=document.createElement('div');images.className='image-tiles';colour.imageUrls.forEach((url,imageIndex)=>images.appendChild(tile(url,`Existing image ${imageIndex+1}`,()=>{colour.imageUrls.splice(imageIndex,1);render();},url.startsWith('/media/product-images/'))));colour.pendingFiles.forEach((entry,imageIndex)=>images.appendChild(tile(entry.preview,`Pending image ${imageIndex+1}`,()=>{colour.pendingFiles.splice(imageIndex,1);render();},true)));card.appendChild(images);
-          const uploadLabel=document.createElement('label');uploadLabel.textContent='Choose product images from this PC';const upload=document.createElement('input');upload.type='file';upload.accept='image/jpeg,image/png,image/webp';upload.multiple=true;upload.onchange=async()=>{try{await queueColourFiles(colour,upload.files);render();}catch(cause){byId('admin-dialog-error').textContent=cause.message;}finally{upload.value='';}};uploadLabel.appendChild(upload);card.appendChild(uploadLabel);
+          const uploadLabel=document.createElement('label');uploadLabel.textContent='Choose product images from this PC';const upload=document.createElement('input');upload.type='file';upload.accept=ADMIN_IMAGE_ACCEPT;upload.multiple=true;upload.onchange=async()=>{try{await queueColourFiles(colour,upload.files);render();}catch(cause){byId('admin-dialog-error').textContent=cause.message;}finally{upload.value='';}};uploadLabel.appendChild(upload);card.appendChild(uploadLabel);
           const [urlsLabel,urls]=makeInput('HTTPS image URLs (optional fallback)',colour.httpsDraft,'textarea');urls.oninput=()=>colour.httpsDraft=urls.value;card.appendChild(urlsLabel);
           if(usesColour&&colours.length>1){const removeColour=document.createElement('button');removeColour.type='button';removeColour.className='danger';removeColour.textContent='Remove colour / shade';removeColour.onclick=()=>{colours.splice(index,1);render();};card.appendChild(removeColour);}cards.appendChild(card);
         });};
@@ -200,10 +201,19 @@ function formDialog(title, fields, submitLabel='Continue') {
   });
 }
 
-const ADMIN_IMAGE_TYPES=new Set(['image/jpeg','image/png','image/webp']);
+const ADMIN_IMAGE_TYPES=new Set(['image/jpeg','image/png','image/webp','image/heic','image/heif']);
+const ADMIN_IMAGE_ACCEPT='image/jpeg,image/png,image/webp,image/heic,image/heif,.heic,.heif';
+const ADMIN_IMAGE_TARGET_BYTES=450*1024;
+const ADMIN_IMAGE_MAX_BYTES=500*1024;
+function adminImageType(file){
+  const direct=String(file?.type||'').trim().toLowerCase();
+  if(direct)return direct;
+  const extension=String(file?.name||'').split('.').pop()?.toLowerCase()||'';
+  return ({jpg:'image/jpeg',jpeg:'image/jpeg',png:'image/png',webp:'image/webp',heic:'image/heic',heif:'image/heif'})[extension]||'';
+}
 function validateAdminImageFile(file,prefix=''){
   if(!(file instanceof File)||file.size<=0)throw new Error(`${prefix}Invalid image file.`);
-  if(!ADMIN_IMAGE_TYPES.has(file.type))throw new Error(`${prefix}Unsupported image type. Choose JPG, PNG or WebP.`);
+  if(!ADMIN_IMAGE_TYPES.has(adminImageType(file)))throw new Error(`${prefix}Unsupported image type. Choose JPG, PNG, WebP, HEIC or HEIF.`);
   if(file.size>12*1024*1024)throw new Error(`${prefix}Image exceeds maximum allowed size of 12 MB before optimization.`);
 }
 function attachImagePreview(control,root){
@@ -212,14 +222,72 @@ function attachImagePreview(control,root){
     const meta=document.createElement('span');meta.className='image-preview-meta';meta.textContent=`${file.name} - ${Math.max(1,Math.round(file.size/1024))} KB`;const remove=document.createElement('button');remove.type='button';remove.className='image-preview-remove';remove.textContent='Remove';remove.onclick=event=>{event.preventDefault();event.stopPropagation();const transfer=new DataTransfer();Array.from(control.files||[]).forEach((candidate,candidateIndex)=>{if(candidateIndex!==index)transfer.items.add(candidate);});control.files=transfer.files;render();};card.append(image,meta,remove);root.appendChild(card);
   }};control.addEventListener('change',render);render();
 }
+async function decodeAdminImage(file){
+  if(typeof createImageBitmap==='function'){
+    try{
+      const bitmap=await createImageBitmap(file,{imageOrientation:'from-image'});
+      return {source:bitmap,width:bitmap.width,height:bitmap.height,close:()=>bitmap.close?.()};
+    }catch{}
+  }
+  const dataUrl=await new Promise((resolve,reject)=>{
+    const reader=new FileReader();
+    reader.onload=()=>typeof reader.result==='string'?resolve(reader.result):reject(new Error('Image decode failed.'));
+    reader.onerror=()=>reject(new Error('Image decode failed.'));
+    reader.readAsDataURL(file);
+  });
+  const image=await new Promise((resolve,reject)=>{
+    const candidate=new Image();
+    candidate.onload=()=>resolve(candidate);
+    candidate.onerror=()=>reject(new Error('Image decode failed.'));
+    candidate.src=dataUrl;
+  });
+  const width=image.naturalWidth||image.width;
+  const height=image.naturalHeight||image.height;
+  if(!width||!height)throw new Error('Image decode failed.');
+  return {source:image,width,height,close:()=>{}};
+}
 async function prepareAdminProductImage(file){
-  validateAdminImageFile(file);let bitmap;try{bitmap=await createImageBitmap(file,{imageOrientation:'from-image'});}catch{throw new Error(`Image ${file.name} could not be decoded.`);}
-  try{const fit=max=>{const scale=Math.min(1,max/Math.max(bitmap.width,bitmap.height));return {width:Math.max(1,Math.round(bitmap.width*scale)),height:Math.max(1,Math.round(bitmap.height*scale))};};let size=fit(1600);let canvas=document.createElement('canvas');canvas.width=size.width;canvas.height=size.height;canvas.getContext('2d').drawImage(bitmap,0,0,size.width,size.height);
-    const make=q=>new Promise((resolve,reject)=>canvas.toBlob(blob=>blob?resolve(blob):reject(new Error('Image compression failed.')),'image/webp',q));let blob=await make(.82);for(const q of [.72,.62,.52]){if(blob.size<=350*1024)break;blob=await make(q);}if(blob.size>500*1024){size=fit(1200);canvas=document.createElement('canvas');canvas.width=size.width;canvas.height=size.height;canvas.getContext('2d').drawImage(bitmap,0,0,size.width,size.height);blob=await new Promise((resolve,reject)=>canvas.toBlob(b=>b?resolve(b):reject(new Error('Image compression failed.')),'image/webp',.62));}if(blob.size>500*1024)throw new Error('Image is still too large after compression.');return blob;
-  }finally{bitmap.close();}
+  validateAdminImageFile(file);
+  let decoded;
+  try{decoded=await decodeAdminImage(file);}catch{throw new Error(`Image ${file.name} could not be decoded. On iPhone, choose it from Photos or export it as JPEG.`);}
+  try{
+    const fit=max=>{const scale=Math.min(1,max/Math.max(decoded.width,decoded.height));return {width:Math.max(1,Math.round(decoded.width*scale)),height:Math.max(1,Math.round(decoded.height*scale))};};
+    const render=max=>{const size=fit(max);const canvas=document.createElement('canvas');canvas.width=size.width;canvas.height=size.height;const context=canvas.getContext('2d');if(!context)throw new Error('Image compression failed.');context.drawImage(decoded.source,0,0,size.width,size.height);return canvas;};
+    const make=(canvas,quality)=>new Promise((resolve,reject)=>canvas.toBlob(blob=>blob?resolve(blob):reject(new Error('Image compression failed.')),'image/webp',quality));
+    const profiles=[
+      [1600,[.82,.72,.62,.52]],
+      [1400,[.62,.52,.44]],
+      [1200,[.56,.48,.40]],
+      [1000,[.50,.42,.34]],
+      [800,[.46,.38,.30]],
+      [640,[.42,.34,.28]],
+    ];
+    let smallest=null;
+    for(const [max,qualities] of profiles){
+      const canvas=render(max);
+      for(const quality of qualities){
+        const blob=await make(canvas,quality);
+        if(!smallest||blob.size<smallest.size)smallest=blob;
+        if(blob.size<=ADMIN_IMAGE_TARGET_BYTES)return blob;
+      }
+    }
+    if(smallest&&smallest.size<=ADMIN_IMAGE_MAX_BYTES)return smallest;
+    throw new Error('Image is still too large after compression.');
+  }finally{decoded?.close?.();}
+}
+async function adminEncodedImageType(blob){
+  const bytes=new Uint8Array(await blob.slice(0,16).arrayBuffer());
+  if(bytes.length>=12&&bytes[0]===0x52&&bytes[1]===0x49&&bytes[2]===0x46&&bytes[3]===0x46&&bytes[8]===0x57&&bytes[9]===0x45&&bytes[10]===0x42&&bytes[11]===0x50)return {contentType:'image/webp',extension:'webp'};
+  if(bytes.length>=3&&bytes[0]===0xff&&bytes[1]===0xd8&&bytes[2]===0xff)return {contentType:'image/jpeg',extension:'jpg'};
+  if(bytes.length>=8&&bytes[0]===0x89&&bytes[1]===0x50&&bytes[2]===0x4e&&bytes[3]===0x47&&bytes[4]===0x0d&&bytes[5]===0x0a&&bytes[6]===0x1a&&bytes[7]===0x0a)return {contentType:'image/png',extension:'png'};
+  throw new Error('Optimized image format could not be verified.');
 }
 async function blobBase64(blob){const bytes=new Uint8Array(await blob.arrayBuffer());let binary='';for(let i=0;i<bytes.length;i+=0x8000)binary+=String.fromCharCode(...bytes.subarray(i,i+0x8000));return btoa(binary);}
-async function uploadAdminProductImages(files,progressOffset=0,progressTotal=null){const urls=[];const total=progressTotal??files.length;for(const [index,file] of (files||[]).entries()){validateAdminImageFile(file);status(`Uploading ${file.name} (${progressOffset+index+1} of ${total})...`);const blob=await prepareAdminProductImage(file);const result=await api('/api/admin/product-images',{method:'POST',body:JSON.stringify({fileName:`${file.name.replace(/\.[^.]+$/,'').slice(0,80)||'product'}.webp`,contentType:'image/webp',dataBase64:await blobBase64(blob)})});urls.push(result.image.url);}return urls;}
+async function adminImageUploadPayload(file,blob){
+  const encoded=await adminEncodedImageType(blob);
+  return {fileName:`${file.name.replace(/\.[^.]+$/,'').slice(0,80)||'product'}.${encoded.extension}`,contentType:encoded.contentType,dataBase64:await blobBase64(blob)};
+}
+async function uploadAdminProductImages(files,progressOffset=0,progressTotal=null){const urls=[];const total=progressTotal??files.length;for(const [index,file] of (files||[]).entries()){validateAdminImageFile(file);status(`Uploading ${file.name} (${progressOffset+index+1} of ${total})...`);const blob=await prepareAdminProductImage(file);const result=await api('/api/admin/product-images',{method:'POST',body:JSON.stringify(await adminImageUploadPayload(file,blob))});urls.push(result.image.url);}return urls;}
 
 function parseVariants(raw) {
   const rows=String(raw||'').split(',').map(value=>value.trim()).filter(Boolean).map(value=>{
@@ -259,8 +327,8 @@ async function createLocalStore(){
     {name:'state',label:'State',required:true,value:'Madhya Pradesh',maxLength:80},
     {name:'pincode',label:'Pincode',required:true,value:'458441',maxLength:6},
     {name:'businessInformation',label:'Business information (optional)',type:'textarea',maxLength:1000},
-    {name:'bannerUpload',label:'Store cover image (optional)',type:'file',accept:'image/jpeg,image/png,image/webp'},
-    {name:'logoUpload',label:'Store logo (optional)',type:'file',accept:'image/jpeg,image/png,image/webp'},
+    {name:'bannerUpload',label:'Store cover image (optional)',type:'file',accept:ADMIN_IMAGE_ACCEPT},
+    {name:'logoUpload',label:'Store logo (optional)',type:'file',accept:ADMIN_IMAGE_ACCEPT},
   ],'Create and activate store'); if(!values)return;
   const payload={ownerUserId:values.ownerUserId,shopName:values.shopName,ownerName:values.ownerName,category:values.category,description:values.description,address:values.address,city:values.city,state:values.state,pincode:values.pincode,businessInformation:values.businessInformation||undefined};
   if(values.bannerUpload instanceof File&&values.bannerUpload.size){payload.bannerImage=(await uploadAdminProductImages([values.bannerUpload]))[0];}
@@ -288,8 +356,8 @@ async function editStore(button){
     {name:'state',label:'State',required:true,value:item.state||'Madhya Pradesh',maxLength:80},
     {name:'pincode',label:'Pincode',required:true,value:item.pincode||'458441',maxLength:6},
     {name:'businessInformation',label:'Business information (optional)',type:'textarea',value:item.businessInformation||'',maxLength:1000},
-    {name:'bannerUpload',label:'Replace store cover (optional)',type:'file',accept:'image/jpeg,image/png,image/webp'},
-    {name:'logoUpload',label:'Replace store logo (optional)',type:'file',accept:'image/jpeg,image/png,image/webp'},
+    {name:'bannerUpload',label:'Replace store cover (optional)',type:'file',accept:ADMIN_IMAGE_ACCEPT},
+    {name:'logoUpload',label:'Replace store logo (optional)',type:'file',accept:ADMIN_IMAGE_ACCEPT},
   ],'Save Store Changes'); if(!values)return;
   const payload={shopName:values.shopName,ownerName:values.ownerName,category:values.category,description:values.description,address:values.address,city:values.city,state:values.state,pincode:values.pincode,businessInformation:values.businessInformation||undefined};
   if(values.bannerUpload instanceof File&&values.bannerUpload.size){payload.bannerImage=(await uploadAdminProductImages([values.bannerUpload]))[0];}
@@ -328,7 +396,7 @@ async function bulkUploadStoreProducts(){
   const values=await formDialog('Bulk upload products',[
     {name:'applicationId',label:'Publish products for',type:'select',required:true,options:applications.map(item=>({value:item.id,label:`${item.shopName} - ${item.ownerName}`}))},
     {name:'csv',label:'Product CSV',type:'file',accept:'.csv,text/csv',required:true,help:'Use imageFile values such as product1.jpg. Keep deliveryType as normal; the site automatically offers Normal Mon-Fri and Normal + Express Sat-Sun for every product.'},
-    {name:'imageFiles',label:'Select the local product images referenced by the CSV',type:'file',accept:'image/jpeg,image/png,image/webp',multiple:true,previewImages:true,help:'Filenames are matched exactly to imageFile. Images upload automatically before products are published.'},
+    {name:'imageFiles',label:'Select the local product images referenced by the CSV',type:'file',accept:ADMIN_IMAGE_ACCEPT,multiple:true,previewImages:true,help:'Filenames are matched exactly to imageFile. Images upload automatically before products are published.'},
   ],'Review import');if(!values)return;
   const csvFile=values.csv;if(!(csvFile instanceof File)||!csvFile.size)throw new Error('Choose a CSV file.');if(csvFile.size>1024*1024)throw new Error('CSV must be 1 MB or smaller.');const csvText=await csvFile.text();const plan=csvImageRequirements(csvText);const selected=selectedImageMap(values.imageFiles||[]);const requiredFiles=new Map();
   for(const requirement of plan.requirements){const file=selected.get(requirement.fileName);if(!file)throw new Error(`Row ${requirement.row}: Image file "${requirement.fileName}" was not selected.`);validateAdminImageFile(file,`Row ${requirement.row}: `);requiredFiles.set(requirement.fileName,file);}
@@ -396,6 +464,25 @@ async function cancellationReasonFor(){
   return details&&type!=='Other'?`${type}: ${details}`:(details||type);
 }
 async function inventoryAdjustment(){const values=await formDialog('Adjust inventory',[{name:'delta',label:'Stock adjustment (for example 5 or -2)',type:'number',required:true,step:'1'}],'Apply adjustment');if(!values)return null;const delta=Number(values.delta);if(!Number.isSafeInteger(delta))throw new Error('Enter a whole-number stock adjustment.');return delta;}
+async function quoteOutsideDelivery(request){
+  const current=request.quote||{};
+  const values=await formDialog('Send outside-Neemuch delivery quote',[
+    {name:'deliveryFee',label:'Delivery charge (Rs)',type:'number',required:true,min:1,max:10000,step:'1',value:current.deliveryFee??''},
+    {name:'estimatedDelivery',label:'Estimated delivery time',maxLength:120,value:current.estimatedDelivery||'',placeholder:'Example: 3-5 business days'},
+    {name:'note',label:'Message to customer (optional)',type:'textarea',maxLength:500,value:current.note||''},
+  ],'Send Payment Request');
+  if(!values)return false;
+  const fee=Number(values.deliveryFee);if(!Number.isFinite(fee)||fee<1||fee>10000)throw new Error('Enter a delivery charge between Rs 1 and Rs 10,000.');
+  await api(`/api/admin/outside-delivery-requests/${encodeURIComponent(request.id)}/quote`,{method:'PATCH',body:JSON.stringify({deliveryFee:fee,estimatedDelivery:String(values.estimatedDelivery||'').trim(),note:String(values.note||'').trim()})});
+  status('Delivery charge confirmed. The customer can now pay securely from Delivery Requests.');
+  return true;
+}
+async function rejectOutsideDelivery(request){
+  const reason=await reasonFor('Why can this outside-Neemuch delivery request not be fulfilled?');if(!reason)return false;
+  await api(`/api/admin/outside-delivery-requests/${encodeURIComponent(request.id)}/reject`,{method:'PATCH',body:JSON.stringify({reason})});
+  status('Outside delivery request rejected and the reason is visible to the customer.');
+  return true;
+}
 function bulkToolbar(resource,statuses){return `<div class="actions bulk-toolbar"><label class="bulk-select bulk-select-all"><input type="checkbox" id="bulk-select-all-${resource}" data-bulk-select-all="${resource}"> Select all</label><span><strong id="bulk-count-${resource}">0</strong> selected</span><select data-bulk-target="${resource}"><option value="">Bulk action...</option>${statuses.map(value=>`<option value="${value}">${escapeText(value.replaceAll('_',' '))}</option>`).join('')}</select><button data-action="bulk-transition" data-resource="${resource}">Apply once</button></div>`;}
 function syncBulkSelectionUi(resource){const boxes=[...byId('content').querySelectorAll(`[data-bulk-select="${resource}"]`)];const selected=boxes.filter(box=>box.checked).length;const count=byId(`bulk-count-${resource}`);if(count)count.textContent=String(selected);const selectAll=byId(`bulk-select-all-${resource}`);if(selectAll){selectAll.checked=boxes.length>0&&selected===boxes.length;selectAll.indeterminate=selected>0&&selected<boxes.length;selectAll.disabled=boxes.length===0;}}
 function addBulkControls(resource,statuses,selector){for(const key of [...bulkSelection])if(key.startsWith(`${resource}:`))bulkSelection.delete(key);const root=byId('content');root.querySelector('h2')?.insertAdjacentHTML('afterend',bulkToolbar(resource,statuses));const seen=new Set();root.querySelectorAll(selector).forEach(container=>{const id=resource==='orders'?container.querySelector('h3')?.textContent:container.querySelector('[data-id]')?.dataset.id;if(!id||seen.has(id))return;seen.add(id);container.insertAdjacentHTML('afterbegin',`<label class="bulk-select"><input type="checkbox" data-bulk-select="${resource}" value="${escapeText(id)}"> Select</label>`);});syncBulkSelectionUi(resource);}
@@ -501,6 +588,8 @@ byId('content').addEventListener('click', async event => {
     if(action==='bulk-shop-products') await bulkUploadStoreProducts();
     if(action==='download-product-template') downloadProductCsvTemplate();
     if(action==='edit-shop-product') await editStoreProduct(button);
+    if(action==='outside-delivery-quote'){const request=(window.__outsideDeliveryRequests||[]).find(item=>item.id===button.dataset.id);if(!request)throw new Error('Delivery request not found.');if(!await quoteOutsideDelivery(request))return;}
+    if(action==='outside-delivery-reject'){const request=(window.__outsideDeliveryRequests||[]).find(item=>item.id===button.dataset.id);if(!request)throw new Error('Delivery request not found.');if(!await rejectOutsideDelivery(request))return;}
     if(action==='mark-cod-paid') { const collectionMethod=await codCollectionMethodFor(); if(!collectionMethod)return; await api(`/api/admin/orders/${encodeURIComponent(button.dataset.id)}/payment`,{method:'PATCH',body:JSON.stringify({collectionMethod})}); status('COD payment marked paid after collection. Order confirmation remains separate.'); }
     if(action==='mark-try-home-late-fee-paid') { const collectionMethod=await lateFeeCollectionMethodFor(); if(!collectionMethod)return; await api(`/api/admin/orders/${encodeURIComponent(button.dataset.id)}/try-at-home-late-fee`,{method:'PATCH',body:JSON.stringify({collectionMethod})}); status('Try at Home late fee marked paid after collection.'); }
     if(action==='mark-cancellation-fee-paid') { const collectionMethod=await feeCollectionMethodFor('Collect cancellation fee'); if(!collectionMethod)return; await api(`/api/admin/orders/${encodeURIComponent(button.dataset.id)}/cancellation-fee`,{method:'PATCH',body:JSON.stringify({collectionMethod})}); status('Cancellation fee marked paid after collection.'); }
@@ -522,10 +611,11 @@ async function loadTab(tab) {
   error(''); byId('content').innerHTML='<p>Loading…</p>';
   try {
     const query=encodeURIComponent(byId('search').value.trim());
-    const searchLabels={orders:'orders, customers or products',vendors:'shops, owners or contact details','shop-products':'products, brands or shops','shop-product-requests':'products, shops or requests',inventory:'products, variants or sizes','store-reviews':'stores, customers or review text',customers:'customers, email or mobile','payment-alerts':'alerts, orders or payment references',audit:'audit actions, targets or results'};
+    const searchLabels={orders:'orders, customers or products','outside-delivery':'requests, products, stores or destinations',vendors:'shops, owners or contact details','shop-products':'products, brands or shops','shop-product-requests':'products, shops or requests',inventory:'products, variants or sizes','store-reviews':'stores, customers or review text',customers:'customers, email or mobile','payment-alerts':'alerts, orders or payment references',audit:'audit actions, targets or results'};
     if(searchLabels[tab])byId('search').placeholder=`Search ${searchLabels[tab]}`;
-    byId('search-form').hidden=!['orders','vendors','shop-products','shop-product-requests','inventory','store-reviews','customers','payment-alerts','audit'].includes(tab);
+    byId('search-form').hidden=!['orders','outside-delivery','vendors','shop-products','shop-product-requests','inventory','store-reviews','customers','payment-alerts','audit'].includes(tab);
     if(tab==='orders'){renderOrders((await api(`/api/admin/orders?q=${query}`)).orders);return;}
+    if(tab==='outside-delivery'){renderOutsideDeliveryRequests((await api('/api/admin/outside-delivery-requests')).requests);return;}
     if(tab==='vendors'){renderVendors((await api('/api/admin/vendors')).applications);addBulkControls('vendors',['UNDER_REVIEW','APPROVED','REJECTED','ACTIVE','SUSPENDED'],'.card');return;}
     if(tab==='shop-products'){
       const [productResult,vendorResult]=await Promise.all([api('/api/admin/shop-products'),api('/api/admin/vendors')]);
@@ -616,7 +706,7 @@ function renderShopProducts(items,applications=shopProductStores){
   const options=['<option value="all"'+(shopProductFilter==='all'?' selected':'')+'>All Shops</option>',...stores.map(store=>`<option value="${escapeText(store.id)}"${shopProductFilter===store.id?' selected':''}>${escapeText(store.name)}</option>`)].join('');
   const extra=[adminSelect('Status','status',items.map(item=>item.status),f.status),adminSelect('Category','category',items.map(item=>item.category),f.category)].join('');
   byId('content').innerHTML=`<h2>Shop product submissions</h2><div class="actions"><button class="success" data-action="create-shop-product">Add Product for Local Store</button><button class="success" data-action="bulk-shop-products">Bulk Upload CSV</button><button class="secondary" data-action="download-product-template">Download CSV Template</button></div><section class="order-filters" aria-label="Shop product filters"><label>Shop<select data-shop-product-filter>${options}</select></label>${extra}<div class="order-filter-summary"><span><strong>${filtered.length}</strong> of ${items.length} products</span></div></section><div class="grid">${filtered.map(item=>`<article class="card"><div class="inventory-product-heading">${inventoryThumbnail(item)}<div><h3>${escapeText(item.name)}</h3><small>${escapeText(storeMap.get(item.applicationId)||item.applicationId)} · ${escapeText(item.id)}</small></div></div><p>${escapeText(item.category)} | Store price Rs ${escapeText((item.pricePaise/100).toFixed(2))} | Customer price Rs ${escapeText(((item.customerPricePaise??item.pricePaise)/100).toFixed(2))} | Commission Rs ${escapeText(((item.commissionPaise??0)/100).toFixed(2))} | total stock ${escapeText(item.inventory)}</p>${item.tryAtHomeEnabled===true?'<p><strong>Try at Home enabled</strong> | two sizes | Rs 50 initial fee | 15-minute decision window</p>':''}<p>${(item.variants||[]).map(variant=>`${escapeText(variant.size)}: <strong>${escapeText(variant.inventory)}</strong>`).join(' · ')}</p><p class="muted">${escapeText(item.description)}</p>${item.rejectionReason?`<p class="error">${escapeText(item.rejectionReason)}</p>`:''}<strong>${escapeText(item.status)}</strong><div class="actions"><button data-action="edit-shop-product" data-id="${escapeText(item.id)}" data-name="${escapeText(item.name)}" data-description="${escapeText(item.description)}" data-price="${escapeText((item.pricePaise/100).toFixed(2))}" data-original="${escapeText((item.originalPricePaise/100).toFixed(2))}">Edit Details</button>${productTransitions(item.status).map(status=>`<button class="${status==='REJECTED'?'danger':'success'}" data-action="shop-product" data-id="${escapeText(item.id)}" data-value="${status}">${escapeText(status==='APPROVED'&&item.status==='PUBLISHED'?'UNPUBLISH':status.replaceAll('_',' '))}</button>`).join('')}</div></article>`).join('')||'<p>No products match the current search and filters.</p>'}</div>`;
-  byId('content').querySelectorAll('.card').forEach(card=>{const id=card.querySelector('[data-action="edit-shop-product"]')?.dataset.id;const item=filtered.find(product=>product.id===id);if(item?.exchangeAvailable===true)card.querySelector('h3')?.insertAdjacentHTML('afterend','<p><strong>Size exchange enabled</strong> | Rs 50 fee</p>');});
+  byId('content').querySelectorAll('.card').forEach(card=>{const id=card.querySelector('[data-action="edit-shop-product"]')?.dataset.id;const item=filtered.find(product=>product.id===id);const heading=card.querySelector('h3');if(item?.exchangeAvailable===true)heading?.insertAdjacentHTML('afterend','<p><strong>Size exchange enabled</strong> | Rs 50 fee</p>');if(item?.outsideNeemuchDeliveryEnabled===true)heading?.insertAdjacentHTML('afterend','<p><strong>Outside Neemuch delivery requests enabled</strong></p>');});
 }
 function renderShopProductRequests(items){
   const all=Array.isArray(items)?items:[]; const f=adminFilters['shop-product-requests'];
@@ -651,6 +741,13 @@ function renderCustomers(items){
   const filtered=all.filter(item=>matchesAdminSearch(item,['name','email','phone','id'])&&(f.status==='all'||(f.status==='active'&&item.is_active)||(f.status==='disabled'&&!item.is_active)));
   const controls=[`<label>Status<select data-admin-filter="status"><option value="all"${f.status==='all'?' selected':''}>All</option><option value="active"${f.status==='active'?' selected':''}>Active</option><option value="disabled"${f.status==='disabled'?' selected':''}>Disabled</option></select></label>`];
   byId('content').innerHTML=`<h2>Customers</h2><div class="actions"><button class="success" data-action="create-owner">Create Store Owner Account</button></div>${adminFilterBar('Customer filters',controls,filtered.length,all.length)}<table><thead><tr><th>Customer</th><th>Contact</th><th>Status</th><th>Action</th></tr></thead><tbody>${filtered.map(item=>`<tr><td>${escapeText(item.name)}<br><small>${escapeText(item.id)}</small></td><td>${escapeText(item.email)}<br>${escapeText(item.phone)}</td><td>${item.is_active?'Active':'Disabled'}</td><td><div class="actions"><button data-action="reset-customer-password" data-id="${escapeText(item.id)}">Reset Password</button><button class="${item.is_active?'danger':'success'}" data-action="customer" data-id="${escapeText(item.id)}" data-value="${item.is_active?'false':'true'}">${item.is_active?'Disable':'Enable'}</button></div></td></tr>`).join('')}</tbody></table>${filtered.length?'':'<p>No customers match the current search and filters.</p>'}`;
+}
+function renderOutsideDeliveryRequests(items){
+  const all=Array.isArray(items)?items:[];window.__outsideDeliveryRequests=all;const f=adminFilters['outside-delivery'];
+  const filtered=all.filter(item=>{const address=item.address||{};const enriched={...item,destination:[address.name,address.phone,address.street,address.city,address.state,address.pincode].filter(Boolean).join(' ')};return matchesAdminSearch(enriched,['id','productName','storeName','status','destination','orderId'])&&(f.status==='all'||item.status===f.status);});
+  const controls=[adminSelect('Status','status',all.map(item=>item.status),f.status)];
+  const cards=filtered.map(item=>{const address=item.address||{},quote=item.quote||{};const canQuote=['requested','quoted'].includes(item.status);const canReject=['requested','quoted'].includes(item.status);const quoteBlock=item.quote?`<div class="facts"><div class="fact"><small>Product subtotal</small><strong>Rs ${escapeText(quote.productSubtotal)}</strong></div><div class="fact"><small>Delivery charge</small><strong>Rs ${escapeText(quote.deliveryFee)}</strong></div><div class="fact"><small>Payment request</small><strong>Rs ${escapeText(quote.grandTotal)}</strong></div><div class="fact"><small>Delivery estimate</small><strong>${escapeText(quote.estimatedDelivery||'Not specified')}</strong></div></div>${quote.note?`<p class="muted"><strong>Customer message:</strong> ${escapeText(quote.note)}</p>`:''}`:`<p class="muted">Product subtotal: Rs ${escapeText(item.productSubtotal)}. Enter the courier/delivery charge before the customer can pay.</p>`;const actions=[canQuote?`<button class="success" data-action="outside-delivery-quote" data-id="${escapeText(item.id)}">${item.status==='quoted'?'Update Quote':'Quote Delivery & Send Payment Request'}</button>`:'',canReject?`<button class="danger" data-action="outside-delivery-reject" data-id="${escapeText(item.id)}">Reject</button>`:''].join('');return `<article class="card"><div class="order-heading"><div><small>Delivery request</small><h3>${escapeText(item.id)}</h3><span class="muted">${escapeText(item.createdAt||'')}</span></div><div class="order-heading-status">${statusBadge(item.status)}${item.quote?`<strong>Rs ${escapeText(item.quote.grandTotal)}</strong>`:''}</div></div><p><strong>${escapeText(item.productName)}</strong> · ${escapeText(item.size||'')} ${item.colourName?`· ${escapeText(item.colourName)}`:''} · Qty ${escapeText(item.quantity)}</p><p class="muted">Store: ${escapeText(item.storeName||item.storeId||'-')}</p><div class="order-customer"><div><small>Customer</small><strong>${escapeText(address.name||'-')}</strong><span>${escapeText(address.phone||'-')}</span></div><div><small>Outside delivery address</small><strong>${escapeText(address.street||'-')}</strong><span>${escapeText([address.city,address.state,address.pincode].filter(Boolean).join(', '))}</span></div><div><small>Linked order</small><strong>${escapeText(item.orderId||'Not paid yet')}</strong><span>${item.paidAt?`Paid ${escapeText(item.paidAt)}`:'Waiting for payment / quote'}</span></div></div>${quoteBlock}${item.rejectionReason?`<p class="error"><strong>Rejected:</strong> ${escapeText(item.rejectionReason)}</p>`:''}${actions?`<div class="actions">${actions}</div>`:''}</article>`;}).join('');
+  byId('content').innerHTML=`<h2>Outside Neemuch delivery requests</h2><p class="muted">Only products whose shop owner opted in appear here. Confirm the actual delivery charge, then the customer receives a secure payment action for product + delivery.</p>${adminFilterBar('Outside delivery request filters',controls,filtered.length,all.length)}<div class="grid">${cards||'<p>No outside-Neemuch delivery requests match the current search and filters.</p>'}</div>`;
 }
 function renderPaymentAlerts(items){
   const all=Array.isArray(items)?items:[]; const f=adminFilters['payment-alerts'];

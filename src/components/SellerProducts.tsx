@@ -61,6 +61,7 @@ export interface ProductFormState {
   material: string;
   tryAtHomeEnabled: boolean;
   exchangeAvailable: boolean;
+  outsideNeemuchDeliveryEnabled: boolean;
 }
 
 const EMPTY_COLOUR: ColourFormState = {
@@ -71,6 +72,7 @@ const EMPTY_COLOUR: ColourFormState = {
 const EMPTY_FORM: ProductFormState = {
   name: '', description: '', brand: '', department: 'unisex', category: CATEGORIES[0], subcategory: '', deliveryType: 'normal',
   price: '', originalPrice: '', colours: [EMPTY_COLOUR], material: '', tryAtHomeEnabled: false, exchangeAvailable: false,
+  outsideNeemuchDeliveryEnabled: false,
 };
 
 const colourToForm = (
@@ -117,6 +119,7 @@ const toForm = (product: SellerProduct): ProductFormState => {
     material: product.attributes.material || '',
     tryAtHomeEnabled: product.tryAtHomeEnabled === true,
     exchangeAvailable: product.exchangeAvailable === true,
+    outsideNeemuchDeliveryEnabled: product.outsideNeemuchDeliveryEnabled === true,
   };
 };
 
@@ -193,6 +196,7 @@ export const toPayload = (form: ProductFormState): SellerProductDraft => {
     attributes: (form.material.trim() ? { material: form.material.trim() } : {}) as Record<string, string>,
     tryAtHomeEnabled: form.tryAtHomeEnabled,
     exchangeAvailable: form.exchangeAvailable,
+    outsideNeemuchDeliveryEnabled: form.outsideNeemuchDeliveryEnabled,
   };
   const [first] = colours;
   if (colours.length === 1) {
@@ -236,6 +240,7 @@ const toChangePayload = (payload: SellerProductDraft): SellerProductChangeDraft 
   attributes: payload.attributes,
   tryAtHomeEnabled: payload.tryAtHomeEnabled,
   exchangeAvailable: payload.exchangeAvailable,
+  outsideNeemuchDeliveryEnabled: payload.outsideNeemuchDeliveryEnabled,
 });
 
 const messageForError = (cause: unknown, fallback: string) =>
@@ -687,6 +692,7 @@ export const SellerProducts: React.FC = () => {
             <label className="font-bold">Material <span className="font-normal text-neutral-500">(optional)</span><input maxLength={200} value={form.material} onChange={event => updateForm('material', event.target.value)} className="mt-1 w-full rounded-xl border p-3 dark:bg-neutral-800" /></label>
             <label className="sm:col-span-2 flex gap-2 rounded-xl border border-lime-200 bg-lime-50 p-3 font-bold text-neutral-800 dark:border-lime-900 dark:bg-lime-950/20 dark:text-neutral-100"><input type="checkbox" checked={form.tryAtHomeEnabled} onChange={event => setForm(current => ({ ...current, tryAtHomeEnabled: event.target.checked }))} className="mt-0.5 accent-lime-600" /> Offer Try at Home: customer may receive two sizes, has 15 minutes to choose, pays ₹50 service fee and ₹50 more if late.</label>
             <label className="sm:col-span-2 flex gap-2 rounded-xl border border-sky-200 bg-sky-50 p-3 font-bold text-neutral-800 dark:border-sky-900 dark:bg-sky-950/20 dark:text-neutral-100"><input type="checkbox" checked={form.exchangeAvailable} onChange={event => setForm(current => ({ ...current, exchangeAvailable: event.target.checked }))} className="mt-0.5 accent-sky-600" /> Offer size exchange: eligible customers may exchange for another available size after paying the ₹50 exchange fee.</label>
+            <label className="sm:col-span-2 flex gap-2 rounded-xl border border-violet-200 bg-violet-50 p-3 font-bold text-neutral-800 dark:border-violet-900 dark:bg-violet-950/20 dark:text-neutral-100"><input type="checkbox" checked={form.outsideNeemuchDeliveryEnabled} onChange={event => setForm(current => ({ ...current, outsideNeemuchDeliveryEnabled: event.target.checked }))} className="mt-0.5 accent-violet-600" /> Allow delivery requests outside Neemuch (458441). The customer cannot checkout directly; Vibe4You will quote the delivery charge first and send a secure payment request.</label>
             <label className="font-bold sm:col-span-2">Description<textarea required minLength={10} maxLength={2000} rows={3} value={form.description} onChange={event => updateForm('description', event.target.value)} className="mt-1 w-full rounded-xl border p-3 dark:bg-neutral-800" /></label>
             {uploadProgress && <p role="status" className="sm:col-span-2 text-[11px] font-bold text-neutral-700 dark:text-neutral-200">{uploadProgress}</p>}
           </div>
@@ -714,6 +720,7 @@ export const SellerProducts: React.FC = () => {
                   <p className="text-xs text-neutral-500">₹{(product.pricePaise / 100).toFixed(2)} · {(product.colourVariants && product.colourVariants.length > 1 ? product.colourVariants.map(colour => colour.colourName).join(', ') : product.colourName)} · Total stock: {product.inventory}</p>
                   {product.tryAtHomeEnabled && <p className="mt-1 text-xs font-bold text-lime-700">Try at Home enabled</p>}
                   {product.exchangeAvailable && <p className="mt-1 text-xs font-bold text-sky-700">Size exchange enabled (₹50)</p>}
+                  {product.outsideNeemuchDeliveryEnabled && <p className="mt-1 text-xs font-bold text-violet-700">Outside Neemuch delivery requests enabled</p>}
                   <div className="mt-2 flex flex-wrap gap-1.5">{product.variants.map(variant => <span key={variant.id} className="rounded-lg bg-neutral-100 px-2 py-1 text-[11px] font-bold dark:bg-neutral-800">{variant.size}: {variant.inventory}</span>)}</div>
                   {product.status === 'REJECTED' && product.rejectionReason && <p className="mt-2 flex gap-2 text-xs text-amber-700"><AlertTriangle className="w-4 shrink-0" />{product.rejectionReason}</p>}
                   {product.status === 'PUBLISHED' && <p className="mt-2 text-xs font-bold text-emerald-700">Published publicly by the private administrator.</p>}

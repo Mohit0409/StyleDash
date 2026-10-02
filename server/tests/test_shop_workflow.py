@@ -379,6 +379,33 @@ class ShopWorkflowTests(unittest.TestCase):
         )
         self.assertEqual(request["proposedProduct"]["imageUrls"], [uploaded_url])
 
+    def test_outside_neemuch_delivery_opt_in_is_reviewed_and_reaches_catalog(self) -> None:
+        self.create_active_shop("user-a", "Outstation Opt In Shop")
+        payload = self.complete_product("Courier Eligible Kurta")
+        payload["outsideNeemuchDeliveryEnabled"] = True
+        product = self.store.create_product_draft("user-a", payload)
+        self.assertTrue(product["outsideNeemuchDeliveryEnabled"])
+        self.store.submit_product("user-a", product["id"])
+        for target in ("UNDER_REVIEW", "APPROVED", "PUBLISHED"):
+            product = self.store.admin_transition_product("admin-a", product["id"], target)
+
+        public = self.store.get_published_product(product["id"])
+        self.assertTrue(public["outsideNeemuchDeliveryAvailable"])
+        payment = next(item for item in self.store.payment_catalog_products() if item["id"] == product["id"])
+        self.assertTrue(payment["outsideNeemuchDeliveryAvailable"])
+
+        change = self.store.create_product_edit_request(
+            "user-a", product["id"], {"outsideNeemuchDeliveryEnabled": False}
+        )
+        self.assertIn(
+            {"field": "Outside Neemuch delivery requests", "before": "Enabled", "after": "Disabled"},
+            change["changeSummary"],
+        )
+        self.assertTrue(self.store.get_published_product(product["id"])["outsideNeemuchDeliveryAvailable"])
+        self.store.admin_transition_product_change_request("admin-a", change["id"], "UNDER_REVIEW")
+        self.store.admin_transition_product_change_request("admin-a", change["id"], "APPROVED")
+        self.assertFalse(self.store.get_published_product(product["id"])["outsideNeemuchDeliveryAvailable"])
+
     def test_incremental_draft_rejection_resubmission_and_suspension(self) -> None:
         draft = self.store.create_draft("user-a", {"shopName": "Partial Shop"})
         self.assertEqual(draft["status"], "DRAFT")

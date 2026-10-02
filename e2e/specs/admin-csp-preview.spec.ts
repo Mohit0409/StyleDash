@@ -129,6 +129,114 @@ test('selected image preview works under the real private-admin CSP', async ({ p
   expect(cspErrors).toEqual([]);
 });
 
+test('large iPhone-style JPEG is progressively compressed below the admin upload target', async ({ page }) => {
+  await page.goto('http://127.0.0.1:8081/');
+  const result = await page.evaluate(async () => {
+    const source = document.createElement('canvas');
+    source.width = 3000;
+    source.height = 3000;
+    const context = source.getContext('2d')!;
+    const image = context.createImageData(source.width, source.height);
+    let seed = 0x13579bdf;
+    for (let index = 0; index < image.data.length; index += 4) {
+      seed = (seed * 1664525 + 1013904223) >>> 0;
+      image.data[index] = seed & 0xff;
+      image.data[index + 1] = (seed >>> 8) & 0xff;
+      image.data[index + 2] = (seed >>> 16) & 0xff;
+      image.data[index + 3] = 255;
+    }
+    context.putImageData(image, 0, 0);
+    const jpeg = await new Promise<Blob>((resolve, reject) =>
+      source.toBlob(blob => blob ? resolve(blob) : reject(new Error('JPEG generation failed.')), 'image/jpeg', 0.9),
+    );
+    const file = new File([jpeg], 'IMG_1207.jpeg', { type: 'image/jpeg' });
+
+    const bitmap = await createImageBitmap(file, { imageOrientation: 'from-image' });
+    const legacyScale = Math.min(1, 1200 / Math.max(bitmap.width, bitmap.height));
+    const legacyCanvas = document.createElement('canvas');
+    legacyCanvas.width = Math.max(1, Math.round(bitmap.width * legacyScale));
+    legacyCanvas.height = Math.max(1, Math.round(bitmap.height * legacyScale));
+    legacyCanvas.getContext('2d')!.drawImage(bitmap, 0, 0, legacyCanvas.width, legacyCanvas.height);
+    const legacyBlob = await new Promise<Blob>((resolve, reject) =>
+      legacyCanvas.toBlob(blob => blob ? resolve(blob) : reject(new Error('Legacy WebP generation failed.')), 'image/webp', 0.62),
+    );
+    bitmap.close();
+
+    const optimized = await (window as any).prepareAdminProductImage(file);
+    return {
+      sourceBytes: file.size,
+      legacyBytes: legacyBlob.size,
+      optimizedBytes: optimized.size,
+      optimizedType: optimized.type,
+    };
+  });
+
+  expect(result.sourceBytes).toBeGreaterThan(500 * 1024);
+  expect(result.legacyBytes).toBeGreaterThan(500 * 1024);
+  expect(result.optimizedBytes).toBeLessThanOrEqual(450 * 1024);
+  expect(result.optimizedType).toBe('image/webp');
+});
+
+test('admin iPhone fallback accepts empty JPEG MIME when createImageBitmap is unavailable', async ({ page }) => {
+  await page.addInitScript(() => {
+    Object.defineProperty(window, 'createImageBitmap', { value: undefined, configurable: true });
+  });
+  await page.goto('http://127.0.0.1:8081/');
+
+  const result = await page.evaluate(async () => {
+    const source = document.createElement('canvas');
+    source.width = 1800;
+    source.height = 1200;
+    const context = source.getContext('2d')!;
+    const gradient = context.createLinearGradient(0, 0, source.width, source.height);
+    gradient.addColorStop(0, '#111');
+    gradient.addColorStop(0.5, '#eee');
+    gradient.addColorStop(1, '#333');
+    context.fillStyle = gradient;
+    context.fillRect(0, 0, source.width, source.height);
+    const jpeg = await new Promise<Blob>((resolve, reject) =>
+      source.toBlob(blob => blob ? resolve(blob) : reject(new Error('JPEG generation failed.')), 'image/jpeg', 0.95),
+    );
+    const file = new File([jpeg], 'IMG_1207.JPEG', { type: '' });
+    const optimized = await (window as any).prepareAdminProductImage(file);
+    return {
+      optimizedBytes: optimized.size,
+      optimizedType: optimized.type,
+      inferred: (window as any).adminImageType(file),
+    };
+  });
+
+  expect(result.inferred).toBe('image/jpeg');
+  expect(result.optimizedBytes).toBeLessThanOrEqual(450 * 1024);
+  expect(result.optimizedType).toBe('image/webp');
+});
+
+test('admin upload derives type and extension from encoded bytes, not Blob metadata', async ({ page }) => {
+  await page.goto('http://127.0.0.1:8081/');
+  const result = await page.evaluate(async () => {
+    const source = document.createElement('canvas');
+    source.width = 64;
+    source.height = 64;
+    const context = source.getContext('2d')!;
+    context.fillStyle = '#4b6cb7';
+    context.fillRect(0, 0, source.width, source.height);
+    const jpeg = await new Promise<Blob>((resolve, reject) =>
+      source.toBlob(blob => blob ? resolve(blob) : reject(new Error('JPEG generation failed.')), 'image/jpeg', 0.9),
+    );
+    const mislabeled = new Blob([await jpeg.arrayBuffer()], {type:'image/webp'});
+    const file = new File([jpeg], 'iphone-photo.jpeg', {type:'image/jpeg'});
+    const payload = await adminImageUploadPayload(file, mislabeled);
+    const raw = atob(payload.dataBase64);
+    return {
+      contentType:payload.contentType,
+      fileName:payload.fileName,
+      jpegMagic:[raw.charCodeAt(0),raw.charCodeAt(1),raw.charCodeAt(2)],
+    };
+  });
+  expect(result.contentType).toBe('image/jpeg');
+  expect(result.fileName).toBe('iphone-photo.jpg');
+  expect(result.jpegMagic).toEqual([0xff,0xd8,0xff]);
+});
 
 test('delivery-zone map draws points and keeps coordinates synchronized', async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== 'desktop-chromium', 'One Chromium map-editor probe is sufficient.');

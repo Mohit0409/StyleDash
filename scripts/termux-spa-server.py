@@ -590,6 +590,7 @@ class JsonStateStore:
             "processedRefunds": {},
             "processedWebhookEvents": {},
             "operationalAlerts": {},
+            "deliveryRequests": {},
         }
         if not self.path.exists():
             return default
@@ -858,6 +859,525 @@ class PaymentService:
     def product_snapshot(self) -> dict[str, dict[str, Any]]:
         with self._products_lock:
             return self.products
+
+    @staticmethod
+    def _public_delivery_request(request: dict[str, Any], *, admin: bool = False) -> dict[str, Any]:
+        allowed = (
+            "id", "productId", "productName", "productSlug", "variantId", "size",
+            "colourName", "quantity", "unitPrice", "productSubtotal", "storeId",
+            "storeName", "storeSlug", "address", "status", "quote", "createdAt",
+            "updatedAt", "quotedAt", "paymentRequestedAt", "paidAt", "cancelledAt",
+            "rejectedAt", "rejectionReason", "orderId", "razorpayOrderId",
+            "razorpayPaymentId",
+        )
+        result = {key: request[key] for key in allowed if key in request}
+        if admin:
+            for key in ("userId", "quotedBy", "rejectedBy"):
+                if key in request:
+                    result[key] = request[key]
+        return result
+
+    def _validate_outstation_address(self, payload: Any) -> dict[str, Any]:
+        if not isinstance(payload, dict):
+            raise ApiError(
+                HTTPStatus.UNPROCESSABLE_ENTITY,
+                "Delivery address is required.",
+                "invalid_delivery_request",
+            )
+        pincode = payload.get("pincode")
+        if not _is_six_ascii_digits(pincode):
+            raise ApiError(
+                HTTPStatus.UNPROCESSABLE_ENTITY,
+                "Enter a valid 6-digit delivery pincode.",
+                "invalid_delivery_request",
+            )
+        if pincode in self.supported_pincodes:
+            raise ApiError(
+                HTTPStatus.CONFLICT,
+                "This address is in the Vibe4You direct delivery area. Use normal checkout instead.",
+                "use_direct_checkout",
+            )
+        phone = _clean_string(payload.get("phone"), "phone number", 10, 16)
+        if not all(character.isdigit() or character in "+ -" for character in phone):
+            raise ApiError(
+                HTTPStatus.UNPROCESSABLE_ENTITY,
+                "Invalid phone number.",
+                "invalid_delivery_request",
+            )
+        return {
+            "id": "addr-outstation",
+            "name": _clean_string(payload.get("name"), "name", 2, 80),
+            "phone": phone,
+            "street": _clean_string(payload.get("street"), "street address", 5, 200),
+            "city": _clean_string(payload.get("city"), "city", 2, 80),
+            "state": _clean_string(payload.get("state"), "state", 2, 80),
+            "pincode": pincode,
+        }
+
+    def create_delivery_request(self, user_id: str, payload: Any) -> dict[str, Any]:
+        self.refresh_shop_products()
+        products = self.product_snapshot()
+        if not isinstance(payload, dict) or set(payload) - {"productId", "variantId", "quantity", "address"}:
+            raise ApiError(
+                HTTPStatus.BAD_REQUEST,
+                "Invalid outside-delivery request.",
+                "invalid_delivery_request",
+            )
+        product_id = payload.get("productId")
+        variant_id = payload.get("variantId")
+        quantity = payload.get("quantity")
+        if not isinstance(product_id, str) or not isinstance(variant_id, str):
+            raise ApiError(
+                HTTPStatus.UNPROCESSABLE_ENTITY,
+                "Choose a valid product option.",
+                "invalid_delivery_request",
+            )
+        product = products.get(product_id)
+        if (
+            not isinstance(product, dict)
+            or product.get("active") is not True
+            or product.get("outsideNeemuchDeliveryAvailable") is not True
+        ):
+            raise ApiError(
+                HTTPStatus.CONFLICT,
+                "This product is not available for delivery requests outside Neemuch.",
+                "outside_delivery_unavailable",
+            )
+        variant = next(
+            (
+                candidate
+                for candidate in product.get("variants", [])
+                if candidate.get("id") == variant_id and candidate.get("active") is not False
+            ),
+            None,
+        )
+        if variant is None:
+            raise ApiError(
+                HTTPStatus.UNPROCESSABLE_ENTITY,
+                "Choose a valid product option.",
+                "invalid_variant",
+            )
+        max_quantity = int(self.settings["maxQuantityPerItem"])
+        if isinstance(quantity, bool) or not isinstance(quantity, int) or not 1 <= quantity <= max_quantity:
+            raise ApiError(
+                HTTPStatus.UNPROCESSABLE_ENTITY,
+                "Invalid item quantity.",
+                "invalid_quantity",
+            )
+        address = self._validate_outstation_address(payload.get("address"))
+        unit_price = _money(variant.get("price", product.get("price")), "price")
+        subtotal = _rounded_rupees(unit_price * quantity)
+        now = datetime.now(timezone.utc).isoformat()
+
+        with self.store.lock:
+            state = self.store.state
+            if self._inventory(state, variant) < quantity:
+                raise ApiError(
+                    HTTPStatus.CONFLICT,
+                    f"{product['name']} is no longer available in the requested quantity.",
+                    "insufficient_stock",
+                )
+            active_statuses = {"requested", "quoted", "payment_pending"}
+            for existing in state["deliveryRequests"].values():
+                if (
+                    isinstance(existing, dict)
+                    and existing.get("userId") == user_id
+                    and existing.get("productId") == product_id
+                    and existing.get("variantId") == variant_id
+                    and existing.get("quantity") == quantity
+                    and existing.get("address") == address
+                    and existing.get("status") in active_statuses
+                ):
+                    return {
+                        "idempotent": True,
+                        "request": self._public_delivery_request(existing),
+                    }
+
+            request_id = "delreq_" + secrets.token_hex(12)
+            request = {
+                "id": request_id,
+                "userId": user_id[:128],
+                "productId": product_id,
+                "productName": product["name"],
+                "productSlug": product["slug"],
+                "variantId": variant["id"],
+                "size": variant.get("size") or "One Size",
+                "colourName": variant.get("colourName") or "",
+                "quantity": quantity,
+                "unitPrice": _rounded_rupees(unit_price),
+                "productSubtotal": subtotal,
+                "storeId": product.get("vendorId"),
+                "storeName": product.get("storeName"),
+                "storeSlug": product.get("storeSlug"),
+                "address": address,
+                "status": "requested",
+                "createdAt": now,
+                "updatedAt": now,
+            }
+            state["deliveryRequests"][request_id] = request
+            self.store.save()
+        return {"idempotent": False, "request": self._public_delivery_request(request)}
+
+    def list_delivery_requests(self, user_id: str) -> list[dict[str, Any]]:
+        with self.store.lock:
+            rows = [
+                self._public_delivery_request(request)
+                for request in self.store.state["deliveryRequests"].values()
+                if isinstance(request, dict) and request.get("userId") == user_id
+            ]
+        return sorted(rows, key=lambda item: item.get("updatedAt", ""), reverse=True)
+
+    def admin_list_delivery_requests(self) -> list[dict[str, Any]]:
+        with self.store.lock:
+            rows = [
+                self._public_delivery_request(request, admin=True)
+                for request in self.store.state["deliveryRequests"].values()
+                if isinstance(request, dict)
+            ]
+        return sorted(rows, key=lambda item: item.get("updatedAt", ""), reverse=True)
+
+    def cancel_delivery_request(self, user_id: str, request_id: str) -> dict[str, Any]:
+        with self.store.lock:
+            request = self.store.state["deliveryRequests"].get(request_id)
+            if not isinstance(request, dict) or request.get("userId") != user_id:
+                raise ApiError(HTTPStatus.NOT_FOUND, "Delivery request not found.", "delivery_request_not_found")
+            if request.get("status") not in {"requested", "quoted"}:
+                raise ApiError(
+                    HTTPStatus.CONFLICT,
+                    "This delivery request can no longer be cancelled.",
+                    "delivery_request_not_cancellable",
+                )
+            now = datetime.now(timezone.utc).isoformat()
+            request.update({"status": "cancelled", "cancelledAt": now, "updatedAt": now})
+            self.store.save()
+            return self._public_delivery_request(request)
+
+    def quote_delivery_request(
+        self,
+        request_id: str,
+        delivery_fee_value: Any,
+        note: Any,
+        estimated_delivery: Any,
+        admin_id: str,
+    ) -> dict[str, Any]:
+        try:
+            fee = _money(delivery_fee_value, "delivery charge")
+        except ApiError:
+            raise
+        if fee < Decimal("1") or fee > Decimal("10000"):
+            raise ApiError(
+                HTTPStatus.UNPROCESSABLE_ENTITY,
+                "Delivery charge must be between Rs 1 and Rs 10,000.",
+                "invalid_delivery_quote",
+            )
+        clean_note = ""
+        if note not in (None, ""):
+            if not isinstance(note, str) or len(note.strip()) > 500:
+                raise ApiError(
+                    HTTPStatus.UNPROCESSABLE_ENTITY,
+                    "Delivery note must be 500 characters or fewer.",
+                    "invalid_delivery_quote",
+                )
+            clean_note = note.strip()
+        clean_eta = ""
+        if estimated_delivery not in (None, ""):
+            if not isinstance(estimated_delivery, str) or not 2 <= len(estimated_delivery.strip()) <= 120:
+                raise ApiError(
+                    HTTPStatus.UNPROCESSABLE_ENTITY,
+                    "Enter a valid delivery estimate.",
+                    "invalid_delivery_quote",
+                )
+            clean_eta = estimated_delivery.strip()
+
+        self.refresh_shop_products()
+        products = self.product_snapshot()
+        with self.store.lock:
+            state = self.store.state
+            request = state["deliveryRequests"].get(request_id)
+            if not isinstance(request, dict):
+                raise ApiError(HTTPStatus.NOT_FOUND, "Delivery request not found.", "delivery_request_not_found")
+            if request.get("status") not in {"requested", "quoted"}:
+                raise ApiError(
+                    HTTPStatus.CONFLICT,
+                    "This delivery request can no longer be quoted.",
+                    "delivery_request_not_quotable",
+                )
+            product = products.get(request.get("productId"))
+            if (
+                not isinstance(product, dict)
+                or product.get("active") is not True
+                or product.get("outsideNeemuchDeliveryAvailable") is not True
+            ):
+                raise ApiError(
+                    HTTPStatus.CONFLICT,
+                    "The product is no longer available for outside-Neemuch delivery.",
+                    "outside_delivery_unavailable",
+                )
+            variant = next(
+                (
+                    candidate
+                    for candidate in product.get("variants", [])
+                    if candidate.get("id") == request.get("variantId") and candidate.get("active") is not False
+                ),
+                None,
+            )
+            quantity = request.get("quantity")
+            if variant is None or not isinstance(quantity, int) or self._inventory(state, variant) < quantity:
+                raise ApiError(
+                    HTTPStatus.CONFLICT,
+                    "The requested product option is no longer in stock.",
+                    "insufficient_stock",
+                )
+            unit_price = _money(variant.get("price", product.get("price")), "price")
+            subtotal = _rounded_rupees(unit_price * quantity)
+            delivery_fee = _rounded_rupees(fee)
+            grand_total = subtotal + delivery_fee
+            now = datetime.now(timezone.utc).isoformat()
+            request.update({
+                "productName": product["name"],
+                "productSlug": product["slug"],
+                "unitPrice": _rounded_rupees(unit_price),
+                "productSubtotal": subtotal,
+                "status": "quoted",
+                "quote": {
+                    "unitPrice": _rounded_rupees(unit_price),
+                    "productSubtotal": subtotal,
+                    "deliveryFee": delivery_fee,
+                    "grandTotal": grand_total,
+                    "note": clean_note,
+                    "estimatedDelivery": clean_eta,
+                },
+                "quotedBy": admin_id,
+                "quotedAt": now,
+                "updatedAt": now,
+            })
+            self.store.save()
+            return self._public_delivery_request(request, admin=True)
+
+    def reject_delivery_request(self, request_id: str, reason: Any, admin_id: str) -> dict[str, Any]:
+        if not isinstance(reason, str) or not 3 <= len(reason.strip()) <= 500:
+            raise ApiError(
+                HTTPStatus.UNPROCESSABLE_ENTITY,
+                "Enter a rejection reason between 3 and 500 characters.",
+                "invalid_delivery_rejection",
+            )
+        with self.store.lock:
+            request = self.store.state["deliveryRequests"].get(request_id)
+            if not isinstance(request, dict):
+                raise ApiError(HTTPStatus.NOT_FOUND, "Delivery request not found.", "delivery_request_not_found")
+            if request.get("status") not in {"requested", "quoted"}:
+                raise ApiError(
+                    HTTPStatus.CONFLICT,
+                    "This delivery request can no longer be rejected.",
+                    "delivery_request_not_rejectable",
+                )
+            now = datetime.now(timezone.utc).isoformat()
+            request.update({
+                "status": "rejected",
+                "rejectionReason": reason.strip(),
+                "rejectedBy": admin_id,
+                "rejectedAt": now,
+                "updatedAt": now,
+            })
+            self.store.save()
+            return self._public_delivery_request(request, admin=True)
+
+    def create_delivery_request_order(
+        self,
+        user_id: str,
+        request_id: str,
+        payload: Any,
+        idempotency_value: str | None,
+    ) -> dict[str, Any]:
+        self._require_ordering_enabled()
+        if not isinstance(payload, dict) or set(payload) - {"paymentMethod"}:
+            raise ApiError(
+                HTTPStatus.BAD_REQUEST,
+                "Invalid delivery payment request.",
+                "invalid_delivery_payment",
+            )
+        payment_method = payload.get("paymentMethod")
+        if payment_method not in ("upi", "card"):
+            raise ApiError(
+                HTTPStatus.UNPROCESSABLE_ENTITY,
+                "Outside-Neemuch delivery requests must be paid online.",
+                "invalid_payment_method",
+            )
+        if not self.key_id or not self.key_secret or self.gateway is None:
+            raise ApiError(
+                HTTPStatus.SERVICE_UNAVAILABLE,
+                "Online payments are temporarily unavailable.",
+                "payments_not_configured",
+            )
+        if not self.key_id.startswith(f"rzp_{self.mode}_"):
+            raise ApiError(
+                HTTPStatus.SERVICE_UNAVAILABLE,
+                "Payment configuration does not match the selected mode.",
+                "payment_mode_mismatch",
+            )
+        idempotency_key = self._idempotency_key(idempotency_value)
+        self.refresh_shop_products()
+        products = self.product_snapshot()
+
+        with self.store.lock:
+            state = self.store.state
+            request = state["deliveryRequests"].get(request_id)
+            if not isinstance(request, dict) or request.get("userId") != user_id:
+                raise ApiError(HTTPStatus.NOT_FOUND, "Delivery request not found.", "delivery_request_not_found")
+            if request.get("status") == "paid":
+                raise ApiError(HTTPStatus.CONFLICT, "This delivery request is already paid.", "delivery_request_paid")
+            linked_order_id = request.get("orderId")
+            if request.get("status") == "payment_pending" and isinstance(linked_order_id, str):
+                existing = state["orders"].get(linked_order_id)
+                if isinstance(existing, dict) and existing.get("razorpayOrderId"):
+                    return self._create_response(existing)
+            if request.get("status") != "quoted" or not isinstance(request.get("quote"), dict):
+                raise ApiError(
+                    HTTPStatus.CONFLICT,
+                    "Wait for Vibe4You to confirm the delivery charge before paying.",
+                    "delivery_quote_required",
+                )
+            if idempotency_key:
+                stored_key = f"outside-delivery:{user_id}:{request_id}:{idempotency_key}"
+                existing_id = state["idempotency"].get(stored_key)
+                if existing_id:
+                    existing = state["orders"].get(existing_id)
+                    if isinstance(existing, dict) and existing.get("razorpayOrderId"):
+                        return self._create_response(existing)
+            else:
+                stored_key = None
+
+            product = products.get(request.get("productId"))
+            if (
+                not isinstance(product, dict)
+                or product.get("active") is not True
+                or product.get("outsideNeemuchDeliveryAvailable") is not True
+            ):
+                raise ApiError(
+                    HTTPStatus.CONFLICT,
+                    "The product is no longer available for outside-Neemuch delivery.",
+                    "outside_delivery_unavailable",
+                )
+            variant = next(
+                (
+                    candidate
+                    for candidate in product.get("variants", [])
+                    if candidate.get("id") == request.get("variantId") and candidate.get("active") is not False
+                ),
+                None,
+            )
+            quantity = request.get("quantity")
+            if variant is None or not isinstance(quantity, int) or self._inventory(state, variant) < quantity:
+                raise ApiError(
+                    HTTPStatus.CONFLICT,
+                    "The requested product option is no longer in stock.",
+                    "insufficient_stock",
+                )
+            current_unit = _rounded_rupees(_money(variant.get("price", product.get("price")), "price"))
+            quote = request["quote"]
+            if current_unit != quote.get("unitPrice"):
+                now = datetime.now(timezone.utc).isoformat()
+                request.update({"status": "requested", "updatedAt": now})
+                request.pop("quote", None)
+                request.pop("quotedAt", None)
+                request.pop("quotedBy", None)
+                self.store.save()
+                raise ApiError(
+                    HTTPStatus.CONFLICT,
+                    "The product price changed. Vibe4You must confirm a fresh delivery quote before payment.",
+                    "delivery_quote_stale",
+                )
+
+            trusted_item = {
+                "productId": product["id"],
+                "productName": product["name"],
+                "productSlug": product["slug"],
+                "variantId": variant["id"],
+                "sku": variant["sku"],
+                "size": variant.get("size") or "One Size",
+                "colourName": variant.get("colourName") or "",
+                "quantity": quantity,
+                "unitPrice": quote["unitPrice"],
+                "lineTotal": quote["productSubtotal"],
+                "reservedVariantIds": [variant["id"]],
+                "exchangeEligible": product.get("exchangeAvailable") is True,
+            }
+            for key, value in (
+                ("storeId", product.get("vendorId")),
+                ("storeName", product.get("storeName")),
+                ("storeSlug", product.get("storeSlug")),
+            ):
+                if value:
+                    trusted_item[key] = value
+            images = variant.get("images") or product.get("images") or []
+            image_url = product.get("thumbnail") or (images[0] if images else None)
+            if image_url:
+                trusted_item["imageUrl"] = image_url
+
+            style_order_id = self._new_order_id()
+            receipt = style_order_id
+            amount_paise = int(quote["grandTotal"]) * 100
+            gateway_order = self.gateway.create_order({
+                "amount": amount_paise,
+                "currency": self.settings["currency"],
+                "receipt": receipt,
+                "notes": {
+                    "styleDashOrderId": style_order_id,
+                    "deliveryRequestId": request_id,
+                },
+            })
+            razorpay_order_id = gateway_order.get("id")
+            if not isinstance(razorpay_order_id, str) or not razorpay_order_id.startswith("order_"):
+                raise ApiError(
+                    HTTPStatus.BAD_GATEWAY,
+                    "Invalid response from payment service.",
+                    "invalid_payment_response",
+                )
+            now = datetime.now(timezone.utc).isoformat()
+            order = {
+                "items": [trusted_item],
+                "address": dict(request["address"]),
+                "userId": user_id[:128],
+                "deliveryMethod": "outstation",
+                "couponCode": None,
+                "subtotal": quote["productSubtotal"],
+                "discount": 0,
+                "walletAmount": 0,
+                "deliveryFee": quote["deliveryFee"],
+                "taxes": 0,
+                "tryAtHomeFee": 0,
+                "grandTotal": quote["grandTotal"],
+                "amount": amount_paise,
+                "currency": self.settings["currency"],
+                "id": style_order_id,
+                "receipt": receipt,
+                "razorpayOrderId": razorpay_order_id,
+                "paymentMethod": payment_method,
+                "paymentStatus": "pending",
+                "status": "payment_pending",
+                "estimatedDelivery": quote.get("estimatedDelivery") or "Delivery timing will be confirmed by Vibe4You.",
+                "statusHistory": [{
+                    "status": "payment_pending",
+                    "timestamp": now,
+                    "note": f"Awaiting verified payment for delivery request {request_id}",
+                }],
+                "createdAt": now,
+                "updatedAt": now,
+                "deliveryRequestId": request_id,
+                "adminLabels": ["Outside Neemuch delivery request"],
+            }
+            state["orders"][style_order_id] = order
+            if stored_key:
+                state["idempotency"][stored_key] = style_order_id
+            request.update({
+                "status": "payment_pending",
+                "orderId": style_order_id,
+                "razorpayOrderId": razorpay_order_id,
+                "paymentRequestedAt": now,
+                "updatedAt": now,
+            })
+            self.store.save()
+            return self._create_response(order)
 
     def order_for_display(self, order: dict[str, Any]) -> dict[str, Any]:
         """Enrich safe order-item snapshots with current display-only metadata."""
@@ -1426,6 +1946,7 @@ class PaymentService:
             "inventoryReleasedAt", "refundId", "refundAmount", "refundCurrency", "refundProcessedAt",
             "cancellationReason", "cancelledAt", "tryAtHomeLateFeeDue", "tryAtHomeLateFeePaid",
             "tryAtHomeLateFeeCollectionMethod", "tryAtHomeLateFeeCollectedAt",
+            "deliveryRequestId",
         )
         public_order = {key: display_order[key] for key in allowed if key in display_order}
         cancellation = display_order.get("cancellationRequest")
@@ -2027,9 +2548,21 @@ class PaymentService:
                 raise ApiError(HTTPStatus.CONFLICT, "This payment is already associated with another order.", "duplicate_payment")
             if order.get("paymentStatus") in ("paid", "refunded"):
                 if order.get("razorpayPaymentId") == payment_id:
+                    delivery_request_id = order.get("deliveryRequestId")
+                    delivery_request = state["deliveryRequests"].get(delivery_request_id) if isinstance(delivery_request_id, str) else None
+                    if isinstance(delivery_request, dict) and delivery_request.get("status") != "paid":
+                        paid_at = order.get("paymentVerifiedAt") or datetime.now(timezone.utc).isoformat()
+                        delivery_request.update({
+                            "status": "paid",
+                            "orderId": style_order_id,
+                            "razorpayOrderId": razorpay_order_id,
+                            "razorpayPaymentId": payment_id,
+                            "paidAt": paid_at,
+                            "updatedAt": paid_at,
+                        })
                     if payment_id not in state["processedPayments"]:
                         state["processedPayments"][payment_id] = style_order_id
-                        self.store.save()
+                    self.store.save()
                     return {"success": True, "idempotent": True, "duplicate": True, "order": self._public_order(order)}
                 raise ApiError(HTTPStatus.CONFLICT, "This order already has a verified payment.", "duplicate_payment")
 
@@ -2083,6 +2616,17 @@ class PaymentService:
 
             order.setdefault("statusHistory", []).append({"status": next_status, "timestamp": now, "note": note})
             state["processedPayments"][payment_id] = style_order_id
+            delivery_request_id = order.get("deliveryRequestId")
+            delivery_request = state["deliveryRequests"].get(delivery_request_id) if isinstance(delivery_request_id, str) else None
+            if isinstance(delivery_request, dict):
+                delivery_request.update({
+                    "status": "paid",
+                    "orderId": style_order_id,
+                    "razorpayOrderId": razorpay_order_id,
+                    "razorpayPaymentId": payment_id,
+                    "paidAt": now,
+                    "updatedAt": now,
+                })
             self.store.save()
             public_order = self._public_order(order)
 
@@ -3222,6 +3766,11 @@ class StyleDashRequestHandler(SimpleHTTPRequestHandler):
                 state = self._security().account_state(user["id"])
                 self._json_response(HTTPStatus.OK, {"success": True, **state})
                 return
+            if path == "/api/outside-delivery-requests":
+                user, _session = self._current_user()
+                requests = self.payment_service.list_delivery_requests(user["id"])
+                self._json_response(HTTPStatus.OK, {"success": True, "requests": requests})
+                return
             if path == "/api/orders":
                 user, _session = self._current_user()
                 orders = self._security().list_orders(self.payment_service.store, user["id"])
@@ -3342,6 +3891,51 @@ class StyleDashRequestHandler(SimpleHTTPRequestHandler):
                 return
             if self._sensitive_path(path):
                 self._json_response(HTTPStatus.NOT_FOUND, {"success": False, "error": "Not found.", "code": "not_found"})
+                return
+            if path == "/api/outside-delivery-requests":
+                self._rate_limit(path, 10)
+                user, _session = self._current_user()
+                self._csrf()
+                result = self.payment_service.create_delivery_request(user["id"], self._read_json())
+                if not result.get("idempotent"):
+                    request = result.get("request") or {}
+                    owner_notifier().send(
+                        event="outside_delivery_request",
+                        title="Outside Neemuch Delivery Request",
+                        message=(
+                            f"Request: {request.get('id') or '-'}\n"
+                            f"Product: {request.get('productName') or '-'}\n"
+                            f"Destination: {(request.get('address') or {}).get('city') or '-'} - {(request.get('address') or {}).get('pincode') or '-'}\n"
+                            "Status: Delivery quote required"
+                        ),
+                        priority=5,
+                        tags=["package"],
+                    )
+                self._json_response(
+                    HTTPStatus.OK if result.get("idempotent") else HTTPStatus.CREATED,
+                    {"success": True, **result},
+                )
+                return
+            outside_payment_match = re.fullmatch(r"/api/outside-delivery-requests/([^/]+)/create-order", path)
+            if outside_payment_match:
+                self._rate_limit("/api/outside-delivery-requests/create-order", 10)
+                user, _session = self._current_user()
+                self._csrf()
+                request_id = unquote(outside_payment_match.group(1))
+                result = self.payment_service.create_delivery_request_order(
+                    user["id"], request_id, self._read_json(), self.headers.get("Idempotency-Key")
+                )
+                self._json_response(HTTPStatus.CREATED, result)
+                return
+            outside_cancel_match = re.fullmatch(r"/api/outside-delivery-requests/([^/]+)/cancel", path)
+            if outside_cancel_match:
+                self._rate_limit("/api/outside-delivery-requests/cancel", 10)
+                user, _session = self._current_user()
+                self._csrf()
+                self._read_json()
+                request_id = unquote(outside_cancel_match.group(1))
+                request = self.payment_service.cancel_delivery_request(user["id"], request_id)
+                self._json_response(HTTPStatus.OK, {"success": True, "request": request})
                 return
             if path == "/api/create-order":
                 self._rate_limit(path, 10)

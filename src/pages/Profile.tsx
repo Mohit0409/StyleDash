@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Heart, LogOut, Package, Save } from 'lucide-react';
+import { Heart, LogOut, Package, Save, Truck } from 'lucide-react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { SEO } from '../components/SEO';
 import { useAuth } from '../context/AuthContext';
@@ -107,8 +107,9 @@ export const Profile: React.FC = () => {
       <h2 className="text-xl font-black">Sign-in security</h2>
       <p className="text-sm text-neutral-500">This account uses a linked Google or mobile sign-in method and does not have a Vibe4You password.</p>
     </div>}
-    <div className="grid sm:grid-cols-2 gap-3">
+    <div className="grid sm:grid-cols-3 gap-3">
       <Link to="/orders" className="flex gap-3 p-4 bg-white dark:bg-neutral-900 rounded-2xl border dark:border-neutral-800 font-bold"><Package className="w-4" />Order history</Link>
+      <Link to="/delivery-requests" className="flex gap-3 p-4 bg-white dark:bg-neutral-900 rounded-2xl border dark:border-neutral-800 font-bold"><Truck className="w-4" />Delivery requests</Link>
       <Link to="/wishlist" className="flex gap-3 p-4 bg-white dark:bg-neutral-900 rounded-2xl border dark:border-neutral-800 font-bold"><Heart className="w-4" />Saved wishlist</Link>
     </div>
     <button onClick={async () => { await logout(); navigate('/login'); }} className="w-full flex gap-3 p-4 rounded-2xl border text-red-600 font-bold"><LogOut className="w-4" />Logout</button>
