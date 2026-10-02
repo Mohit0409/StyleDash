@@ -1,13 +1,14 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { Star, Zap, Heart, ShieldCheck, RefreshCw, ShoppingBag, CheckCircle, ArrowRight, Share2 } from 'lucide-react';
+import { Star, Zap, Heart, ShieldCheck, RefreshCw, ShoppingBag, CheckCircle, ArrowRight, Share2, Truck } from 'lucide-react';
 import { SEO } from '../components/SEO';
 import { VariantSelector } from '../components/VariantSelector';
 import { SizeGuideModal } from '../components/SizeGuideModal';
 import { ProductCard } from '../components/ProductCard';
 import { ProductImageLightbox } from '../components/ProductImageLightbox';
 import { ProductReviews } from '../components/ProductReviews';
-import { Product, ProductVariant } from '../types';
+import { OutsideDeliveryRequestDialog } from '../components/OutsideDeliveryRequestDialog';
+import { Product } from '../types';
 import { productRepository } from '../repositories/productRepository';
 import { useCart } from '../context/CartContext';
 import { useWishlist } from '../context/WishlistContext';
@@ -33,6 +34,7 @@ export const ProductDetail: React.FC = () => {
   const [relatedProducts, setRelatedProducts] = useState<Product[]>([]);
   const [tryAtHomeSizeIds, setTryAtHomeSizeIds] = useState<string[]>([]);
   const [tryAtHomeTermsAccepted, setTryAtHomeTermsAccepted] = useState(false);
+  const [outsideDeliveryOpen, setOutsideDeliveryOpen] = useState(false);
 
   const handleReviewSummaryChange = useCallback((rating: number, reviewCount: number) => {
     setProduct(current => current ? { ...current, rating, reviewCount } : current);
@@ -372,6 +374,14 @@ export const ProductDetail: React.FC = () => {
             </button>
           </div>
 
+          {product.outsideNeemuchDeliveryAvailable && (
+            <section className="rounded-2xl border border-violet-200 bg-violet-50 p-4 text-xs text-neutral-700 dark:border-violet-900 dark:bg-violet-950/20 dark:text-neutral-200">
+              <div className="flex items-center gap-2 font-black text-violet-800 dark:text-violet-300"><ShieldCheck className="h-4 w-4" /> Delivery outside Neemuch available by request</div>
+              <p className="mt-1">For addresses outside 458441, do not pay at normal checkout. Send a delivery request first; Vibe4You will confirm the delivery charge and then send a secure payment request.</p>
+              <button type="button" onClick={() => setOutsideDeliveryOpen(true)} disabled={!selectedVariant || selectedVariant.available !== true} className="mt-3 inline-flex items-center gap-2 rounded-xl bg-violet-600 px-4 py-2.5 font-black text-white disabled:opacity-50"><Truck className="h-4 w-4" /> Request Delivery Outside Neemuch</button>
+            </section>
+          )}
+
           {/* Hyperlocal Delivery Trust Box */}
           <div className="p-4 bg-lime-50 dark:bg-lime-950/20 rounded-2xl border border-lime-200 dark:border-lime-900 space-y-2 text-xs text-neutral-700 dark:text-neutral-300">
             <div className="flex items-center gap-2 font-black text-lime-800 dark:text-lime-300">
@@ -406,6 +416,15 @@ export const ProductDetail: React.FC = () => {
         onSelectImage={setSelectedImage}
         onClose={() => setImageViewerOpen(false)}
       />
+
+      {outsideDeliveryOpen && product.outsideNeemuchDeliveryAvailable && selectedVariant && (
+        <OutsideDeliveryRequestDialog
+          product={product}
+          variant={selectedVariant}
+          quantity={quantity}
+          onClose={() => setOutsideDeliveryOpen(false)}
+        />
+      )}
 
       <ProductReviews productId={product.id} onSummaryChange={handleReviewSummaryChange} />
 

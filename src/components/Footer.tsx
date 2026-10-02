@@ -90,6 +90,7 @@ export const Footer: React.FC = () => {
             <ul className="space-y-2 text-xs">
               <li><Link to="/profile" className="hover:text-lime-400">My Profile</Link></li>
               <li><Link to="/orders" className="hover:text-lime-400">Order History</Link></li>
+              <li><Link to="/delivery-requests" className="hover:text-lime-400">Delivery Requests</Link></li>
               <li><Link to="/wishlist" className="hover:text-lime-400">Saved Wishlist</Link></li>
             </ul>
           </div>

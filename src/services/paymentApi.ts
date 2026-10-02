@@ -86,7 +86,7 @@ export interface ServerOrder {
   tryAtHomeLateFeeCollectionMethod?: 'cash' | 'upi_at_delivery';
   tryAtHomeLateFeeCollectedAt?: string;
   grandTotal: number;
-  deliveryMethod: 'express' | 'standard' | 'none';
+  deliveryMethod: 'express' | 'standard' | 'outstation' | 'none';
   estimatedDelivery: string;
   status: string;
   statusHistory: Array<{ status: string; timestamp: string; note?: string }>;

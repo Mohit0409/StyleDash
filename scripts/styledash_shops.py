@@ -108,6 +108,7 @@ PRODUCT_PAYLOAD_FIELDS = {
     "colourVariants",
     "tryAtHomeEnabled",
     "exchangeAvailable",
+    "outsideNeemuchDeliveryEnabled",
     "hsnCode",
     "gstRate",
 }
@@ -1519,6 +1520,20 @@ class ShopWorkflow:
             clean_attributes.pop("subcategory", None)
         delivery_value = payload.get("deliveryType", clean_attributes.get("deliveryType", "normal"))
         clean_attributes["deliveryType"] = normalize_delivery_type(delivery_value)
+        outside_neemuch_delivery = (
+            payload["outsideNeemuchDeliveryEnabled"]
+            if "outsideNeemuchDeliveryEnabled" in payload
+            else str(current_attributes.get("outsideNeemuchDeliveryEnabled", "false")).casefold() == "true"
+        )
+        if isinstance(outside_neemuch_delivery, int) and outside_neemuch_delivery in (0, 1):
+            outside_neemuch_delivery = bool(outside_neemuch_delivery)
+        if not isinstance(outside_neemuch_delivery, bool):
+            raise SecurityError(
+                400,
+                "Choose whether delivery outside Neemuch is available by request.",
+                "invalid_product",
+            )
+        clean_attributes["outsideNeemuchDeliveryEnabled"] = "true" if outside_neemuch_delivery else "false"
         try_at_home = (
             payload["tryAtHomeEnabled"] if "tryAtHomeEnabled" in payload
             else (bool(current["try_at_home_enabled"]) if current is not None and "try_at_home_enabled" in current.keys() else False)
@@ -1586,6 +1601,7 @@ class ShopWorkflow:
         attributes = json.loads(row["attributes_json"])
         attributes.pop("hsnCode", None)
         attributes.pop("gstRate", None)
+        outside_neemuch_delivery = str(attributes.pop("outsideNeemuchDeliveryEnabled", "false")).casefold() == "true"
         source_variants = _row_variants(row)
         variants = [
             {
@@ -1621,6 +1637,7 @@ class ShopWorkflow:
             "attributes": attributes,
             "tryAtHomeEnabled": bool(row["try_at_home_enabled"]) if "try_at_home_enabled" in row.keys() else False,
             "exchangeAvailable": bool(row["exchange_available"]) if "exchange_available" in row.keys() else False,
+            "outsideNeemuchDeliveryEnabled": outside_neemuch_delivery,
             "status": row["status"],
             "rejectionReason": row["rejection_reason"] if row["status"] == "REJECTED" else None,
             "createdAt": row["created_at"],
@@ -1644,6 +1661,7 @@ class ShopWorkflow:
         attributes = json.loads(values["attributes_json"])
         attributes.pop("hsnCode", None)
         attributes.pop("gstRate", None)
+        outside_neemuch_delivery = str(attributes.pop("outsideNeemuchDeliveryEnabled", "false")).casefold() == "true"
         return {
             "name": values["name"],
             "description": values["description"],
@@ -1669,6 +1687,7 @@ class ShopWorkflow:
             "attributes": attributes,
             "tryAtHomeEnabled": bool(values.get("try_at_home_enabled", 0)),
             "exchangeAvailable": bool(values.get("exchange_available", 0)),
+            "outsideNeemuchDeliveryEnabled": outside_neemuch_delivery,
         }
 
     @staticmethod
@@ -1681,12 +1700,13 @@ class ShopWorkflow:
             "colourName": "Colour name", "colourHex": "Colour", "imageUrls": "Images",
             "attributes": "Attributes", "tryAtHomeEnabled": "Try at Home",
             "exchangeAvailable": "Size exchange",
+            "outsideNeemuchDeliveryEnabled": "Outside Neemuch delivery requests",
         }
 
         def display(key: str, value: Any) -> str:
             if key in {"pricePaise", "originalPricePaise"}:
                 return f"Rs {int(value or 0) / 100:.2f}"
-            if key in {"tryAtHomeEnabled", "exchangeAvailable"}:
+            if key in {"tryAtHomeEnabled", "exchangeAvailable", "outsideNeemuchDeliveryEnabled"}:
                 return "Enabled" if value else "Disabled"
             if key == "variants" and isinstance(value, list):
                 return ", ".join(
@@ -2808,6 +2828,7 @@ class ShopWorkflow:
         attributes = json.loads(row["attributes_json"])
         attributes.pop("hsnCode", None)
         attributes.pop("gstRate", None)
+        outside_neemuch_delivery = str(attributes.get("outsideNeemuchDeliveryEnabled", "false")).casefold() == "true"
         subcategory = normalize_subcategory(
             attributes.get("subcategory"), name=row["name"], category=row["category"]
         )
@@ -2875,6 +2896,7 @@ class ShopWorkflow:
             "returnWindowDays": EXCHANGE_WINDOW_DAYS if bool(row["exchange_available"]) else 0,
             "exchangeAvailable": bool(row["exchange_available"]) if "exchange_available" in row.keys() else False,
             "tryAtHomeAvailable": bool(row["try_at_home_enabled"]) if "try_at_home_enabled" in row.keys() else False,
+            "outsideNeemuchDeliveryAvailable": outside_neemuch_delivery,
             "vendorId": row["application_id"],
             "storeName": row["shop_name"],
             "storeSlug": store_slug,
@@ -3018,6 +3040,7 @@ class ShopWorkflow:
                     "price": price,
                     "tryAtHomeAvailable": bool(row["try_at_home_enabled"]) if "try_at_home_enabled" in row.keys() else False,
                     "exchangeAvailable": bool(row["exchange_available"]) if "exchange_available" in row.keys() else False,
+                    "outsideNeemuchDeliveryAvailable": str(attributes.get("outsideNeemuchDeliveryEnabled", "false")).casefold() == "true",
                     "variants": [
                         {
                             "id": item["id"],

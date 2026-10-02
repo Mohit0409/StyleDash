@@ -278,6 +278,95 @@ class PaymentServiceTests(unittest.TestCase):
             callback()
         self.assertEqual(caught.exception.code, code)
 
+    def test_outside_delivery_request_quote_and_payment_are_server_authoritative(self) -> None:
+        product_id = "sd-prod-001"
+        variant_id = "sd-prod-001-var-2"
+        original = self.service._static_products[product_id]
+        self.service._static_products[product_id] = {
+            **original,
+            "outsideNeemuchDeliveryAvailable": True,
+        }
+        outside_address = {
+            "name": "Outside Customer",
+            "phone": "9999999999",
+            "street": "12 Test Colony",
+            "city": "Bhopal",
+            "state": "Madhya Pradesh",
+            "pincode": "462001",
+        }
+        try:
+            self.assert_api_error(
+                "use_direct_checkout",
+                lambda: self.service.create_delivery_request(
+                    "test-user",
+                    {
+                        "productId": product_id,
+                        "variantId": variant_id,
+                        "quantity": 1,
+                        "address": {**outside_address, "pincode": "458441"},
+                    },
+                ),
+            )
+            created_request = self.service.create_delivery_request(
+                "test-user",
+                {
+                    "productId": product_id,
+                    "variantId": variant_id,
+                    "quantity": 1,
+                    "address": outside_address,
+                },
+            )["request"]
+            self.assertEqual(created_request["status"], "requested")
+
+            quoted = self.service.quote_delivery_request(
+                created_request["id"], 123, "Courier charge confirmed.", "3-5 business days", "admin-a"
+            )
+            self.assertEqual(quoted["status"], "quoted")
+            self.assertEqual(quoted["quote"]["deliveryFee"], 123)
+            self.assertEqual(
+                quoted["quote"]["grandTotal"],
+                quoted["quote"]["productSubtotal"] + 123,
+            )
+            self.assertEqual(self.service.list_delivery_requests("other-user"), [])
+            self.assert_api_error(
+                "delivery_request_not_found",
+                lambda: self.service.create_delivery_request_order(
+                    "other-user",
+                    created_request["id"],
+                    {"paymentMethod": "upi"},
+                    "outside-delivery-other-user",
+                ),
+            )
+            self.assert_api_error(
+                "invalid_delivery_payment",
+                lambda: self.service.create_delivery_request_order(
+                    "test-user",
+                    created_request["id"],
+                    {"paymentMethod": "upi", "deliveryFee": 1, "grandTotal": 1},
+                    "outside-delivery-tampered-amount",
+                ),
+            )
+
+            payment_order = self.service.create_delivery_request_order(
+                "test-user",
+                created_request["id"],
+                {"paymentMethod": "upi"},
+                "outside-delivery-payment-001",
+            )
+            self.assertEqual(payment_order["amount"], quoted["quote"]["grandTotal"] * 100)
+            self.assertEqual(payment_order["trustedTotals"]["deliveryFee"], 123)
+            paid = self.service.verify_payment(
+                self.browser_verification(payment_order, "pay_outside_delivery_001")
+            )
+            self.assertEqual(paid["order"]["paymentStatus"], "paid")
+            self.assertEqual(paid["order"]["deliveryMethod"], "outstation")
+            request_after = self.service.list_delivery_requests("test-user")[0]
+            self.assertEqual(request_after["status"], "paid")
+            self.assertEqual(request_after["orderId"], paid["order"]["id"])
+        finally:
+            self.service._static_products[product_id] = original
+            self.service.refresh_shop_products()
+
     def test_ordering_lock_blocks_cod_and_razorpay_without_mutation(self) -> None:
         self.service.ordering_enabled = False
         state_before = json.loads(json.dumps(self.service.store.state))

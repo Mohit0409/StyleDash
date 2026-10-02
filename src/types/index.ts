@@ -76,6 +76,8 @@ export interface Product {
   exchangeAvailable: boolean;
   /** Opt-in store-controlled offer; pricing/eligibility are always verified by the server. */
   tryAtHomeAvailable?: boolean;
+  /** Seller opt-in. Outside-Neemuch customers must request a delivery quote before payment. */
+  outsideNeemuchDeliveryAvailable?: boolean;
 
   // Multi-Store & Vendor Fields
   vendorId: string;

@@ -205,6 +205,7 @@ export interface SellerProductDraft {
   attributes: Record<string, string>;
   tryAtHomeEnabled?: boolean;
   exchangeAvailable?: boolean;
+  outsideNeemuchDeliveryEnabled?: boolean;
 }
 
 export interface SellerProduct extends Omit<SellerProductDraft, 'variants' | 'inventory' | 'size'> {

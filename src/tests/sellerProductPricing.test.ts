@@ -11,7 +11,7 @@ const form = (overrides: Partial<ProductFormState> = {}): ProductFormState => ({
   name: 'Local Kurta', description: 'A locally stocked cotton kurta for testing.', brand: 'Local Loom',
   department: 'women', category: 'Clothing & Fashion', subcategory: '', deliveryType: 'normal',
   price: '500.00', originalPrice: '540.00', colours: [colour()], material: '',
-  tryAtHomeEnabled: false, exchangeAvailable: false, ...overrides,
+  tryAtHomeEnabled: false, exchangeAvailable: false, outsideNeemuchDeliveryEnabled: false, ...overrides,
 });
 
 describe('seller product MRP validation', () => {

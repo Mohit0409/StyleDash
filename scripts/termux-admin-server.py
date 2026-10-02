@@ -266,6 +266,7 @@ class AdminApplication:
         self.reviews = ReviewWorkflow(database) if has_customers else None
         self._store_product_image_payload = public.store_product_image_payload
         self._public_security_error = public.SecurityError
+        self._public_api_error = public.ApiError
         self.product_image_directory = database.parent / "product-images"
         self.payments = public.PaymentService(
             catalog, settings, data_dir, key_id="", key_secret="", webhook_secret="",
@@ -328,6 +329,52 @@ class AdminApplication:
                 orders = [order for order in orders if needle in str(order.get("id", "")).casefold()]
             selected = [dict(order) for order in sorted(orders, key=lambda item: item.get("createdAt", ""), reverse=True)[:250]]
         return [self.payments.order_for_display(order) for order in selected]
+
+    def list_outside_delivery_requests(self) -> list[dict[str, Any]]:
+        return self.payments.admin_list_delivery_requests()
+
+    def quote_outside_delivery_request(self, admin_id: str, request_id: str, payload: Any) -> dict[str, Any]:
+        if not isinstance(payload, dict):
+            raise SecurityError(400, "Delivery quote must be an object.", "invalid_delivery_quote")
+        try:
+            result = self.payments.quote_delivery_request(
+                request_id,
+                payload.get("deliveryFee"),
+                payload.get("note"),
+                payload.get("estimatedDelivery"),
+                admin_id,
+            )
+        except self._public_api_error as exc:
+            raise SecurityError(exc.status, exc.message, exc.code) from None
+        self.identity.record_action(
+            admin_id,
+            "outside_delivery_quoted",
+            "outside_delivery_request",
+            request_id,
+            "success",
+            {
+                "deliveryFee": (result.get("quote") or {}).get("deliveryFee"),
+                "grandTotal": (result.get("quote") or {}).get("grandTotal"),
+            },
+        )
+        return result
+
+    def reject_outside_delivery_request(self, admin_id: str, request_id: str, payload: Any) -> dict[str, Any]:
+        if not isinstance(payload, dict):
+            raise SecurityError(400, "Rejection request must be an object.", "invalid_delivery_rejection")
+        try:
+            result = self.payments.reject_delivery_request(request_id, payload.get("reason"), admin_id)
+        except self._public_api_error as exc:
+            raise SecurityError(exc.status, exc.message, exc.code) from None
+        self.identity.record_action(
+            admin_id,
+            "outside_delivery_rejected",
+            "outside_delivery_request",
+            request_id,
+            "success",
+            {"reason": result.get("rejectionReason")},
+        )
+        return result
 
     def payment_alerts(self) -> list[dict[str, Any]]:
         with self.payments.store.lock:
@@ -1133,6 +1180,9 @@ class AdminHandler(BaseHTTPRequestHandler):
             if path == "/api/admin/orders":
                 self._admin(); query = self._query().get("q", [""])[0]
                 self._json(200, {"success": True, "orders": self.application.list_orders(query)}); return
+            if path == "/api/admin/outside-delivery-requests":
+                self._admin()
+                self._json(200, {"success": True, "requests": self.application.list_outside_delivery_requests()}); return
             if path == "/api/admin/payment-alerts":
                 self._admin(); self._json(200, {"success": True, "alerts": self.application.payment_alerts()}); return
             if path.startswith("/api/admin/orders/"):
@@ -1255,6 +1305,14 @@ class AdminHandler(BaseHTTPRequestHandler):
             if path == "/api/admin/delivery-zone":
                 result = self.application.replace_delivery_zone_configuration(admin["id"], payload)
                 self._json(200, {"success": True, **result}); return
+            outside_delivery_match = re.fullmatch(r"/api/admin/outside-delivery-requests/([^/]+)/(quote|reject)", path)
+            if outside_delivery_match:
+                request_id, action = (unquote(value) for value in outside_delivery_match.groups())
+                if action == "quote":
+                    result = self.application.quote_outside_delivery_request(admin["id"], request_id, payload)
+                else:
+                    result = self.application.reject_outside_delivery_request(admin["id"], request_id, payload)
+                self._json(200, {"success": True, "request": result}); return
             if path.startswith("/api/admin/orders/") and path.endswith("/payment"):
                 order_id = unquote(path.removeprefix("/api/admin/orders/").removesuffix("/payment"))
                 result = self.application.mark_cod_paid(admin["id"], order_id, payload.get("collectionMethod"))

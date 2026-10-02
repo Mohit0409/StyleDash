@@ -21,6 +21,7 @@ const Checkout = lazy(() => import('./pages/Checkout').then(m => ({ default: m.C
 const OrderSuccess = lazy(() => import('./pages/OrderSuccess').then(m => ({ default: m.OrderSuccess })));
 const OrderTracking = lazy(() => import('./pages/OrderTracking').then(m => ({ default: m.OrderTracking })));
 const Orders = lazy(() => import('./pages/Orders').then(m => ({ default: m.Orders })));
+const OutsideDeliveryRequests = lazy(() => import('./pages/OutsideDeliveryRequests').then(m => ({ default: m.OutsideDeliveryRequests })));
 const Profile = lazy(() => import('./pages/Profile').then(m => ({ default: m.Profile })));
 const NotFound = lazy(() => import('./pages/NotFound').then(m => ({ default: m.NotFound })));
 const Help = lazy(() => import('./pages/Help').then(m => ({ default: m.Help })));
@@ -66,6 +67,7 @@ export const App: React.FC = () => {
                       <Route path="order-success/:orderId" element={<ProtectedRoute><OrderSuccess /></ProtectedRoute>} />
                       <Route path="orders/:orderId/track" element={<ProtectedRoute><OrderTracking /></ProtectedRoute>} />
                       <Route path="orders" element={<ProtectedRoute><Orders /></ProtectedRoute>} />
+                      <Route path="delivery-requests" element={<ProtectedRoute><OutsideDeliveryRequests /></ProtectedRoute>} />
                       <Route path="profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
                       <Route path="help" element={<Help />} />
                       <Route path="returns" element={<Returns />} />
