@@ -319,9 +319,10 @@ class PaymentServiceTests(unittest.TestCase):
             self.assertEqual(created_request["status"], "requested")
 
             quoted = self.service.quote_delivery_request(
-                created_request["id"], 123, "Courier charge confirmed.", "3-5 business days", "admin-a"
+                created_request["id"], 123, "Courier charge confirmed.", "2", "admin-a"
             )
             self.assertEqual(quoted["status"], "quoted")
+            self.assertEqual(quoted["quote"]["estimatedDelivery"], "2 days")
             self.assertEqual(quoted["quote"]["deliveryFee"], 123)
             self.assertEqual(
                 quoted["quote"]["grandTotal"],
