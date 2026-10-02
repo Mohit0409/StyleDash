@@ -1,6 +1,8 @@
 import { InventoryAvailabilityResponse } from '../types';
 import { apiFetch } from '../services/apiClient';
 
+const PRODUCT_AVAILABILITY_BATCH_SIZE = 32;
+
 export const inventoryRepository = {
   async getAvailability(variantId?: string, fetcher: typeof fetch = fetch): Promise<InventoryAvailabilityResponse> {
     const query = variantId ? `?variantId=${encodeURIComponent(variantId)}` : '';
@@ -10,8 +12,21 @@ export const inventoryRepository = {
   async getAvailabilityForProducts(productIds: string[], fetcher: typeof fetch = fetch): Promise<InventoryAvailabilityResponse> {
     const uniqueIds = [...new Set(productIds)];
     if (uniqueIds.length === 0) return { success: true, availability: [] };
-    const query = uniqueIds.map(id => `productId=${encodeURIComponent(id)}`).join('&');
-    return apiFetch<InventoryAvailabilityResponse>(`/api/inventory/availability?${query}`, {}, fetcher);
+
+    const batches: string[][] = [];
+    for (let offset = 0; offset < uniqueIds.length; offset += PRODUCT_AVAILABILITY_BATCH_SIZE) {
+      batches.push(uniqueIds.slice(offset, offset + PRODUCT_AVAILABILITY_BATCH_SIZE));
+    }
+
+    const responses = await Promise.all(batches.map(batch => {
+      const query = batch.map(id => `productId=${encodeURIComponent(id)}`).join('&');
+      return apiFetch<InventoryAvailabilityResponse>(`/api/inventory/availability?${query}`, {}, fetcher);
+    }));
+
+    return {
+      success: true,
+      availability: responses.flatMap(response => response.availability),
+    };
   },
 };
 

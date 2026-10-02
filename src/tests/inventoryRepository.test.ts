@@ -64,6 +64,32 @@ describe('authoritative inventory repository', () => {
     expect(fetcher.mock.calls.some(([input]) => String(input) === '/api/inventory/availability')).toBe(false);
   }, 10_000);
 
+
+  it('splits product availability into backend-safe batches of at most 32 ids', async () => {
+    const productIds = Array.from({ length: 70 }, (_, index) => `shopprod_batch_${String(index + 1).padStart(2, '0')}`);
+    const fetcher = vi.fn<typeof fetch>(async input => {
+      const url = new URL(String(input), 'https://styledash.test');
+      const ids = url.searchParams.getAll('productId');
+      return response(ids.map(id => ({
+        productId: id,
+        variantId: `${id}-var-1`,
+        available: true,
+      })));
+    });
+
+    const result = await inventoryRepository.getAvailabilityForProducts(productIds, fetcher);
+
+    expect(fetcher).toHaveBeenCalledTimes(3);
+    const requestedIds = fetcher.mock.calls.flatMap(([input]) =>
+      new URL(String(input), 'https://styledash.test').searchParams.getAll('productId'));
+    for (const [input] of fetcher.mock.calls) {
+      const ids = new URL(String(input), 'https://styledash.test').searchParams.getAll('productId');
+      expect(ids.length).toBeLessThanOrEqual(32);
+    }
+    expect(new Set(requestedIds)).toEqual(new Set(productIds));
+    expect(result.availability).toHaveLength(70);
+  });
+
   it('deduplicates concurrent public catalogue and availability requests', async () => {
     const fetcher = vi.fn<typeof fetch>(async input => String(input) === '/api/shop-products/published'
       ? productsResponse()

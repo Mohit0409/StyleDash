@@ -2441,6 +2441,24 @@ class HttpApiTests(unittest.TestCase):
             self.assertIn("<loc>https://styledash.test/products</loc>", body)
             self.assertIn("https://styledash.test/product/", body)
 
+    def test_live_hostname_serves_robots_and_sitemap_when_public_origin_env_is_missing(self) -> None:
+        configured_origin = os.environ.pop("STYLEDASH_PUBLIC_ORIGIN", None)
+        try:
+            for path, expected_content in (
+                ("/robots.txt", "Sitemap: https://vibe4you.in/sitemap.xml"),
+                ("/sitemap.xml", "<loc>https://vibe4you.in/</loc>"),
+            ):
+                connection = http.client.HTTPConnection("127.0.0.1", self.server.server_address[1])
+                connection.request("GET", path, headers={"Host": "vibe4you.in"})
+                response = connection.getresponse()
+                body = response.read().decode("utf-8")
+                self.assertEqual(response.status, 200, path)
+                self.assertIn(expected_content, body)
+                connection.close()
+        finally:
+            if configured_origin is not None:
+                os.environ["STYLEDASH_PUBLIC_ORIGIN"] = configured_origin
+
     def test_noncanonical_web_host_redirects_to_public_origin(self) -> None:
         connection = http.client.HTTPConnection("127.0.0.1", self.server.server_address[1])
         connection.request(

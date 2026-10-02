@@ -3442,15 +3442,23 @@ class StyleDashRequestHandler(SimpleHTTPRequestHandler):
         self.end_headers()
         return True
 
-    def _robots_body(self) -> str:
+    def _seo_origin(self) -> str:
         origin = self._public_origin()
+        if origin:
+            return origin
+        if (self._request_hostname() or "").lower() in {"vibe4you.in", "www.vibe4you.in"}:
+            return "https://vibe4you.in"
+        return ""
+
+    def _robots_body(self) -> str:
+        origin = self._seo_origin()
         lines = ["User-agent: *", "Allow: /"]
         if origin:
             lines.append(f"Sitemap: {origin}/sitemap.xml")
         return "\n".join(lines) + "\n"
 
     def _sitemap_body(self) -> str:
-        origin = self._public_origin()
+        origin = self._seo_origin()
         if not origin:
             raise ApiError(HTTPStatus.SERVICE_UNAVAILABLE, "Sitemap is unavailable.", "sitemap_unavailable")
         paths = [
