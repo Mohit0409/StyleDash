@@ -480,7 +480,7 @@ async function quoteOutsideDelivery(request){
   const current=request.quote||{};
   const values=await formDialog('Send outside-Neemuch delivery quote',[
     {name:'deliveryFee',label:'Delivery charge (Rs)',type:'number',required:true,min:1,max:10000,step:'1',value:current.deliveryFee??''},
-    {name:'estimatedDelivery',label:'Estimated delivery time',maxLength:120,value:current.estimatedDelivery||'',placeholder:'Example: 3-5 business days'},
+    {name:'estimatedDelivery',label:'Estimated delivery time',maxLength:120,value:current.estimatedDelivery||'',placeholder:'Example: 2 or 3-5 business days',help:'You can enter just a number of days (for example 2), or a range such as 3-5 business days.'},
     {name:'note',label:'Message to customer (optional)',type:'textarea',maxLength:500,value:current.note||''},
   ],'Send Payment Request');
   if(!values)return false;

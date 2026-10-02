@@ -1081,13 +1081,28 @@ class PaymentService:
             clean_note = note.strip()
         clean_eta = ""
         if estimated_delivery not in (None, ""):
-            if not isinstance(estimated_delivery, str) or not 2 <= len(estimated_delivery.strip()) <= 120:
+            if not isinstance(estimated_delivery, str):
                 raise ApiError(
                     HTTPStatus.UNPROCESSABLE_ENTITY,
                     "Enter a valid delivery estimate.",
                     "invalid_delivery_quote",
                 )
             clean_eta = estimated_delivery.strip()
+            if not 1 <= len(clean_eta) <= 120:
+                raise ApiError(
+                    HTTPStatus.UNPROCESSABLE_ENTITY,
+                    "Enter a valid delivery estimate.",
+                    "invalid_delivery_quote",
+                )
+            if clean_eta.isdigit():
+                days = int(clean_eta)
+                if days < 1 or days > 90:
+                    raise ApiError(
+                        HTTPStatus.UNPROCESSABLE_ENTITY,
+                        "Enter a delivery estimate between 1 and 90 days.",
+                        "invalid_delivery_quote",
+                    )
+                clean_eta = f"{days} day" if days == 1 else f"{days} days"
 
         self.refresh_shop_products()
         products = self.product_snapshot()
