@@ -406,6 +406,49 @@ class ShopWorkflowTests(unittest.TestCase):
         self.store.admin_transition_product_change_request("admin-a", change["id"], "APPROVED")
         self.assertFalse(self.store.get_published_product(product["id"])["outsideNeemuchDeliveryAvailable"])
 
+    def test_admin_can_toggle_outside_neemuch_delivery_immediately_on_published_product(self) -> None:
+        self.create_active_shop("user-a", "Admin Delivery Toggle Shop")
+        product = self.store.create_product_draft(
+            "user-a", self.complete_product("Admin Toggle Kurta")
+        )
+        self.store.submit_product("user-a", product["id"])
+        for target in ("UNDER_REVIEW", "APPROVED", "PUBLISHED"):
+            product = self.store.admin_transition_product("admin-a", product["id"], target)
+
+        self.assertEqual(product["status"], "PUBLISHED")
+        self.assertFalse(product["outsideNeemuchDeliveryEnabled"])
+        self.assertEqual(self.store.admin_list_product_change_requests("admin-a"), [])
+
+        enabled = self.store.admin_update_product(
+            "admin-a", product["id"], {"outsideNeemuchDeliveryEnabled": True}
+        )
+        self.assertEqual(enabled["status"], "PUBLISHED")
+        self.assertTrue(enabled["outsideNeemuchDeliveryEnabled"])
+        self.assertTrue(
+            self.store.get_published_product(product["id"])[
+                "outsideNeemuchDeliveryAvailable"
+            ]
+        )
+        payment = next(
+            item
+            for item in self.store.payment_catalog_products()
+            if item["id"] == product["id"]
+        )
+        self.assertTrue(payment["outsideNeemuchDeliveryAvailable"])
+        self.assertEqual(self.store.admin_list_product_change_requests("admin-a"), [])
+
+        disabled = self.store.admin_update_product(
+            "admin-a", product["id"], {"outsideNeemuchDeliveryEnabled": False}
+        )
+        self.assertEqual(disabled["status"], "PUBLISHED")
+        self.assertFalse(disabled["outsideNeemuchDeliveryEnabled"])
+        self.assertFalse(
+            self.store.get_published_product(product["id"])[
+                "outsideNeemuchDeliveryAvailable"
+            ]
+        )
+        self.assertEqual(self.store.admin_list_product_change_requests("admin-a"), [])
+
     def test_incremental_draft_rejection_resubmission_and_suspension(self) -> None:
         draft = self.store.create_draft("user-a", {"shopName": "Partial Shop"})
         self.assertEqual(draft["status"], "DRAFT")
