@@ -211,6 +211,33 @@ test('admin iPhone fallback accepts empty JPEG MIME when createImageBitmap is un
   expect(result.optimizedType).toBe('image/webp');
 });
 
+test('admin upload derives type and extension from encoded bytes, not Blob metadata', async ({ page }) => {
+  await page.goto('http://127.0.0.1:8081/');
+  const result = await page.evaluate(async () => {
+    const source = document.createElement('canvas');
+    source.width = 64;
+    source.height = 64;
+    const context = source.getContext('2d')!;
+    context.fillStyle = '#4b6cb7';
+    context.fillRect(0, 0, source.width, source.height);
+    const jpeg = await new Promise<Blob>((resolve, reject) =>
+      source.toBlob(blob => blob ? resolve(blob) : reject(new Error('JPEG generation failed.')), 'image/jpeg', 0.9),
+    );
+    const mislabeled = new Blob([await jpeg.arrayBuffer()], {type:'image/webp'});
+    const file = new File([jpeg], 'iphone-photo.jpeg', {type:'image/jpeg'});
+    const payload = await adminImageUploadPayload(file, mislabeled);
+    const raw = atob(payload.dataBase64);
+    return {
+      contentType:payload.contentType,
+      fileName:payload.fileName,
+      jpegMagic:[raw.charCodeAt(0),raw.charCodeAt(1),raw.charCodeAt(2)],
+    };
+  });
+  expect(result.contentType).toBe('image/jpeg');
+  expect(result.fileName).toBe('iphone-photo.jpg');
+  expect(result.jpegMagic).toEqual([0xff,0xd8,0xff]);
+});
+
 test('delivery-zone map draws points and keeps coordinates synchronized', async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== 'desktop-chromium', 'One Chromium map-editor probe is sufficient.');
   const tileReferers: string[] = [];

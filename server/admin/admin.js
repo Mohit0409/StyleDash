@@ -274,8 +274,19 @@ async function prepareAdminProductImage(file){
     throw new Error('Image is still too large after compression.');
   }finally{decoded?.close?.();}
 }
+async function adminEncodedImageType(blob){
+  const bytes=new Uint8Array(await blob.slice(0,16).arrayBuffer());
+  if(bytes.length>=12&&bytes[0]===0x52&&bytes[1]===0x49&&bytes[2]===0x46&&bytes[3]===0x46&&bytes[8]===0x57&&bytes[9]===0x45&&bytes[10]===0x42&&bytes[11]===0x50)return {contentType:'image/webp',extension:'webp'};
+  if(bytes.length>=3&&bytes[0]===0xff&&bytes[1]===0xd8&&bytes[2]===0xff)return {contentType:'image/jpeg',extension:'jpg'};
+  if(bytes.length>=8&&bytes[0]===0x89&&bytes[1]===0x50&&bytes[2]===0x4e&&bytes[3]===0x47&&bytes[4]===0x0d&&bytes[5]===0x0a&&bytes[6]===0x1a&&bytes[7]===0x0a)return {contentType:'image/png',extension:'png'};
+  throw new Error('Optimized image format could not be verified.');
+}
 async function blobBase64(blob){const bytes=new Uint8Array(await blob.arrayBuffer());let binary='';for(let i=0;i<bytes.length;i+=0x8000)binary+=String.fromCharCode(...bytes.subarray(i,i+0x8000));return btoa(binary);}
-async function uploadAdminProductImages(files,progressOffset=0,progressTotal=null){const urls=[];const total=progressTotal??files.length;for(const [index,file] of (files||[]).entries()){validateAdminImageFile(file);status(`Uploading ${file.name} (${progressOffset+index+1} of ${total})...`);const blob=await prepareAdminProductImage(file);const result=await api('/api/admin/product-images',{method:'POST',body:JSON.stringify({fileName:`${file.name.replace(/\.[^.]+$/,'').slice(0,80)||'product'}.webp`,contentType:'image/webp',dataBase64:await blobBase64(blob)})});urls.push(result.image.url);}return urls;}
+async function adminImageUploadPayload(file,blob){
+  const encoded=await adminEncodedImageType(blob);
+  return {fileName:`${file.name.replace(/\.[^.]+$/,'').slice(0,80)||'product'}.${encoded.extension}`,contentType:encoded.contentType,dataBase64:await blobBase64(blob)};
+}
+async function uploadAdminProductImages(files,progressOffset=0,progressTotal=null){const urls=[];const total=progressTotal??files.length;for(const [index,file] of (files||[]).entries()){validateAdminImageFile(file);status(`Uploading ${file.name} (${progressOffset+index+1} of ${total})...`);const blob=await prepareAdminProductImage(file);const result=await api('/api/admin/product-images',{method:'POST',body:JSON.stringify(await adminImageUploadPayload(file,blob))});urls.push(result.image.url);}return urls;}
 
 function parseVariants(raw) {
   const rows=String(raw||'').split(',').map(value=>value.trim()).filter(Boolean).map(value=>{
