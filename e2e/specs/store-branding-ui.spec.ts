@@ -265,6 +265,8 @@ test('public stores, storefront, product search, and royals search use safe bran
   await expect(page.locator('img[src*="missing-product-"]')).toHaveCount(0);
 
   await page.goto('/');
+  const mobileSearchButton = page.getByRole('button', { name: 'Search products' });
+  if ((page.viewportSize()?.width ?? 1024) < 768) await mobileSearchButton.click();
   const search = page.locator('header input[aria-label="Search products, brands, or local Neemuch stores"]:visible');
   await search.fill('royals');
   await search.press('Enter');

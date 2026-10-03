@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { ShoppingBag, Heart, User, Search, Zap, Sun, Moon, Store, PlusCircle, LoaderCircle, Grid2X2, Mic } from 'lucide-react';
+import { ShoppingBag, Heart, User, Search, Zap, Sun, Moon, Store, PlusCircle, LoaderCircle, Grid2X2, Mic, Menu, X, Shirt, Footprints, Sparkles, Gem } from 'lucide-react';
 import { useCart } from '../context/CartContext';
 import { useWishlist } from '../context/WishlistContext';
 import { useTheme } from '../context/ThemeContext';
@@ -35,6 +35,8 @@ export const Header: React.FC<{ onOpenCart: () => void }> = ({ onOpenCart }) => 
   const { isDark, toggleTheme } = useTheme();
   const [searchQuery, setSearchQuery] = useState('');
   const [isMobileCollapsed, setIsMobileCollapsed] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [mobileSearchOpen, setMobileSearchOpen] = useState(false);
   const [speechSearchAvailable, setSpeechSearchAvailable] = useState(false);
   const [isListening, setIsListening] = useState(false);
   const [debouncedSearch, setDebouncedSearch] = useState('');
@@ -267,119 +269,57 @@ export const Header: React.FC<{ onOpenCart: () => void }> = ({ onOpenCart }) => 
     );
   };
 
+  const mobileCategories = [
+    { label: 'Women', href: '/products?dept=women', icon: Shirt, tone: 'bg-rose-50 dark:bg-rose-950/30' },
+    { label: 'Men', href: '/products?dept=men', icon: User, tone: 'bg-sky-50 dark:bg-sky-950/30' },
+    { label: 'Footwear', href: '/products?category=Footwear', icon: Footprints, tone: 'bg-stone-100 dark:bg-stone-800' },
+    { label: 'Beauty', href: '/products?category=Beauty%20%26%20Personal%20Care', icon: Sparkles, tone: 'bg-pink-50 dark:bg-pink-950/30' },
+    { label: 'Jewellery', href: '/products?category=Accessories', icon: Gem, tone: 'bg-amber-50 dark:bg-amber-950/30' },
+    { label: 'Kids', href: '/products?dept=kids', icon: User, tone: 'bg-violet-50 dark:bg-violet-950/30' },
+  ];
+
   return (
-    <header
-      data-mobile-header-collapsed={isMobileCollapsed ? 'true' : 'false'}
-      className="sticky top-0 z-40 border-b border-neutral-200 bg-white shadow-sm transition-colors dark:border-neutral-800 dark:bg-neutral-900"
-    >
-      {/* Top Banner */}
-      <div className={`${isMobileCollapsed ? 'hidden md:flex' : 'flex'} min-h-8 items-center justify-center gap-2 bg-neutral-950 px-4 py-1.5 text-center text-xs text-white`}>
-        <Zap className="w-3.5 h-3.5 text-lime-400 fill-lime-400" />
+    <header data-mobile-header-collapsed={isMobileCollapsed ? 'true' : 'false'} className="sticky top-0 z-40 border-b border-neutral-200 bg-white shadow-sm transition-colors dark:border-neutral-800 dark:bg-neutral-900">
+      <div className={`${isMobileCollapsed ? 'hidden md:flex' : 'flex'} min-h-9 items-center justify-center gap-2 bg-neutral-950 px-4 py-2 text-center text-xs text-white`}>
+        <Zap className="h-4 w-4 fill-lime-400 text-lime-400" />
         <span><strong>SAME-DAY DELIVERY</strong> in {CONFIG.SERVICE_CITY}</span>
       </div>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className={`${isMobileCollapsed ? 'hidden md:flex' : 'flex'} min-h-16 items-center justify-between gap-2 py-1.5 sm:h-16 sm:gap-4 sm:py-0`}>
-          <div className="flex min-w-0 shrink items-center">
-            <Link
-              to="/"
-              aria-label="vibe4you home"
-              className="group block w-[clamp(7.25rem,37vw,9.5rem)] shrink-0 sm:w-[205px]"
-            >
-              <BrandWordmark showTagline className="transition-transform duration-200 group-hover:scale-[1.015]" />
-            </Link>
-          </div>
-
-          {renderSearchForm(false)}
-
-          <div className="flex shrink-0 items-center gap-0.5 sm:gap-3">
-            <Link
-              to="/stores"
-              className="hidden sm:flex min-h-11 items-center gap-1.5 px-3 py-1.5 text-xs font-extrabold text-neutral-800 dark:text-neutral-200 hover:text-lime-600 transition-colors"
-              title="Browse Local Stores"
-            >
-              <Store className="w-4 h-4 text-lime-600" />
-              <span>Local Stores</span>
-            </Link>
-
-            <button
-              onClick={toggleTheme}
-              className="hidden min-h-11 min-w-11 items-center justify-center rounded-full p-2 text-neutral-700 transition-colors hover:bg-neutral-100 dark:text-neutral-300 dark:hover:bg-neutral-800 sm:flex"
-              aria-label={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
-              title="Toggle Dark Mode"
-            >
-              {isDark ? <Sun className="w-5 h-5 text-amber-400" /> : <Moon className="w-5 h-5" />}
-            </button>
-
-            <Link
-              to="/wishlist"
-              className="relative hidden min-h-11 min-w-11 items-center justify-center rounded-full p-2 text-neutral-700 transition-colors hover:bg-neutral-100 dark:text-neutral-300 dark:hover:bg-neutral-800 md:flex"
-              aria-label={`Wishlist${wishlistIds.length ? `, ${wishlistIds.length} saved` : ''}`}
-              title="Wishlist"
-            >
-              <Heart className="w-5 h-5" />
-              {wishlistIds.length > 0 && (
-                <span className="absolute top-1 right-1 bg-rose-500 text-white text-[10px] font-bold w-4 h-4 rounded-full flex items-center justify-center">
-                  {wishlistIds.length}
-                </span>
-              )}
-            </Link>
-
-            <Link
-              to="/profile"
-              className="hidden min-h-11 min-w-11 items-center justify-center rounded-full p-2 text-neutral-700 transition-colors hover:bg-neutral-100 dark:text-neutral-300 dark:hover:bg-neutral-800 md:flex"
-              aria-label={user ? 'Profile and account' : 'Sign in or open account'}
-              title="Profile / Account"
-            >
-              <User className="w-5 h-5" />
-            </Link>
-
-            <button
-              onClick={onOpenCart}
-              aria-label={`Cart ${totalItemsCount}`}
-              className="hidden min-h-11 items-center gap-1.5 rounded-full bg-neutral-950 px-2.5 py-2 text-sm font-bold text-white shadow-md transition-all active:scale-95 hover:bg-neutral-800 dark:bg-lime-400 dark:text-neutral-950 dark:hover:bg-lime-300 md:flex sm:gap-2 sm:px-4"
-            >
-              <ShoppingBag className="w-4 h-4" />
-              <span className="hidden sm:inline">Cart</span>
-              <span className="bg-lime-400 dark:bg-neutral-900 text-neutral-950 dark:text-lime-400 px-2 py-0.5 rounded-full text-xs font-black">
-                {totalItemsCount}
-              </span>
-            </button>
+      <div className="md:hidden">
+        <div className={`flex items-center ${isMobileCollapsed ? 'justify-end' : 'justify-between'} gap-2 px-4 py-3`}>
+          {!isMobileCollapsed && <button type="button" onClick={() => navigate('/')} aria-label="vibe4you home" className="block w-[clamp(9.5rem,48vw,12.5rem)] shrink-0 text-left"><BrandWordmark className="w-full" /></button>}
+          <div className="ml-auto flex items-center gap-1">
+            <button type="button" onClick={() => setMobileSearchOpen(open => !open)} className="flex min-h-11 min-w-11 items-center justify-center rounded-full text-neutral-950 hover:bg-neutral-100 dark:text-white dark:hover:bg-neutral-800" aria-label={mobileSearchOpen ? 'Close search' : 'Search products'} aria-expanded={mobileSearchOpen}><Search className="h-7 w-7" strokeWidth={2.4} /></button>
+            {!isMobileCollapsed && <button type="button" onClick={onOpenCart} className="relative flex min-h-11 min-w-11 items-center justify-center rounded-full text-neutral-950 hover:bg-neutral-100 dark:text-white dark:hover:bg-neutral-800" aria-label={`Header bag ${totalItemsCount}`}><ShoppingBag className="h-7 w-7" strokeWidth={2.4} />{totalItemsCount > 0 && <span className="absolute right-0 top-0 flex h-5 min-w-5 items-center justify-center rounded-full bg-lime-400 px-1 text-[11px] font-black text-neutral-950">{totalItemsCount}</span>}</button>}
+            <button type="button" onClick={() => setMobileMenuOpen(open => !open)} className="flex min-h-11 min-w-11 items-center justify-center rounded-full text-neutral-950 hover:bg-neutral-100 dark:text-white dark:hover:bg-neutral-800" aria-label={mobileMenuOpen ? 'Close menu' : 'Open menu'} aria-expanded={mobileMenuOpen}>{mobileMenuOpen ? <X className="h-8 w-8" /> : <Menu className="h-8 w-8" />}</button>
           </div>
         </div>
 
-        {renderSearchForm(true)}
+        {mobileSearchOpen && <div className="px-4 pb-3">{renderSearchForm(true)}</div>}
 
-        <nav
-          aria-label="Shop navigation"
-          className="-mx-4 flex items-center gap-1.5 overflow-x-auto border-t border-neutral-100 px-4 py-1 text-xs font-semibold text-neutral-700 no-scrollbar dark:border-neutral-800 dark:text-neutral-300 sm:mx-0 sm:gap-4 sm:px-0 sm:py-0"
-        >
-          <button
-            type="button"
-            onClick={toggleTheme}
-            className={`${isMobileCollapsed ? 'hidden' : 'inline-flex'} min-h-11 shrink-0 items-center gap-1.5 rounded-full bg-neutral-100 px-3 text-neutral-700 dark:bg-neutral-800 dark:text-neutral-200 sm:hidden`}
-            aria-label={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
-          >
-            {isDark ? <Sun className="h-3.5 w-3.5 text-amber-400" /> : <Moon className="h-3.5 w-3.5" />}
-            <span>{isDark ? 'Light' : 'Dark'}</span>
-          </button>
-          <Link to="/stores" className="inline-flex min-h-11 shrink-0 items-center gap-1 rounded-full px-2.5 whitespace-nowrap text-lime-600 font-bold hover:bg-lime-50 sm:px-0 sm:hover:bg-transparent sm:hover:underline sm:hidden dark:text-lime-400 dark:hover:bg-lime-950/30">
-            <Store className="w-3.5 h-3.5" /> Local stores
-          </Link>
-          <Link to="/categories" className="inline-flex min-h-11 items-center hover:text-lime-600 transition-colors whitespace-nowrap flex items-center gap-1">
-            <Grid2X2 className="w-3.5 h-3.5" /> Categories
-          </Link>
-          <span className="text-neutral-300 dark:text-neutral-700">|</span>
-          <Link to="/products?dept=men" className="inline-flex min-h-11 items-center hover:text-lime-600 transition-colors whitespace-nowrap">Men</Link>
-          <Link to="/products?dept=women" className="inline-flex min-h-11 items-center hover:text-lime-600 transition-colors whitespace-nowrap">Women</Link>
-          <Link to="/products?dept=kids" className="inline-flex min-h-11 items-center hover:text-lime-600 transition-colors whitespace-nowrap">Kids</Link>
-          <Link to="/products?category=Footwear" className="inline-flex min-h-11 items-center hover:text-lime-600 transition-colors whitespace-nowrap">Footwear</Link>
-          <Link to="/products?category=Accessories" className="inline-flex min-h-11 items-center hover:text-lime-600 transition-colors whitespace-nowrap">Accessories</Link>
-          <Link to="/products?category=Beauty%20%26%20Personal%20Care" className="inline-flex min-h-11 items-center hover:text-lime-600 transition-colors whitespace-nowrap">Beauty &amp; Care</Link>
-          <span className="text-neutral-300 dark:text-neutral-700">|</span>
-          <Link to="/partner" className="inline-flex min-h-11 items-center text-emerald-600 dark:text-emerald-400 font-extrabold hover:underline whitespace-nowrap flex items-center gap-1">
-            <PlusCircle className="w-3.5 h-3.5" /> List your shop
-          </Link>
+        {!isMobileCollapsed && <div className="no-scrollbar flex gap-4 overflow-x-auto border-t border-neutral-100 px-4 pb-3 pt-4 dark:border-neutral-800">
+          {mobileCategories.map(({ label, href, icon: Icon, tone }) => <Link key={label} to={href} className="group flex w-[72px] shrink-0 flex-col items-center gap-2 text-center"><span className={`flex h-16 w-16 items-center justify-center rounded-full ${tone} ring-1 ring-neutral-200 transition-transform group-active:scale-95 dark:ring-neutral-700`}><Icon className="h-8 w-8 text-neutral-800 dark:text-neutral-100" strokeWidth={1.8} /></span><span className="text-xs font-extrabold text-neutral-900 dark:text-neutral-100">{label}</span></Link>)}
+        </div>}
+
+        {mobileMenuOpen && <nav aria-label="Mobile menu" className="border-t border-neutral-200 bg-white px-4 py-3 shadow-lg dark:border-neutral-800 dark:bg-neutral-900"><div className="grid grid-cols-2 gap-2 text-sm font-bold">
+          <Link onClick={() => setMobileMenuOpen(false)} to="/stores" className="rounded-xl px-3 py-3 hover:bg-neutral-100 dark:hover:bg-neutral-800">Local stores</Link><Link onClick={() => setMobileMenuOpen(false)} to="/categories" className="rounded-xl px-3 py-3 hover:bg-neutral-100 dark:hover:bg-neutral-800">All categories</Link><Link onClick={() => setMobileMenuOpen(false)} to="/wishlist" className="rounded-xl px-3 py-3 hover:bg-neutral-100 dark:hover:bg-neutral-800">Wishlist</Link><Link onClick={() => setMobileMenuOpen(false)} to="/profile" className="rounded-xl px-3 py-3 hover:bg-neutral-100 dark:hover:bg-neutral-800">Profile</Link><Link onClick={() => setMobileMenuOpen(false)} to="/partner" className="rounded-xl px-3 py-3 text-emerald-600 hover:bg-neutral-100 dark:text-emerald-400 dark:hover:bg-neutral-800">List your shop</Link><button type="button" onClick={toggleTheme} className="rounded-xl px-3 py-3 text-left hover:bg-neutral-100 dark:hover:bg-neutral-800">{isDark ? 'Light mode' : 'Dark mode'}</button>
+        </div></nav>}
+      </div>
+
+      <div className="mx-auto hidden max-w-7xl px-4 sm:px-6 md:block lg:px-8">
+        <div className="flex min-h-16 items-center justify-between gap-4 py-1.5 sm:h-16 sm:py-0">
+          <div className="flex min-w-0 shrink items-center"><Link to="/" aria-label="vibe4you home" className="group block w-[205px] shrink-0"><BrandWordmark showTagline className="transition-transform duration-200 group-hover:scale-[1.015]" /></Link></div>
+          {renderSearchForm(false)}
+          <div className="flex shrink-0 items-center gap-3">
+            <Link to="/stores" className="flex min-h-11 items-center gap-1.5 px-3 py-1.5 text-xs font-extrabold text-neutral-800 transition-colors hover:text-lime-600 dark:text-neutral-200" title="Browse Local Stores"><Store className="h-4 w-4 text-lime-600" /><span>Local Stores</span></Link>
+            <button onClick={toggleTheme} className="flex min-h-11 min-w-11 items-center justify-center rounded-full p-2 text-neutral-700 transition-colors hover:bg-neutral-100 dark:text-neutral-300 dark:hover:bg-neutral-800" aria-label={isDark ? 'Switch to light mode' : 'Switch to dark mode'} title="Toggle Dark Mode">{isDark ? <Sun className="h-5 w-5 text-amber-400" /> : <Moon className="h-5 w-5" />}</button>
+            <Link to="/wishlist" className="relative flex min-h-11 min-w-11 items-center justify-center rounded-full p-2 text-neutral-700 transition-colors hover:bg-neutral-100 dark:text-neutral-300 dark:hover:bg-neutral-800" aria-label={`Wishlist${wishlistIds.length ? `, ${wishlistIds.length} saved` : ''}`} title="Wishlist"><Heart className="h-5 w-5" />{wishlistIds.length > 0 && <span className="absolute right-1 top-1 flex h-4 w-4 items-center justify-center rounded-full bg-rose-500 text-[10px] font-bold text-white">{wishlistIds.length}</span>}</Link>
+            <Link to="/profile" className="flex min-h-11 min-w-11 items-center justify-center rounded-full p-2 text-neutral-700 transition-colors hover:bg-neutral-100 dark:text-neutral-300 dark:hover:bg-neutral-800" aria-label={user ? 'Profile and account' : 'Sign in or open account'} title="Profile / Account"><User className="h-5 w-5" /></Link>
+            <button onClick={onOpenCart} aria-label={`Cart ${totalItemsCount}`} className="flex min-h-11 items-center gap-2 rounded-full bg-neutral-950 px-4 py-2 text-sm font-bold text-white shadow-md transition-all active:scale-95 hover:bg-neutral-800 dark:bg-lime-400 dark:text-neutral-950 dark:hover:bg-lime-300"><ShoppingBag className="h-4 w-4" /><span>Cart</span><span className="rounded-full bg-lime-400 px-2 py-0.5 text-xs font-black text-neutral-950 dark:bg-neutral-900 dark:text-lime-400">{totalItemsCount}</span></button>
+          </div>
+        </div>
+        <nav aria-label="Shop navigation" className="flex items-center gap-4 overflow-x-auto border-t border-neutral-100 text-xs font-semibold text-neutral-700 no-scrollbar dark:border-neutral-800 dark:text-neutral-300">
+          <Link to="/categories" className="inline-flex min-h-11 items-center gap-1 whitespace-nowrap transition-colors hover:text-lime-600"><Grid2X2 className="h-3.5 w-3.5" /> Categories</Link><span className="text-neutral-300 dark:text-neutral-700">|</span><Link to="/products?dept=men" className="inline-flex min-h-11 items-center whitespace-nowrap transition-colors hover:text-lime-600">Men</Link><Link to="/products?dept=women" className="inline-flex min-h-11 items-center whitespace-nowrap transition-colors hover:text-lime-600">Women</Link><Link to="/products?dept=kids" className="inline-flex min-h-11 items-center whitespace-nowrap transition-colors hover:text-lime-600">Kids</Link><Link to="/products?category=Footwear" className="inline-flex min-h-11 items-center whitespace-nowrap transition-colors hover:text-lime-600">Footwear</Link><Link to="/products?category=Accessories" className="inline-flex min-h-11 items-center whitespace-nowrap transition-colors hover:text-lime-600">Accessories</Link><Link to="/products?category=Beauty%20%26%20Personal%20Care" className="inline-flex min-h-11 items-center whitespace-nowrap transition-colors hover:text-lime-600">Beauty &amp; Care</Link><span className="text-neutral-300 dark:text-neutral-700">|</span><Link to="/partner" className="inline-flex min-h-11 items-center gap-1 whitespace-nowrap font-extrabold text-emerald-600 hover:underline dark:text-emerald-400"><PlusCircle className="h-3.5 w-3.5" /> List your shop</Link>
         </nav>
       </div>
     </header>

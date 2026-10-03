@@ -27,10 +27,12 @@ for (const route of routes) {
 
 test('vibe4you wordmark and tagline are visible', async ({ page }) => {
   await page.goto('/');
-  const homeLink = page.getByRole('link', { name: 'vibe4you home' });
+  const homeLink = page.locator('header [aria-label="vibe4you home"]:visible');
   await expect(homeLink).toBeVisible();
   await expect(homeLink.locator('svg[aria-label="Vibe4You"]')).toBeVisible();
-  await expect(page.getByText('Your City. Your Shops. Your Style.', { exact: true }).first()).toBeVisible();
+  if ((page.viewportSize()?.width ?? 1024) >= 768) {
+    await expect(page.getByText('Your City. Your Shops. Your Style.', { exact: true }).first()).toBeVisible();
+  }
   await expect(page.locator('header')).not.toContainText('StyleDash');
   await expect(page).not.toHaveTitle(/StyleDash/i);
 });
@@ -139,7 +141,7 @@ test('header uses category queries for Footwear and Accessories', async ({ page 
   await page.goto('/');
   const header = page.locator('header');
   await expect(header.getByRole('link', { name: 'Footwear', exact: true })).toHaveAttribute('href', '/products?category=Footwear');
-  await expect(header.getByRole('link', { name: 'Accessories', exact: true })).toHaveAttribute('href', '/products?category=Accessories');
+  await expect(header.locator('a[href="/products?category=Accessories"]:visible').first()).toBeVisible();
 });
 
 test('header brand and controls do not overlap', async ({ page }) => {
@@ -281,6 +283,8 @@ test('global search returns matching local stores', async ({ page }) => {
   }));
 
   await page.goto('/');
+  const mobileSearchButton = page.getByRole('button', { name: 'Search products' });
+  if ((page.viewportSize()?.width ?? 1024) < 768) await mobileSearchButton.click();
   const search = page.locator('header input[aria-label="Search products, brands, or local Neemuch stores"]:visible');
   await search.fill('royals');
   await search.press('Enter');
