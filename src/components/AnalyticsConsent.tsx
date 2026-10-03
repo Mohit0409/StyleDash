@@ -41,7 +41,7 @@ export const AnalyticsConsent: React.FC = () => {
   return (
     <section
       aria-label="Analytics preferences"
-      className="fixed inset-x-3 bottom-3 z-[120] mx-auto max-w-3xl rounded-2xl border border-neutral-700 bg-neutral-950 p-5 text-white shadow-2xl sm:inset-x-6"
+      className="fixed inset-x-3 bottom-[calc(4.75rem+env(safe-area-inset-bottom))] z-[120] mx-auto max-w-3xl rounded-2xl border border-neutral-700 bg-neutral-950 p-5 text-white shadow-2xl sm:inset-x-6 md:bottom-3"
       role="dialog"
     >
       <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">

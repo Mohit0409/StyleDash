@@ -3,6 +3,7 @@ import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { Header } from '../components/Header';
 import { Footer } from '../components/Footer';
 import { NavigationScrollPolicy } from '../components/NavigationScrollPolicy';
+import { MobileBottomNav } from '../components/MobileBottomNav';
 import { useToast } from '../context/ToastContext';
 
 const CartDrawer = lazy(() => import('../components/CartDrawer').then(m => ({ default: m.CartDrawer })));
@@ -97,7 +98,7 @@ export const MainLayout: React.FC = () => {
   }, [location.hash, location.pathname, location.search, showToast]);
 
   return (
-    <div className="min-h-screen flex flex-col bg-neutral-50 dark:bg-neutral-950 text-neutral-900 dark:text-neutral-100 transition-colors">
+    <div className="min-h-screen flex flex-col bg-neutral-50 pb-[calc(4.75rem+env(safe-area-inset-bottom))] text-neutral-900 transition-colors dark:bg-neutral-950 dark:text-neutral-100 md:pb-0">
       <NavigationScrollPolicy />
       <a href="#main-content" className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-[100] focus:rounded-lg focus:bg-white focus:px-4 focus:py-2 focus:font-bold focus:text-neutral-950 focus:shadow-xl">Skip to main content</a>
       <Header onOpenCart={openCart} />
@@ -107,6 +108,8 @@ export const MainLayout: React.FC = () => {
       </main>
 
       <Footer />
+
+      <MobileBottomNav onOpenCart={openCart} />
 
       <Suspense fallback={null}>
         {isCartOpen && <CartDrawer isOpen onClose={closeCart} onCheckout={proceedToCheckout} />}
