@@ -17,6 +17,37 @@ test('mobile homepage and search work', async ({ page }) => {
   await expect(page.locator('main')).toBeVisible();
 });
 
+
+test('mobile scroll keeps only search and shop navigation at the top and four-item bottom navigation', async ({ page }) => {
+  await page.goto('/');
+
+  const bottomNav = page.locator('[data-mobile-bottom-nav]');
+  await expect(bottomNav).toBeVisible();
+  await expect(bottomNav.getByRole('link', { name: 'Home', exact: true })).toBeVisible();
+  await expect(bottomNav.getByRole('link', { name: 'Profile', exact: true })).toBeVisible();
+  await expect(bottomNav.getByRole('button', { name: /^Cart \d+$/ })).toBeVisible();
+  await expect(bottomNav.getByRole('link', { name: /^Wishlist/ })).toBeVisible();
+  await expect(bottomNav.locator('a,button')).toHaveCount(4);
+
+  const header = page.locator('header');
+  await expect(header).toHaveAttribute('data-mobile-header-collapsed', 'false');
+  await expect(page.getByRole('link', { name: 'vibe4you home' })).toBeVisible();
+
+  await page.evaluate(() => window.scrollTo(0, 700));
+  await expect(header).toHaveAttribute('data-mobile-header-collapsed', 'true');
+  await expect(page.getByRole('link', { name: 'vibe4you home' })).toBeHidden();
+
+  const search = page.locator('header input[aria-label="Search products, brands, or local Neemuch stores"]:visible');
+  await expect(search).toBeVisible();
+  await expect(header.getByRole('navigation', { name: 'Shop navigation' })).toBeVisible();
+  await expect(header.getByRole('link', { name: 'Categories', exact: true })).toBeVisible();
+  await expect(header.getByRole('link', { name: 'Men', exact: true })).toBeVisible();
+
+  await page.evaluate(() => window.scrollTo(0, 0));
+  await expect(header).toHaveAttribute('data-mobile-header-collapsed', 'false');
+  await expect(page.getByRole('link', { name: 'vibe4you home' })).toBeVisible();
+});
+
 test('mobile legal and support routes render without 404', async ({
   page,
 }) => {

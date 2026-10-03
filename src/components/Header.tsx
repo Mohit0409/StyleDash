@@ -34,6 +34,7 @@ export const Header: React.FC<{ onOpenCart: () => void }> = ({ onOpenCart }) => 
   const { wishlistIds } = useWishlist();
   const { isDark, toggleTheme } = useTheme();
   const [searchQuery, setSearchQuery] = useState('');
+  const [isMobileCollapsed, setIsMobileCollapsed] = useState(false);
   const [speechSearchAvailable, setSpeechSearchAvailable] = useState(false);
   const [isListening, setIsListening] = useState(false);
   const [debouncedSearch, setDebouncedSearch] = useState('');
@@ -47,6 +48,27 @@ export const Header: React.FC<{ onOpenCart: () => void }> = ({ onOpenCart }) => 
   const { user } = useAuth();
 
   useEffect(() => { setSpeechSearchAvailable(Boolean(getSpeechRecognitionConstructor())); }, []);
+
+  useEffect(() => {
+    let frame = 0;
+    const updateCollapsedState = () => {
+      frame = 0;
+      setIsMobileCollapsed(window.innerWidth < 768 && window.scrollY > 96);
+    };
+    const scheduleUpdate = () => {
+      if (frame) return;
+      frame = window.requestAnimationFrame(updateCollapsedState);
+    };
+
+    updateCollapsedState();
+    window.addEventListener('scroll', scheduleUpdate, { passive: true });
+    window.addEventListener('resize', scheduleUpdate);
+    return () => {
+      window.removeEventListener('scroll', scheduleUpdate);
+      window.removeEventListener('resize', scheduleUpdate);
+      if (frame) window.cancelAnimationFrame(frame);
+    };
+  }, []);
 
   useEffect(() => {
     const trimmed = searchQuery.trim();
@@ -246,15 +268,18 @@ export const Header: React.FC<{ onOpenCart: () => void }> = ({ onOpenCart }) => 
   };
 
   return (
-    <header className="sticky top-0 z-40 bg-white dark:bg-neutral-900 border-b border-neutral-200 dark:border-neutral-800 shadow-sm transition-colors">
+    <header
+      data-mobile-header-collapsed={isMobileCollapsed ? 'true' : 'false'}
+      className="sticky top-0 z-40 border-b border-neutral-200 bg-white shadow-sm transition-colors dark:border-neutral-800 dark:bg-neutral-900"
+    >
       {/* Top Banner */}
-      <div className="min-h-8 bg-neutral-950 text-white text-xs py-1.5 px-4 text-center flex items-center justify-center gap-2">
+      <div className={`${isMobileCollapsed ? 'hidden md:flex' : 'flex'} min-h-8 items-center justify-center gap-2 bg-neutral-950 px-4 py-1.5 text-center text-xs text-white`}>
         <Zap className="w-3.5 h-3.5 text-lime-400 fill-lime-400" />
         <span><strong>SAME-DAY DELIVERY</strong> in {CONFIG.SERVICE_CITY}</span>
       </div>
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex min-h-16 items-center justify-between gap-2 py-1.5 sm:h-16 sm:py-0 sm:gap-4">
+        <div className={`${isMobileCollapsed ? 'hidden md:flex' : 'flex'} min-h-16 items-center justify-between gap-2 py-1.5 sm:h-16 sm:gap-4 sm:py-0`}>
           <div className="flex min-w-0 shrink items-center">
             <Link
               to="/"
@@ -288,7 +313,7 @@ export const Header: React.FC<{ onOpenCart: () => void }> = ({ onOpenCart }) => 
 
             <Link
               to="/wishlist"
-              className="relative flex min-h-11 min-w-11 items-center justify-center rounded-full p-2 text-neutral-700 transition-colors hover:bg-neutral-100 dark:text-neutral-300 dark:hover:bg-neutral-800"
+              className="relative hidden min-h-11 min-w-11 items-center justify-center rounded-full p-2 text-neutral-700 transition-colors hover:bg-neutral-100 dark:text-neutral-300 dark:hover:bg-neutral-800 md:flex"
               aria-label={`Wishlist${wishlistIds.length ? `, ${wishlistIds.length} saved` : ''}`}
               title="Wishlist"
             >
@@ -302,7 +327,7 @@ export const Header: React.FC<{ onOpenCart: () => void }> = ({ onOpenCart }) => 
 
             <Link
               to="/profile"
-              className="flex min-h-11 min-w-11 items-center justify-center rounded-full p-2 text-neutral-700 transition-colors hover:bg-neutral-100 dark:text-neutral-300 dark:hover:bg-neutral-800"
+              className="hidden min-h-11 min-w-11 items-center justify-center rounded-full p-2 text-neutral-700 transition-colors hover:bg-neutral-100 dark:text-neutral-300 dark:hover:bg-neutral-800 md:flex"
               aria-label={user ? 'Profile and account' : 'Sign in or open account'}
               title="Profile / Account"
             >
@@ -312,7 +337,7 @@ export const Header: React.FC<{ onOpenCart: () => void }> = ({ onOpenCart }) => 
             <button
               onClick={onOpenCart}
               aria-label={`Cart ${totalItemsCount}`}
-              className="flex min-h-11 items-center gap-1.5 rounded-full bg-neutral-950 px-2.5 py-2 text-sm font-bold text-white shadow-md transition-all active:scale-95 hover:bg-neutral-800 dark:bg-lime-400 dark:text-neutral-950 dark:hover:bg-lime-300 sm:gap-2 sm:px-4"
+              className="hidden min-h-11 items-center gap-1.5 rounded-full bg-neutral-950 px-2.5 py-2 text-sm font-bold text-white shadow-md transition-all active:scale-95 hover:bg-neutral-800 dark:bg-lime-400 dark:text-neutral-950 dark:hover:bg-lime-300 md:flex sm:gap-2 sm:px-4"
             >
               <ShoppingBag className="w-4 h-4" />
               <span className="hidden sm:inline">Cart</span>
@@ -332,7 +357,7 @@ export const Header: React.FC<{ onOpenCart: () => void }> = ({ onOpenCart }) => 
           <button
             type="button"
             onClick={toggleTheme}
-            className="inline-flex min-h-11 shrink-0 items-center gap-1.5 rounded-full bg-neutral-100 px-3 text-neutral-700 dark:bg-neutral-800 dark:text-neutral-200 sm:hidden"
+            className={`${isMobileCollapsed ? 'hidden' : 'inline-flex'} min-h-11 shrink-0 items-center gap-1.5 rounded-full bg-neutral-100 px-3 text-neutral-700 dark:bg-neutral-800 dark:text-neutral-200 sm:hidden`}
             aria-label={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
           >
             {isDark ? <Sun className="h-3.5 w-3.5 text-amber-400" /> : <Moon className="h-3.5 w-3.5" />}
