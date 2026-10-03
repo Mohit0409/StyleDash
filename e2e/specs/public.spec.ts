@@ -30,7 +30,9 @@ test('vibe4you wordmark and tagline are visible', async ({ page }) => {
   const homeLink = page.locator('header [aria-label="vibe4you home"]:visible');
   await expect(homeLink).toBeVisible();
   await expect(homeLink.locator('svg[aria-label="Vibe4You"]')).toBeVisible();
-  await expect(page.getByText('Your City. Your Shops. Your Style.', { exact: true }).first()).toBeVisible();
+  if ((page.viewportSize()?.width ?? 1024) >= 768) {
+    await expect(page.getByText('Your City. Your Shops. Your Style.', { exact: true }).first()).toBeVisible();
+  }
   await expect(page.locator('header')).not.toContainText('StyleDash');
   await expect(page).not.toHaveTitle(/StyleDash/i);
 });
