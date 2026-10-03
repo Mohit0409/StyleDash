@@ -311,7 +311,7 @@ export const Header: React.FC<{ onOpenCart: () => void }> = ({ onOpenCart }) => 
           </div>
         </div>
 
-        <nav aria-label="Shop by category" aria-hidden={isMobileCollapsed} className="mobile-header-categories">
+        <nav aria-label="Browse departments" aria-hidden={isMobileCollapsed} className="mobile-header-categories">
           <div className="no-scrollbar flex h-[76px] gap-1 overflow-x-auto px-3 py-1.5">
             {mobileCategories.map(({ label, href, position }) => <Link key={label} to={href} tabIndex={isMobileCollapsed ? -1 : undefined} className="group flex min-w-[56px] flex-1 shrink-0 flex-col items-center gap-0.5 text-center"><span aria-hidden="true" className="h-12 w-12 shrink-0 rounded-full bg-white bg-[length:300%_200%] transition-transform group-active:scale-95 motion-reduce:transition-none" style={{ backgroundImage: `url(${categoryArtwork})`, backgroundPosition: position }} /><span className="text-[10px] font-semibold leading-[14px] text-neutral-800 dark:text-neutral-100">{label}</span></Link>)}
           </div>
