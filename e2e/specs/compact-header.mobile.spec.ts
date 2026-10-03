@@ -9,7 +9,7 @@ test.beforeEach(async ({ page }) => {
 
 test('compact photo categories fit mobile widths and retain their routes', async ({ page }) => {
   const header = page.locator('header');
-  const categories = header.getByRole('navigation', { name: 'Shop by category' });
+  const categories = header.getByRole('navigation', { name: 'Browse departments' });
   await expect(categories.getByRole('link')).toHaveCount(6);
   await expect(categories.getByRole('link', { name: 'Women', exact: true })).toHaveAttribute('href', '/products?dept=women');
   await expect(categories.getByRole('link', { name: 'Kids', exact: true })).toHaveAttribute('href', '/products?dept=kids');
@@ -63,7 +63,7 @@ test('collapse animates without shifting content or bouncing at the threshold', 
   expect(samples.frames.every(frame => Math.abs(frame.mainTop - samples.originalMainTop) <= 1)).toBeTruthy();
   expect(new Set(samples.frames.map(frame => Math.round(frame.height))).size).toBeGreaterThan(2);
   expect(samples.frames.at(-1)?.height).toBeLessThanOrEqual(54);
-  await expect(header.getByRole('navigation', { name: 'Shop by category' })).toBeHidden();
+  await expect(header.getByRole('navigation', { name: 'Browse departments' })).toBeHidden();
   await expect(header.getByRole('button', { name: 'vibe4you home' })).toBeHidden();
   await expect(header.locator('.mobile-header-shell button:visible')).toHaveCount(2);
   await page.screenshot({ path: 'test-results/compact-header-collapsed.png' });
