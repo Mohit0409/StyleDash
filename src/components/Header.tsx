@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import { ShoppingBag, Heart, User, Search, Zap, Sun, Moon, Store, PlusCircle, LoaderCircle, Grid2X2, Mic, Menu, X, Shirt, Footprints, Sparkles, Gem } from 'lucide-react';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { ShoppingBag, Heart, User, Search, Zap, Sun, Moon, Store, PlusCircle, LoaderCircle, Grid2X2, Mic, Menu, X } from 'lucide-react';
 import { useCart } from '../context/CartContext';
 import { useWishlist } from '../context/WishlistContext';
 import { useTheme } from '../context/ThemeContext';
@@ -11,6 +11,8 @@ import { productRepository } from '../repositories/productRepository';
 import { vendorRepository } from '../repositories/vendorRepository';
 import type { Product, VendorStore } from '../types';
 import { buildSearchSuggestions, highlightSearchMatch, type SearchSuggestion } from '../utils/searchSuggestions';
+import categoryArtwork from '../assets/category-artwork.jpg';
+import './Header.css';
 
 const SEARCH_DEBOUNCE_MS = 220;
 const MIN_SUGGESTION_QUERY = 2;
@@ -30,6 +32,7 @@ const getSpeechRecognitionConstructor = (): SpeechRecognitionConstructor | undef
 
 export const Header: React.FC<{ onOpenCart: () => void }> = ({ onOpenCart }) => {
   const navigate = useNavigate();
+  const { key: locationKey } = useLocation();
   const { totalItemsCount } = useCart();
   const { wishlistIds } = useWishlist();
   const { isDark, toggleTheme } = useTheme();
@@ -51,11 +54,20 @@ export const Header: React.FC<{ onOpenCart: () => void }> = ({ onOpenCart }) => 
 
   useEffect(() => { setSpeechSearchAvailable(Boolean(getSpeechRecognitionConstructor())); }, []);
 
+  // Fixed panels must not cover the destination page after any navigation.
+  useEffect(() => {
+    setMobileSearchOpen(false);
+    setMobileMenuOpen(false);
+  }, [locationKey]);
+
   useEffect(() => {
     let frame = 0;
     const updateCollapsedState = () => {
       frame = 0;
-      setIsMobileCollapsed(window.innerWidth < 768 && window.scrollY > 96);
+      // Separate thresholds prevent flicker around the collapse boundary.
+      // The mobile header's reserved space never changes with this state.
+      setIsMobileCollapsed(collapsed => window.innerWidth < 768
+        && window.scrollY > (collapsed ? 32 : 104));
     };
     const scheduleUpdate = () => {
       if (frame) return;
@@ -270,38 +282,45 @@ export const Header: React.FC<{ onOpenCart: () => void }> = ({ onOpenCart }) => 
   };
 
   const mobileCategories = [
-    { label: 'Women', href: '/products?dept=women', icon: Shirt, tone: 'bg-rose-50 dark:bg-rose-950/30' },
-    { label: 'Men', href: '/products?dept=men', icon: User, tone: 'bg-sky-50 dark:bg-sky-950/30' },
-    { label: 'Footwear', href: '/products?category=Footwear', icon: Footprints, tone: 'bg-stone-100 dark:bg-stone-800' },
-    { label: 'Beauty', href: '/products?category=Beauty%20%26%20Personal%20Care', icon: Sparkles, tone: 'bg-pink-50 dark:bg-pink-950/30' },
-    { label: 'Jewellery', href: '/products?category=Accessories', icon: Gem, tone: 'bg-amber-50 dark:bg-amber-950/30' },
-    { label: 'Kids', href: '/products?dept=kids', icon: User, tone: 'bg-violet-50 dark:bg-violet-950/30' },
+    { label: 'Women', href: '/products?dept=women', position: '0% 0%' },
+    { label: 'Men', href: '/products?dept=men', position: '50% 0%' },
+    { label: 'Kids', href: '/products?dept=kids', position: '100% 0%' },
+    { label: 'Footwear', href: '/products?category=Footwear', position: '0% 100%' },
+    { label: 'Beauty', href: '/products?category=Beauty%20%26%20Personal%20Care', position: '50% 100%' },
+    { label: 'Jewellery', href: '/products?category=Accessories', position: '100% 100%' },
   ];
 
   return (
-    <header data-mobile-header-collapsed={isMobileCollapsed ? 'true' : 'false'} className="sticky top-0 z-40 border-b border-neutral-200 bg-white shadow-sm transition-colors dark:border-neutral-800 dark:bg-neutral-900">
-      <div className={`${isMobileCollapsed ? 'hidden md:flex' : 'flex'} min-h-9 items-center justify-center gap-2 bg-neutral-950 px-4 py-2 text-center text-xs text-white`}>
+    <header data-mobile-header-collapsed={isMobileCollapsed ? 'true' : 'false'} className="site-header relative z-40 md:sticky md:top-0 md:border-b md:border-neutral-200 md:bg-white md:shadow-sm dark:md:border-neutral-800 dark:md:bg-neutral-900">
+      <div className="hidden min-h-9 items-center justify-center gap-2 bg-neutral-950 px-4 py-2 text-center text-xs text-white md:flex">
         <Zap className="h-4 w-4 fill-lime-400 text-lime-400" />
         <span><strong>SAME-DAY DELIVERY</strong> in {CONFIG.SERVICE_CITY}</span>
       </div>
 
-      <div className="md:hidden">
-        <div className={`flex items-center ${isMobileCollapsed ? 'justify-end' : 'justify-between'} gap-2 px-4 py-3`}>
-          {!isMobileCollapsed && <button type="button" onClick={() => navigate('/')} aria-label="vibe4you home" className="block w-[clamp(9.5rem,48vw,12.5rem)] shrink-0 text-left"><BrandWordmark className="w-full" /></button>}
-          <div className="ml-auto flex items-center gap-1">
-            <button type="button" onClick={() => setMobileSearchOpen(open => !open)} className="flex min-h-11 min-w-11 items-center justify-center rounded-full text-neutral-950 hover:bg-neutral-100 dark:text-white dark:hover:bg-neutral-800" aria-label={mobileSearchOpen ? 'Close search' : 'Search products'} aria-expanded={mobileSearchOpen}><Search className="h-7 w-7" strokeWidth={2.4} /></button>
-            {!isMobileCollapsed && <button type="button" onClick={onOpenCart} className="relative flex min-h-11 min-w-11 items-center justify-center rounded-full text-neutral-950 hover:bg-neutral-100 dark:text-white dark:hover:bg-neutral-800" aria-label={`Header bag ${totalItemsCount}`}><ShoppingBag className="h-7 w-7" strokeWidth={2.4} />{totalItemsCount > 0 && <span className="absolute right-0 top-0 flex h-5 min-w-5 items-center justify-center rounded-full bg-lime-400 px-1 text-[11px] font-black text-neutral-950">{totalItemsCount}</span>}</button>}
-            <button type="button" onClick={() => setMobileMenuOpen(open => !open)} className="flex min-h-11 min-w-11 items-center justify-center rounded-full text-neutral-950 hover:bg-neutral-100 dark:text-white dark:hover:bg-neutral-800" aria-label={mobileMenuOpen ? 'Close menu' : 'Open menu'} aria-expanded={mobileMenuOpen}>{mobileMenuOpen ? <X className="h-8 w-8" /> : <Menu className="h-8 w-8" />}</button>
+      <div className="mobile-header-shell fixed inset-x-0 top-0 border-b border-neutral-200 bg-white shadow-sm dark:border-neutral-800 dark:bg-neutral-900 md:hidden">
+        <div className="mobile-header-chrome">
+        <div className="mobile-header-delivery bg-neutral-950 text-white" aria-hidden={isMobileCollapsed}>
+          <div className="flex h-[26px] items-center justify-center gap-1.5 text-[10px] tracking-wide"><Zap className="h-3 w-3 fill-lime-400 text-lime-400" /><span><strong>SAME-DAY DELIVERY</strong> in {CONFIG.SERVICE_CITY}</span></div>
+        </div>
+        <div className="flex h-[52px] items-center justify-between gap-2 px-3">
+          <button type="button" onClick={() => navigate('/')} aria-label="vibe4you home" aria-hidden={isMobileCollapsed} tabIndex={isMobileCollapsed ? -1 : undefined} className="mobile-header-brand block min-h-11 w-[clamp(8rem,40vw,10rem)] shrink-0 text-left"><BrandWordmark className="w-full" /></button>
+          <div className="mobile-header-actions ml-auto grid items-center">
+            <button type="button" onClick={() => { setMobileSearchOpen(open => !open); setMobileMenuOpen(false); }} className="flex min-h-11 min-w-11 items-center justify-center rounded-full text-neutral-950 hover:bg-neutral-100 dark:text-white dark:hover:bg-neutral-800" aria-label={mobileSearchOpen ? 'Close search' : 'Search products'} aria-expanded={mobileSearchOpen} aria-controls="mobile-header-search"><Search className="h-6 w-6" strokeWidth={2} /></button>
+            <button type="button" onClick={onOpenCart} aria-hidden={isMobileCollapsed} tabIndex={isMobileCollapsed ? -1 : undefined} className="mobile-header-bag relative flex h-11 w-11 items-center justify-center rounded-full text-neutral-950 hover:bg-neutral-100 dark:text-white dark:hover:bg-neutral-800" aria-label={`Header bag ${totalItemsCount}`}><ShoppingBag className="h-6 w-6" strokeWidth={2} />{totalItemsCount > 0 && <span className="absolute right-0 top-0 flex h-4 min-w-4 items-center justify-center rounded-full bg-lime-400 px-1 text-[10px] font-bold text-neutral-950">{totalItemsCount}</span>}</button>
+            <button type="button" onClick={() => { setMobileMenuOpen(open => !open); setMobileSearchOpen(false); }} className="flex min-h-11 min-w-11 items-center justify-center rounded-full text-neutral-950 hover:bg-neutral-100 dark:text-white dark:hover:bg-neutral-800" aria-label={mobileMenuOpen ? 'Close menu' : 'Open menu'} aria-expanded={mobileMenuOpen} aria-controls="mobile-header-menu">{mobileMenuOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}</button>
           </div>
         </div>
 
-        {mobileSearchOpen && <div className="px-4 pb-3">{renderSearchForm(true)}</div>}
+        <nav aria-label="Browse departments" aria-hidden={isMobileCollapsed} className="mobile-header-categories">
+          <div className="no-scrollbar flex h-[76px] gap-1 overflow-x-auto px-3 py-1.5">
+            {mobileCategories.map(({ label, href, position }) => <Link key={label} to={href} tabIndex={isMobileCollapsed ? -1 : undefined} className="group flex min-w-[56px] flex-1 shrink-0 flex-col items-center gap-0.5 text-center"><span aria-hidden="true" className="h-12 w-12 shrink-0 rounded-full bg-white bg-[length:300%_200%] transition-transform group-active:scale-95 motion-reduce:transition-none" style={{ backgroundImage: `url(${categoryArtwork})`, backgroundPosition: position }} /><span className="text-[10px] font-semibold leading-[14px] text-neutral-800 dark:text-neutral-100">{label}</span></Link>)}
+          </div>
+        </nav>
+        </div>
 
-        {!isMobileCollapsed && <div className="no-scrollbar flex gap-4 overflow-x-auto border-t border-neutral-100 px-4 pb-3 pt-4 dark:border-neutral-800">
-          {mobileCategories.map(({ label, href, icon: Icon, tone }) => <Link key={label} to={href} className="group flex w-[72px] shrink-0 flex-col items-center gap-2 text-center"><span className={`flex h-16 w-16 items-center justify-center rounded-full ${tone} ring-1 ring-neutral-200 transition-transform group-active:scale-95 dark:ring-neutral-700`}><Icon className="h-8 w-8 text-neutral-800 dark:text-neutral-100" strokeWidth={1.8} /></span><span className="text-xs font-extrabold text-neutral-900 dark:text-neutral-100">{label}</span></Link>)}
-        </div>}
+        {mobileSearchOpen && <div id="mobile-header-search" className="px-3 pb-2">{renderSearchForm(true)}</div>}
 
-        {mobileMenuOpen && <nav aria-label="Mobile menu" className="border-t border-neutral-200 bg-white px-4 py-3 shadow-lg dark:border-neutral-800 dark:bg-neutral-900"><div className="grid grid-cols-2 gap-2 text-sm font-bold">
+        {mobileMenuOpen && <nav id="mobile-header-menu" aria-label="Mobile menu" className="max-h-[60dvh] overflow-y-auto border-t border-neutral-200 bg-white px-4 py-3 shadow-lg dark:border-neutral-800 dark:bg-neutral-900"><div className="grid grid-cols-2 gap-2 text-sm font-bold">
           <Link onClick={() => setMobileMenuOpen(false)} to="/stores" className="rounded-xl px-3 py-3 hover:bg-neutral-100 dark:hover:bg-neutral-800">Local stores</Link><Link onClick={() => setMobileMenuOpen(false)} to="/categories" className="rounded-xl px-3 py-3 hover:bg-neutral-100 dark:hover:bg-neutral-800">All categories</Link><Link onClick={() => setMobileMenuOpen(false)} to="/wishlist" className="rounded-xl px-3 py-3 hover:bg-neutral-100 dark:hover:bg-neutral-800">Wishlist</Link><Link onClick={() => setMobileMenuOpen(false)} to="/profile" className="rounded-xl px-3 py-3 hover:bg-neutral-100 dark:hover:bg-neutral-800">Profile</Link><Link onClick={() => setMobileMenuOpen(false)} to="/partner" className="rounded-xl px-3 py-3 text-emerald-600 hover:bg-neutral-100 dark:text-emerald-400 dark:hover:bg-neutral-800">List your shop</Link><button type="button" onClick={toggleTheme} className="rounded-xl px-3 py-3 text-left hover:bg-neutral-100 dark:hover:bg-neutral-800">{isDark ? 'Light mode' : 'Dark mode'}</button>
         </div></nav>}
       </div>

@@ -1,0 +1,47 @@
+/* Keep document geometry stable while the fixed mobile chrome collapses.
+   Removing header rows from flow used to move scrollY and retrigger collapse. */
+@media (max-width: 767px) {
+  .site-header { height: 154px; }
+  .mobile-header-chrome {
+    display: grid;
+    grid-template-rows: 26px 52px 76px;
+    transition: grid-template-rows 220ms cubic-bezier(.2, .7, .2, 1);
+  }
+  .mobile-header-delivery,
+  .mobile-header-categories {
+    min-height: 0;
+    overflow: hidden;
+    transition: opacity 160ms ease, visibility 220ms;
+  }
+  .mobile-header-brand,
+  .mobile-header-bag {
+    transition: opacity 160ms ease, visibility 220ms;
+  }
+  .mobile-header-actions {
+    grid-template-columns: 44px 44px 44px;
+    transition: grid-template-columns 220ms cubic-bezier(.2, .7, .2, 1);
+  }
+  [data-mobile-header-collapsed="true"] .mobile-header-chrome {
+    grid-template-rows: 0px 52px 0px;
+  }
+  [data-mobile-header-collapsed="true"] .mobile-header-actions {
+    grid-template-columns: 44px 0px 44px;
+  }
+  [data-mobile-header-collapsed="true"] .mobile-header-delivery,
+  [data-mobile-header-collapsed="true"] .mobile-header-categories,
+  [data-mobile-header-collapsed="true"] .mobile-header-brand,
+  [data-mobile-header-collapsed="true"] .mobile-header-bag {
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mobile-header-chrome,
+  .mobile-header-actions,
+  .mobile-header-delivery,
+  .mobile-header-categories,
+  .mobile-header-brand,
+  .mobile-header-bag { transition: none; }
+}
