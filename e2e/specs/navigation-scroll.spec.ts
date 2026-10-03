@@ -46,7 +46,14 @@ test('back navigation preserves the browser history scroll position', async ({ p
   const previousPosition = await page.evaluate(() => window.scrollY);
   expect(previousPosition).toBeGreaterThan(0);
 
-  await page.locator('header a[href="/"]').first().click();
+  const mobileHome = page
+    .locator('[data-mobile-bottom-nav]')
+    .getByRole('link', { name: 'Home', exact: true });
+  if (await mobileHome.isVisible()) {
+    await mobileHome.click();
+  } else {
+    await page.locator('header a[href="/"]').first().click();
+  }
   await expect(page).toHaveURL(/\/$/);
   await expectPageTop(page);
 
