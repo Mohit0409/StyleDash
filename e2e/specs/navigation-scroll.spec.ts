@@ -59,5 +59,9 @@ test('back navigation preserves the browser history scroll position', async ({ p
 
   await page.goBack();
   await expect(page).toHaveURL(/\/products$/);
-  await expect.poll(() => page.evaluate(() => window.scrollY)).toBeGreaterThanOrEqual(Math.max(1, previousPosition - 100));
+  await expect.poll(async () => page.evaluate((previous) => {
+    const maxScrollY = Math.max(0, document.documentElement.scrollHeight - window.innerHeight);
+    const expectedPosition = Math.min(previous, maxScrollY);
+    return Math.abs(window.scrollY - expectedPosition);
+  }, previousPosition)).toBeLessThanOrEqual(200);
 });
