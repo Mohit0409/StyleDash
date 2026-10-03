@@ -7,6 +7,7 @@ test('mobile homepage and search work', async ({ page }) => {
     page.getByRole('heading', { name: /Your look/i }),
   ).toBeVisible();
 
+  await page.getByRole('button', { name: 'Search products' }).click();
   const search = page.locator('header input[aria-label="Search products, brands, or local Neemuch stores"]:visible');
 
   await search.fill('shirt');
@@ -31,21 +32,19 @@ test('mobile scroll keeps only search and shop navigation at the top and four-it
 
   const header = page.locator('header');
   await expect(header).toHaveAttribute('data-mobile-header-collapsed', 'false');
-  await expect(page.getByRole('link', { name: 'vibe4you home' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'vibe4you home' })).toBeVisible();
 
   await page.evaluate(() => window.scrollTo(0, 700));
   await expect(header).toHaveAttribute('data-mobile-header-collapsed', 'true');
-  await expect(page.getByRole('link', { name: 'vibe4you home' })).toBeHidden();
+  await expect(page.getByRole('button', { name: 'vibe4you home' })).toBeHidden();
 
-  const search = page.locator('header input[aria-label="Search products, brands, or local Neemuch stores"]:visible');
-  await expect(search).toBeVisible();
-  await expect(header.getByRole('navigation', { name: 'Shop navigation' })).toBeVisible();
-  await expect(header.getByRole('link', { name: 'Categories', exact: true })).toBeVisible();
-  await expect(header.getByRole('link', { name: 'Men', exact: true })).toBeVisible();
+  await expect(header.getByRole('button', { name: 'Search products' })).toBeVisible();
+  await expect(header.getByRole('button', { name: 'Open menu' })).toBeVisible();
+  await expect(header.getByRole('button', { name: /^Header bag/ })).toBeHidden();
 
   await page.evaluate(() => window.scrollTo(0, 0));
   await expect(header).toHaveAttribute('data-mobile-header-collapsed', 'false');
-  await expect(page.getByRole('link', { name: 'vibe4you home' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'vibe4you home' })).toBeVisible();
 });
 
 test('mobile legal and support routes render without 404', async ({

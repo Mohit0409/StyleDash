@@ -63,6 +63,7 @@ test('supported browsers can search by voice and retain typed search as a fallba
   });
 
   await page.goto('/');
+  await page.getByRole('button', { name: 'Search products' }).click();
   await page.locator('button[aria-label="Speak to search"]:visible').click();
 
   await expect(page).toHaveURL(/\/products\?search=running%20shoes$/);

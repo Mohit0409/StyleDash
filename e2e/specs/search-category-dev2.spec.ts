@@ -1,7 +1,10 @@
 import { expect, test, type Page } from '@playwright/test';
 
-const visibleSearch = (page: Page) =>
-  page.locator('header input[aria-label="Search products, brands, or local Neemuch stores"]:visible');
+const visibleSearch = async (page: Page) => {
+  const mobileSearchButton = page.getByRole('button', { name: 'Search products' });
+  if ((page.viewportSize()?.width ?? 1024) < 768) await mobileSearchButton.click();
+  return page.locator('header input[aria-label="Search products, brands, or local Neemuch stores"]:visible');
+};
 
 test('homepage category cards use canonical catalogue queries', async ({ page }) => {
   await page.goto('/');
@@ -36,7 +39,7 @@ test('search suggestions debounce data loads and support keyboard navigation', a
   productRequests = 0;
   storeRequests = 0;
 
-  const search = visibleSearch(page);
+  const search = await visibleSearch(page);
   await search.fill('Pure Cotton');
   const suggestions = page.getByRole('listbox', { name: 'Search suggestions' });
   await expect(suggestions).toBeVisible();
@@ -52,7 +55,7 @@ test('search suggestions debounce data loads and support keyboard navigation', a
 test('search keeps the normal full-results fallback when suggestions miss', async ({ page }) => {
   await page.goto('/');
 
-  const search = visibleSearch(page);
+  const search = await visibleSearch(page);
   await search.fill('zzzzzzq');
   const suggestions = page.getByRole('listbox', { name: 'Search suggestions' });
   await expect(suggestions).toBeVisible();

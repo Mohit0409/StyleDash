@@ -36,6 +36,7 @@ export const Header: React.FC<{ onOpenCart: () => void }> = ({ onOpenCart }) => 
   const [searchQuery, setSearchQuery] = useState('');
   const [isMobileCollapsed, setIsMobileCollapsed] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [mobileSearchOpen, setMobileSearchOpen] = useState(false);
   const [speechSearchAvailable, setSpeechSearchAvailable] = useState(false);
   const [isListening, setIsListening] = useState(false);
   const [debouncedSearch, setDebouncedSearch] = useState('');
@@ -286,13 +287,15 @@ export const Header: React.FC<{ onOpenCart: () => void }> = ({ onOpenCart }) => 
 
       <div className="md:hidden">
         <div className={`flex items-center ${isMobileCollapsed ? 'justify-end' : 'justify-between'} gap-2 px-4 py-3`}>
-          {!isMobileCollapsed && <Link to="/" aria-label="vibe4you home" className="block w-[clamp(9.5rem,48vw,12.5rem)] shrink-0"><BrandWordmark className="w-full" /></Link>}
+          {!isMobileCollapsed && <button type="button" onClick={() => navigate('/')} aria-label="vibe4you home" className="block w-[clamp(9.5rem,48vw,12.5rem)] shrink-0 text-left"><BrandWordmark className="w-full" /></button>}
           <div className="ml-auto flex items-center gap-1">
-            <button type="button" onClick={() => navigate('/products')} className="flex min-h-11 min-w-11 items-center justify-center rounded-full text-neutral-950 hover:bg-neutral-100 dark:text-white dark:hover:bg-neutral-800" aria-label="Search products"><Search className="h-7 w-7" strokeWidth={2.4} /></button>
-            {!isMobileCollapsed && <button type="button" onClick={onOpenCart} className="relative flex min-h-11 min-w-11 items-center justify-center rounded-full text-neutral-950 hover:bg-neutral-100 dark:text-white dark:hover:bg-neutral-800" aria-label={`Cart ${totalItemsCount}`}><ShoppingBag className="h-7 w-7" strokeWidth={2.4} />{totalItemsCount > 0 && <span className="absolute right-0 top-0 flex h-5 min-w-5 items-center justify-center rounded-full bg-lime-400 px-1 text-[11px] font-black text-neutral-950">{totalItemsCount}</span>}</button>}
+            <button type="button" onClick={() => setMobileSearchOpen(open => !open)} className="flex min-h-11 min-w-11 items-center justify-center rounded-full text-neutral-950 hover:bg-neutral-100 dark:text-white dark:hover:bg-neutral-800" aria-label={mobileSearchOpen ? 'Close search' : 'Search products'} aria-expanded={mobileSearchOpen}><Search className="h-7 w-7" strokeWidth={2.4} /></button>
+            {!isMobileCollapsed && <button type="button" onClick={onOpenCart} className="relative flex min-h-11 min-w-11 items-center justify-center rounded-full text-neutral-950 hover:bg-neutral-100 dark:text-white dark:hover:bg-neutral-800" aria-label={`Header bag ${totalItemsCount}`}><ShoppingBag className="h-7 w-7" strokeWidth={2.4} />{totalItemsCount > 0 && <span className="absolute right-0 top-0 flex h-5 min-w-5 items-center justify-center rounded-full bg-lime-400 px-1 text-[11px] font-black text-neutral-950">{totalItemsCount}</span>}</button>}
             <button type="button" onClick={() => setMobileMenuOpen(open => !open)} className="flex min-h-11 min-w-11 items-center justify-center rounded-full text-neutral-950 hover:bg-neutral-100 dark:text-white dark:hover:bg-neutral-800" aria-label={mobileMenuOpen ? 'Close menu' : 'Open menu'} aria-expanded={mobileMenuOpen}>{mobileMenuOpen ? <X className="h-8 w-8" /> : <Menu className="h-8 w-8" />}</button>
           </div>
         </div>
+
+        {mobileSearchOpen && <div className="px-4 pb-3">{renderSearchForm(true)}</div>}
 
         {!isMobileCollapsed && <div className="no-scrollbar flex gap-4 overflow-x-auto border-t border-neutral-100 px-4 pb-3 pt-4 dark:border-neutral-800">
           {mobileCategories.map(({ label, href, icon: Icon, tone }) => <Link key={label} to={href} className="group flex w-[72px] shrink-0 flex-col items-center gap-2 text-center"><span className={`flex h-16 w-16 items-center justify-center rounded-full ${tone} ring-1 ring-neutral-200 transition-transform group-active:scale-95 dark:ring-neutral-700`}><Icon className="h-8 w-8 text-neutral-800 dark:text-neutral-100" strokeWidth={1.8} /></span><span className="text-xs font-extrabold text-neutral-900 dark:text-neutral-100">{label}</span></Link>)}
@@ -305,7 +308,7 @@ export const Header: React.FC<{ onOpenCart: () => void }> = ({ onOpenCart }) => 
 
       <div className="mx-auto hidden max-w-7xl px-4 sm:px-6 md:block lg:px-8">
         <div className="flex min-h-16 items-center justify-between gap-4 py-1.5 sm:h-16 sm:py-0">
-          <div className="flex min-w-0 shrink items-center"><Link to="/" aria-label="vibe4you desktop home" className="group block w-[205px] shrink-0"><BrandWordmark showTagline className="transition-transform duration-200 group-hover:scale-[1.015]" /></Link></div>
+          <div className="flex min-w-0 shrink items-center"><Link to="/" aria-label="vibe4you home" className="group block w-[205px] shrink-0"><BrandWordmark showTagline className="transition-transform duration-200 group-hover:scale-[1.015]" /></Link></div>
           {renderSearchForm(false)}
           <div className="flex shrink-0 items-center gap-3">
             <Link to="/stores" className="flex min-h-11 items-center gap-1.5 px-3 py-1.5 text-xs font-extrabold text-neutral-800 transition-colors hover:text-lime-600 dark:text-neutral-200" title="Browse Local Stores"><Store className="h-4 w-4 text-lime-600" /><span>Local Stores</span></Link>
