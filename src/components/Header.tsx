@@ -305,7 +305,7 @@ export const Header: React.FC<{ onOpenCart: () => void }> = ({ onOpenCart }) => 
 
       <div className="mx-auto hidden max-w-7xl px-4 sm:px-6 md:block lg:px-8">
         <div className="flex min-h-16 items-center justify-between gap-4 py-1.5 sm:h-16 sm:py-0">
-          <div className="flex min-w-0 shrink items-center"><Link to="/" aria-label="vibe4you home" className="group block w-[205px] shrink-0"><BrandWordmark showTagline className="transition-transform duration-200 group-hover:scale-[1.015]" /></Link></div>
+          <div className="flex min-w-0 shrink items-center"><Link to="/" aria-label="vibe4you desktop home" className="group block w-[205px] shrink-0"><BrandWordmark showTagline className="transition-transform duration-200 group-hover:scale-[1.015]" /></Link></div>
           {renderSearchForm(false)}
           <div className="flex shrink-0 items-center gap-3">
             <Link to="/stores" className="flex min-h-11 items-center gap-1.5 px-3 py-1.5 text-xs font-extrabold text-neutral-800 transition-colors hover:text-lime-600 dark:text-neutral-200" title="Browse Local Stores"><Store className="h-4 w-4 text-lime-600" /><span>Local Stores</span></Link>
