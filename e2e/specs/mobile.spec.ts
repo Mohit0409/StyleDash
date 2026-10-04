@@ -36,7 +36,7 @@ test('mobile scroll keeps only search and shop navigation at the top and four-it
 
   await page.evaluate(() => window.scrollTo(0, 700));
   await expect(header).toHaveAttribute('data-mobile-header-collapsed', 'true');
-  await expect(page.getByRole('button', { name: 'vibe4you home' })).toBeHidden();
+  await expect(page.getByRole('button', { name: 'vibe4you home' })).toBeVisible();
 
   await expect(header.getByRole('button', { name: 'Search products' })).toBeVisible();
   await expect(header.getByRole('button', { name: 'Open menu' })).toBeVisible();

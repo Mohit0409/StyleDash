@@ -64,8 +64,8 @@ test('collapse animates without shifting content or bouncing at the threshold', 
   expect(new Set(samples.frames.map(frame => Math.round(frame.height))).size).toBeGreaterThan(2);
   expect(samples.frames.at(-1)?.height).toBeLessThanOrEqual(54);
   await expect(header.getByRole('navigation', { name: 'Browse departments' })).toBeHidden();
-  await expect(header.getByRole('button', { name: 'vibe4you home' })).toBeHidden();
-  await expect(header.locator('.mobile-header-shell button:visible')).toHaveCount(2);
+  await expect(header.getByRole('button', { name: 'vibe4you home' })).toBeVisible();
+  await expect(header.locator('.mobile-header-shell button:visible')).toHaveCount(3);
   await page.screenshot({ path: 'test-results/compact-header-collapsed.png' });
   await page.locator('.mobile-header-shell').screenshot({ path: 'test-results/compact-header-collapsed-preview.png', scale: 'css' });
 
