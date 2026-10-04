@@ -29,7 +29,6 @@
   }
   [data-mobile-header-collapsed="true"] .mobile-header-delivery,
   [data-mobile-header-collapsed="true"] .mobile-header-categories,
-  [data-mobile-header-collapsed="true"] .mobile-header-brand,
   [data-mobile-header-collapsed="true"] .mobile-header-bag {
     opacity: 0;
     visibility: hidden;
