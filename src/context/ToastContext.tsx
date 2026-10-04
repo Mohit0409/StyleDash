@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState } from 'react';
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 
 interface Toast {
   id: string;
@@ -14,17 +14,34 @@ const ToastContext = createContext<ToastContextType | undefined>(undefined);
 
 export const ToastProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [toasts, setToasts] = useState<Toast[]>([]);
+  const activeToastKeys = useRef(new Set<string>());
+  const dismissTimers = useRef(new Set<ReturnType<typeof setTimeout>>());
 
-  const showToast = (message: string, type: 'success' | 'error' | 'info' = 'info') => {
+  useEffect(() => () => {
+    dismissTimers.current.forEach(timer => clearTimeout(timer));
+    dismissTimers.current.clear();
+    activeToastKeys.current.clear();
+  }, []);
+
+  const showToast = useCallback((message: string, type: 'success' | 'error' | 'info' = 'info') => {
+    const key = `${type}:${message}`;
+    if (activeToastKeys.current.has(key)) return;
+
     const id = Math.random().toString(36).substring(2, 9);
+    activeToastKeys.current.add(key);
     setToasts(prev => [...prev, { id, message, type }]);
-    setTimeout(() => {
-      setToasts(prev => prev.filter(t => t.id !== id));
+    const timer = setTimeout(() => {
+      dismissTimers.current.delete(timer);
+      activeToastKeys.current.delete(key);
+      setToasts(prev => prev.filter(toast => toast.id !== id));
     }, 3000);
-  };
+    dismissTimers.current.add(timer);
+  }, []);
+
+  const value = useMemo(() => ({ showToast }), [showToast]);
 
   return (
-    <ToastContext.Provider value={{ showToast }}>
+    <ToastContext.Provider value={value}>
       {children}
       <div className="fixed bottom-5 right-5 z-50 flex flex-col gap-2 pointer-events-none">
         {toasts.map(toast => (
