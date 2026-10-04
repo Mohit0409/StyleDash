@@ -1,4 +1,4 @@
-/* Keep document geometry stable while the fixed mobile chrome collapses.
+﻿/* Keep document geometry stable while the fixed mobile chrome collapses.
    Removing header rows from flow used to move scrollY and retrigger collapse. */
 @media (max-width: 767px) {
   .site-header { height: 154px; }
