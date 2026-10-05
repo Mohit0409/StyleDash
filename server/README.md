@@ -108,6 +108,13 @@ once and completes the approved cancellation. A transport/5xx outcome is treated
 as uncertain and must be verified in Razorpay before any retry; a definite
 Razorpay rejection can be retried explicitly from the admin UI.
 
+Production keeps Razorpay API credentials on the public payment service rather
+than copying them into the private admin service. Refund submission crosses a
+loopback-only internal bridge authenticated with a random 0600 token stored in
+the shared runtime directory. The route additionally requires a loopback peer
+and a localhost Host header, and remains hidden behind the normal public
+sensitive-path deny rules for non-internal requests.
+
 ## Verification
 
 ```bash
