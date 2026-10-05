@@ -3253,6 +3253,12 @@ class StyleDashRequestHandler(SimpleHTTPRequestHandler):
         path = urlsplit(self.path).path
         if path.startswith(("/assets/", "/media/product-images/")):
             self.send_header("Cache-Control", "public, max-age=31536000, immutable")
+        elif not path.startswith("/api/"):
+            # HTML/navigation responses must never pin an old hashed bundle in
+            # Android in-app browsers (notably Instagram WebView).
+            self.send_header("Cache-Control", "no-store, no-cache, must-revalidate")
+            self.send_header("Pragma", "no-cache")
+            self.send_header("Expires", "0")
         if self._is_canonical_public_host():
             self.send_header("Strict-Transport-Security", HSTS_POLICY)
         self.send_header("X-Content-Type-Options", "nosniff")

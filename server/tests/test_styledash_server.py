@@ -2427,6 +2427,27 @@ class HttpApiTests(unittest.TestCase):
             self.assertEqual(response.headers.get_content_charset(), "utf-8")
             self.assertIn("â‚¹576", body)
 
+    def test_spa_navigation_is_not_cached_by_android_instagram_webview(self) -> None:
+        request = urllib.request.Request(
+            f"{self.base_url}/",
+            headers={
+                "User-Agent": (
+                    "Mozilla/5.0 (Linux; Android 14; SM-S918B) "
+                    "AppleWebKit/537.36 (KHTML, like Gecko) "
+                    "Chrome/140.0 Mobile Safari/537.36 "
+                    "Instagram 400.0.0.0.0 Android"
+                )
+            },
+        )
+        with urllib.request.urlopen(request) as response:
+            self.assertEqual(response.status, 200)
+            cache_control = response.headers.get("Cache-Control", "")
+            self.assertIn("no-store", cache_control)
+            self.assertIn("no-cache", cache_control)
+            self.assertIn("must-revalidate", cache_control)
+            self.assertEqual(response.headers.get("Pragma"), "no-cache")
+            self.assertEqual(response.headers.get("Expires"), "0")
+
     def test_public_robots_and_sitemap_use_configured_origin(self) -> None:
         with urllib.request.urlopen(f"{self.base_url}/robots.txt") as response:
             body = response.read().decode("utf-8")
