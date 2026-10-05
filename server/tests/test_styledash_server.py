@@ -2677,6 +2677,54 @@ class HttpApiTests(unittest.TestCase):
         with response:
             return response.status, json.load(response), response.headers
 
+    def test_internal_admin_refund_bridge_requires_loopback_token_and_submits_once(self) -> None:
+        order_id = "HTTP-INTERNAL-REFUND"
+        with self.service.store.lock:
+            self.service.store.state["orders"][order_id] = {
+                "id": order_id, "userId": "customer-internal-refund",
+                "paymentMethod": "upi", "paymentStatus": "paid", "status": "confirmed",
+                "fulfillmentRequired": True, "inventoryCommitted": False,
+                "razorpayOrderId": "order_internal_refund",
+                "razorpayPaymentId": "pay_internal_refund",
+                "amount": 25500, "currency": "INR", "grandTotal": 255,
+                "createdAt": "2026-10-05T10:00:00+00:00",
+                "updatedAt": "2026-10-05T10:00:00+00:00",
+                "statusHistory": [], "items": [],
+            }
+            self.service.store.save()
+
+        status, rejected, _headers = self.post_json(
+            "/api/internal-admin/refund-cancel",
+            {"orderId": order_id, "requestedBy": "admin-test", "reason": "Customer requested cancellation"},
+            headers={"X-Vibe4You-Admin-Refund-Token": "wrong-token"},
+            include_terms=False,
+        )
+        self.assertEqual((status, rejected["code"]), (404, "not_found"))
+        self.assertEqual(self.gateway.refund_calls, [])
+
+        token = SERVER.ensure_admin_refund_token(self.service.store.path.parent)
+        status, accepted, _headers = self.post_json(
+            "/api/internal-admin/refund-cancel",
+            {"orderId": order_id, "requestedBy": "admin-test", "reason": "Customer requested cancellation"},
+            headers={"X-Vibe4You-Admin-Refund-Token": token},
+            include_terms=False,
+        )
+        self.assertEqual(status, 200)
+        self.assertFalse(accepted["idempotent"])
+        self.assertEqual(len(self.gateway.refund_calls), 1)
+        self.assertEqual(self.gateway.refund_calls[0]["payment_id"], "pay_internal_refund")
+        self.assertEqual(self.gateway.refund_calls[0]["payload"]["amount"], 25500)
+
+        status, duplicate, _headers = self.post_json(
+            "/api/internal-admin/refund-cancel",
+            {"orderId": order_id, "requestedBy": "admin-test", "reason": "Customer requested cancellation"},
+            headers={"X-Vibe4You-Admin-Refund-Token": token},
+            include_terms=False,
+        )
+        self.assertEqual(status, 200)
+        self.assertTrue(duplicate["idempotent"])
+        self.assertEqual(len(self.gateway.refund_calls), 1)
+
     def test_authentication_requires_and_records_current_terms_consent(self) -> None:
         registration = {
             "name": "Terms Customer",

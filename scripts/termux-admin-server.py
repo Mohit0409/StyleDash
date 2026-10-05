@@ -18,8 +18,9 @@ from http.cookies import SimpleCookie
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Any
+from urllib.error import HTTPError, URLError
 from urllib.parse import parse_qs, unquote, urlsplit
-from urllib.request import urlopen
+from urllib.request import Request, urlopen
 
 try:
     from styledash_admin import ADMIN_COOKIE, CHALLENGE_COOKIE, AdminStore
@@ -267,6 +268,11 @@ class AdminApplication:
         self._store_product_image_payload = public.store_product_image_payload
         self._public_security_error = public.SecurityError
         self._public_api_error = public.ApiError
+        self._ensure_admin_refund_token = public.ensure_admin_refund_token
+        self._refund_bridge_url = os.environ.get(
+            "STYLEDASH_REFUND_BRIDGE_URL",
+            "http://127.0.0.1:8080/api/internal-admin/refund-cancel",
+        ).strip()
         self.product_image_directory = database.parent / "product-images"
         self.payments = public.PaymentService(
             catalog, settings, data_dir, webhook_secret="",
@@ -274,8 +280,8 @@ class AdminApplication:
             shop_workflow=self.shops,
         )
         print(
-            "Vibe4You admin refund gateway configured="
-            + ("yes" if self.payments.gateway is not None else "no"),
+            "Vibe4You admin refund transport="
+            + ("direct-gateway" if self.payments.gateway is not None else "internal-bridge"),
             flush=True,
         )
 
@@ -585,20 +591,97 @@ class AdminApplication:
             _notify_inventory_alerts(inventory_alerts)
         return self.payments.order_for_display(result)
 
+    def _refund_via_public_service(
+        self,
+        admin_id: str,
+        order_id: str,
+        reason: Any,
+    ) -> dict[str, Any]:
+        parsed = urlsplit(self._refund_bridge_url)
+        if (
+            parsed.scheme != "http"
+            or (parsed.hostname or "").lower() not in {"127.0.0.1", "localhost", "::1"}
+            or parsed.username is not None
+            or parsed.password is not None
+            or parsed.query
+            or parsed.fragment
+            or parsed.path != "/api/internal-admin/refund-cancel"
+        ):
+            raise SecurityError(
+                503,
+                "The private refund bridge is not configured safely.",
+                "refund_bridge_unavailable",
+            )
+
+        token = self._ensure_admin_refund_token(self.payments.store.path.parent)
+        body = json.dumps(
+            {"orderId": order_id, "requestedBy": admin_id, "reason": reason},
+            separators=(",", ":"),
+        ).encode("utf-8")
+        request = Request(
+            self._refund_bridge_url,
+            data=body,
+            method="POST",
+            headers={
+                "Content-Type": "application/json",
+                "X-Vibe4You-Admin-Refund-Token": token,
+            },
+        )
+        try:
+            with urlopen(request, timeout=20) as response:
+                raw = response.read()
+        except HTTPError as error:
+            try:
+                payload = json.loads(error.read().decode("utf-8"))
+            except Exception:
+                payload = {}
+            message = payload.get("error") if isinstance(payload, dict) else None
+            code = payload.get("code") if isinstance(payload, dict) else None
+            raise SecurityError(
+                int(error.code),
+                message if isinstance(message, str) and message else "Refund request failed.",
+                code if isinstance(code, str) and code else "refund_request_failed",
+            ) from None
+        except (URLError, TimeoutError, OSError):
+            raise SecurityError(
+                503,
+                "The private refund service is temporarily unavailable. Refresh the order before retrying.",
+                "refund_bridge_unavailable",
+            ) from None
+
+        try:
+            result = json.loads(raw.decode("utf-8"))
+        except (UnicodeDecodeError, json.JSONDecodeError):
+            raise SecurityError(
+                502,
+                "The private refund service returned an invalid response.",
+                "invalid_refund_response",
+            ) from None
+        if not isinstance(result, dict) or result.get("success") is not True:
+            raise SecurityError(
+                502,
+                "The private refund service returned an invalid response.",
+                "invalid_refund_response",
+            )
+        return result
+
     def refund_and_cancel_order(
         self,
         admin_id: str,
         order_id: str,
         reason: Any,
     ) -> dict[str, Any]:
-        try:
-            result = self.payments.initiate_full_refund_for_cancellation(
-                order_id,
-                admin_id,
-                reason,
-            )
-        except self._public_api_error as exc:
-            raise SecurityError(exc.status, exc.message, exc.code) from None
+        if self.payments.gateway is None:
+            result = self._refund_via_public_service(admin_id, order_id, reason)
+        else:
+            try:
+                result = self.payments.initiate_full_refund_for_cancellation(
+                    order_id,
+                    admin_id,
+                    reason,
+                )
+            except self._public_api_error as exc:
+                raise SecurityError(exc.status, exc.message, exc.code) from None
 
         with self.payments.store.lock:
             stored = self.payments.store.state["orders"].get(order_id)

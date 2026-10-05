@@ -483,6 +483,50 @@ class ApiError(Exception):
         self.code = code
 
 
+ADMIN_REFUND_TOKEN_FILENAME = ".admin-refund-token"
+
+
+def ensure_admin_refund_token(data_directory: Path) -> str:
+    """Return a private cross-process token used only on the loopback refund bridge."""
+    data_directory.mkdir(parents=True, exist_ok=True)
+    path = data_directory / ADMIN_REFUND_TOKEN_FILENAME
+
+    def read_existing() -> str:
+        try:
+            token = path.read_text(encoding="utf-8").strip()
+        except OSError as exc:
+            raise RuntimeError("The private admin refund token could not be read") from exc
+        if not 40 <= len(token) <= 256 or any(character.isspace() for character in token):
+            raise RuntimeError("The private admin refund token is invalid")
+        try:
+            os.chmod(path, 0o600)
+        except OSError:
+            pass
+        return token
+
+    if path.exists():
+        return read_existing()
+
+    token = secrets.token_urlsafe(48)
+    try:
+        descriptor = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+    except FileExistsError:
+        return read_existing()
+    try:
+        with os.fdopen(descriptor, "w", encoding="utf-8") as handle:
+            handle.write(token + "\n")
+            handle.flush()
+            os.fsync(handle.fileno())
+    except Exception:
+        try:
+            path.unlink(missing_ok=True)
+        except OSError:
+            pass
+        raise
+    os.chmod(path, 0o600)
+    return token
+
+
 class RazorpayGateway:
     """Small adapter that keeps SDK details out of the order service."""
 
@@ -3939,6 +3983,47 @@ class StyleDashRequestHandler(SimpleHTTPRequestHandler):
         if not self.rate_limiter.allow(account_key, 3):
             raise ApiError(HTTPStatus.TOO_MANY_REQUESTS, "Too many requests. Please wait and try again.", "rate_limited")
 
+    def _handle_internal_admin_refund(self, path: str) -> bool:
+        if path != "/api/internal-admin/refund-cancel":
+            return False
+
+        hostname = (self._request_hostname() or "").lower()
+        peer = self.client_address[0]
+        if peer not in ("127.0.0.1", "::1") or hostname not in {"127.0.0.1", "localhost", "::1"}:
+            self._json_response(
+                HTTPStatus.NOT_FOUND,
+                {"success": False, "error": "Not found.", "code": "not_found"},
+            )
+            return True
+
+        expected = ensure_admin_refund_token(self.payment_service.store.path.parent)
+        supplied = self.headers.get("X-Vibe4You-Admin-Refund-Token", "")
+        if (
+            not isinstance(supplied, str)
+            or not supplied
+            or not hmac.compare_digest(expected, supplied)
+        ):
+            self._json_response(
+                HTTPStatus.NOT_FOUND,
+                {"success": False, "error": "Not found.", "code": "not_found"},
+            )
+            return True
+
+        payload = self._read_json()
+        order_id = payload.get("orderId")
+        requested_by = payload.get("requestedBy")
+        if not isinstance(order_id, str) or not order_id.strip():
+            raise ApiError(HTTPStatus.BAD_REQUEST, "Order reference is required.", "order_not_found")
+        if not isinstance(requested_by, str) or not requested_by.strip():
+            raise ApiError(HTTPStatus.BAD_REQUEST, "Administrator reference is required.", "invalid_admin_reference")
+        result = self.payment_service.initiate_full_refund_for_cancellation(
+            order_id.strip(),
+            requested_by.strip()[:128],
+            payload.get("reason"),
+        )
+        self._json_response(HTTPStatus.OK, result)
+        return True
+
     def do_GET(self) -> None:  # noqa: N802 - stdlib override name
         parsed = urlsplit(self.path)
         path = parsed.path
@@ -4253,6 +4338,8 @@ class StyleDashRequestHandler(SimpleHTTPRequestHandler):
     def do_POST(self) -> None:  # noqa: N802 - stdlib override name
         path = urlsplit(self.path).path
         try:
+            if self._handle_internal_admin_refund(path):
+                return
             if self._redirect_http_to_https():
                 return
             if self._sensitive_path(path):
