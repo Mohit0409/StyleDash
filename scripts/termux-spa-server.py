@@ -525,6 +525,29 @@ class RazorpayGateway:
                 "payment_service_unavailable",
             ) from None
 
+    def create_refund(self, payment_id: str, payload: dict[str, Any]) -> dict[str, Any]:
+        try:
+            return self.client.payment.refund(payment_id, data=payload)
+        except Exception as exc:  # Razorpay SDK exceptions expose status_code.
+            status = int(getattr(exc, "status_code", 500) or 500)
+            if status in (HTTPStatus.UNAUTHORIZED, HTTPStatus.FORBIDDEN):
+                raise ApiError(
+                    HTTPStatus.UNAUTHORIZED,
+                    "Refund service authentication failed.",
+                    "payment_auth_failed",
+                ) from None
+            if 400 <= status < 500 and status != HTTPStatus.TOO_MANY_REQUESTS:
+                raise ApiError(
+                    HTTPStatus.CONFLICT,
+                    "Razorpay rejected the refund request. Check the payment and available balance before retrying.",
+                    "refund_rejected",
+                ) from None
+            raise ApiError(
+                HTTPStatus.BAD_GATEWAY,
+                "The refund service is temporarily unavailable. The refund outcome is not confirmed.",
+                "refund_service_unavailable",
+            ) from None
+
 
 class StateFileLock:
     """Thread lock plus Termux process lock; reloads state after acquisition."""
@@ -2436,6 +2459,226 @@ class PaymentService:
             self.store.save()
             return {"idempotent": False, "order": self._public_order(order)}
 
+    def initiate_full_refund_for_cancellation(
+        self,
+        order_id: str,
+        requested_by: str,
+        reason: Any,
+    ) -> dict[str, Any]:
+        """Submit one full Razorpay refund after an administrator approves cancellation."""
+        if self.gateway is None or not hasattr(self.gateway, "create_refund"):
+            raise ApiError(
+                HTTPStatus.SERVICE_UNAVAILABLE,
+                "Refund processing is not configured for the administrator service.",
+                "refunds_not_configured",
+            )
+        if not isinstance(reason, str) or not 3 <= len(reason.strip()) <= 500:
+            raise ApiError(
+                HTTPStatus.BAD_REQUEST,
+                "A cancellation reason is required.",
+                "cancellation_reason_required",
+            )
+        cancellation_reason = " ".join(reason.strip().split())
+        cancellable = {
+            "payment_pending", "payment_review_required", "placed", "confirmed",
+            "preparing", "packed", "out_for_delivery",
+        }
+
+        with self.store.lock:
+            state = self.store.state
+            order = state["orders"].get(order_id)
+            if not isinstance(order, dict):
+                raise ApiError(HTTPStatus.NOT_FOUND, "Order not found.", "order_not_found")
+            if order.get("fulfillmentRequired") is False or order.get("status") not in cancellable:
+                raise ApiError(
+                    HTTPStatus.CONFLICT,
+                    "This order can no longer be cancelled.",
+                    "cancellation_unavailable",
+                )
+            if order.get("paymentMethod") not in ("upi", "card"):
+                raise ApiError(
+                    HTTPStatus.CONFLICT,
+                    "This order does not require an online-payment refund.",
+                    "refund_not_applicable",
+                )
+            if order.get("paymentStatus") == "refunded":
+                return {
+                    "success": True,
+                    "idempotent": True,
+                    "pending": False,
+                    "order": self._public_order(order),
+                }
+            if order.get("paymentStatus") != "paid":
+                raise ApiError(
+                    HTTPStatus.CONFLICT,
+                    "Only a captured online payment can be refunded.",
+                    "payment_not_refundable",
+                )
+
+            cancellation_request = order.get("cancellationRequest")
+            if (
+                order.get("status") == "out_for_delivery"
+                and isinstance(cancellation_request, dict)
+                and int(cancellation_request.get("feeDue", 0) or 0) > 0
+                and cancellation_request.get("feePaid") is not True
+            ):
+                raise ApiError(
+                    HTTPStatus.CONFLICT,
+                    "Collect the Rs 50 after-dispatch cancellation fee before refunding.",
+                    "cancellation_fee_required",
+                )
+
+            payment_id = order.get("razorpayPaymentId")
+            if not isinstance(payment_id, str) or not payment_id:
+                raise ApiError(
+                    HTTPStatus.CONFLICT,
+                    "The captured payment reference is unavailable.",
+                    "payment_reference_missing",
+                )
+            amount = order.get("amount")
+            currency = order.get("currency")
+            if isinstance(amount, bool) or not isinstance(amount, int) or amount <= 0:
+                raise ApiError(
+                    HTTPStatus.CONFLICT,
+                    "The captured payment amount is unavailable.",
+                    "payment_amount_unavailable",
+                )
+            if not isinstance(currency, str) or not currency:
+                raise ApiError(
+                    HTTPStatus.CONFLICT,
+                    "The captured payment currency is unavailable.",
+                    "payment_currency_unavailable",
+                )
+
+            existing = order.get("refundRequest")
+            if isinstance(existing, dict) and existing.get("status") in {
+                "submitting", "submitted", "processing", "uncertain", "processed",
+            }:
+                return {
+                    "success": True,
+                    "idempotent": True,
+                    "pending": existing.get("status") != "processed",
+                    "order": self._public_order(order),
+                }
+
+            requested_at = datetime.now(timezone.utc).isoformat()
+            request_token = "rfq_" + secrets.token_hex(12)
+            order["refundRequest"] = {
+                "status": "submitting",
+                "requestedAt": requested_at,
+                "requestedBy": str(requested_by)[:128],
+                "amount": amount,
+                "currency": currency,
+                "reason": cancellation_reason,
+                "requestToken": request_token,
+                "cancelAfterRefund": True,
+            }
+            order["updatedAt"] = requested_at
+            order.setdefault("statusHistory", []).append({
+                "status": order.get("status"),
+                "timestamp": requested_at,
+                "note": "Administrator approved cancellation; full Razorpay refund submission started",
+            })
+            self.store.save()
+
+        payload = {
+            "amount": amount,
+            "notes": {
+                "styledash_order_id": order_id,
+                "styledash_refund_token": request_token,
+            },
+        }
+        try:
+            refund = self.gateway.create_refund(payment_id, payload)
+        except ApiError as error:
+            failed_at = datetime.now(timezone.utc).isoformat()
+            with self.store.lock:
+                order = self.store.state["orders"].get(order_id)
+                if isinstance(order, dict):
+                    request = order.get("refundRequest")
+                    if isinstance(request, dict) and request.get("requestToken") == request_token:
+                        request["status"] = (
+                            "failed"
+                            if error.code in {"refund_rejected", "payment_auth_failed"}
+                            else "uncertain"
+                        )
+                        request["failedAt"] = failed_at
+                        request["errorCode"] = error.code
+                        order["requiresAdminAttention"] = True
+                        order["updatedAt"] = failed_at
+                        order.setdefault("statusHistory", []).append({
+                            "status": order.get("status"),
+                            "timestamp": failed_at,
+                            "note": (
+                                "Razorpay refund request was rejected"
+                                if request["status"] == "failed"
+                                else "Razorpay refund request outcome is uncertain; verify before retrying"
+                            ),
+                        })
+                        self.store.save()
+            raise
+
+        if not isinstance(refund, dict):
+            refund = {}
+        refund_id = refund.get("id")
+        response_payment_id = refund.get("payment_id")
+        response_amount = refund.get("amount")
+        response_currency = refund.get("currency")
+        invalid_response = (
+            not isinstance(refund_id, str)
+            or not refund_id
+            or (response_payment_id is not None and response_payment_id != payment_id)
+            or (response_amount is not None and response_amount != amount)
+            or (response_currency is not None and response_currency != currency)
+        )
+        if invalid_response:
+            uncertain_at = datetime.now(timezone.utc).isoformat()
+            with self.store.lock:
+                order = self.store.state["orders"].get(order_id)
+                if isinstance(order, dict):
+                    request = order.get("refundRequest")
+                    if isinstance(request, dict) and request.get("requestToken") == request_token:
+                        request.update({
+                            "status": "uncertain",
+                            "failedAt": uncertain_at,
+                            "errorCode": "invalid_refund_response",
+                        })
+                        order["requiresAdminAttention"] = True
+                        order["updatedAt"] = uncertain_at
+                        self.store.save()
+            raise ApiError(
+                HTTPStatus.BAD_GATEWAY,
+                "Razorpay returned an invalid refund response. Verify the payment in Razorpay before retrying.",
+                "invalid_refund_response",
+            )
+
+        submitted_at = datetime.now(timezone.utc).isoformat()
+        with self.store.lock:
+            order = self.store.state["orders"].get(order_id)
+            if not isinstance(order, dict):
+                raise ApiError(HTTPStatus.NOT_FOUND, "Order not found.", "order_not_found")
+            request = order.get("refundRequest")
+            if isinstance(request, dict) and request.get("requestToken") == request_token:
+                request.setdefault("razorpayRefundId", refund_id)
+                request.setdefault("providerStatus", refund.get("status"))
+                request.setdefault("submittedAt", submitted_at)
+                if request.get("status") != "processed":
+                    request["status"] = "submitted"
+                order["updatedAt"] = submitted_at
+                order.setdefault("statusHistory", []).append({
+                    "status": order.get("status"),
+                    "timestamp": submitted_at,
+                    "note": f"Full Razorpay refund submitted ({refund_id}); awaiting signed refund.processed webhook",
+                })
+                self.store.save()
+            return {
+                "success": True,
+                "idempotent": False,
+                "pending": order.get("paymentStatus") != "refunded",
+                "refundId": refund_id,
+                "order": self._public_order(order),
+            }
+
     def request_exchange(
         self, order_id: str, user_id: str, item_index: Any, target_variant_id: Any,
         now: datetime | None = None,
@@ -2819,6 +3062,17 @@ class PaymentService:
                 order["requiresAdminAttention"] = True
                 if event == "refund.failed":
                     order["refundFailureAttention"] = True
+                    refund_request = order.get("refundRequest")
+                    if isinstance(refund_request, dict):
+                        known_refund_id = refund_request.get("razorpayRefundId")
+                        if not known_refund_id or known_refund_id == entity_id:
+                            refund_request.update({
+                                "status": "failed",
+                                "razorpayRefundId": entity_id,
+                                "providerStatus": "failed",
+                                "failedAt": now,
+                                "errorCode": "refund_failed",
+                            })
                 elif event == "payment.dispute.created":
                     order["paymentDisputed"] = True
                     order["paymentDisputeId"] = entity_id
@@ -2929,8 +3183,8 @@ class PaymentService:
             }
             if safe_event_id:
                 state["processedWebhookEvents"][safe_event_id] = alert_id
+            auto_cancelled = False
             if order is not None:
-                order["requiresAdminAttention"] = True
                 order["updatedAt"] = now
                 if full_refund:
                     order["paymentStatus"] = "refunded"
@@ -2943,13 +3197,96 @@ class PaymentService:
                     order["refundCurrency"] = currency
                     order["refundProcessedAt"] = now
                     state["processedPayments"].setdefault(payment_id, order["id"])
+
+                    refund_request = order.get("refundRequest")
+                    if isinstance(refund_request, dict):
+                        refund_request.update({
+                            "status": "processed",
+                            "razorpayRefundId": refund_id,
+                            "providerStatus": "processed",
+                            "processedAt": now,
+                        })
+
+                    should_cancel = (
+                        isinstance(refund_request, dict)
+                        and refund_request.get("cancelAfterRefund") is True
+                        and order.get("status") != "cancelled"
+                    )
+                    if should_cancel:
+                        try:
+                            self._release_inventory(state, order)
+                        except ApiError:
+                            inventory_alert_id = f"refund_inventory_release_failed:{order['id']}"
+                            state["operationalAlerts"][inventory_alert_id] = {
+                                "id": inventory_alert_id,
+                                "type": "refund_inventory_release_failed",
+                                "entityId": order["id"],
+                                "razorpayPaymentId": payment_id,
+                                "styleDashOrderId": order["id"],
+                                "status": "open",
+                                "recordedAt": now,
+                            }
+                            order["requiresAdminAttention"] = True
+                            note = (
+                                "Razorpay confirmed a full refund; cancellation is held for "
+                                "administrator inventory reconciliation"
+                            )
+                        else:
+                            cancellation_reason = str(
+                                refund_request.get("reason") or "Administrator approved cancellation"
+                            )
+                            order["status"] = "cancelled"
+                            order["cancelledAt"] = now
+                            order["cancellationReason"] = cancellation_reason
+                            cancellation_request = order.get("cancellationRequest")
+                            if isinstance(cancellation_request, dict):
+                                cancellation_request.update({
+                                    "status": "completed",
+                                    "completedAt": now,
+                                })
+                            refund_request["cancellationCompletedAt"] = now
+                            for pending_alert in state["operationalAlerts"].values():
+                                if (
+                                    isinstance(pending_alert, dict)
+                                    and pending_alert.get("styleDashOrderId") == order["id"]
+                                    and pending_alert.get("status") == "open"
+                                    and pending_alert.get("type") in {
+                                        "inventory_shortfall_after_capture",
+                                        "refund.processed",
+                                        "refund.processed_review",
+                                    }
+                                ):
+                                    pending_alert.update({
+                                        "status": "resolved",
+                                        "resolvedAt": now,
+                                        "resolution": "order_cancelled_after_admin_refund",
+                                    })
+                            order["requiresAdminAttention"] = any(
+                                isinstance(pending_alert, dict)
+                                and pending_alert.get("styleDashOrderId") == order["id"]
+                                and pending_alert.get("status") == "open"
+                                for pending_alert in state["operationalAlerts"].values()
+                            )
+                            auto_cancelled = True
+                            note = "Razorpay confirmed a full refund; administrator-approved cancellation completed"
+                    else:
+                        order["requiresAdminAttention"] = True
+                        note = "Razorpay confirmed a full refund; fulfillment state awaits administrator reconciliation"
+
                     order.setdefault("statusHistory", []).append({
                         "status": order.get("status", "payment_pending"),
                         "timestamp": now,
-                        "note": "Razorpay confirmed a full refund; fulfillment state awaits administrator reconciliation",
+                        "note": note,
                     })
+                else:
+                    order["requiresAdminAttention"] = True
             self.store.save()
-            return {"duplicate": False, "fullRefund": full_refund, "order": self._public_order(order) if order else None}
+            return {
+                "duplicate": False,
+                "fullRefund": full_refund,
+                "autoCancelled": auto_cancelled,
+                "order": self._public_order(order) if order else None,
+            }
 
     def process_webhook(
         self,

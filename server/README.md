@@ -96,8 +96,17 @@ The Live webhook URL must be the public HTTPS `/api/webhooks/razorpay` endpoint
 and subscribe to `payment.captured`, `payment.failed`, `order.paid`,
 `refund.processed`, `refund.failed`, and `payment.dispute.created`. Refund failures and newly created
 disputes create persistent, idempotent alerts visible only in the private admin
-service. They never change inventory, refund automatically, or rewrite a paid
-order's successful payment history.
+service. They never change inventory or rewrite a paid order's successful payment
+history.
+
+For a captured online order, the private admin can approve cancellation and submit
+one full Razorpay refund from the order card. The order is held from further
+fulfilment while that refund is unresolved. The admin response does **not** mark
+the payment refunded: only a signed `refund.processed` webhook can do that. Once
+the full refund is confirmed, the server releases committed inventory exactly
+once and completes the approved cancellation. A transport/5xx outcome is treated
+as uncertain and must be verified in Razorpay before any retry; a definite
+Razorpay rejection can be retried explicitly from the admin UI.
 
 ## Verification
 

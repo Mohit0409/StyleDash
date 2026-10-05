@@ -109,6 +109,7 @@ class FakeGateway:
     def __init__(self) -> None:
         self.calls: list[dict] = []
         self.payments: dict[str, dict] = {}
+        self.refund_calls: list[dict] = []
 
     def create_order(self, payload: dict) -> dict:
         self.calls.append(payload)
@@ -116,6 +117,16 @@ class FakeGateway:
 
     def fetch_payment(self, payment_id: str) -> dict:
         return dict(self.payments[payment_id])
+
+    def create_refund(self, payment_id: str, payload: dict) -> dict:
+        self.refund_calls.append({"payment_id": payment_id, "payload": dict(payload)})
+        return {
+            "id": f"rfnd_test_{len(self.refund_calls):03d}",
+            "payment_id": payment_id,
+            "amount": payload["amount"],
+            "currency": "INR",
+            "status": "pending",
+        }
 
 
 class PaymentServiceTests(unittest.TestCase):
@@ -907,6 +918,67 @@ class PaymentServiceTests(unittest.TestCase):
                 "Status: Refunded",
                 notification["message"],
             )
+
+    def test_admin_approved_refund_is_submitted_once_and_webhook_cancels_order(self) -> None:
+        created = self.create_payment("admin-refund-cancel")
+        payment_id = "pay_admin_refund_cancel"
+        paid = self.service.verify_payment(self.browser_verification(created, payment_id))
+        order_id = paid["order"]["id"]
+        self.service.request_customer_cancellation(order_id, "test-user")
+
+        with self.service.store.lock:
+            stored = self.service.store.state["orders"][order_id]
+            variant_id = stored["items"][0]["variantId"]
+            inventory_before = self.service.store.state["inventory"][variant_id]
+            self.assertTrue(stored["inventoryCommitted"])
+
+        first = self.service.initiate_full_refund_for_cancellation(
+            order_id, "admin-test", "Customer requested cancellation"
+        )
+        self.assertFalse(first["idempotent"])
+        self.assertTrue(first["pending"])
+        self.assertEqual(len(self.gateway.refund_calls), 1)
+        self.assertEqual(self.gateway.refund_calls[0]["payment_id"], payment_id)
+        self.assertEqual(self.gateway.refund_calls[0]["payload"]["amount"], created["amount"])
+
+        duplicate = self.service.initiate_full_refund_for_cancellation(
+            order_id, "admin-test", "Customer requested cancellation"
+        )
+        self.assertTrue(duplicate["idempotent"])
+        self.assertEqual(len(self.gateway.refund_calls), 1)
+
+        refund_id = first["refundId"]
+        refund_body = json.dumps({
+            "event": "refund.processed",
+            "payload": {
+                "payment": {"entity": {
+                    "id": payment_id,
+                    "order_id": created["razorpayOrderId"],
+                    "amount": created["amount"],
+                    "amount_refunded": created["amount"],
+                    "currency": created["currency"],
+                    "status": "captured",
+                }},
+                "refund": {"entity": {
+                    "id": refund_id,
+                    "payment_id": payment_id,
+                    "amount": created["amount"],
+                    "currency": created["currency"],
+                    "status": "processed",
+                }},
+            },
+        }, separators=(",", ":")).encode()
+        self.deliver(refund_body)
+
+        with self.service.store.lock:
+            final = self.service.store.state["orders"][order_id]
+            self.assertEqual(final["paymentStatus"], "refunded")
+            self.assertEqual(final["status"], "cancelled")
+            self.assertEqual(final["refundRequest"]["status"], "processed")
+            self.assertEqual(final["refundRequest"]["razorpayRefundId"], refund_id)
+            self.assertFalse(final["inventoryCommitted"])
+            self.assertFalse(final["requiresAdminAttention"])
+            self.assertGreater(self.service.store.state["inventory"][variant_id], inventory_before)
 
     def test_refund_failed_notification_is_deduplicated(self) -> None:
         created = self.create_payment(

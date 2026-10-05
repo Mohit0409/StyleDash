@@ -250,6 +250,69 @@ class AdminStoreTests(unittest.TestCase):
         actions = {row["action"] for row in self.store.audit()}
         self.assertTrue({"exchange_approved", "exchange_fee_paid", "exchange_completed", "cancellation_fee_paid"}.issubset(actions))
 
+    def test_private_admin_inherits_razorpay_credentials_for_refund_gateway(self):
+        with patch.dict(ADMIN_SERVER.os.environ, {
+            "RAZORPAY_MODE": "test",
+            "RAZORPAY_TEST_KEY_ID": "rzp_test_admin_refund",
+            "RAZORPAY_TEST_KEY_SECRET": "test_admin_refund_secret",
+        }, clear=False):
+            app = ADMIN_SERVER.AdminApplication(
+                self.database, self.key, ROOT / "server/payment-data/catalog.json",
+                ROOT / "server/payment-data/settings.json", self.root / "data-admin-gateway",
+            )
+        self.assertIsNotNone(app.payments.gateway)
+
+    def test_private_admin_submits_real_refund_request_once_and_audits_it(self):
+        app = ADMIN_SERVER.AdminApplication(
+            self.database, self.key, ROOT / "server/payment-data/catalog.json",
+            ROOT / "server/payment-data/settings.json", self.root / "data-admin-refund",
+        )
+        calls = []
+        def create_refund(payment_id, payload):
+            calls.append((payment_id, dict(payload)))
+            return {
+                "id": "rfnd_admin_submit", "payment_id": payment_id,
+                "amount": payload["amount"], "currency": "INR", "status": "pending",
+            }
+        app.payments.gateway = SimpleNamespace(create_refund=create_refund)
+        with app.payments.store.lock:
+            app.payments.store.state["orders"]["ONLINE-REFUND"] = {
+                "id": "ONLINE-REFUND", "paymentMethod": "upi", "paymentStatus": "paid",
+                "status": "confirmed", "fulfillmentRequired": True, "inventoryCommitted": False,
+                "razorpayPaymentId": "pay_admin_submit", "amount": 123400, "currency": "INR",
+                "grandTotal": 1234, "createdAt": "2026-10-05T10:00:00+00:00",
+                "updatedAt": "2026-10-05T10:00:00+00:00", "statusHistory": [], "items": [],
+            }
+            app.payments.store.save()
+
+        first = app.refund_and_cancel_order(
+            self.admin["id"], "ONLINE-REFUND", "Customer requested cancellation"
+        )
+        self.assertTrue(first["pending"])
+        self.assertEqual(first["refundId"], "rfnd_admin_submit")
+        self.assertEqual(calls, [("pay_admin_submit", {
+            "amount": 123400,
+            "notes": {
+                "styledash_order_id": "ONLINE-REFUND",
+                "styledash_refund_token": calls[0][1]["notes"]["styledash_refund_token"],
+            },
+        })])
+
+        duplicate = app.refund_and_cancel_order(
+            self.admin["id"], "ONLINE-REFUND", "Customer requested cancellation"
+        )
+        self.assertTrue(duplicate["idempotent"])
+        self.assertEqual(len(calls), 1)
+        self.assert_error(
+            "refund_pending",
+            lambda: app.update_order_status(self.admin["id"], "ONLINE-REFUND", "preparing"),
+        )
+        audit = [row for row in self.store.audit() if row["action"] == "order_refund_submitted"]
+        self.assertEqual(len(audit), 1)
+        metadata = json.loads(audit[0]["metadata_json"])
+        self.assertEqual(metadata["amountPaise"], 123400)
+        self.assertEqual(metadata["razorpayRefundId"], "rfnd_admin_submit")
+
     def test_private_admin_owner_mobile_required_email_optional_and_otp_binds(self):
         owner = self.store.create_customer_account(self.admin["id"], {
             "name": "Phone First Owner", "phone": "9876501234", "password": "TempPass8!",
@@ -972,6 +1035,12 @@ class AdminStoreTests(unittest.TestCase):
         self.assertIn("delivered:'green'", admin_ui)
         self.assertIn("cancelled:'red'", admin_ui)
         self.assertIn("async function cancellationReasonFor()", admin_ui)
+        self.assertIn("async function refundCancellationReasonFor(order)", admin_ui)
+        self.assertIn('data-action="refund-cancel"', admin_ui)
+        self.assertIn("/refund-cancel`,{method:\'PATCH\'", admin_ui)
+        self.assertIn("initiate full ₹", admin_ui)
+        self.assertIn("signed refund.processed webhook confirms the refund", admin_ui)
+        self.assertIn("Paid online orders must be refunded and cancelled individually", admin_ui)
         self.assertIn("Customer requested cancellation", admin_ui)
         self.assertIn("Other", admin_ui)
         self.assertIn("Cancellation reason", admin_ui)
@@ -991,7 +1060,7 @@ class AdminStoreTests(unittest.TestCase):
         self.assertIn("Admin changes take effect immediately after save.", admin_ui)
         map_ui = (ROOT / "server/admin/delivery-zone-map.js").read_text(encoding="utf-8")
         admin_css = (ROOT / "server/admin/admin.css").read_text(encoding="utf-8")
-        self.assertIn('/admin.js?v=delivery-estimate-20261002-1', admin_index)
+        self.assertIn('/admin.js?v=refund-cancel-20261005-1', admin_index)
         self.assertIn('/admin.css?v=thumbnail-20260916-4', admin_index)
         self.assertIn('id="admin-dialog"', admin_index)
         self.assertIn('role="status"', admin_index)
@@ -1080,8 +1149,8 @@ class AdminHttpTests(unittest.TestCase):
         status, index, headers = self.request("/")
         self.assertEqual(status, 200)
         self.assertEqual(headers.get("Cache-Control"), "no-store")
-        self.assertIn("/admin.js?v=delivery-estimate-20261002-1", index)
-        status, script, headers = self.request("/admin.js?v=delivery-estimate-20261002-1")
+        self.assertIn("/admin.js?v=refund-cancel-20261005-1", index)
+        status, script, headers = self.request("/admin.js?v=refund-cancel-20261005-1")
         self.assertEqual(status, 200)
         self.assertEqual(headers.get("Cache-Control"), "no-store")
         self.assertIn('width="48" height="48"', script)
@@ -1275,6 +1344,63 @@ class AdminHttpTests(unittest.TestCase):
         status, audit, _ = self.request('/api/admin/audit')
         self.assertEqual(status, 200)
         self.assertTrue(any(row['action']=='cod_payment_marked_paid' for row in audit['audit']))
+
+    def test_refund_cancel_http_is_private_csrf_protected_and_idempotent(self):
+        app = self.server.RequestHandlerClass.application
+        calls = []
+        def create_refund(payment_id, payload):
+            calls.append((payment_id, dict(payload)))
+            return {
+                'id':'rfnd_http_admin', 'payment_id':payment_id,
+                'amount':payload['amount'], 'currency':'INR', 'status':'pending',
+            }
+        app.payments.gateway = SimpleNamespace(create_refund=create_refund)
+        with app.payments.store.lock:
+            app.payments.store.state['orders']['HTTP-REFUND'] = {
+                'id':'HTTP-REFUND','paymentMethod':'upi','paymentStatus':'paid',
+                'status':'confirmed','fulfillmentRequired':True,'inventoryCommitted':False,
+                'razorpayPaymentId':'pay_http_refund','amount':25900,'currency':'INR',
+                'grandTotal':259,'createdAt':'2026-10-05T10:00:00+00:00',
+                'updatedAt':'2026-10-05T10:00:00+00:00','statusHistory':[],'items':[],
+            }
+            app.payments.store.save()
+
+        status, body, _ = self.request(
+            '/api/admin/orders/HTTP-REFUND/refund-cancel',
+            {'reason':'Customer requested cancellation'}, method='PATCH',
+        )
+        self.assertEqual((status, body['code']), (401, 'admin_authentication_required'))
+
+        self.request('/api/admin/login', {'username':'local-owner','password':'long administrator password 123'}, method='POST')
+        status, auth, _ = self.request('/api/admin/totp', {'code':pyotp.TOTP(self.secret).now()}, method='POST')
+        self.assertEqual(status, 200)
+        csrf = auth['csrfToken']
+
+        status, body, _ = self.request(
+            '/api/admin/orders/HTTP-REFUND/refund-cancel',
+            {'reason':'Customer requested cancellation'}, method='PATCH',
+        )
+        self.assertEqual((status, body['code']), (403, 'admin_csrf_failed'))
+
+        status, body, _ = self.request(
+            '/api/admin/orders/HTTP-REFUND/refund-cancel',
+            {'reason':'Customer requested cancellation'},
+            headers={'X-CSRF-Token':csrf}, method='PATCH',
+        )
+        self.assertEqual(status, 200)
+        self.assertTrue(body['pending'])
+        self.assertFalse(body['idempotent'])
+        self.assertEqual(body['refundId'], 'rfnd_http_admin')
+        self.assertEqual(len(calls), 1)
+
+        status, duplicate, _ = self.request(
+            '/api/admin/orders/HTTP-REFUND/refund-cancel',
+            {'reason':'Customer requested cancellation'},
+            headers={'X-CSRF-Token':csrf}, method='PATCH',
+        )
+        self.assertEqual(status, 200)
+        self.assertTrue(duplicate['idempotent'])
+        self.assertEqual(len(calls), 1)
 
     def test_shop_transition_success_does_not_depend_on_admin_catalog_refresh(self):
         customers = SECURITY.SecurityStore(self.database, self.key)
