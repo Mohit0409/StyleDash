@@ -86,7 +86,7 @@ class SecurityStoreTests(unittest.TestCase):
         }, "client-a")
         self.assertFalse(logged_in["emailVerified"])
         cookie = self.store.cookie(raw)
-        for flag in ("__Host-styledash_session=", "HttpOnly", "Secure", "SameSite=Lax", "Path=/"):
+        for flag in ("__Host-styledash_session=", "HttpOnly", "Secure", "SameSite=None", "Partitioned", "Path=/"):
             self.assertIn(flag, cookie)
         with self.store.connect() as db:
             stored = db.execute("SELECT token_hash FROM sessions WHERE token_hash=?", (SECURITY.token_hash(raw),)).fetchone()

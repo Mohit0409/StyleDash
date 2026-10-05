@@ -535,11 +535,11 @@ class SecurityStore:
 
     @staticmethod
     def cookie(raw_session: str, max_age: int = CUSTOMER_ABSOLUTE_HOURS * 3600) -> str:
-        return f"{COOKIE_NAME}={raw_session}; Path=/; Max-Age={max_age}; HttpOnly; Secure; SameSite=Lax"
+        return f"{COOKIE_NAME}={raw_session}; Path=/; Max-Age={max_age}; HttpOnly; Secure; SameSite=None; Partitioned"
 
     @staticmethod
     def clear_cookie() -> str:
-        return f"{COOKIE_NAME}=; Path=/; Max-Age=0; HttpOnly; Secure; SameSite=Lax"
+        return f"{COOKIE_NAME}=; Path=/; Max-Age=0; HttpOnly; Secure; SameSite=None; Partitioned"
 
     @staticmethod
     def _require_current_terms(payload: dict[str, Any]) -> None:
