@@ -3871,7 +3871,7 @@ class HttpApiTests(unittest.TestCase):
         })
         self.assertEqual(status, 201)
         set_cookie = headers["Set-Cookie"]
-        for flag in ("__Host-styledash_session=", "HttpOnly", "Secure", "SameSite=Lax", "Path=/"):
+        for flag in ("__Host-styledash_session=", "HttpOnly", "Secure", "SameSite=None", "Partitioned", "Path=/"):
             self.assertIn(flag, set_cookie)
         cookie = set_cookie.split(";", 1)[0]
         csrf = registered["csrfToken"]
