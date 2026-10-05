@@ -269,9 +269,14 @@ class AdminApplication:
         self._public_api_error = public.ApiError
         self.product_image_directory = database.parent / "product-images"
         self.payments = public.PaymentService(
-            catalog, settings, data_dir, key_id="", key_secret="", webhook_secret="",
+            catalog, settings, data_dir, webhook_secret="",
             mode=os.environ.get("RAZORPAY_MODE", "test"), gateway=None,
             shop_workflow=self.shops,
+        )
+        print(
+            "Vibe4You admin refund gateway configured="
+            + ("yes" if self.payments.gateway is not None else "no"),
+            flush=True,
         )
 
     def store_product_image(self, payload: dict[str, Any]) -> dict[str, Any]:
@@ -580,6 +585,60 @@ class AdminApplication:
             _notify_inventory_alerts(inventory_alerts)
         return self.payments.order_for_display(result)
 
+    def refund_and_cancel_order(
+        self,
+        admin_id: str,
+        order_id: str,
+        reason: Any,
+    ) -> dict[str, Any]:
+        try:
+            result = self.payments.initiate_full_refund_for_cancellation(
+                order_id,
+                admin_id,
+                reason,
+            )
+        except self._public_api_error as exc:
+            raise SecurityError(exc.status, exc.message, exc.code) from None
+
+        with self.payments.store.lock:
+            stored = self.payments.store.state["orders"].get(order_id)
+            if not isinstance(stored, dict):
+                raise SecurityError(404, "Order not found.", "order_not_found")
+            display_order = self.payments.order_for_display(dict(stored))
+            refund_request = stored.get("refundRequest")
+            refund_id = (
+                refund_request.get("razorpayRefundId")
+                if isinstance(refund_request, dict)
+                else result.get("refundId")
+            )
+            refund_amount = (
+                refund_request.get("amount")
+                if isinstance(refund_request, dict)
+                else stored.get("amount")
+            )
+
+        if result.get("idempotent") is not True:
+            self.identity.record_action(
+                admin_id,
+                "order_refund_submitted",
+                "order",
+                order_id,
+                "success",
+                {
+                    "amountPaise": refund_amount,
+                    "razorpayRefundId": refund_id,
+                    "reason": " ".join(str(reason).strip().split())[:500],
+                    "cancelAfterRefund": True,
+                },
+            )
+
+        return {
+            "order": display_order,
+            "pending": result.get("pending", True),
+            "refundId": refund_id,
+            "idempotent": result.get("idempotent") is True,
+        }
+
     def update_order_status(
         self, admin_id: str, order_id: str, requested: Any, reason: Any = None
     ) -> dict[str, Any]:
@@ -623,6 +682,17 @@ class AdminApplication:
                     409,
                     "A customer cancellation request is pending. Resolve the cancellation before continuing fulfillment.",
                     "cancellation_pending",
+                )
+            refund_request = order.get("refundRequest")
+            if (
+                isinstance(refund_request, dict)
+                and refund_request.get("status") in {"submitting", "submitted", "processing", "uncertain", "failed"}
+                and requested != "cancelled"
+            ):
+                raise SecurityError(
+                    409,
+                    "A cancellation refund is unresolved. Resolve the refund before continuing fulfillment.",
+                    "refund_pending",
                 )
             cancellation_reason = None
             if requested == "cancelled":
@@ -1329,6 +1399,12 @@ class AdminHandler(BaseHTTPRequestHandler):
                 else:
                     result = self.application.update_exchange_status(admin["id"], order_id, exchange_id, payload.get("status"))
                 self._json(200, {"success": True, "order": result}); return
+            if path.startswith("/api/admin/orders/") and path.endswith("/refund-cancel"):
+                order_id = unquote(path.removeprefix("/api/admin/orders/").removesuffix("/refund-cancel"))
+                result = self.application.refund_and_cancel_order(
+                    admin["id"], order_id, payload.get("reason")
+                )
+                self._json(200, {"success": True, **result}); return
             if path.startswith("/api/admin/orders/") and path.endswith("/status"):
                 order_id = unquote(path.removeprefix("/api/admin/orders/").removesuffix("/status"))
                 result = self.application.update_order_status(

@@ -475,6 +475,25 @@ async function cancellationReasonFor(){
   if(type==='Other'&&!details)throw new Error('Enter the cancellation reason in Additional details.');
   return details&&type!=='Other'?`${type}: ${details}`:(details||type);
 }
+async function refundCancellationReasonFor(order){
+  const options=['Product unavailable','Size/color unavailable','Store unable to fulfil','Customer requested cancellation','Duplicate order','Delivery not serviceable','Other'].map(value=>({value,label:value}));
+  const amount=Number(order?.grandTotal||0);
+  const paymentMethod=String(order?.paymentMethod||'online').toUpperCase();
+  const amountText=Number.isFinite(amount)?amount.toFixed(0):String(order?.grandTotal||'');
+  const values=await formDialog(`Refund ₹${amountText} and cancel order`,[
+    {name:'reasonType',label:'Cancellation reason',type:'select',required:true,options},
+    {name:'details',label:'Additional details (required for Other)',type:'textarea',maxLength:500},
+    {name:'refundConfirmation',label:`Confirm full refund of ₹${amountText} to the original ${paymentMethod} payment`,type:'select',required:true,value:'',options:[
+      {value:'',label:'Choose confirmation'},
+      {value:'confirm',label:`Yes - initiate full ₹${amountText} Razorpay refund`},
+    ],help:'This sends a real refund request to Razorpay. Fulfillment stays blocked until the signed refund.processed webhook confirms the refund.'},
+  ],`Refund ₹${amountText} & Cancel`);
+  if(!values)return null;
+  const type=String(values.reasonType||'').trim(),details=String(values.details||'').trim();
+  if(type==='Other'&&!details)throw new Error('Enter the cancellation reason in Additional details.');
+  if(values.refundConfirmation!=='confirm')throw new Error('Confirm the full refund before continuing.');
+  return details&&type!=='Other'?`${type}: ${details}`:(details||type);
+}
 async function inventoryAdjustment(){const values=await formDialog('Adjust inventory',[{name:'delta',label:'Stock adjustment (for example 5 or -2)',type:'number',required:true,step:'1'}],'Apply adjustment');if(!values)return null;const delta=Number(values.delta);if(!Number.isSafeInteger(delta))throw new Error('Enter a whole-number stock adjustment.');return delta;}
 async function quoteOutsideDelivery(request){
   const current=request.quote||{};
@@ -502,6 +521,10 @@ async function bulkTransition(resource){
   const ids=[...bulkSelection].filter(value=>value.startsWith(`${resource}:`)).map(value=>value.slice(resource.length+1));
   const target=document.querySelector(`[data-bulk-target="${resource}"]`)?.value;
   if(!ids.length)throw new Error('Select one or more records first.');if(!target)throw new Error('Choose a bulk action.');
+  if(resource==='orders'&&target==='cancelled'){
+    const paidOnline=ids.map(id=>currentOrders.find(order=>order.id===id)).filter(isPaidOnlineOrder);
+    if(paidOnline.length)throw new Error('Paid online orders must be refunded and cancelled individually so each real Razorpay refund is explicitly confirmed.');
+  }
   let reason=null;if(target==='cancelled')reason=await cancellationReasonFor();else if(target==='REJECTED'||target==='SUSPENDED')reason=await reasonFor(`Enter the ${target.toLowerCase()} reason`);if((target==='cancelled'||target==='REJECTED'||target==='SUSPENDED')&&!reason)return;
   const route={orders:id=>`/api/admin/orders/${encodeURIComponent(id)}/status`,vendors:id=>`/api/admin/vendors/${encodeURIComponent(id)}`,products:id=>`/api/admin/shop-products/${encodeURIComponent(id)}`,requests:id=>`/api/admin/shop-product-requests/${encodeURIComponent(id)}`,customers:id=>`/api/admin/customers/${encodeURIComponent(id)}`,inventory:id=>`/api/admin/inventory/${encodeURIComponent(id)}`}[resource];
   if(!route)throw new Error('Unsupported bulk action.');let succeeded=0;const failures=[];
@@ -609,6 +632,12 @@ byId('content').addEventListener('click', async event => {
     if(action==='mark-exchange-fee-paid') { const collectionMethod=await feeCollectionMethodFor('Collect exchange fee'); if(!collectionMethod)return; await api(`/api/admin/orders/${encodeURIComponent(button.dataset.orderId)}/exchanges/${encodeURIComponent(button.dataset.id)}/fee`,{method:'PATCH',body:JSON.stringify({collectionMethod})}); status('Exchange fee marked paid after collection.'); }
     if(action==='exchange-status') { await api(`/api/admin/orders/${encodeURIComponent(button.dataset.orderId)}/exchanges/${encodeURIComponent(button.dataset.id)}/status`,{method:'PATCH',body:JSON.stringify({status:button.dataset.value})}); status(`Exchange ${button.dataset.value}.`); }
     if(action==='bulk-transition') await bulkTransition(button.dataset.resource);
+    if(action==='refund-cancel') {
+      const order=currentOrders.find(item=>item.id===button.dataset.id);if(!order)throw new Error('Order details are no longer available. Refresh and try again.');
+      const reason=await refundCancellationReasonFor(order);if(!reason)return;
+      const result=await api(`/api/admin/orders/${encodeURIComponent(order.id)}/refund-cancel`,{method:'PATCH',body:JSON.stringify({reason})});
+      status(result.pending?'Full refund submitted to Razorpay. Fulfillment is on hold until the signed refund confirmation arrives.':'Payment is already refunded; cancellation reconciliation is ready.');
+    }
     if(action==='order-status') { const nextStatus=button.dataset.value; let reason=null; if(nextStatus==='cancelled'){reason=await cancellationReasonFor();if(!reason)return;} await api(`/api/admin/orders/${encodeURIComponent(button.dataset.id)}/status`,{method:'PATCH',body:JSON.stringify({status:nextStatus,reason})}); status(nextStatus==='cancelled'?'Order cancelled and the reason is visible to the customer.':'Order status updated.'); }
     if(action==='vendor') { const nextStatus=button.dataset.value; let reason=null; if(['REJECTED','SUSPENDED'].includes(nextStatus)){reason=await reasonFor(`Enter the ${nextStatus.toLowerCase()} reason`);if(!reason)return;} await api(`/api/admin/vendors/${encodeURIComponent(button.dataset.id)}`,{method:'PATCH',body:JSON.stringify({status:nextStatus,reason})}); status('Shop application status updated.'); }
     if(action==='shop-product') { const nextStatus=button.dataset.value; let reason=null; if(nextStatus==='REJECTED'){reason=await reasonFor('Enter the product rejection reason');if(!reason)return;} await api(`/api/admin/shop-products/${encodeURIComponent(button.dataset.id)}`,{method:'PATCH',body:JSON.stringify({status:nextStatus,reason})}); status('Shop product status updated.'); }
@@ -647,14 +676,29 @@ async function loadTab(tab) {
 }
 
 function orderActionLabel(value){return ({placed:'Confirm Stock',confirmed:'Confirm Order',preparing:'Mark Preparing',packed:'Mark Packed',out_for_delivery:'Out for Delivery',delivered:'Mark Delivered',cancelled:'Cancel Order'})[value]||value.replaceAll('_',' ');}
+function isPaidOnlineOrder(order){return ['upi','card'].includes(String(order?.paymentMethod||'').toLowerCase())&&order?.paymentStatus==='paid';}
+function activeRefundRequest(order){return ['submitting','submitted','processing','uncertain'].includes(String(order?.refundRequest?.status||''));}
 function orderActions(order){
   const transitions={payment_pending:['cancelled'],payment_review_required:['placed','cancelled'],placed:['confirmed','cancelled'],confirmed:['preparing','packed','cancelled'],preparing:['out_for_delivery','cancelled'],packed:['out_for_delivery','cancelled'],out_for_delivery:['delivered','cancelled']};
   const actions=transitions[order.status]||[];
   if(order.cancellationRequest?.status==='requested')return actions.filter(status=>status==='cancelled');
+  if(['submitting','submitted','processing','uncertain','failed'].includes(String(order.refundRequest?.status||'')))return actions.filter(status=>status==='cancelled');
   if(order.status==='payment_pending'&&order.paymentStatus!=='refunded') return [];
   return order.paymentStatus==='refunded'
     ? actions.filter(status=>status==='cancelled')
     : actions;
+}
+function orderActionButton(order,next){
+  if(next==='cancelled'&&isPaidOnlineOrder(order)){
+    const refund=order.refundRequest||{};
+    const amount=Number(order.grandTotal||0);
+    const amountText=Number.isFinite(amount)?amount.toFixed(0):String(order.grandTotal||'');
+    if(refund.status==='uncertain')return '<button class="secondary" disabled>Refund needs Razorpay review</button>';
+    if(['submitting','submitted','processing'].includes(refund.status))return '<button class="secondary" disabled>Refund pending</button>';
+    const retry=refund.status==='failed';
+    return `<button class="danger" data-action="refund-cancel" data-id="${escapeText(order.id)}">${retry?'Retry ':''}Refund ₹${escapeText(amountText)} &amp; Cancel</button>`;
+  }
+  return `<button class="${next==='cancelled'?'danger':'success'}" data-action="order-status" data-id="${escapeText(order.id)}" data-value="${next}">${escapeText(orderActionLabel(next))}</button>`;
 }
 
 function statusTone(value){return ({payment_pending:'amber',payment_review_required:'rose',placed:'sky',confirmed:'blue',preparing:'violet',packed:'indigo',out_for_delivery:'teal',delivered:'green',cancelled:'red',payment_test_completed:'slate',pending:'yellow',approved:'green',rejected:'red',hidden:'slate',paid:'lime',failed:'crimson',refunded:'purple',refund_pending:'orange',partially_refunded:'fuchsia',review_required:'pink'})[String(value||'').toLowerCase()]||'slate';}
@@ -672,6 +716,22 @@ function orderItemMarkup(item){
   return `<div class="order-item"><div><small>Store</small><strong>${escapeText(store)}</strong></div><div><small>Product</small><strong>${escapeText(product)}</strong><span>${escapeText(variant||'Variant not recorded')}</span></div><div><small>Quantity</small><strong>${escapeText(item.quantity||0)}</strong></div><div><small>Line total</small><strong>₹${escapeText(item.lineTotal??'-')}</strong></div></div>`;
 }
 function cancellationRequestMarkup(order){const request=order.cancellationRequest;if(!request)return '';const fee=Number(request.feeDue||0);return `<div class="order-cancellation"><strong>Customer cancellation requested</strong><span>Status: ${escapeText(request.status)} | Fee: Rs ${escapeText(fee)} (${request.feePaid===true?'paid':'due'})</span>${fee>0&&request.feePaid!==true&&request.status==='requested'?`<div class="actions"><button class="success" data-action="mark-cancellation-fee-paid" data-id="${escapeText(order.id)}">Collect Rs ${escapeText(fee)} fee</button></div>`:''}</div>`;}
+function refundRequestMarkup(order){
+  const request=order.refundRequest;if(!request)return '';
+  const amount=Number(request.amount||0)/100;
+  const amountText=Number.isFinite(amount)?amount.toFixed(0):'-';
+  const provider=request.razorpayRefundId?` | Razorpay: ${escapeText(request.razorpayRefundId)}`:'';
+  const messages={
+    submitting:'Submitting full refund to Razorpay. Do not retry.',
+    submitted:'Full refund submitted. Fulfillment is on hold until Razorpay confirms it.',
+    processing:'Refund is processing. Fulfillment remains on hold.',
+    uncertain:'Refund outcome is uncertain. Verify Razorpay before any retry.',
+    failed:'Refund failed. Resolve the Razorpay issue, then use Retry Refund & Cancel.',
+    processed:'Full refund confirmed by Razorpay.',
+  };
+  const message=messages[request.status]||'Refund status requires review.';
+  return `<div class="order-cancellation"><strong>Refund ₹${escapeText(amountText)} — ${escapeText(String(request.status||'review').replaceAll('_',' '))}</strong><span>${escapeText(message)}${provider}</span></div>`;
+}
 function exchangeRequestsMarkup(order){return (order.exchangeRequests||[]).map(request=>{const actions=[];if(request.status==='requested')actions.push(`<button class="success" data-action="exchange-status" data-order-id="${escapeText(order.id)}" data-id="${escapeText(request.id)}" data-value="approved">Approve & reserve ${escapeText(request.targetSize)}</button>`,`<button class="danger" data-action="exchange-status" data-order-id="${escapeText(order.id)}" data-id="${escapeText(request.id)}" data-value="rejected">Reject</button>`);if(request.status==='approved'&&request.feePaid!==true)actions.push(`<button class="success" data-action="mark-exchange-fee-paid" data-order-id="${escapeText(order.id)}" data-id="${escapeText(request.id)}">Collect Rs ${escapeText(request.feeDue)} fee</button>`);if(request.status==='approved')actions.push(`<button class="success" data-action="exchange-status" data-order-id="${escapeText(order.id)}" data-id="${escapeText(request.id)}" data-value="completed">Complete exchange</button>`,`<button class="danger" data-action="exchange-status" data-order-id="${escapeText(order.id)}" data-id="${escapeText(request.id)}" data-value="rejected">Reject & release stock</button>`);return `<div class="order-cancellation"><strong>Exchange: ${escapeText(request.sourceSize)} to ${escapeText(request.targetSize)}</strong><span>Status: ${escapeText(request.status)} | Fee: Rs ${escapeText(request.feeDue)} (${request.feePaid===true?'paid':'due'})</span>${actions.length?`<div class="actions">${actions.join('')}</div>`:''}</div>`;}).join('');}
 function renderOrdersView(){
   const filtered=currentOrders.filter(order=>{
@@ -693,11 +753,11 @@ function renderOrdersView(){
     const collectButton=!paymentTest&&order.paymentMethod==='cod'&&order.paymentStatus==='pending'&&order.status!=='cancelled'?`<button class="success" data-action="mark-cod-paid" data-id="${escapeText(order.id)}">Mark as Paid</button>`:'';
     const lateFeeButton=!paymentTest&&Number(order.tryAtHomeLateFeeDue||0)>0&&order.tryAtHomeLateFeePaid!==true?`<button class="success" data-action="mark-try-home-late-fee-paid" data-id="${escapeText(order.id)}">Collect Rs ${escapeText(order.tryAtHomeLateFeeDue)} Late Fee</button>`:'';
     const tryHomeSummary=Number(order.tryAtHomeFee||0)>0?`<div class="order-cancellation"><strong>Try at Home</strong><span>Initial fee: Rs ${escapeText(order.tryAtHomeFee)}${Number(order.tryAtHomeLateFeeDue||0)>0?` | Late fee: Rs ${escapeText(order.tryAtHomeLateFeeDue)} (${order.tryAtHomeLateFeePaid===true?'paid':'due'})`:''}</span></div>`:'';
-    const actions=paymentTest?'<p class="payment-test-note">Payment validation record only. Do not pack, dispatch, deliver, or adjust fashion inventory.</p>':`<div class="actions">${collectButton}${lateFeeButton}${orderActions(order).map(next=>`<button class="${next==='cancelled'?'danger':'success'}" data-action="order-status" data-id="${escapeText(order.id)}" data-value="${next}">${escapeText(orderActionLabel(next))}</button>`).join('')}</div>`;
+    const actions=paymentTest?'<p class="payment-test-note">Payment validation record only. Do not pack, dispatch, deliver, or adjust fashion inventory.</p>':`<div class="actions">${collectButton}${lateFeeButton}${orderActions(order).map(next=>orderActionButton(order,next)).join('')}</div>`;
     return `<article class="card order-card order-tone-${tone}">${paymentTest?'<div class="payment-test-banner"><strong>TEST</strong><strong>NO FULFILLMENT REQUIRED</strong></div>':''}<div class="order-heading"><div><small>Order reference</small><h3>${escapeText(order.id)}</h3><span class="muted">${escapeText(order.createdAt||'')}</span></div><div class="order-heading-status">${statusBadge(order.status)}<strong>₹${escapeText(order.grandTotal)}</strong></div></div><div class="order-customer"><div><small>Customer</small><strong>${escapeText(address.name||'-')}</strong><span>${escapeText(address.phone||'-')}</span></div><div><small>Delivery address</small><strong>${escapeText(address.street||'-')}</strong><span>${escapeText([address.city,address.state,address.pincode].filter(Boolean).join(', '))}</span></div><div><small>Payment</small>${statusBadge(order.paymentStatus)}<span>${escapeText(String(order.paymentMethod||'').toUpperCase())}</span>${order.paymentCollectionMethod?`<span>${escapeText(order.paymentCollectionMethod==='upi_at_delivery'?'UPI at delivery':'Cash')} · ${escapeText(order.paymentCollectedAt||'')}</span>`:''}</div></div><div class="order-items"><h4>Products</h4>${(order.items||[]).map(orderItemMarkup).join('')||'<p class="muted">No item details recorded.</p>'}</div>${tryHomeSummary}${cancellation}${actions}</article>`;
   }).join('');
   byId('content').innerHTML=`<h2>Recent orders</h2>${filters}<div class="grid">${cards||'<p>No orders match the selected filters.</p>'}</div>`;
-  byId('content').querySelectorAll('.order-card').forEach(card=>{const order=filtered.find(item=>item.id===card.querySelector('h3')?.textContent);if(!order)return;const marker=card.querySelector('.actions')||card.lastElementChild;marker?.insertAdjacentHTML('beforebegin',cancellationRequestMarkup(order)+exchangeRequestsMarkup(order));});
+  byId('content').querySelectorAll('.order-card').forEach(card=>{const order=filtered.find(item=>item.id===card.querySelector('h3')?.textContent);if(!order)return;const marker=card.querySelector('.actions')||card.lastElementChild;marker?.insertAdjacentHTML('beforebegin',cancellationRequestMarkup(order)+refundRequestMarkup(order)+exchangeRequestsMarkup(order));});
   addBulkControls('orders',['confirmed','preparing','packed','out_for_delivery','delivered','cancelled'],'.order-card');
 }
 function applicationTransitions(status){return {SUBMITTED:['UNDER_REVIEW'],UNDER_REVIEW:['APPROVED','REJECTED'],APPROVED:['ACTIVE'],ACTIVE:['SUSPENDED'],SUSPENDED:['ACTIVE']}[status]||[];}
