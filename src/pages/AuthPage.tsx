@@ -1,11 +1,13 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { ExternalLink } from 'lucide-react';
 import { SEO } from '../components/SEO';
 import { useAuth } from '../context/AuthContext';
 import type { PhoneVerificationSession } from '../services/firebaseClient';
 import { safeLocalReturnPath } from '../utils/navigation';
 import { CONFIG } from '../config';
 import type { TermsAcceptance } from '../services/authApi';
+import { androidChromeIntentUrl, customerBrowserUrl, isAndroidInstagramInAppBrowser } from '../utils/inAppBrowser';
 
 const getFirebaseClient = () => import('../services/firebaseClient');
 
@@ -14,6 +16,7 @@ export const AuthPage: React.FC<{ mode: 'login' | 'register' }> = ({ mode }) => 
   const navigate = useNavigate();
   const location = useLocation();
   const destination = safeLocalReturnPath((location.state as { from?: string } | null)?.from);
+  const [requiresExternalBrowser] = useState(() => isAndroidInstagramInAppBrowser(navigator.userAgent));
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
   const [email, setEmail] = useState('');
@@ -157,10 +160,24 @@ export const AuthPage: React.FC<{ mode: 'login' | 'register' }> = ({ mode }) => 
     setPhoneSession(null); setOtpSent(false); setOtpCode(''); setResendIn(0); setProviderError('');
   };
 
+  // The handoff must always use the canonical HTTPS origin, even when a local
+  // development server or an alternate public tunnel rendered this page.
+  const browserUrl = customerBrowserUrl('https://vibe4you.in', destination);
+  const chromeIntentUrl = androidChromeIntentUrl(browserUrl);
+
   return <div className="max-w-md mx-auto px-4 py-12">
     <SEO title={`${mode === 'login' ? 'Login' : 'Register'} - Vibe4You`} noIndex />
     <div className="bg-white dark:bg-neutral-900 border dark:border-neutral-800 rounded-3xl p-7 space-y-4 shadow-sm">
       <h1 className="text-2xl font-black">{mode === 'login' ? 'Welcome back' : 'Create your account'}</h1>
+      {requiresExternalBrowser ? <div className="space-y-4 rounded-2xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-950 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-100">
+        <p className="font-bold">Continue in your browser to sign in securely.</p>
+        <p className="text-xs leading-5">Instagram&apos;s in-app browser is not retaining secure customer sessions on this device. To protect your account, sign in in Chrome or another browser instead.</p>
+        <a href={chromeIntentUrl} className="flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-neutral-950 px-3 py-3 font-bold text-white dark:bg-lime-400 dark:text-neutral-950">
+          Open in Chrome <ExternalLink className="h-4 w-4" aria-hidden="true" />
+        </a>
+        <a href={browserUrl} target="_blank" rel="noopener noreferrer" className="block text-center text-xs font-bold underline">Open in another browser</a>
+        <p className="text-xs leading-5">If Chrome does not open, use Instagram&apos;s menu (⋮) and choose <span className="font-bold">Open in browser</span>.</p>
+      </div> : <>
       <label className="flex items-start gap-3 rounded-xl border border-neutral-200 bg-neutral-50 p-3 text-xs text-neutral-700 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-200">
         <input
           type="checkbox"
@@ -198,6 +215,7 @@ export const AuthPage: React.FC<{ mode: 'login' | 'register' }> = ({ mode }) => 
         <button disabled={authBusy || !termsAccepted} className="w-full p-3 rounded-xl bg-neutral-950 dark:bg-lime-400 text-white dark:text-neutral-950 font-bold disabled:opacity-60">{loading ? 'Please wait…' : mode === 'login' ? 'Login' : 'Register'}</button>
         <p className="text-xs text-center">{mode === 'login' ? <><Link className="text-lime-600 font-bold" to="/forgot-password">Forgot password?</Link><span className="mx-2 text-neutral-400">·</span>New here? <Link className="text-lime-600 font-bold" to="/register" state={{ from: destination }}>Register</Link></> : <>Already registered? <Link className="text-lime-600 font-bold" to="/login" state={{ from: destination }}>Login</Link></>}</p>
       </form>
+      </>}
     </div>
   </div>;
 };
