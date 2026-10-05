@@ -18,7 +18,9 @@ describe('Android Instagram browser safety', () => {
     expect(() => customerBrowserUrl('http://vibe4you.in', '/partner')).toThrow('secure public origin');
   });
 
-  it('rejects a backslash return path that URL parsing would otherwise turn into another origin', () => {
-    expect(() => customerBrowserUrl('https://vibe4you.in', '/\\attacker.example/')).toThrow('remain on the public origin');
+  it('falls back to the public homepage for inputs that could resolve to another origin', () => {
+    for (const returnPath of ['//attacker.example/', '/\\attacker.example/', 'https://attacker.example/']) {
+      expect(customerBrowserUrl('https://vibe4you.in', returnPath)).toBe('https://vibe4you.in/');
+    }
   });
 });

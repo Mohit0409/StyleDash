@@ -12,10 +12,10 @@ export const isAndroidInstagramInAppBrowser = (userAgent: string): boolean =>
 export const customerBrowserUrl = (origin: string, returnPath: string): string => {
   const publicOrigin = new URL(origin);
   if (publicOrigin.protocol !== 'https:') throw new Error('A secure public origin is required.');
-  const safePath = returnPath.startsWith('/') ? returnPath : '/';
-  const destination = new URL(safePath, publicOrigin);
-  if (destination.origin !== publicOrigin.origin) throw new Error('The return path must remain on the public origin.');
-  return destination.toString();
+  const fallback = new URL('/', publicOrigin);
+  if (!returnPath.startsWith('/') || returnPath.startsWith('//')) return fallback.toString();
+  const destination = new URL(returnPath, publicOrigin);
+  return destination.origin === publicOrigin.origin ? destination.toString() : fallback.toString();
 };
 
 /**
