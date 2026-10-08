@@ -83,7 +83,8 @@ test('approved shop owner can draft and submit but cannot publish a product', as
   await page.getByRole('button', { name: 'Save Product Draft' }).click();
   await expect(page.getByRole('alert')).toContainText('Each size can appear only once');
   await page.getByPlaceholder('Size, e.g. S or XL').nth(1).fill('L');
-  await expect(page.getByRole('radio', { name: 'Image link' })).toHaveAttribute('aria-checked', 'true');
+  await expect(page.getByRole('radio', { name: 'Image upload' })).toHaveAttribute('aria-checked', 'true');
+  await page.getByRole('radio', { name: 'Image link' }).click();
   await expect(page.getByLabel('HTTPS image URLs')).toBeVisible();
   await page.getByRole('radio', { name: 'Image upload' }).click();
   await expect(page.getByLabel('HTTPS image URLs')).toHaveCount(0);
@@ -92,7 +93,7 @@ test('approved shop owner can draft and submit but cannot publish a product', as
     { name: 'local-product-1.png', mimeType: 'image/png', buffer: tinyPng },
     { name: 'local-product-2.png', mimeType: 'image/png', buffer: tinyPng },
   ]);
-  await expect(page.getByText(/2 images optimized and uploaded/)).toBeVisible();
+  await expect(page.getByText(/2 images uploaded/)).toBeVisible();
   await expect(page.getByAltText('Uploaded product image 1 preview')).toBeVisible();
   await expect(page.getByAltText('Uploaded product image 2 preview')).toBeVisible();
   await expect(page.getByText('MAIN', { exact: true })).toBeVisible();
@@ -199,6 +200,7 @@ test('approved shop owner can draft a multi-colour product and reopen it without
   await page.getByLabel('Colour name').fill('Blue');
   await page.getByPlaceholder('Size, e.g. S or XL').fill('M');
   await page.getByPlaceholder('Stock').fill('4');
+  await page.getByRole('radio', { name: 'Image link' }).click();
   await page.getByLabel('HTTPS image URLs').fill('https://images.example.test/kurta-blue.jpg');
 
   await page.getByRole('button', { name: '+ Add colour' }).click();
@@ -206,6 +208,7 @@ test('approved shop owner can draft a multi-colour product and reopen it without
   await page.getByLabel('Colour 2 hex').fill('#FF0000');
   await page.getByPlaceholder('Size, e.g. S or XL').nth(1).fill('L');
   await page.getByPlaceholder('Stock').nth(1).fill('2');
+  await page.getByRole('radio', { name: 'Colour 2 image link' }).click();
   await page.getByLabel('Colour 2 HTTPS image URLs').fill('https://images.example.test/kurta-red.jpg');
   await page.getByRole('button', { name: 'Save Product Draft' }).click();
 
