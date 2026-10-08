@@ -65,7 +65,7 @@ export interface ProductFormState {
 }
 
 const EMPTY_COLOUR: ColourFormState = {
-  colourName: '', colourHex: '', imageMode: 'links', imageUrls: '', uploadedImageUrls: [],
+  colourName: '', colourHex: '', imageMode: 'upload', imageUrls: '', uploadedImageUrls: [],
   variants: [{ size: '', inventory: '0' }],
 };
 
@@ -155,7 +155,7 @@ const normalizeColourGroup = (colour: ColourFormState) => {
       throw new Error(`Add 1-8 direct HTTPS image links for ${colourName}. Webpage (.html) links are not images.`);
     }
   } else if (imageUrls.length < 1 || imageUrls.length > 8 || imageUrls.some(value => !validImageReference(value))) {
-    throw new Error(`Upload 1-8 product images for ${colourName}.`);
+    throw new Error(`Choose 1-8 photos for ${colourName} using Choose images and wait for their previews before saving.`);
   }
   return { colourName, colourHex: colourHex || undefined, imageUrls, sizes };
 };
@@ -272,6 +272,7 @@ export const SellerProducts: React.FC = () => {
   const [busy, setBusy] = useState(false);
   const [uploadBusy, setUploadBusy] = useState(false);
   const [uploadProgress, setUploadProgress] = useState('');
+  const [imageUploadError, setImageUploadError] = useState<{ colourIndex: number; detail: string } | null>(null);
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
   const [productQuery, setProductQuery] = useState('');
@@ -389,37 +390,49 @@ export const SellerProducts: React.FC = () => {
   };
 
   const uploadImages = async (colourIndex: number, files: FileList | null) => {
-    if (!files?.length) return;
+    // Snapshot files before Safari resets the input after picker completion.
+    const selectedFiles = Array.from(files ?? []);
+    if (!selectedFiles.length) return;
     const existing = form.colours[colourIndex]?.uploadedImageUrls ?? [];
-    if (existing.length + files.length > 8) {
-      setError('Each colour can have at most 8 images.');
+    if (existing.length + selectedFiles.length > 8) {
+      const detail = 'Each colour can have at most 8 images.';
+      setError(detail);
+      setImageUploadError({ colourIndex, detail });
       return;
     }
     setUploadBusy(true);
+    setImageUploadError(null);
     setError('');
     setMessage('');
+    let completed = 0;
     try {
-      const uploaded: string[] = [];
-      const selectedFiles = Array.from(files);
       for (const [index, file] of selectedFiles.entries()) {
-        setUploadProgress(`Optimizing image ${index + 1} of ${selectedFiles.length}…`);
-        const prepared = await prepareProductImage(file);
-        const image = await shopProductApi.uploadImage({
-          fileName: prepared.fileName,
-          contentType: prepared.blob.type || 'image/webp',
-          dataBase64: await blobToBase64(prepared.blob),
-        });
-        uploaded.push(image.url);
+        try {
+          setUploadProgress(`Optimizing image ${index + 1} of ${selectedFiles.length}…`);
+          const prepared = await prepareProductImage(file);
+          setUploadProgress(`Uploading image ${index + 1} of ${selectedFiles.length}…`);
+          const image = await shopProductApi.uploadImage({
+            fileName: prepared.fileName,
+            contentType: prepared.blob.type || 'image/webp',
+            dataBase64: await blobToBase64(prepared.blob),
+          });
+          // Preserve earlier uploads if a subsequent selected image fails.
+          setForm(current => ({
+            ...current,
+            colours: current.colours.map((colour, position) => position === colourIndex
+              ? { ...colour, uploadedImageUrls: [...colour.uploadedImageUrls, image.url] }
+              : colour),
+          }));
+          completed++;
+        } catch (cause) {
+          const reason = messageForError(cause, 'The image could not be optimized or uploaded.');
+          const detail = `${file.name}: ${reason} Try a JPEG photo if it still fails.`;
+          setImageUploadError({ colourIndex, detail });
+          setError(`Upload failed for ${form.colours[colourIndex]?.colourName || 'this colour'}: ${reason}`);
+          return;
+        }
       }
-      setForm(current => ({
-        ...current,
-        colours: current.colours.map((colour, position) => position === colourIndex
-          ? { ...colour, uploadedImageUrls: [...colour.uploadedImageUrls, ...uploaded] }
-          : colour),
-      }));
-      setMessage(`${uploaded.length} image${uploaded.length === 1 ? '' : 's'} optimized and uploaded. Drag order is controlled with the arrow buttons below; image 1 is the main product image.`);
-    } catch (cause) {
-      setError(messageForError(cause, 'The image could not be optimized or uploaded.'));
+      setMessage(`${completed} image${completed === 1 ? '' : 's'} uploaded. Image 1 is the main product image.`);
     } finally {
       setUploadProgress('');
       setUploadBusy(false);
@@ -427,6 +440,7 @@ export const SellerProducts: React.FC = () => {
   };
 
   const setImageMode = (colourIndex: number, imageMode: ColourFormState['imageMode']) => {
+    setImageUploadError(null);
     setForm(current => ({
       ...current,
       colours: current.colours.map((colour, position) => position === colourIndex ? { ...colour, imageMode } : colour),
@@ -658,14 +672,17 @@ export const SellerProducts: React.FC = () => {
                         <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                           <div>
                             <p className="font-bold">{firstColour ? 'Upload product images' : `Upload ${colourLabel.toLowerCase()} images`}</p>
-                            <p className="text-[11px] text-neutral-500">JPEG, PNG, WebP, HEIC or HEIF. Images are resized to max 1600 px and compressed before upload, targeting about 350 KB with a 500 KB hard limit.</p>
+                            <p className="text-[11px] text-neutral-500">JPEG, PNG, WebP, HEIC or HEIF (up to 20 MB). Select photos, wait for previews, then save. Images are resized to max 1600 px and compressed before upload, targeting about 350 KB with a 500 KB hard limit.</p>
                           </div>
                           <label className="inline-flex cursor-pointer items-center justify-center rounded-xl border px-4 py-2.5 font-bold">
                             {uploadBusy ? 'Optimizing...' : 'Choose images'}
                             <input aria-label={firstColour ? 'Upload product images' : `Upload ${colourLabel.toLowerCase()} images`} type="file" multiple accept={PRODUCT_IMAGE_ACCEPT} disabled={busy || uploadBusy} onChange={event => { void uploadImages(colourIndex, event.target.files); event.currentTarget.value = ''; }} className="sr-only" />
                           </label>
                         </div>
-                        {colour.uploadedImageUrls.length > 0 ? (
+                         {imageUploadError?.colourIndex === colourIndex && (
+                           <p role="alert" className="rounded-lg border border-red-300 bg-red-50 p-3 text-xs font-bold text-red-700">Upload failed: {imageUploadError.detail}</p>
+                         )}
+                         {colour.uploadedImageUrls.length > 0 ? (
                           <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
                             {colour.uploadedImageUrls.map((value, index) => (
                               <div key={`${value}-${index}`} className="rounded-xl border p-2 dark:border-neutral-700">
