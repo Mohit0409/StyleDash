@@ -1,4 +1,4 @@
-const MAX_SOURCE_BYTES = 12 * 1024 * 1024;
+const MAX_SOURCE_BYTES = 20 * 1024 * 1024;
 const TARGET_BYTES = 350 * 1024;
 const MAX_OUTPUT_BYTES = 500 * 1024;
 const MAX_DIMENSION = 1600;
@@ -30,7 +30,7 @@ interface LoadedImage {
 
 const resolvedType = (file: File) => {
   const declared = file.type.trim().toLowerCase();
-  if (declared) return declared;
+  if (declared && declared !== 'application/octet-stream') return declared;
   const extension = file.name.split('.').pop()?.toLowerCase() || '';
   return EXTENSION_TYPES[extension] || '';
 };
@@ -117,38 +117,33 @@ export async function prepareProductImage(file: File): Promise<PreparedProductIm
   }
 
   if (file.size <= 0 || file.size > MAX_SOURCE_BYTES) {
-    throw new Error('Choose an image smaller than 12 MB.');
+    throw new Error('Choose an image smaller than 20 MB.');
   }
 
   const loaded = await loadImage(file);
   try {
-    let rendered = render(loaded.source, loaded.width, loaded.height, MAX_DIMENSION);
-    let blob = await canvasBlob(rendered.canvas, 'image/webp', 0.82);
-    for (const quality of [0.72, 0.62, 0.52]) {
-      if (blob.size <= TARGET_BYTES) break;
-      blob = await canvasBlob(rendered.canvas, 'image/webp', quality);
+    // Large phone photos can exceed 500 KB even after the first resize.
+    for (const dimension of [MAX_DIMENSION, FALLBACK_DIMENSION, 960, 768, 640]) {
+      const rendered = render(loaded.source, loaded.width, loaded.height, dimension);
+      for (const quality of [0.82, 0.68, 0.52, 0.38]) {
+        let blob = await canvasBlob(rendered.canvas, 'image/webp', quality);
+        if (blob.type !== 'image/webp' && !(contentType === 'image/png' && blob.size <= MAX_OUTPUT_BYTES)) {
+          // Older Safari may return PNG for WebP; try JPEG as a fallback.
+          const jpeg = await canvasBlob(rendered.canvas, 'image/jpeg', quality);
+          if (jpeg.type === 'image/jpeg') blob = jpeg;
+        }
+        if (blob.size > MAX_OUTPUT_BYTES) continue;
+        if (blob.size > TARGET_BYTES && quality > 0.52) continue;
+        const extension = blob.type === 'image/jpeg' ? 'jpg' : blob.type === 'image/png' ? 'png' : 'webp';
+        return {
+          blob,
+          fileName: `${file.name.replace(/\.[^.]+$/, '').slice(0, 80) || 'product'}.${extension}`,
+          width: rendered.width,
+          height: rendered.height,
+        };
+      }
     }
-
-    if (
-      blob.size > MAX_OUTPUT_BYTES
-      && Math.max(rendered.width, rendered.height) > FALLBACK_DIMENSION
-    ) {
-      rendered = render(loaded.source, loaded.width, loaded.height, FALLBACK_DIMENSION);
-      blob = await canvasBlob(rendered.canvas, 'image/webp', 0.62);
-    }
-
-    if (blob.size > MAX_OUTPUT_BYTES) {
-      throw new Error(
-        'This image is still too large after compression. Choose a simpler or smaller image.',
-      );
-    }
-
-    return {
-      blob,
-      fileName: `${file.name.replace(/\.[^.]+$/, '').slice(0, 80) || 'product'}.webp`,
-      width: rendered.width,
-      height: rendered.height,
-    };
+    throw new Error('This photo could not be compressed below 500 KB. Please choose a smaller photo.');
   } finally {
     loaded.release();
   }
