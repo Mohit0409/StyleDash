@@ -44,3 +44,55 @@
   .mobile-header-brand,
   .mobile-header-bag { transition: none; }
 }
+
+/* Vibe4You mobile category rail: compact circles with intentional horizontal swipe.
+   Scoped to the existing 26/52/76px collapsible mobile header. */
+@media (max-width: 767px) {
+  .mobile-header-categories > div {
+    display: flex;
+    gap: 8px;
+    overflow-x: auto;
+    overflow-y: hidden;
+    overscroll-behavior-x: contain;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    scroll-snap-type: x proximity;
+    touch-action: pan-x;
+    padding-inline: 12px 22px;
+    padding-top: 6px;
+    padding-bottom: 5px;
+  }
+  .mobile-header-categories > div::-webkit-scrollbar { display: none; }
+  .mobile-header-categories > div > a {
+    flex: 0 0 54px;
+    min-width: 54px;
+    max-width: 54px;
+    scroll-snap-align: start;
+    align-items: center;
+    text-decoration: none;
+  }
+  .mobile-header-categories > div > a > span:first-child {
+    display: block;
+    width: 40px;
+    height: 40px;
+    flex: 0 0 40px;
+    border-radius: 9999px;
+    border: 1px solid rgba(25,25,25,.08);
+    background-color: #f5f8ee;
+    box-shadow: 0 1px 3px rgba(0,0,0,.06);
+  }
+  .mobile-header-categories > div > a > span:last-child {
+    display: block;
+    max-width: 62px;
+    font-size: 10px;
+    line-height: 14px;
+    font-weight: 600;
+    text-align: center;
+    white-space: nowrap;
+  }
+  .mobile-header-categories > div > a:focus-visible {
+    outline: 2px solid #9fcb17;
+    outline-offset: 2px;
+    border-radius: 8px;
+  }
+}

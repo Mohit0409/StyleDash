@@ -288,6 +288,9 @@ export const Header: React.FC<{ onOpenCart: () => void }> = ({ onOpenCart }) => 
     { label: 'Footwear', href: '/products?category=Footwear', position: '0% 100%' },
     { label: 'Beauty', href: '/products?category=Beauty%20%26%20Personal%20Care', position: '50% 100%' },
     { label: 'Jewellery', href: '/products?category=Accessories', position: '100% 100%' },
+    { label: 'Groceries', href: '/products?category=Groceries', image: '/assets/category-groceries-20261008.webp' },
+    // Watch inventory spans Accessories and Clothing & Fashion, including Ladies Watch.
+    { label: 'Watches', href: '/products?search=watch', image: '/assets/category-watches-20261008.webp' },
   ];
 
   return (
@@ -313,7 +316,7 @@ export const Header: React.FC<{ onOpenCart: () => void }> = ({ onOpenCart }) => 
 
         <nav aria-label="Browse departments" aria-hidden={isMobileCollapsed} className="mobile-header-categories">
           <div className="no-scrollbar flex h-[76px] gap-1 overflow-x-auto px-3 py-1.5">
-            {mobileCategories.map(({ label, href, position }) => <Link key={label} to={href} tabIndex={isMobileCollapsed ? -1 : undefined} className="group flex min-w-[56px] flex-1 shrink-0 flex-col items-center gap-0.5 text-center"><span aria-hidden="true" className="h-12 w-12 shrink-0 rounded-full bg-white bg-[length:300%_200%] transition-transform group-active:scale-95 motion-reduce:transition-none" style={{ backgroundImage: `url(${categoryArtwork})`, backgroundPosition: position }} /><span className="text-[10px] font-semibold leading-[14px] text-neutral-800 dark:text-neutral-100">{label}</span></Link>)}
+            {mobileCategories.map(({ label, href, position, image }) => <Link key={label} to={href} tabIndex={isMobileCollapsed ? -1 : undefined} className="group flex min-w-[56px] flex-1 shrink-0 flex-col items-center gap-0.5 text-center"><span aria-hidden="true" className="h-12 w-12 shrink-0 rounded-full bg-white bg-[length:300%_200%] transition-transform group-active:scale-95 motion-reduce:transition-none" style={{ backgroundImage: `url(${image || categoryArtwork})`, backgroundPosition: image ? 'center' : position, ...(image ? { backgroundSize: 'cover' } : {}) }} /><span className="text-[10px] font-semibold leading-[14px] text-neutral-800 dark:text-neutral-100">{label}</span></Link>)}
           </div>
         </nav>
         </div>
