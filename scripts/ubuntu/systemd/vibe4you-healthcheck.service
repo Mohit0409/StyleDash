@@ -1,0 +1,16 @@
+[Unit]
+Description=Vibe4You Production Health Check
+After=network-online.target vibe4you-production-public.service vibe4you-production-admin.service vibe4you-cloudflared.service
+Wants=network-online.target
+OnFailure=vibe4you-ops-alert@%n.service
+
+[Service]
+Type=oneshot
+User=vibe4you
+Group=vibe4you
+ExecStart=/opt/vibe4you-production/bin/vibe4you_healthcheck.py
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+UMask=0077
