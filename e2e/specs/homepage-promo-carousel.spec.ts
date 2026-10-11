@@ -6,6 +6,7 @@ test('replaces the large black hero with horizontal promotional cards', async ({
   const rail = page.getByTestId('homepage-promo-rail');
 
   await expect(carousel).toBeVisible();
+  await expect(page.getByRole('heading', { level: 1, name: 'Featured for you' })).toBeVisible();
   await expect(page.getByTestId('homepage-promo-slide')).toHaveCount(6);
   await expect(page.getByText('Your look,', { exact: true })).toHaveCount(0);
   await expect(carousel.getByRole('link', { name: 'Explore Your city. Your style.' })).toHaveAttribute('href', '/stores');

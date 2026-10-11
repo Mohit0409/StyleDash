@@ -73,9 +73,9 @@ export const HomepagePromoCarousel: React.FC = () => {
       className="mx-auto max-w-7xl px-3 sm:px-6 lg:px-8"
     >
       <div className="mb-3 flex items-center justify-between gap-4 px-1">
-        <h2 className="text-base font-black text-neutral-900 dark:text-white sm:text-xl">
+        <h1 className="text-base font-black text-neutral-900 dark:text-white sm:text-xl">
           Featured for you
-        </h2>
+        </h1>
         <span className="text-[11px] font-medium text-neutral-500 sm:text-xs">
           Swipe to explore
         </span>
