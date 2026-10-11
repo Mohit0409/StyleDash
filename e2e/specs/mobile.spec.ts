@@ -3,9 +3,7 @@ import { expect, test } from '@playwright/test';
 test('mobile homepage and search work', async ({ page }) => {
   await page.goto('/');
 
-  await expect(
-    page.getByRole('heading', { name: /Your look/i }),
-  ).toBeVisible();
+  await expect(page.getByTestId('homepage-promo-carousel')).toBeVisible();
 
   await page.getByRole('button', { name: 'Search products' }).click();
   const search = page.locator('header input[aria-label="Search products, brands, or local Neemuch stores"]:visible');

@@ -2,7 +2,7 @@ import { expect, test } from '@playwright/test';
 
 test.beforeEach(async ({ page }) => {
   await page.goto('/');
-  await expect(page.getByRole('heading', { name: /Your look/i })).toBeVisible();
+  await expect(page.getByTestId('homepage-promo-carousel')).toBeVisible();
   const consent = page.getByRole('button', { name: 'Only necessary', exact: true });
   if (await consent.isVisible()) await consent.click();
 });

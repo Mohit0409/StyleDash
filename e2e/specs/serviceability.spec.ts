@@ -23,7 +23,7 @@ test('shopping header no longer depends on the delivery checker UI', async ({ pa
   await page.route('**/api/serviceability*', route => route.abort());
   await page.goto('/');
 
-  await expect(page.getByRole('heading', { name: /Your look/i })).toBeVisible();
+  await expect(page.getByTestId('homepage-promo-carousel')).toBeVisible();
   await expect(page.getByRole('button', { name: /Deliver to:/ })).toHaveCount(0);
   await expect(page.getByRole('button', { name: /Check delivery availability/ })).toHaveCount(0);
   await expect(page.getByText(/Deliver to Neemuch \(458441\).*Check area/i)).toHaveCount(0);
