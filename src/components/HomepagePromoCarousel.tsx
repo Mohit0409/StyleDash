@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowUpRight, ChevronLeft, ChevronRight } from 'lucide-react';
 import { HOME_PROMO_SLIDES } from '../data/homePromoSlides';
+import './HomepagePromoCarousel.css';
 
 const AUTO_ADVANCE_MS = 4500;
 
@@ -70,7 +71,7 @@ export const HomepagePromoCarousel: React.FC = () => {
       aria-label="Featured Vibe4You collections"
       aria-roledescription="carousel"
       data-testid="homepage-promo-carousel"
-      className="mx-auto max-w-7xl px-3 sm:px-6 lg:px-8"
+      className="vibe-home-promo mx-auto max-w-7xl px-3 sm:px-6 lg:px-8"
     >
       <div className="mb-3 flex items-center justify-between gap-4 px-1">
         <h1 className="text-base font-black text-neutral-900 dark:text-white sm:text-xl">

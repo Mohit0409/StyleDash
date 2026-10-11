@@ -14,9 +14,13 @@ test('replaces the large black hero with horizontal promotional cards', async ({
   const geometry = await rail.evaluate(element => ({
     scrollWidth: element.scrollWidth,
     clientWidth: element.clientWidth,
+    cardWidth: element.querySelector('[data-promo-slide]')?.getBoundingClientRect().width ?? 0,
+    snapType: getComputedStyle(element).scrollSnapType,
     viewportOverflow: document.documentElement.scrollWidth > document.documentElement.clientWidth,
   }));
   expect(geometry.scrollWidth).toBeGreaterThan(geometry.clientWidth);
+  expect(geometry.cardWidth / geometry.clientWidth).toBeGreaterThan(0.65);
+  expect(geometry.snapType).toContain('x');
   expect(geometry.viewportOverflow).toBe(false);
 });
 
