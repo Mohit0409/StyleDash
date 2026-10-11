@@ -1,4 +1,5 @@
 import { Product } from '../types';
+import { ApiError } from '../services/apiClient';
 import { inventoryRepository } from './inventoryRepository';
 import { shopProductApi } from '../services/businessApi';
 import { reviewApi, ReviewSummary } from '../services/reviewApi';
@@ -19,11 +20,23 @@ const isObviouslyPageUrl = (value: string): boolean => {
 let publishedShopCache: { expiresAt: number; products: Product[] } | null = null;
 let publishedShopRequest: Promise<Product[]> | null = null;
 let availabilityRequest: ReturnType<typeof inventoryRepository.getAvailability> | null = null;
+// Display-only snapshots prevent bursts of identical GETs. Cart/order validation
+// always uses inventoryRepository.getAvailability(variantId), never this snapshot.
+const DISPLAY_INVENTORY_TTL_MS = 10_000;
+const REVIEW_SUMMARY_TTL_MS = 120_000;
+const RATE_LIMIT_COOLDOWN_MS = 60_000;
+let availabilityCache: { expiresAt: number; response: Awaited<ReturnType<typeof inventoryRepository.getAvailability>> } | null = null;
+let availabilityCooldownUntil = 0;
+let homepageCache: { expiresAt: number; products: Product[] } | null = null;
+let homepageRequest: Promise<Product[]> | null = null;
 
 const retryOnce = async <T>(request: () => Promise<T>): Promise<T> => {
   try {
     return await request();
-  } catch {
+  } catch (error) {
+    // A 429 is not a transient network failure; immediately repeating it
+    // worsens the shared server-side per-client rate limit.
+    if (error instanceof ApiError && error.status === 429) throw error;
     await new Promise(resolve => setTimeout(resolve, 150));
     return request();
   }
@@ -62,26 +75,38 @@ const normalizeStoreMetadata = (product: Product): Product => {
   };
 };
 
-const withServerAvailability = async (products: Product[]): Promise<Product[]> => {
+const getDisplayAvailability = async (): Promise<
+  Awaited<ReturnType<typeof inventoryRepository.getAvailability>> | null
+> => {
+  const now = Date.now();
+  if (availabilityCache && availabilityCache.expiresAt > now) return availabilityCache.response;
+  if (now < availabilityCooldownUntil) return null;
+  if (!availabilityRequest) availabilityRequest = retryOnce(() => inventoryRepository.getAvailability());
+  const request = availabilityRequest;
   try {
-    if (!availabilityRequest) availabilityRequest = retryOnce(() => inventoryRepository.getAvailability());
-    const request = availabilityRequest;
-    const { availability } = await request;
+    const response = await request;
+    availabilityCache = { expiresAt: Date.now() + DISPLAY_INVENTORY_TTL_MS, response };
+    return response;
+  } catch (error) {
+    availabilityCooldownUntil = Date.now() + (error instanceof ApiError && error.status === 429
+      ? RATE_LIMIT_COOLDOWN_MS : 2_000);
+    return null;
+  } finally {
     if (availabilityRequest === request) availabilityRequest = null;
-    const byVariantId = new Map(availability.map(item => [item.variantId, item.available]));
-    return products.map(product => ({
-      ...product,
-      variants: product.variants.map(variant => ({
-        ...variant,
-        available: byVariantId.has(variant.id) ? byVariantId.get(variant.id) === true : undefined,
-      })),
-    }));
-  } catch {
-    availabilityRequest = null;
-    // Keep the UI in an unresolved state rather than falsely presenting every
-    // product as sold out. Cart/order paths still fail closed against live stock.
-    return products;
   }
+};
+
+const withServerAvailability = async (products: Product[]): Promise<Product[]> => {
+  const response = await getDisplayAvailability();
+  if (!response) return products;
+  const byVariantId = new Map(response.availability.map(item => [item.variantId, item.available]));
+  return products.map(product => ({
+    ...product,
+    variants: product.variants.map(variant => ({
+      ...variant,
+      available: byVariantId.has(variant.id) ? byVariantId.get(variant.id) === true : undefined,
+    })),
+  }));
 };
 
 const getPublishedShopProducts = async (): Promise<Product[]> => {
@@ -134,23 +159,55 @@ const getCatalogue = async (): Promise<Product[]> => {
 
 
 const REVIEW_SUMMARY_BATCH_SIZE = 64;
+const REVIEW_SUMMARY_CONCURRENCY = 2;
+const reviewBatchCache = new Map<string, { expiresAt: number; summaries: Record<string, ReviewSummary> }>();
+const reviewBatchRequests = new Map<string, Promise<Record<string, ReviewSummary>>>();
+let reviewCooldownUntil = 0;
+
+const getReviewBatch = (batch: string[]): Promise<Record<string, ReviewSummary>> => {
+  const key = batch.join('|');
+  const cached = reviewBatchCache.get(key);
+  if (cached && cached.expiresAt > Date.now()) return Promise.resolve(cached.summaries);
+  const inFlight = reviewBatchRequests.get(key);
+  if (inFlight) return inFlight;
+  if (Date.now() < reviewCooldownUntil) return Promise.resolve({});
+  const request = reviewApi.summaries(batch)
+    .then(summaries => {
+      const result = summaries && typeof summaries === 'object' ? summaries : {};
+      // Bound memory use if the user visits many different catalog subsets.
+      if (reviewBatchCache.size >= 64) reviewBatchCache.delete(reviewBatchCache.keys().next().value as string);
+      reviewBatchCache.set(key, { expiresAt: Date.now() + REVIEW_SUMMARY_TTL_MS, summaries: result });
+      return result;
+    })
+    .catch(error => {
+      if (error instanceof ApiError && error.status === 429) {
+        reviewCooldownUntil = Date.now() + RATE_LIMIT_COOLDOWN_MS;
+      }
+      // Ratings are optional presentation data. Never convert an error into fake ratings.
+      return {};
+    })
+    .finally(() => {
+      if (reviewBatchRequests.get(key) === request) reviewBatchRequests.delete(key);
+    });
+  reviewBatchRequests.set(key, request);
+  return request;
+};
 
 const getReviewSummaries = async (products: Product[]): Promise<Record<string, ReviewSummary>> => {
   if (!products.length) return {};
-  const productIds = products.map(product => product.id);
+  const uniqueIds = [...new Set(products.map(product => product.id))];
   const batches: string[][] = [];
-  for (let offset = 0; offset < productIds.length; offset += REVIEW_SUMMARY_BATCH_SIZE) {
-    batches.push(productIds.slice(offset, offset + REVIEW_SUMMARY_BATCH_SIZE));
+  for (let offset = 0; offset < uniqueIds.length; offset += REVIEW_SUMMARY_BATCH_SIZE) {
+    batches.push(uniqueIds.slice(offset, offset + REVIEW_SUMMARY_BATCH_SIZE));
   }
-  const results = await Promise.all(batches.map(async batch => {
-    try {
-      const summaries = await reviewApi.summaries(batch);
-      return summaries && typeof summaries === 'object' ? summaries : {};
-    } catch {
-      return {};
-    }
-  }));
-  return Object.assign({}, ...results);
+  const summaries: Record<string, ReviewSummary> = {};
+  for (let index = 0; index < batches.length; index += REVIEW_SUMMARY_CONCURRENCY) {
+    const responses = await Promise.all(
+      batches.slice(index, index + REVIEW_SUMMARY_CONCURRENCY).map(getReviewBatch)
+    );
+    Object.assign(summaries, ...responses);
+  }
+  return summaries;
 };
 
 const applyReviewSummaries = (products: Product[], summaries: Record<string, ReviewSummary>): Product[] =>
@@ -179,17 +236,24 @@ const withHomepageAvailability = async (products: Product[]): Promise<Product[]>
 
 export const productRepository = {
   async getHomepageProducts(): Promise<Product[]> {
-    const products = selectHomepageProducts(await getCatalogue());
-    const [availableProducts, summaries] = await Promise.all([
-      withHomepageAvailability(products),
-      getReviewSummaries(products),
-    ]);
-    return applyReviewSummaries(availableProducts, summaries);
+    if (homepageCache && homepageCache.expiresAt > Date.now()) return homepageCache.products;
+    if (homepageRequest) return homepageRequest;
+    homepageRequest = (async () => {
+      const products = selectHomepageProducts(await getCatalogue());
+      const [availableProducts, summaries] = await Promise.all([
+        withHomepageAvailability(products),
+        getReviewSummaries(products),
+      ]);
+      return applyReviewSummaries(availableProducts, summaries);
+    })().then(products => {
+      homepageCache = { expiresAt: Date.now() + DISPLAY_INVENTORY_TTL_MS, products };
+      return products;
+    }).finally(() => { homepageRequest = null; });
+    return homepageRequest;
   },
 
   async getAllProducts(): Promise<Product[]> {
-    // Start availability while catalogue data loads; review summaries are independent and fail open to zero.
-    if (!availabilityRequest) availabilityRequest = retryOnce(() => inventoryRepository.getAvailability());
+    // Snapshot and in-flight request are shared across rapid route transitions.
     const products = await getCatalogue();
     const [availableProducts, summaries] = await Promise.all([
       withServerAvailability(products),
@@ -202,4 +266,18 @@ export const productRepository = {
     const products = await this.getAllProducts();
     return products.find(p => p.slug === slug || p.id === slug) || null;
   }
+};
+
+// Explicit reset is used only by tests to avoid cross-case module cache leakage.
+export const resetPublicProductCachesForTests = (): void => {
+  publishedShopCache = null;
+  publishedShopRequest = null;
+  availabilityRequest = null;
+  availabilityCache = null;
+  availabilityCooldownUntil = 0;
+  homepageCache = null;
+  homepageRequest = null;
+  reviewBatchCache.clear();
+  reviewBatchRequests.clear();
+  reviewCooldownUntil = 0;
 };
