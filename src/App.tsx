@@ -13,6 +13,7 @@ const Home = lazy(() => import('./pages/Home').then(m => ({ default: m.Home })))
 const Products = lazy(() => import('./pages/Products').then(m => ({ default: m.Products })));
 const ProductDetail = lazy(() => import('./pages/ProductDetail').then(m => ({ default: m.ProductDetail })));
 const Categories = lazy(() => import('./pages/Categories').then(m => ({ default: m.Categories })));
+const Offers = lazy(() => import('./pages/Offers').then(m => ({ default: m.Offers })));
 const Stores = lazy(() => import('./pages/Stores').then(m => ({ default: m.Stores })));
 const StoreDetail = lazy(() => import('./pages/StoreDetail').then(m => ({ default: m.StoreDetail })));
 const VendorOnboarding = lazy(() => import('./pages/VendorOnboarding').then(m => ({ default: m.VendorOnboarding })));
@@ -54,6 +55,7 @@ export const App: React.FC = () => {
                       <Route path="products" element={<Products />} />
                       <Route path="product/:slug" element={<ProductDetail />} />
                       <Route path="categories" element={<Categories />} />
+                      <Route path="offers" element={<Offers />} />
                       <Route path="stores" element={<Stores />} />
                       <Route path="store/:slug" element={<StoreDetail />} />
                       <Route path="partner" element={<ProtectedRoute><VendorOnboarding /></ProtectedRoute>} />
