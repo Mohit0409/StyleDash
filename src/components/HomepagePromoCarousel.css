@@ -217,3 +217,23 @@
   .vibe-home-promo [data-promo-slide] > img,
   .vibe-home-promo > div:last-child > div button { transition: none; }
 }
+
+/* Small-screen readable promo cards:
+   preserve a fully visible CTA and safe padding on 320px Android/iPhone screens. */
+@media (max-width: 359px) {
+  .vibe-home-promo [data-promo-slide] {
+    aspect-ratio: 1.42 / 1;
+  }
+  .vibe-home-promo [data-promo-slide] > div:nth-of-type(2) {
+    width: 89%;
+    gap: 6px;
+    padding: 16px;
+  }
+  .vibe-home-promo [data-promo-slide] h3 {
+    font-size: 22px;
+  }
+  .vibe-home-promo [data-promo-slide] p {
+    font-size: 10px;
+    line-height: 1.4;
+  }
+}

@@ -46,3 +46,32 @@ test('respects the reduced-motion setting', async ({ page }) => {
   await page.waitForTimeout(4800);
   await expect(page.getByRole('button', { name: /Show promotion 1: / })).toHaveAttribute('aria-current', 'true');
 });
+
+test('keeps all promotional buttons visible on 320px phones', async ({ page }) => {
+  await page.setViewportSize({ width: 320, height: 568 });
+  await page.goto('/');
+  const rail = page.getByTestId('homepage-promo-rail');
+  await expect(rail).toBeVisible();
+
+  const cards = await rail.evaluate(element =>
+    Array.from(element.querySelectorAll<HTMLElement>('[data-promo-slide]')).map(card => {
+      const cta = card.querySelector<HTMLElement>('div:nth-of-type(2) > span:last-child');
+      const heading = card.querySelector<HTMLElement>('h3');
+      return {
+        bottom: card.getBoundingClientRect().bottom,
+        ctaBottom: cta?.getBoundingClientRect().bottom ?? Infinity,
+        headingBottom: heading?.getBoundingClientRect().bottom ?? Infinity,
+      };
+    }),
+  );
+
+  expect(cards).toHaveLength(6);
+  for (const card of cards) {
+    expect(card.ctaBottom).toBeLessThanOrEqual(card.bottom - 4);
+    expect(card.headingBottom).toBeLessThanOrEqual(card.bottom - 4);
+  }
+  const documentOverflows = await page.evaluate(
+    () => document.documentElement.scrollWidth > window.innerWidth,
+  );
+  expect(documentOverflows).toBe(false);
+});
