@@ -261,3 +261,9 @@
     line-height: 1.4;
   }
 }
+/* Owner-requested minimal homepage: conceal the entire arrows/dots/pause strip.
+   Promotional cards, horizontal touch scrolling, automatic advance, and
+   reduced-motion support remain unchanged. This selector is carousel-scoped. */
+.vibe-home-promo > [aria-label="Carousel navigation"] {
+  display: none !important;
+}

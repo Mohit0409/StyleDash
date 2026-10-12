@@ -24,27 +24,34 @@ test('replaces the large black hero with horizontal promotional cards', async ({
   expect(geometry.viewportOverflow).toBe(false);
 });
 
-test('pagination moves cards and updates the active indicator', async ({ page }) => {
+test('hides the bottom navigation strip while manual scrolling remains available', async ({ page }) => {
   await page.goto('/');
-  const controls = page.getByRole('button', { name: /Show promotion 4: / });
-  await controls.click();
-  await expect(controls).toHaveAttribute('aria-current', 'true');
-  await expect.poll(async () => page.getByTestId('homepage-promo-rail').evaluate(element => element.scrollLeft)).toBeGreaterThan(0);
+  const carousel = page.getByTestId('homepage-promo-carousel');
+  const rail = page.getByTestId('homepage-promo-rail');
+  const strip = carousel.locator('[aria-label="Carousel navigation"]');
+  await expect(strip).toBeHidden();
+  expect(await strip.evaluate(element => getComputedStyle(element).display)).toBe('none');
+
+  await rail.evaluate(element => {
+    const slides = Array.from(element.querySelectorAll<HTMLElement>('[data-promo-slide]'));
+    element.scrollTo({ left: slides[3].offsetLeft - slides[0].offsetLeft, behavior: 'instant' });
+  });
+  await expect.poll(async () => rail.evaluate(element => element.scrollLeft)).toBeGreaterThan(0);
 });
 
 test('carousel advances automatically when motion is allowed', async ({ page }) => {
   await page.emulateMedia({ reducedMotion: 'no-preference' });
   await page.goto('/');
-  await expect(page.getByRole('button', { name: /Show promotion 1: / })).toHaveAttribute('aria-current', 'true');
-  await expect(page.getByRole('button', { name: /Show promotion 2: / })).toHaveAttribute('aria-current', 'true', { timeout: 8000 });
+  const rail = page.getByTestId('homepage-promo-rail');
+  await expect.poll(async () => rail.evaluate(element => element.scrollLeft), { timeout: 8000 }).toBeGreaterThan(0);
 });
 
 test('respects the reduced-motion setting', async ({ page }) => {
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await page.goto('/');
-  await expect(page.getByRole('button', { name: /Show promotion 1: / })).toHaveAttribute('aria-current', 'true');
+  const rail = page.getByTestId('homepage-promo-rail');
   await page.waitForTimeout(4800);
-  await expect(page.getByRole('button', { name: /Show promotion 1: / })).toHaveAttribute('aria-current', 'true');
+  expect(await rail.evaluate(element => element.scrollLeft)).toBe(0);
 });
 
 test('keeps all promotional buttons visible on 320px phones', async ({ page }) => {
@@ -75,32 +82,21 @@ test('keeps all promotional buttons visible on 320px phones', async ({ page }) =
   );
   expect(documentOverflows).toBe(false);
 });
-test('can pause and resume automatic promotion movement', async ({ page }) => {
+test('hovering over a carousel pauses its automatic movement', async ({ page }) => {
   await page.emulateMedia({ reducedMotion: 'no-preference' });
   await page.goto('/');
-  const toggle = page.getByTestId('homepage-promo-autoplay-toggle');
-  const firstIndicator = page.getByRole('button', { name: /Show promotion 1:/ });
-  const secondIndicator = page.getByRole('button', { name: /Show promotion 2:/ });
-
-  await expect(toggle).toBeVisible();
-  await expect(toggle).toHaveAttribute('aria-label', 'Pause automatic promotions');
-  await expect(toggle).toHaveAttribute('aria-pressed', 'false');
-  await toggle.click();
-  await expect(toggle).toHaveAttribute('aria-label', 'Resume automatic promotions');
-  await expect(toggle).toHaveAttribute('aria-pressed', 'true');
-
+  const rail = page.getByTestId('homepage-promo-rail');
+  await rail.hover();
   await page.waitForTimeout(5000);
-  await expect(firstIndicator).toHaveAttribute('aria-current', 'true');
-  await toggle.click();
-  await expect(toggle).toHaveAttribute('aria-label', 'Pause automatic promotions');
-  await expect(secondIndicator).toHaveAttribute('aria-current', 'true', { timeout: 8000 });
+  expect(await rail.evaluate(element => element.scrollLeft)).toBe(0);
+  await page.mouse.move(0, 0);
+  await expect.poll(async () => rail.evaluate(element => element.scrollLeft), { timeout: 8000 }).toBeGreaterThan(0);
 });
-
 test('disables autoplay control when reduced motion is requested', async ({ page }) => {
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await page.goto('/');
   const toggle = page.getByTestId('homepage-promo-autoplay-toggle');
-  await expect(toggle).toBeVisible();
+  await expect(toggle).toBeHidden();
   await expect(toggle).toBeDisabled();
   await expect(toggle).toHaveAttribute('aria-label', 'Automatic promotions disabled by reduced motion setting');
 });
