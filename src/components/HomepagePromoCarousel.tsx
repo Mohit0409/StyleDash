@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowUpRight, ChevronLeft, ChevronRight } from 'lucide-react';
+import { ArrowUpRight, ChevronLeft, ChevronRight, Pause, Play } from 'lucide-react';
 import { HOME_PROMO_SLIDES } from '../data/homePromoSlides';
 import './HomepagePromoCarousel.css';
 
@@ -10,6 +10,7 @@ export const HomepagePromoCarousel: React.FC = () => {
   const railRef = useRef<HTMLDivElement>(null);
   const [activeIndex, setActiveIndex] = useState(0);
   const [isInteracting, setIsInteracting] = useState(false);
+  const [userPaused, setUserPaused] = useState(false);
   const [pageVisible, setPageVisible] = useState(true);
   const [reducedMotion, setReducedMotion] = useState(false);
 
@@ -59,12 +60,12 @@ export const HomepagePromoCarousel: React.FC = () => {
   };
 
   useEffect(() => {
-    if (isInteracting || !pageVisible || reducedMotion || HOME_PROMO_SLIDES.length < 2) return;
+    if (isInteracting || userPaused || !pageVisible || reducedMotion || HOME_PROMO_SLIDES.length < 2) return;
     const timer = window.setInterval(() => {
       showSlide((activeIndex + 1) % HOME_PROMO_SLIDES.length);
     }, AUTO_ADVANCE_MS);
     return () => window.clearInterval(timer);
-  }, [activeIndex, isInteracting, pageVisible, reducedMotion, showSlide]);
+  }, [activeIndex, isInteracting, userPaused, pageVisible, reducedMotion, showSlide]);
 
   return (
     <section
@@ -160,6 +161,25 @@ export const HomepagePromoCarousel: React.FC = () => {
             />
           ))}
         </div>
+        <button
+          type="button"
+          data-testid="homepage-promo-autoplay-toggle"
+          aria-label={
+            reducedMotion
+              ? 'Automatic promotions disabled by reduced motion setting'
+              : userPaused
+                ? 'Resume automatic promotions'
+                : 'Pause automatic promotions'
+          }
+          aria-pressed={userPaused}
+          disabled={reducedMotion}
+          onClick={() => setUserPaused(previous => !previous)}
+          className="vibe-home-promo-toggle"
+        >
+          {userPaused || reducedMotion
+            ? <Play className="h-4 w-4" aria-hidden="true" />
+            : <Pause className="h-4 w-4" aria-hidden="true" />}
+        </button>
         <button
           type="button"
           onClick={() => showSlide((activeIndex + 1) % HOME_PROMO_SLIDES.length)}

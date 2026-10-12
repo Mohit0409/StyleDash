@@ -167,6 +167,30 @@
   background: transparent;
   color: #404040;
 }
+/* Accessible pause/play control stays visible even on small phones. */
+.vibe-home-promo > div:last-child > button.vibe-home-promo-toggle {
+  display: inline-flex;
+  flex: 0 0 44px;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  min-width: 44px;
+  min-height: 44px;
+  border: 1px solid #d4d4d4;
+  border-radius: 999px;
+  color: #262626;
+  background-color: #fafafa;
+}
+.dark .vibe-home-promo > div:last-child > button.vibe-home-promo-toggle {
+  color: #f5f5f5;
+  background-color: #262626;
+  border-color: #525252;
+}
+.vibe-home-promo > div:last-child > button.vibe-home-promo-toggle:disabled {
+  opacity: .5;
+  cursor: not-allowed;
+}
 .vibe-home-promo > div:last-child > div button {
   display: block;
   width: 10px;

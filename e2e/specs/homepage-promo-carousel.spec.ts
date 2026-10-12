@@ -75,3 +75,32 @@ test('keeps all promotional buttons visible on 320px phones', async ({ page }) =
   );
   expect(documentOverflows).toBe(false);
 });
+test('can pause and resume automatic promotion movement', async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: 'no-preference' });
+  await page.goto('/');
+  const toggle = page.getByTestId('homepage-promo-autoplay-toggle');
+  const firstIndicator = page.getByRole('button', { name: /Show promotion 1:/ });
+  const secondIndicator = page.getByRole('button', { name: /Show promotion 2:/ });
+
+  await expect(toggle).toBeVisible();
+  await expect(toggle).toHaveAttribute('aria-label', 'Pause automatic promotions');
+  await expect(toggle).toHaveAttribute('aria-pressed', 'false');
+  await toggle.click();
+  await expect(toggle).toHaveAttribute('aria-label', 'Resume automatic promotions');
+  await expect(toggle).toHaveAttribute('aria-pressed', 'true');
+
+  await page.waitForTimeout(5000);
+  await expect(firstIndicator).toHaveAttribute('aria-current', 'true');
+  await toggle.click();
+  await expect(toggle).toHaveAttribute('aria-label', 'Pause automatic promotions');
+  await expect(secondIndicator).toHaveAttribute('aria-current', 'true', { timeout: 8000 });
+});
+
+test('disables autoplay control when reduced motion is requested', async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await page.goto('/');
+  const toggle = page.getByTestId('homepage-promo-autoplay-toggle');
+  await expect(toggle).toBeVisible();
+  await expect(toggle).toBeDisabled();
+  await expect(toggle).toHaveAttribute('aria-label', 'Automatic promotions disabled by reduced motion setting');
+});
