@@ -2392,6 +2392,9 @@ class HttpApiTests(unittest.TestCase):
                 "camera=(), microphone=(), geolocation=(self)",
             )
             policy = response.headers["Content-Security-Policy"]
+            script_src = policy.split("script-src ", 1)[1].split(";", 1)[0]
+            self.assertIn("'sha256-7OnTkiJuRrLckemKsfyAX5MjqfB07JVU3ZmmI4TvobM='", script_src)
+            self.assertNotIn("'unsafe-inline'", script_src)
             self.assertIn("checkout.razorpay.com", policy)
             self.assertIn("https://static.cloudflareinsights.com", policy)
             self.assertIn("https://cloudflareinsights.com", policy)

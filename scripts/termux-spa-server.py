@@ -318,7 +318,9 @@ def store_product_image_payload(product_image_directory: Path, payload: dict[str
 SECURITY_POLICY = (
     "default-src 'self'; "
     "base-uri 'self'; object-src 'none'; frame-ancestors 'self'; "
-    "script-src 'self' https://checkout.razorpay.com https://*.razorpay.com "
+    # Permit only the exact reviewed homepage importmap content. Do NOT use unsafe-inline.
+    "script-src 'self' 'sha256-7OnTkiJuRrLckemKsfyAX5MjqfB07JVU3ZmmI4TvobM=' "
+    "https://checkout.razorpay.com https://*.razorpay.com "
     "https://apis.google.com https://www.gstatic.com https://www.google.com https://www.recaptcha.net "
     "https://static.cloudflareinsights.com https://www.googletagmanager.com https://connect.facebook.net; "
     "style-src 'self' 'unsafe-inline' https://*.razorpay.com; "

@@ -50,7 +50,7 @@ describe('site quality guardrails', () => {
     const home = readText('../pages/Home.tsx');
     expect(home).not.toContain('Easy Size Exchange');
     expect(home).toContain('Shop by Budget');
-    expect(home).toContain('/products?maxPrice=499');
+    expect(home).toContain('/products?maxPrice=${price}');
   });
 
   it('keeps one department grid and separates Top Picks from lower curated rows', () => {

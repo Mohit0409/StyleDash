@@ -276,6 +276,8 @@ test('delivery-zone map draws points and keeps coordinates synchronized', async 
 
 test('bulk toolbar Select all controls every visible record and tracks partial selection', async ({ page }) => {
   await page.goto('http://127.0.0.1:8081/');
+  // Wait for Admin startup before installing the isolated test-only customer table.
+  await page.waitForLoadState('networkidle');
   await page.evaluate(() => {
     document.getElementById('login-view')!.hidden = true;
     document.getElementById('app-view')!.hidden = false;
