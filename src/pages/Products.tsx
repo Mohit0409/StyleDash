@@ -3,6 +3,8 @@ import { Link, useSearchParams } from 'react-router-dom';
 import { MapPin, SlidersHorizontal, Store, Zap } from 'lucide-react';
 import { SEO } from '../components/SEO';
 import { ProductCard } from '../components/ProductCard';
+import { ProductPagination } from '../components/ProductPagination';
+import { useProductPagination } from '../hooks/useProductPagination';
 import { StoreImage } from '../components/StoreImage';
 import { FilterSidebar } from '../components/FilterSidebar';
 import { Product, VendorStore } from '../types';
@@ -93,6 +95,7 @@ export const Products: React.FC = () => {
     } else {
       newParams.delete(key);
     }
+    newParams.delete('page');
     setSearchParams(newParams);
   };
 
@@ -105,6 +108,7 @@ export const Products: React.FC = () => {
     if (value && value !== 'all') nextParams.set('category', value);
     else nextParams.delete('category');
     nextParams.delete('subcategory');
+    nextParams.delete('page');
     setSearchParams(nextParams);
   };
 
@@ -151,7 +155,10 @@ export const Products: React.FC = () => {
       nextParams.delete('size');
       changed = true;
     }
-    if (changed) setSearchParams(nextParams, { replace: true });
+    if (changed) {
+      nextParams.delete('page');
+      setSearchParams(nextParams, { replace: true });
+    }
   }, [brand, brandOptions, loading, searchParams, setSearchParams, size, sizeOptions]);
 
   const filteredProducts = products.filter(product => matchesCatalogueProduct(product, catalogueFilters));
@@ -173,6 +180,8 @@ export const Products: React.FC = () => {
     if (sortBy === 'discount') return b.discount - a.discount;
     return 0; // recommended
   });
+
+  const pagination = useProductPagination(sortedProducts, 24, 'page', !loading, 'catalogue-products');
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
@@ -274,7 +283,7 @@ export const Products: React.FC = () => {
         />
 
         {/* Catalogue Product Grid */}
-        <div className="flex-1 min-w-0">
+        <div id="catalogue-products" className="flex-1 min-w-0 scroll-mt-24">
           {loading ? (
             <div className="grid grid-cols-2 md:grid-cols-3 gap-6">
               {[1, 2, 3, 4, 6].map(i => (
@@ -298,10 +307,13 @@ export const Products: React.FC = () => {
             </div>
           ) : (
             <div className="grid grid-cols-2 md:grid-cols-3 gap-4 sm:gap-6">
-              {sortedProducts.map((p, index) => (
+              {pagination.items.map((p, index) => (
                 <ProductCard key={p.id} product={p} priority={index === 0} />
               ))}
             </div>
+          )}
+          {!loading && sortedProducts.length > 0 && (
+            <ProductPagination {...pagination} onPageChange={pagination.changePage} label="products" testId="catalogue-pagination" />
           )}
         </div>
       </div>

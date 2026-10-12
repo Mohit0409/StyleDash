@@ -3,6 +3,8 @@ import { useParams, Link } from 'react-router-dom';
 import { MapPin, Zap, Star, Phone, Mail } from 'lucide-react';
 import { SEO } from '../components/SEO';
 import { ProductCard } from '../components/ProductCard';
+import { ProductPagination } from '../components/ProductPagination';
+import { useProductPagination } from '../hooks/useProductPagination';
 import { StoreImage } from '../components/StoreImage';
 import { StoreReviews } from '../components/StoreReviews';
 import { vendorRepository } from '../repositories/vendorRepository';
@@ -32,6 +34,8 @@ export const StoreDetail: React.FC = () => {
       }
     });
   }, [slug]);
+
+  const pagination = useProductPagination(products, 16, 'page', !loading, 'store-inventory');
 
   if (loading) {
     return <div className="max-w-7xl mx-auto p-12 text-center text-xs text-neutral-500">Loading Store...</div>;
@@ -89,7 +93,7 @@ export const StoreDetail: React.FC = () => {
       <StoreReviews storeId={store.id} onSummaryChange={updateReviewSummary} />
 
       {/* Store Inventory Section */}
-      <div className="space-y-6">
+      <div id="store-inventory" className="space-y-6 scroll-mt-24">
         <div className="flex items-center justify-between pb-4 border-b border-neutral-200 dark:border-neutral-800">
           <div>
             <h2 className="text-xl font-black text-neutral-900 dark:text-white">Store Inventory Catalogue</h2>
@@ -103,11 +107,12 @@ export const StoreDetail: React.FC = () => {
           </div>
         ) : (
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 sm:gap-6">
-            {products.map(p => (
+            {pagination.items.map(p => (
               <ProductCard key={p.id} product={p} />
             ))}
           </div>
         )}
+        <ProductPagination {...pagination} onPageChange={pagination.changePage} label="store products" testId="store-pagination" />
       </div>
     </div>
   );
