@@ -9,7 +9,10 @@ test('replaces the large black hero with horizontal promotional cards', async ({
   await expect(page.getByRole('heading', { level: 1, name: 'Featured for you' })).toBeVisible();
   await expect(page.getByTestId('homepage-promo-slide')).toHaveCount(6);
   await expect(page.getByText('Your look,', { exact: true })).toHaveCount(0);
-  await expect(carousel.getByRole('link', { name: 'Explore Your city. Your style.' })).toHaveAttribute('href', '/stores');
+  await expect(carousel.getByRole('link', { name: 'Explore Discover local shops.' })).toHaveAttribute('href', '/stores');
+  await expect(carousel.getByRole('link', { name: 'Explore Find everything you love.' })).toHaveAttribute('href', '/categories');
+  await expect(carousel.getByRole('link', { name: 'Explore More reasons to smile.' })).toHaveAttribute('href', '/offers');
+  await expect(carousel.getByRole('link', { name: 'Explore Meet the newest shops.' })).toHaveAttribute('href', '/stores?sort=newest');
 
   const geometry = await rail.evaluate(element => ({
     scrollWidth: element.scrollWidth,
