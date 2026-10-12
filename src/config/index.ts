@@ -11,7 +11,7 @@ export const CONFIG = {
   TAX_RATE: 0.05, // 5% GST
 
   ANALYTICS: {
-    GOOGLE_MEASUREMENT_ID: import.meta.env.VITE_GA_MEASUREMENT_ID?.trim() || '',
+    GOOGLE_MEASUREMENT_ID: import.meta.env.VITE_GA_MEASUREMENT_ID?.trim() || 'G-PSHXB46P50',
     META_PIXEL_ID: import.meta.env.VITE_META_PIXEL_ID?.trim() || '4725510931060051',
   },
 
