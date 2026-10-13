@@ -1,5 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
-const HOME_RAIL_PAGE_SIZE = 5;
+import React, { useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowRight, ChevronLeft, ChevronRight } from 'lucide-react';
 import type { Product } from '../types';
@@ -30,35 +29,6 @@ export const HomepageProductSection: React.FC<HomepageProductSectionProps> = ({
   priorityCount = 0,
 }) => {
   const railRef = useRef<HTMLDivElement>(null);
-  const [currentPage, setCurrentPage] = useState(1);
-  const pageCount = Math.ceil(products.length / HOME_RAIL_PAGE_SIZE);
-
-  useEffect(() => { setCurrentPage(1); }, [products]);
-
-  const goToPage = (page: number) => {
-    const rail = railRef.current;
-    if (!rail || page < 1 || page > pageCount) return;
-    const cards = Array.from(rail.querySelectorAll<HTMLElement>('[data-home-product-card]'));
-    const target = cards[(page - 1) * HOME_RAIL_PAGE_SIZE];
-    if (!target || !cards[0]) return;
-    rail.scrollTo({ left: target.offsetLeft - cards[0].offsetLeft, behavior: 'smooth' });
-    setCurrentPage(page);
-  };
-
-  const trackSwipePage = () => {
-    const rail = railRef.current;
-    if (!rail) return;
-    const cards = Array.from(rail.querySelectorAll<HTMLElement>('[data-home-product-card]'));
-    if (!cards.length) return;
-    const left = rail.scrollLeft + cards[0].offsetLeft;
-    let closest = 0;
-    cards.forEach((card, index) => {
-      if (Math.abs(card.offsetLeft - left) < Math.abs(cards[closest].offsetLeft - left)) closest = index;
-    });
-    const page = Math.floor(closest / HOME_RAIL_PAGE_SIZE) + 1;
-    setCurrentPage(previous => previous === page ? previous : page);
-  };
-
   const scrollRail = (direction: -1 | 1) => {
     const rail = railRef.current;
     if (!rail) return;
@@ -115,7 +85,6 @@ export const HomepageProductSection: React.FC<HomepageProductSectionProps> = ({
 
       <div
         ref={railRef}
-        onScroll={trackSwipePage}
         aria-label={`${title} horizontal product slider`}
         className="flex w-full snap-x snap-mandatory gap-3 overflow-x-auto overscroll-x-contain pb-3 pr-4 scroll-smooth sm:gap-4"
         data-home-section={id}
@@ -127,25 +96,6 @@ export const HomepageProductSection: React.FC<HomepageProductSectionProps> = ({
           </div>
         ))}
       </div>
-      {pageCount > 1 && (
-        <nav aria-label={title + ' product pages'} data-testid={testId ? testId + '-pagination' : undefined}
-          className="flex flex-wrap items-center justify-center gap-2">
-          <span className="mr-2 text-xs font-semibold text-neutral-500 dark:text-neutral-400">
-            Page {currentPage} of {pageCount}
-          </span>
-          {Array.from({ length: pageCount }, (_, index) => index + 1).map(page => (
-            <button key={page} type="button" aria-label={title + ' page ' + page}
-              aria-current={currentPage === page ? 'page' : undefined}
-              onClick={() => goToPage(page)}
-              className={'inline-flex min-h-11 min-w-11 items-center justify-center rounded-xl border px-3 text-xs font-bold transition-colors ' +
-                (currentPage === page
-                  ? 'border-neutral-950 bg-neutral-950 text-white dark:border-lime-400 dark:bg-lime-400 dark:text-neutral-950'
-                  : 'border-neutral-200 bg-white text-neutral-700 hover:border-lime-500 dark:border-neutral-700 dark:bg-neutral-900 dark:text-white')}>
-              {page}
-            </button>
-          ))}
-        </nav>
-      )}
     </section>
   );
 };

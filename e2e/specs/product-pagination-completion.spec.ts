@@ -1,21 +1,21 @@
 import { expect, test } from '@playwright/test';
 import { PRODUCTS } from '../../src/data/products';
 
-test('homepage product rows gain numbered page navigation without losing horizontal swipe', async ({ page }) => {
+test('homepage product rows keep horizontal scrolling but never render numbered pagination', async ({ page }) => {
   await page.goto('/');
   const rail = page.getByTestId('top-picks-rail');
-  const buttons = page.getByTestId('top-picks-rail-pagination');
   await expect(rail).toBeVisible();
-  await expect(buttons).toBeVisible();
   const cards = rail.locator('[data-home-product-card]');
   const originalCount = await cards.count();
   expect(originalCount).toBeGreaterThan(5);
-  const before = await rail.evaluate(element => element.scrollLeft);
 
-  await buttons.getByRole('button', { name: 'Top Picks page 2' }).click();
+  await expect(page.locator('[data-testid$="-rail-pagination"]')).toHaveCount(0);
+  await expect(page.getByRole('navigation', { name: /product pages/i })).toHaveCount(0);
+  const before = await rail.evaluate(element => element.scrollLeft);
+  await rail.evaluate(element => { element.scrollLeft += Math.max(element.clientWidth * 0.8, 240); });
   await expect.poll(() => rail.evaluate(element => element.scrollLeft)).toBeGreaterThan(before + 10);
-  await expect(buttons.getByRole('button', { name: 'Top Picks page 2' })).toHaveAttribute('aria-current', 'page');
   expect(await cards.count()).toBe(originalCount);
+  await expect(page.getByRole('link', { name: /View All/ }).first()).toBeVisible();
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
   expect(overflow).toBeLessThanOrEqual(1);
 });
