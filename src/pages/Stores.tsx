@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { MapPin, Zap, Star, ChevronRight, PlusCircle } from 'lucide-react';
 import { SEO } from '../components/SEO';
 import { StoreImage } from '../components/StoreImage';
@@ -9,6 +9,8 @@ import { CONFIG } from '../config';
 import { rankStoresByProductCount } from '../utils/storeRanking';
 
 export const Stores: React.FC = () => {
+  const [searchParams] = useSearchParams();
+  const newestFirst = searchParams.get('sort') === 'newest';
   const [stores, setStores] = useState<VendorStore[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -17,7 +19,7 @@ export const Stores: React.FC = () => {
     vendorRepository.getAllStores()
       .then(s => {
         if (active) {
-          setStores(rankStoresByProductCount(s.filter(item => item.approved && item.active)));
+          setStores(s.filter(item => item.approved && item.active));
         }
       })
       .catch(() => { if (active) setStores([]); })
@@ -25,15 +27,24 @@ export const Stores: React.FC = () => {
     return () => { active = false; };
   }, []);
 
+  const visibleStores = newestFirst
+    ? [...stores].sort((a, b) => {
+        const aTime = Date.parse(a.createdAt || '');
+        const bTime = Date.parse(b.createdAt || '');
+        return (Number.isFinite(bTime) ? bTime : 0) - (Number.isFinite(aTime) ? aTime : 0)
+          || a.storeName.localeCompare(b.storeName);
+      })
+    : rankStoresByProductCount(stores);
+
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
-      <SEO title="Local Partner Stores in Neemuch - Vibe4You" />
+      <SEO title={newestFirst ? "Newly Added Shops in Neemuch - Vibe4You" : "Local Partner Stores in Neemuch - Vibe4You"} />
 
       {/* Header Banner */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 p-8 bg-neutral-950 text-white rounded-3xl relative overflow-hidden shadow-xl">
         <div className="space-y-2 z-10 max-w-xl">
           <span className="text-xs font-black text-lime-400 uppercase tracking-widest">Multi-Store Quick-Commerce Marketplace</span>
-          <h1 className="text-2xl sm:text-3xl font-black">Local Boutiques & Partner Stores in {CONFIG.SERVICE_CITY}</h1>
+          <h1 className="text-2xl sm:text-3xl font-black">{newestFirst ? "Newly Added Shops in " : "Local Boutiques & Partner Stores in "}{CONFIG.SERVICE_CITY}</h1>
           <p className="text-xs text-neutral-400">
             Shop directly from verified neighbourhood clothing, ethnic wear, and footwear stores with Same Day Delivery across the supported Neemuch service area.
           </p>
@@ -45,6 +56,17 @@ export const Stores: React.FC = () => {
         >
           <PlusCircle className="w-4 h-4" />
           <span>List Your Store on Vibe4You</span>
+        </Link>
+      </div>
+
+      <div className="flex flex-wrap items-center gap-3 text-xs font-bold">
+        <Link to="/stores?sort=newest" aria-current={newestFirst ? "page" : undefined}
+          className={`rounded-full px-4 py-2.5 ${newestFirst ? "bg-lime-400 text-neutral-950" : "bg-neutral-100 text-neutral-700 dark:bg-neutral-800 dark:text-white"}`}>
+          Newly added first
+        </Link>
+        <Link to="/stores" aria-current={!newestFirst ? "page" : undefined}
+          className={`rounded-full px-4 py-2.5 ${!newestFirst ? "bg-lime-400 text-neutral-950" : "bg-neutral-100 text-neutral-700 dark:bg-neutral-800 dark:text-white"}`}>
+          Popular stores
         </Link>
       </div>
 
@@ -65,7 +87,7 @@ export const Stores: React.FC = () => {
               <div className="h-9 w-full rounded-xl bg-neutral-200 dark:bg-neutral-800" />
             </div>
           </div>
-        )) : stores.map(store => (
+        )) : visibleStores.map(store => (
           <div key={store.id} className="group bg-white dark:bg-neutral-900 rounded-3xl border border-neutral-200 dark:border-neutral-800 overflow-hidden shadow-sm hover:shadow-xl transition-all duration-300 flex flex-col">
             <div className="relative aspect-[16/9] bg-neutral-100 dark:bg-neutral-800 overflow-hidden">
               <StoreImage

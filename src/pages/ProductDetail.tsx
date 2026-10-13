@@ -5,6 +5,8 @@ import { SEO } from '../components/SEO';
 import { VariantSelector } from '../components/VariantSelector';
 import { SizeGuideModal } from '../components/SizeGuideModal';
 import { ProductCard } from '../components/ProductCard';
+import { ProductPagination } from '../components/ProductPagination';
+import { useProductPagination } from '../hooks/useProductPagination';
 import { ProductImageLightbox } from '../components/ProductImageLightbox';
 import { ProductReviews } from '../components/ProductReviews';
 import { OutsideDeliveryRequestDialog } from '../components/OutsideDeliveryRequestDialog';
@@ -32,6 +34,7 @@ export const ProductDetail: React.FC = () => {
   const [quantity, setQuantity] = useState(1);
   const [sizeGuideOpen, setSizeGuideOpen] = useState(false);
   const [relatedProducts, setRelatedProducts] = useState<Product[]>([]);
+  const relatedPagination = useProductPagination(relatedProducts, 4, 'relatedPage', relatedProducts.length > 0, 'related-products');
   const [tryAtHomeSizeIds, setTryAtHomeSizeIds] = useState<string[]>([]);
   const [tryAtHomeTermsAccepted, setTryAtHomeTermsAccepted] = useState(false);
   const [outsideDeliveryOpen, setOutsideDeliveryOpen] = useState(false);
@@ -62,7 +65,7 @@ export const ProductDetail: React.FC = () => {
       setLoading(false);
       if (p) {
         const related = await productRepository.getSimilarProducts(p);
-        if (!cancelled) setRelatedProducts(related.slice(0, 4));
+        if (!cancelled) setRelatedProducts(related);
       }
     })();
     return () => { cancelled = true; };
@@ -429,13 +432,15 @@ export const ProductDetail: React.FC = () => {
       <ProductReviews productId={product.id} onSummaryChange={handleReviewSummaryChange} />
 
       {/* Similar Products */}
-      <section className="pt-12 border-t border-neutral-200 dark:border-neutral-800 space-y-6">
+      <section id="related-products" className="scroll-mt-24 space-y-6 border-t border-neutral-200 pt-12 dark:border-neutral-800">
         <h3 className="text-xl font-black text-neutral-900 dark:text-white">You May Also Like</h3>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 sm:gap-6">
-          {relatedProducts.map(p => (
-            <ProductCard key={p.id} product={p} />
+        <div className="grid grid-cols-2 gap-4 sm:gap-6 md:grid-cols-4" data-testid="related-products-grid">
+          {relatedPagination.items.map(item => (
+            <ProductCard key={item.id} product={item} />
           ))}
         </div>
+        <ProductPagination {...relatedPagination} onPageChange={relatedPagination.changePage}
+          label="related products" testId="related-products-pagination" />
       </section>
     </div>
   );

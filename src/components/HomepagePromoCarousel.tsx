@@ -132,7 +132,7 @@ export const HomepagePromoCarousel: React.FC = () => {
                 {slide.subtitle}
               </p>
               <span className="mt-1 inline-flex w-fit items-center gap-1 rounded-full border border-white/60 bg-white/15 px-3 py-1.5 text-[11px] font-extrabold backdrop-blur-sm transition-colors group-hover:bg-white/30 sm:text-sm">
-                Shop now <ArrowUpRight className="h-3.5 w-3.5" aria-hidden="true" />
+                {slide.ctaLabel ?? 'Explore now'} <ArrowUpRight className="h-3.5 w-3.5" aria-hidden="true" />
               </span>
             </div>
           </Link>

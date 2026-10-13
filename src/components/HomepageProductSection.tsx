@@ -29,7 +29,6 @@ export const HomepageProductSection: React.FC<HomepageProductSectionProps> = ({
   priorityCount = 0,
 }) => {
   const railRef = useRef<HTMLDivElement>(null);
-
   const scrollRail = (direction: -1 | 1) => {
     const rail = railRef.current;
     if (!rail) return;
