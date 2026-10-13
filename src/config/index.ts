@@ -1,3 +1,10 @@
+// The public GA4 ID is intentionally not a secret. A missing or malformed
+// build-time override must never silently disable production analytics.
+export const resolveGoogleMeasurementId = (configured: string | undefined): string => {
+  const value = configured?.trim() || '';
+  return /^(?:G|GT)-[A-Z0-9]{6,}$/i.test(value) ? value : 'G-PSHXB46P50';
+};
+
 export const CONFIG = {
   BRAND_NAME: import.meta.env.VITE_BRAND_NAME || 'Vibe4You',
   TAGLINE: 'Your City. Your Shops. Your Style.',
@@ -11,7 +18,7 @@ export const CONFIG = {
   TAX_RATE: 0.05, // 5% GST
 
   ANALYTICS: {
-    GOOGLE_MEASUREMENT_ID: import.meta.env.VITE_GA_MEASUREMENT_ID?.trim() || '',
+    GOOGLE_MEASUREMENT_ID: resolveGoogleMeasurementId(import.meta.env.VITE_GA_MEASUREMENT_ID),
     META_PIXEL_ID: import.meta.env.VITE_META_PIXEL_ID?.trim() || '4725510931060051',
   },
 
