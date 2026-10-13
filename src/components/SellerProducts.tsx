@@ -1,4 +1,6 @@
 import React, { useEffect, useState } from 'react';
+import { ProductPagination } from './ProductPagination';
+import { paginateItems } from '../utils/pagination';
 import { AlertTriangle, Boxes, Edit3, PackageMinus, PackagePlus, Search, Send } from 'lucide-react';
 import { ApiError } from '../services/apiClient';
 import { blobToBase64, prepareProductImage, PRODUCT_IMAGE_ACCEPT } from '../utils/productImage';
@@ -277,6 +279,8 @@ export const SellerProducts: React.FC = () => {
   const [message, setMessage] = useState('');
   const [productQuery, setProductQuery] = useState('');
   const [productFilter, setProductFilter] = useState<SellerProductView>('all');
+  // Seller catalogue paging is scoped to this private product-management panel.
+  const [productPage, setProductPage] = useState(1);
   const [stockEdit, setStockEdit] = useState<{ productId: string; variantId: string; size: string; value: string } | null>(null);
   const [unpublishConfirmId, setUnpublishConfirmId] = useState<string | null>(null);
 
@@ -488,6 +492,7 @@ export const SellerProducts: React.FC = () => {
           ? await shopProductApi.updateDraft(editingId, payload)
           : await shopProductApi.createDraft(payload);
         setProducts(current => [saved, ...current.filter(product => product.id !== saved.id)]);
+        setProductPage(1);
         setMessage('Product draft saved. It is not public until a private administrator publishes it.');
       }
       setFormOpen(false);
@@ -566,6 +571,11 @@ export const SellerProducts: React.FC = () => {
       .filter(Boolean)
       .some(value => String(value).toLocaleLowerCase().includes(normalizedQuery));
   });
+  const sellerPagination = paginateItems(filteredProducts, String(productPage), 12);
+  useEffect(() => {
+    if (productPage > sellerPagination.totalPages) setProductPage(sellerPagination.totalPages);
+  }, [productPage, sellerPagination.totalPages]);
+
   const productCounts = {
     live: products.filter(product => productView(product) === 'live').length,
     out: products.filter(product => productView(product) === 'out').length,
@@ -595,14 +605,14 @@ export const SellerProducts: React.FC = () => {
       {products.length > 0 && (
         <div className="space-y-3 rounded-2xl bg-neutral-50 p-3 dark:bg-neutral-800/60">
           <div className="grid grid-cols-2 gap-2 text-center text-xs sm:grid-cols-4">
-            <button type="button" onClick={() => setProductFilter('live')} className="rounded-xl border bg-white p-2 dark:bg-neutral-900"><strong className="block text-base">{productCounts.live}</strong>Live</button>
-            <button type="button" onClick={() => setProductFilter('out')} className="rounded-xl border bg-white p-2 dark:bg-neutral-900"><strong className="block text-base">{productCounts.out}</strong>Out of stock</button>
-            <button type="button" onClick={() => setProductFilter('draft')} className="rounded-xl border bg-white p-2 dark:bg-neutral-900"><strong className="block text-base">{productCounts.draft}</strong>Draft / changes</button>
-            <button type="button" onClick={() => setProductFilter('review')} className="rounded-xl border bg-white p-2 dark:bg-neutral-900"><strong className="block text-base">{productCounts.review}</strong>In review</button>
+            <button type="button" onClick={() => { setProductPage(1); setProductFilter('live'); }} className="rounded-xl border bg-white p-2 dark:bg-neutral-900"><strong className="block text-base">{productCounts.live}</strong>Live</button>
+            <button type="button" onClick={() => { setProductPage(1); setProductFilter('out'); }} className="rounded-xl border bg-white p-2 dark:bg-neutral-900"><strong className="block text-base">{productCounts.out}</strong>Out of stock</button>
+            <button type="button" onClick={() => { setProductPage(1); setProductFilter('draft'); }} className="rounded-xl border bg-white p-2 dark:bg-neutral-900"><strong className="block text-base">{productCounts.draft}</strong>Draft / changes</button>
+            <button type="button" onClick={() => { setProductPage(1); setProductFilter('review'); }} className="rounded-xl border bg-white p-2 dark:bg-neutral-900"><strong className="block text-base">{productCounts.review}</strong>In review</button>
           </div>
           <div className="grid gap-2 sm:grid-cols-[1fr_auto]">
-            <label className="relative"><span className="sr-only">Search your products</span><Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-neutral-400" /><input aria-label="Search your products" value={productQuery} onChange={event => setProductQuery(event.target.value)} placeholder="Search product, brand, category or size" className="w-full rounded-xl border bg-white py-2.5 pl-9 pr-3 text-xs dark:bg-neutral-900" /></label>
-            <select aria-label="Filter products by status" value={productFilter} onChange={event => setProductFilter(event.target.value as SellerProductView)} className="rounded-xl border bg-white px-3 py-2.5 text-xs font-bold dark:bg-neutral-900"><option value="all">All products</option><option value="live">Live</option><option value="out">Out of stock</option><option value="draft">Draft / needs changes</option><option value="review">In review</option></select>
+            <label className="relative"><span className="sr-only">Search your products</span><Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-neutral-400" /><input aria-label="Search your products" value={productQuery} onChange={event => { setProductPage(1); setProductQuery(event.target.value); }} placeholder="Search product, brand, category or size" className="w-full rounded-xl border bg-white py-2.5 pl-9 pr-3 text-xs dark:bg-neutral-900" /></label>
+            <select aria-label="Filter products by status" value={productFilter} onChange={event => { setProductPage(1); setProductFilter(event.target.value as SellerProductView); }} className="rounded-xl border bg-white px-3 py-2.5 text-xs font-bold dark:bg-neutral-900"><option value="all">All products</option><option value="live">Live</option><option value="out">Out of stock</option><option value="draft">Draft / needs changes</option><option value="review">In review</option></select>
           </div>
         </div>
       )}
@@ -723,7 +733,7 @@ export const SellerProducts: React.FC = () => {
       {loading ? <p className="text-sm text-neutral-500">Loading product submissions…</p>
         : products.length === 0 ? <p className="rounded-2xl bg-neutral-50 p-4 text-sm text-neutral-500 dark:bg-neutral-800">No product drafts yet.</p>
           : filteredProducts.length === 0 ? <p className="rounded-2xl bg-neutral-50 p-4 text-sm text-neutral-500 dark:bg-neutral-800">No products match this search or filter.</p>
-            : <div className="space-y-3">{filteredProducts.map(product => {
+            : <div id="seller-product-list" className="space-y-3 scroll-mt-24">{sellerPagination.items.map(product => {
             const editable = product.status === 'DRAFT' || product.status === 'REJECTED';
             const latestRequest = requests.find(request => request.productId === product.id);
             const pendingRequest = latestRequest && ['SUBMITTED', 'UNDER_REVIEW'].includes(latestRequest.status) ? latestRequest : null;
@@ -767,7 +777,12 @@ export const SellerProducts: React.FC = () => {
                 <div className="mt-2 flex gap-2"><button type="button" disabled={busy} onClick={() => void requestUnpublish(product)} className="rounded-lg bg-amber-700 px-3 py-2 font-bold text-white disabled:opacity-60">Confirm unpublish request</button><button type="button" disabled={busy} onClick={() => setUnpublishConfirmId(null)} className="rounded-lg border border-amber-400 px-3 py-2 font-bold">Cancel</button></div>
               </div>}
             </article>;
-          })}</div>}
+          })}
+              <ProductPagination {...sellerPagination} onPageChange={page => {
+                setProductPage(page);
+                document.getElementById('seller-product-list')?.scrollIntoView({ block: 'start', behavior: 'auto' });
+              }} label="seller products" testId="seller-products-pagination" />
+            </div>}
     </section>
   );
 };

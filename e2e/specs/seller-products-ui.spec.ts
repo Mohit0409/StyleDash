@@ -372,3 +372,91 @@ test('published seller can update stock and submit edit or unpublish requests wi
   expect(unpublishPayload).toEqual({});
   await expect(page.getByRole('button', { name: /publish/i })).toHaveCount(0);
 });
+
+test('seller Product submissions are paginated without changing draft editing or status filters', async ({ page }) => {
+  const products = Array.from({ length: 29 }, (_, index) => ({
+    id: `seller-page-${index + 1}`,
+    slug: `seller-page-${index + 1}`,
+    applicationId: 'shop-1',
+    status: index < 20 ? 'DRAFT' : 'PUBLISHED',
+    name: `Local Submission ${String(index + 1).padStart(2, '0')}`,
+    description: 'Safe seller pagination test product.',
+    brand: 'Local',
+    department: 'women',
+    category: 'Clothing & Fashion',
+    pricePaise: 49900,
+    originalPricePaise: 59900,
+    inventory: 3,
+    size: 'M',
+    colourName: 'Blue',
+    colourHex: '#0000FF',
+    imageUrls: ['/product-placeholder.svg'],
+    attributes: {},
+    variants: [{ id: `seller-var-${index + 1}`, size: 'M', inventory: 3 }],
+    createdAt: '2026-10-10T10:00:00Z',
+    updatedAt: '2026-10-10T10:00:00Z',
+  }));
+
+  await page.route('**/api/**', async route => {
+    const request = route.request();
+    const path = new URL(request.url()).pathname;
+    const method = request.method();
+    const reply = (body: unknown, status = 200) => route.fulfill({
+      status, contentType: 'application/json', body: JSON.stringify(body),
+    });
+    if (path === '/api/auth/me') {
+      return reply({ success: true, csrfToken: 'seller-pagination-fixture', user: {
+        uid: 'seller-pagination', name: 'Seller Pagination', email: 'seller-pagination@example.test',
+        role: 'customer',
+      } });
+    }
+    if (path === '/api/vendor-applications/me' && method === 'GET') {
+      return reply({ success: true, application: {
+        id: 'shop-1', status: 'ACTIVE', shopName: 'Pagination Test Shop',
+        ownerName: 'Seller Pagination', registeredEmail: 'seller-pagination@example.test',
+        category: 'Clothing & Fashion', description: 'Verified seller pagination shop',
+        address: 'Main market', city: 'Neemuch', state: 'Madhya Pradesh', pincode: '458441',
+        createdAt: '2026-10-01T00:00:00Z', updatedAt: '2026-10-01T00:00:00Z',
+      } });
+    }
+    if (path === '/api/shop-products' && method === 'GET') return reply({ success: true, products });
+    if (path === '/api/shop-product-requests' && method === 'GET') return reply({ success: true, requests: [] });
+    return reply({ success: false, error: `Unexpected seller pagination fixture request: ${method} ${path}` }, 500);
+  });
+
+  await page.goto('/partner');
+  const panel = page.getByRole('heading', { name: 'Product submissions' }).locator('..');
+  await expect(panel).toBeVisible();
+  const articles = page.locator('#seller-product-list article');
+  const pager = page.getByTestId('seller-products-pagination');
+  await expect(articles).toHaveCount(12);
+  await expect(pager.getByRole('status')).toContainText('Showing 1–12 of 29 seller products');
+  await pager.getByRole('button', { name: 'Next seller products page' }).click();
+  await expect(articles).toHaveCount(12);
+  await expect(pager.getByRole('status')).toContainText('Showing 13–24 of 29 seller products');
+  await expect(articles.first()).toContainText('Local Submission 13');
+
+  // Draft Edit must remain accessible from a paginated result.
+  await articles.first().getByRole('button', { name: 'Edit', exact: true }).click();
+  await expect(page.getByLabel('Product name')).toHaveValue('Local Submission 13');
+  await page.getByRole('button', { name: 'Cancel', exact: true }).click();
+
+  await pager.getByRole('button', { name: 'Next seller products page' }).click();
+  await expect(articles).toHaveCount(5);
+  await expect(pager.getByRole('status')).toContainText('Showing 25–29 of 29 seller products');
+
+  // Searching and status filters start at page one but do not change the backend.
+  await page.getByLabel('Search your products').fill('Local Submission 02');
+  await expect(articles).toHaveCount(1);
+  await expect(articles.first()).toContainText('Local Submission 02');
+  await expect(pager).toHaveCount(0);
+
+  await page.getByLabel('Search your products').fill('');
+  await page.getByLabel('Filter products by status').selectOption('live');
+  await expect(articles).toHaveCount(9);
+  await expect(articles.first()).toContainText('Local Submission 21');
+  await expect(pager).toHaveCount(0);
+  await page.getByLabel('Filter products by status').selectOption('all');
+  await expect(articles).toHaveCount(12);
+  await expect(pager.getByRole('status')).toContainText('Showing 1–12 of 29 seller products');
+});

@@ -3,9 +3,11 @@ import { Link } from 'react-router-dom';
 import { CalendarDays, Clock3, Tag } from 'lucide-react';
 import { SEO } from '../components/SEO';
 import { ProductCard } from '../components/ProductCard';
+import { ProductPagination } from '../components/ProductPagination';
+import { useProductPagination } from '../hooks/useProductPagination';
 import { productRepository } from '../repositories/productRepository';
 import type { Product } from '../types';
-import { selectRotatingOffers } from '../utils/rotatingOffers';
+import { selectRotatingOffers, type RotatingOfferSection } from '../utils/rotatingOffers';
 
 const PERIOD_INFO = {
   today: {
@@ -22,6 +24,19 @@ const PERIOD_INFO = {
   },
 } as const;
 
+const OfferProductGrid: React.FC<{ section: RotatingOfferSection }> = ({ section }) => {
+  const pagination = useProductPagination(section.products, 8, `${section.period}Page`, true, `offers-${section.period}`);
+  return (
+    <div className="space-y-3" data-testid={`offers-products-${section.period}`}>
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 sm:gap-5">
+        {pagination.items.map(item => <ProductCard key={item.id} product={item} />)}
+      </div>
+      <ProductPagination {...pagination} onPageChange={pagination.changePage}
+        label={`${section.period} offers`} testId={`offers-${section.period}-pagination`} />
+    </div>
+  );
+};
+
 export const Offers: React.FC = () => {
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
@@ -36,7 +51,8 @@ export const Offers: React.FC = () => {
     return () => { active = false; };
   }, []);
 
-  const sections = useMemo(() => selectRotatingOffers(products), [products]);
+  // Present eight verified discounts per page and 24 rotating picks per period.
+  const sections = useMemo(() => selectRotatingOffers(products, new Date(), 24), [products]);
   const hasOffers = sections.some(section => section.products.length > 0);
 
   return (
@@ -109,9 +125,7 @@ export const Offers: React.FC = () => {
               </div>
             </div>
             {section.products.length ? (
-              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 sm:gap-5">
-                {section.products.map(item => <ProductCard key={item.id} product={item} />)}
-              </div>
+              <OfferProductGrid section={section} />
             ) : (
               <p className="rounded-2xl border border-neutral-200 p-5 text-sm text-neutral-600 dark:border-neutral-800 dark:text-neutral-300">
                 No additional offers in this selection. Explore the other periods or browse all products.
