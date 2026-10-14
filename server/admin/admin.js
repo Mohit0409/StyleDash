@@ -7,6 +7,47 @@ let shopProductStores = [];
 let shopProductFilter = 'all';
 let currentVendors = [];
 let inventoryShops = [];
+let currentShopProductRequests = [];
+let currentInventory = [];
+const ADMIN_PRODUCT_PAGE_SIZE = 25;
+const ADMIN_PRODUCT_TABS = ['shop-products','shop-product-requests','inventory'];
+const adminProductPages = Object.fromEntries(ADMIN_PRODUCT_TABS.map(tab => [tab,1]));
+function resetAdminProductPage(tab){
+  if(ADMIN_PRODUCT_TABS.includes(tab))adminProductPages[tab]=1;
+}
+function adminProductPage(items,tab){
+  const total=items.length;
+  const totalPages=Math.max(1,Math.ceil(total/ADMIN_PRODUCT_PAGE_SIZE));
+  const requested=Number(adminProductPages[tab]);
+  const page=Math.max(1,Math.min(Number.isSafeInteger(requested)?requested:1,totalPages));
+  adminProductPages[tab]=page;
+  const offset=(page-1)*ADMIN_PRODUCT_PAGE_SIZE;
+  return {items:items.slice(offset,offset+ADMIN_PRODUCT_PAGE_SIZE),total,page,totalPages,
+    start:total?offset+1:0,end:Math.min(total,offset+ADMIN_PRODUCT_PAGE_SIZE)};
+}
+function adminProductPager(tab,data){
+  if(!data.total)return '';
+  const label={'shop-products':'Shop products','shop-product-requests':'Product requests',inventory:'Inventory'}[tab];
+  const pages=[...new Set([1,2,data.page-1,data.page,data.page+1,data.totalPages-1,data.totalPages])]
+    .filter(n=>n>=1&&n<=data.totalPages).sort((a,b)=>a-b);
+  const button=(n,title,aria,disabled=false)=>'<button type="button" class="admin-page-button'+
+    (n===data.page?' active':'')+'" data-admin-page-tab="'+tab+'" data-admin-page="'+n+
+    '" aria-label="'+aria+'"'+(n===data.page?' aria-current="page"':'')+
+    (disabled?' disabled':'')+'>'+title+'</button>';
+  const tokens=[];
+  let last=0;
+  for(const n of pages){
+    if(last&&n-last>1)tokens.push('<span aria-hidden="true">…</span>');
+    tokens.push(button(n,String(n),'Page '+n+' of '+data.totalPages+' for '+label));
+    last=n;
+  }
+  const nav=data.totalPages>1?'<div class="admin-page-buttons">'+
+    button(data.page-1,'Previous','Previous '+label+' page',data.page===1)+tokens.join('')+
+    button(data.page+1,'Next','Next '+label+' page',data.page===data.totalPages)+'</div>':'';
+  return '<nav class="admin-product-pagination" data-admin-pagination="'+tab+'" aria-label="'+
+    label+' pagination"><span role="status" class="muted">Showing '+data.start+'–'+data.end+
+    ' of '+data.total+' | Page '+data.page+' of '+data.totalPages+'</span>'+nav+'</nav>';
+}
 const bulkSelection = new Set();
 let adminFilters = {
   vendors:{status:'all',category:'all'},
@@ -69,16 +110,16 @@ byId('totp-form').addEventListener('submit', async event => {
 });
 
 byId('logout').addEventListener('click', async () => { try { await api('/api/admin/logout',{method:'POST',body:'{}'}); } finally { location.reload(); } });
-byId('tabs').addEventListener('click', event => { const button=event.target.closest('[data-tab]'); if(!button)return; activeTab=button.dataset.tab; document.querySelectorAll('[data-tab]').forEach(item=>item.classList.toggle('active',item===button)); loadTab(activeTab); });
-byId('search-form').addEventListener('submit', event => { event.preventDefault(); loadTab(activeTab); });
+byId('tabs').addEventListener('click', event => { const button=event.target.closest('[data-tab]'); if(!button)return; resetAdminProductPage(button.dataset.tab); activeTab=button.dataset.tab; document.querySelectorAll('[data-tab]').forEach(item=>item.classList.toggle('active',item===button)); loadTab(activeTab); });
+byId('search-form').addEventListener('submit', event => { event.preventDefault(); resetAdminProductPage(activeTab); loadTab(activeTab); });
 byId('content').addEventListener('error', event => { const image=event.target.closest?.('.inventory-thumbnail'); if(!image)return; let sources=[]; try{sources=JSON.parse(decodeURIComponent(image.dataset.sources||''));}catch{} const next=Number(image.dataset.index||0)+1; if(next<sources.length){image.dataset.index=String(next);image.src=sources[next];return;} const fallback=document.createElement('span'); fallback.className='inventory-thumbnail-fallback'; fallback.setAttribute('role','img'); fallback.setAttribute('aria-label','Product image unavailable'); fallback.textContent='No image'; image.replaceWith(fallback); }, true);
 byId('content').addEventListener('change', event => {
   const orderControl=event.target.closest('[data-order-filter]');
   if(orderControl){orderFilters[orderControl.dataset.orderFilter]=orderControl.value;renderOrdersView();return;}
   const shopControl=event.target.closest('[data-shop-product-filter]');
-  if(shopControl){shopProductFilter=shopControl.value;loadTab(activeTab);return;}
+  if(shopControl){shopProductFilter=shopControl.value;resetAdminProductPage(activeTab);loadTab(activeTab);return;}
   const adminControl=event.target.closest('[data-admin-filter]');
-  if(adminControl){adminFilters[activeTab][adminControl.dataset.adminFilter]=adminControl.value;loadTab(activeTab);return;}
+  if(adminControl){adminFilters[activeTab][adminControl.dataset.adminFilter]=adminControl.value;resetAdminProductPage(activeTab);loadTab(activeTab);return;}
   const bulkAll=event.target.closest('[data-bulk-select-all]');
   if(bulkAll){
     const resource=bulkAll.dataset.bulkSelectAll;
@@ -514,7 +555,7 @@ async function rejectOutsideDelivery(request){
   status('Outside delivery request rejected and the reason is visible to the customer.');
   return true;
 }
-function bulkToolbar(resource,statuses){return `<div class="actions bulk-toolbar"><label class="bulk-select bulk-select-all"><input type="checkbox" id="bulk-select-all-${resource}" data-bulk-select-all="${resource}"> Select all</label><span><strong id="bulk-count-${resource}">0</strong> selected</span><select data-bulk-target="${resource}"><option value="">Bulk action...</option>${statuses.map(value=>`<option value="${value}">${escapeText(value.replaceAll('_',' '))}</option>`).join('')}</select><button data-action="bulk-transition" data-resource="${resource}">Apply once</button></div>`;}
+function bulkToolbar(resource,statuses){return `<div class="actions bulk-toolbar"><label class="bulk-select bulk-select-all"><input type="checkbox" id="bulk-select-all-${resource}" data-bulk-select-all="${resource}"> ${['products','requests','inventory'].includes(resource)?'Select this page':'Select all'}</label><span><strong id="bulk-count-${resource}">0</strong> selected</span><select data-bulk-target="${resource}"><option value="">Bulk action...</option>${statuses.map(value=>`<option value="${value}">${escapeText(value.replaceAll('_',' '))}</option>`).join('')}</select><button data-action="bulk-transition" data-resource="${resource}">Apply once</button></div>`;}
 function syncBulkSelectionUi(resource){const boxes=[...byId('content').querySelectorAll(`[data-bulk-select="${resource}"]`)];const selected=boxes.filter(box=>box.checked).length;const count=byId(`bulk-count-${resource}`);if(count)count.textContent=String(selected);const selectAll=byId(`bulk-select-all-${resource}`);if(selectAll){selectAll.checked=boxes.length>0&&selected===boxes.length;selectAll.indeterminate=selected>0&&selected<boxes.length;selectAll.disabled=boxes.length===0;}}
 function addBulkControls(resource,statuses,selector){for(const key of [...bulkSelection])if(key.startsWith(`${resource}:`))bulkSelection.delete(key);const root=byId('content');root.querySelector('h2')?.insertAdjacentHTML('afterend',bulkToolbar(resource,statuses));const seen=new Set();root.querySelectorAll(selector).forEach(container=>{const id=resource==='orders'?container.querySelector('h3')?.textContent:container.querySelector('[data-id]')?.dataset.id;if(!id||seen.has(id))return;seen.add(id);container.insertAdjacentHTML('afterbegin',`<label class="bulk-select"><input type="checkbox" data-bulk-select="${resource}" value="${escapeText(id)}"> Select</label>`);});syncBulkSelectionUi(resource);}
 async function bulkTransition(resource){
@@ -606,6 +647,29 @@ function renderDeliveryZone(configuration){
   byId('content').innerHTML=`<section class="panel delivery-zone-panel"><h2>Delivery Zones</h2>${warning}<div class="facts"><div class="fact"><small>Enforcement mode</small><strong>${mode==='polygon'?'Polygon':'Pincode only'}</strong></div><div class="fact"><small>Zone name</small><strong>${escapeText(properties.name||'No saved boundary')}</strong></div><div class="fact"><small>Zone ID</small><strong>${escapeText(properties.id||'—')}</strong></div><div class="fact"><small>Active state</small><strong>${feature?'Saved draft':'No boundary'}</strong></div><div class="fact"><small>Boundary points</small><strong>${points}</strong></div></div><div class="delivery-zone-editor"><label>Zone ID<input id="delivery-zone-id" maxlength="80" value="${escapeText(properties.id||'neemuch-delivery-zone')}"><small class="field-help">Lowercase identifier for this boundary. It is shown only to private administration.</small></label><label>Zone name<input id="delivery-zone-name" maxlength="100" value="${escapeText(properties.name||'Neemuch delivery zone')}"></label><label class="delivery-zone-boundary">Boundary coordinates<textarea id="delivery-zone-boundary" rows="9" placeholder="24.123456, 74.123456">${escapeText(deliveryZoneBoundaryText(deliveryZoneConfiguration))}</textarea><small class="field-help">One point per line in latitude, longitude order. At least three distinct points are required. The app closes the GeoJSON ring automatically when saving.</small></label></div><div class="actions"><button data-action="save-delivery-zone-draft">Save Boundary Draft</button><button class="success" data-action="activate-delivery-zone"${feature?'':' disabled'}>Activate Polygon Delivery</button><button class="secondary" data-action="use-pincode-only">Use Pincode Only</button></div></section>`;
 }
 
+byId('content').addEventListener('click', event => {
+  const button=event.target.closest('[data-admin-page]');
+  if(!button)return;
+  const tab=button.dataset.adminPageTab;
+  if(tab!==activeTab||!ADMIN_PRODUCT_TABS.includes(tab))return;
+  const requested=Number(button.dataset.adminPage);
+  if(!Number.isSafeInteger(requested)||requested<1||requested===adminProductPages[tab])return;
+  adminProductPages[tab]=requested;
+  // Every page transition clears bulk selections. Hidden-page IDs are never selected.
+  if(tab==='shop-products'){
+    renderShopProducts(currentShopProducts,shopProductStores);
+    addBulkControls('products',['UNDER_REVIEW','APPROVED','REJECTED','PUBLISHED'],'.card');
+  }else if(tab==='shop-product-requests'){
+    renderShopProductRequests(currentShopProductRequests);
+    addBulkControls('requests',['UNDER_REVIEW','APPROVED','REJECTED'],'.card');
+  }else{
+    renderInventory(currentInventory,inventoryShops);
+    addBulkControls('inventory',['1','5','-1','-5'],'tbody tr');
+  }
+  const pageNav=byId('content').querySelector('[data-admin-pagination="'+tab+'"]');
+  pageNav?.querySelector('[aria-current="page"]')?.focus({preventScroll:true});
+  pageNav?.scrollIntoView({block:'nearest'});
+});
 byId('content').addEventListener('click', async event => {
   const button=event.target.closest('[data-action]'); if(!button)return;
   button.disabled=true; error(''); status('');
@@ -664,8 +728,8 @@ async function loadTab(tab) {
       currentShopProducts=productResult.products; shopProductStores=vendorResult.applications;
       renderShopProducts(currentShopProducts,shopProductStores);addBulkControls('products',['UNDER_REVIEW','APPROVED','REJECTED','PUBLISHED'],'.card');return;
     }
-    if(tab==='shop-product-requests'){renderShopProductRequests((await api('/api/admin/shop-product-requests')).requests);addBulkControls('requests',['UNDER_REVIEW','APPROVED','REJECTED'],'.card');return;}
-    if(tab==='inventory'){const snapshot=await api(`/api/admin/inventory?low=0&q=${query}`);inventoryShops=Array.isArray(snapshot.shops)?snapshot.shops:[];renderInventory(snapshot.inventory,inventoryShops);addBulkControls('inventory',['1','5','-1','-5'],'tbody tr');return;}
+    if(tab==='shop-product-requests'){currentShopProductRequests=(await api('/api/admin/shop-product-requests')).requests;renderShopProductRequests(currentShopProductRequests);addBulkControls('requests',['UNDER_REVIEW','APPROVED','REJECTED'],'.card');return;}
+    if(tab==='inventory'){const snapshot=await api(`/api/admin/inventory?low=0&q=${query}`);inventoryShops=Array.isArray(snapshot.shops)?snapshot.shops:[];currentInventory=snapshot.inventory;renderInventory(currentInventory,inventoryShops);addBulkControls('inventory',['1','5','-1','-5'],'tbody tr');return;}
     if(tab==='store-reviews'){renderStoreReviews((await api('/api/admin/store-reviews')).reviews);return;}
     if(tab==='customers'){renderCustomers((await api(`/api/admin/customers?q=${query}`)).customers);addBulkControls('customers',['enable','disable'],'tbody tr');return;}
     if(tab==='payment-alerts') return renderPaymentAlerts((await api('/api/admin/payment-alerts')).alerts);
@@ -776,16 +840,18 @@ function renderShopProducts(items,applications=shopProductStores){
   const stores=storeIds.map(id=>({id,name:storeMap.get(id)||id})).sort((a,b)=>a.name.localeCompare(b.name));
   const f=adminFilters['shop-products'];
   const filtered=items.filter(item=>(shopProductFilter==='all'||item.applicationId===shopProductFilter)&&(f.status==='all'||item.status===f.status)&&(f.category==='all'||item.category===f.category)&&matchesAdminSearch({...item,storeName:storeMap.get(item.applicationId)},['name','brand','category','department','description','id','applicationId','storeName']));
+  const page=adminProductPage(filtered,'shop-products');
   const options=['<option value="all"'+(shopProductFilter==='all'?' selected':'')+'>All Shops</option>',...stores.map(store=>`<option value="${escapeText(store.id)}"${shopProductFilter===store.id?' selected':''}>${escapeText(store.name)}</option>`)].join('');
   const extra=[adminSelect('Status','status',items.map(item=>item.status),f.status),adminSelect('Category','category',items.map(item=>item.category),f.category)].join('');
-  byId('content').innerHTML=`<h2>Shop product submissions</h2><div class="actions"><button class="success" data-action="create-shop-product">Add Product for Local Store</button><button class="success" data-action="bulk-shop-products">Bulk Upload CSV</button><button class="secondary" data-action="download-product-template">Download CSV Template</button></div><section class="order-filters" aria-label="Shop product filters"><label>Shop<select data-shop-product-filter>${options}</select></label>${extra}<div class="order-filter-summary"><span><strong>${filtered.length}</strong> of ${items.length} products</span></div></section><div class="grid">${filtered.map(item=>`<article class="card"><div class="inventory-product-heading">${inventoryThumbnail(item)}<div><h3>${escapeText(item.name)}</h3><small>${escapeText(storeMap.get(item.applicationId)||item.applicationId)} · ${escapeText(item.id)}</small></div></div><p>${escapeText(item.category)} | Store price Rs ${escapeText((item.pricePaise/100).toFixed(2))} | Customer price Rs ${escapeText(((item.customerPricePaise??item.pricePaise)/100).toFixed(2))} | Commission Rs ${escapeText(((item.commissionPaise??0)/100).toFixed(2))} | total stock ${escapeText(item.inventory)}</p>${item.tryAtHomeEnabled===true?'<p><strong>Try at Home enabled</strong> | two sizes | Rs 50 initial fee | 15-minute decision window</p>':''}<p>${(item.variants||[]).map(variant=>`${escapeText(variant.size)}: <strong>${escapeText(variant.inventory)}</strong>`).join(' · ')}</p><p class="muted">${escapeText(item.description)}</p>${item.rejectionReason?`<p class="error">${escapeText(item.rejectionReason)}</p>`:''}<strong>${escapeText(item.status)}</strong><div class="actions"><button data-action="edit-shop-product" data-id="${escapeText(item.id)}" data-name="${escapeText(item.name)}" data-description="${escapeText(item.description)}" data-price="${escapeText((item.pricePaise/100).toFixed(2))}" data-original="${escapeText((item.originalPricePaise/100).toFixed(2))}">Edit Details</button><button class="${item.outsideNeemuchDeliveryEnabled===true?'secondary':'success'}" data-action="toggle-outside-delivery" data-id="${escapeText(item.id)}">${item.outsideNeemuchDeliveryEnabled===true?'Disable Outside Delivery':'Enable Outside Delivery'}</button>${productTransitions(item.status).map(status=>`<button class="${status==='REJECTED'?'danger':'success'}" data-action="shop-product" data-id="${escapeText(item.id)}" data-value="${status}">${escapeText(status==='APPROVED'&&item.status==='PUBLISHED'?'UNPUBLISH':status.replaceAll('_',' '))}</button>`).join('')}</div></article>`).join('')||'<p>No products match the current search and filters.</p>'}</div>`;
+  byId('content').innerHTML=`<h2>Shop product submissions</h2><div class="actions"><button class="success" data-action="create-shop-product">Add Product for Local Store</button><button class="success" data-action="bulk-shop-products">Bulk Upload CSV</button><button class="secondary" data-action="download-product-template">Download CSV Template</button></div><section class="order-filters" aria-label="Shop product filters"><label>Shop<select data-shop-product-filter>${options}</select></label>${extra}<div class="order-filter-summary"><span><strong>${filtered.length}</strong> of ${items.length} products</span></div></section><div class="grid">${page.items.map(item=>`<article class="card"><div class="inventory-product-heading">${inventoryThumbnail(item)}<div><h3>${escapeText(item.name)}</h3><small>${escapeText(storeMap.get(item.applicationId)||item.applicationId)} · ${escapeText(item.id)}</small></div></div><p>${escapeText(item.category)} | Store price Rs ${escapeText((item.pricePaise/100).toFixed(2))} | Customer price Rs ${escapeText(((item.customerPricePaise??item.pricePaise)/100).toFixed(2))} | Commission Rs ${escapeText(((item.commissionPaise??0)/100).toFixed(2))} | total stock ${escapeText(item.inventory)}</p>${item.tryAtHomeEnabled===true?'<p><strong>Try at Home enabled</strong> | two sizes | Rs 50 initial fee | 15-minute decision window</p>':''}<p>${(item.variants||[]).map(variant=>`${escapeText(variant.size)}: <strong>${escapeText(variant.inventory)}</strong>`).join(' · ')}</p><p class="muted">${escapeText(item.description)}</p>${item.rejectionReason?`<p class="error">${escapeText(item.rejectionReason)}</p>`:''}<strong>${escapeText(item.status)}</strong><div class="actions"><button data-action="edit-shop-product" data-id="${escapeText(item.id)}" data-name="${escapeText(item.name)}" data-description="${escapeText(item.description)}" data-price="${escapeText((item.pricePaise/100).toFixed(2))}" data-original="${escapeText((item.originalPricePaise/100).toFixed(2))}">Edit Details</button><button class="${item.outsideNeemuchDeliveryEnabled===true?'secondary':'success'}" data-action="toggle-outside-delivery" data-id="${escapeText(item.id)}">${item.outsideNeemuchDeliveryEnabled===true?'Disable Outside Delivery':'Enable Outside Delivery'}</button>${productTransitions(item.status).map(status=>`<button class="${status==='REJECTED'?'danger':'success'}" data-action="shop-product" data-id="${escapeText(item.id)}" data-value="${status}">${escapeText(status==='APPROVED'&&item.status==='PUBLISHED'?'UNPUBLISH':status.replaceAll('_',' '))}</button>`).join('')}</div></article>`).join('')||'<p>No products match the current search and filters.</p>'}</div>${adminProductPager('shop-products',page)}`;
   byId('content').querySelectorAll('.card').forEach(card=>{const id=card.querySelector('[data-action="edit-shop-product"]')?.dataset.id;const item=filtered.find(product=>product.id===id);const heading=card.querySelector('h3');if(item?.exchangeAvailable===true)heading?.insertAdjacentHTML('afterend','<p><strong>Size exchange enabled</strong> | Rs 50 fee</p>');if(item?.outsideNeemuchDeliveryEnabled===true)heading?.insertAdjacentHTML('afterend','<p><strong>Outside Neemuch delivery requests enabled</strong></p>');});
 }
 function renderShopProductRequests(items){
   const all=Array.isArray(items)?items:[]; const f=adminFilters['shop-product-requests'];
   const filtered=all.filter(item=>matchesAdminSearch(item,['productName','productId','shopName','applicationId','action','status'])&&(f.status==='all'||item.status===f.status)&&(f.action==='all'||item.action===f.action));
+  const page=adminProductPage(filtered,'shop-product-requests');
   const controls=[adminSelect('Status','status',all.map(item=>item.status),f.status),adminSelect('Request type','action',all.map(item=>item.action),f.action)];
-  byId('content').innerHTML=`<h2>Product change requests</h2>${adminFilterBar('Product change request filters',controls,filtered.length,all.length)}<div class="grid">${filtered.map(item=>{const changes=Array.isArray(item.changeSummary)?item.changeSummary:[];const summary=changes.length?`<table class="change-summary"><thead><tr><th>Changed field</th><th>Current value</th><th>Requested value</th></tr></thead><tbody>${changes.map(change=>`<tr><td><strong>${escapeText(change.field)}</strong></td><td>${escapeText(change.before)}</td><td>${escapeText(change.after)}</td></tr>`).join('')}</tbody></table>`:'<p class="muted">Seller requested this product be unpublished, or this legacy request has no saved field-by-field summary.</p>';return `<article class="card"><h3>${escapeText(item.productName||item.productId)}</h3><p>${escapeText(item.shopName||item.applicationId)} / ${escapeText(item.action)}</p>${summary}${item.rejectionReason?`<p class="error">${escapeText(item.rejectionReason)}</p>`:''}<strong>${escapeText(item.status)}</strong><div class="actions">${productRequestTransitions(item.status).map(status=>`<button class="${status==='REJECTED'?'danger':'success'}" data-action="shop-product-request" data-id="${escapeText(item.id)}" data-value="${status}">${escapeText(status.replaceAll('_',' '))}</button>`).join('')}</div></article>`;}).join('')||'<p>No product change requests match the current search and filters.</p>'}</div>`;
+  byId('content').innerHTML=`<h2>Product change requests</h2>${adminFilterBar('Product change request filters',controls,filtered.length,all.length)}<div class="grid">${page.items.map(item=>{const changes=Array.isArray(item.changeSummary)?item.changeSummary:[];const summary=changes.length?`<table class="change-summary"><thead><tr><th>Changed field</th><th>Current value</th><th>Requested value</th></tr></thead><tbody>${changes.map(change=>`<tr><td><strong>${escapeText(change.field)}</strong></td><td>${escapeText(change.before)}</td><td>${escapeText(change.after)}</td></tr>`).join('')}</tbody></table>`:'<p class="muted">Seller requested this product be unpublished, or this legacy request has no saved field-by-field summary.</p>';return `<article class="card"><h3>${escapeText(item.productName||item.productId)}</h3><p>${escapeText(item.shopName||item.applicationId)} / ${escapeText(item.action)}</p>${summary}${item.rejectionReason?`<p class="error">${escapeText(item.rejectionReason)}</p>`:''}<strong>${escapeText(item.status)}</strong><div class="actions">${productRequestTransitions(item.status).map(status=>`<button class="${status==='REJECTED'?'danger':'success'}" data-action="shop-product-request" data-id="${escapeText(item.id)}" data-value="${status}">${escapeText(status.replaceAll('_',' '))}</button>`).join('')}</div></article>`;}).join('')||'<p>No product change requests match the current search and filters.</p>'}</div>${adminProductPager('shop-product-requests',page)}`;
 }
 function storeReviewActions(item){
   const actions={pending:[['approved','Approve','success'],['rejected','Reject','danger']],approved:[['hidden','Hide','secondary']],rejected:[['approved','Approve','success']],hidden:[['approved','Approve','success']]}[item.status]||[];
@@ -803,11 +869,12 @@ function renderInventory(items,shops=inventoryShops){
   if(f.shop!=='all'&&!knownShops.some(shop=>shop.id===f.shop))f.shop='all';
   const shopOptions=['<option value="all"'+(f.shop==='all'?' selected':'')+'>All Shops</option>',...knownShops.map(shop=>`<option value="${escapeText(shop.id)}"${f.shop===shop.id?' selected':''}>${escapeText(shop.name)}${shop.status==='ACTIVE'?'':` (${escapeText(shop.status)})`}</option>`)].join('');
   const filtered=all.filter(item=>matchesAdminSearch(item,['productName','size','colour','variantId','productId','brand','category','department','storeName'])&&stockMatch(item)&&(f.category==='all'||item.category===f.category)&&(f.department==='all'||item.department===f.department)&&(f.shop==='all'||item.storeId===f.shop)&&(f.brand==='all'||item.brand===f.brand));
+  const page=adminProductPage(filtered,'inventory');
   const controls=[
     `<label>Stock<select data-admin-filter="stock"><option value="attention"${f.stock==='attention'?' selected':''}>Needs attention (5 or fewer)</option><option value="out"${f.stock==='out'?' selected':''}>Out of stock</option><option value="low"${f.stock==='low'?' selected':''}>Low stock (1-5)</option><option value="healthy"${f.stock==='healthy'?' selected':''}>Healthy stock (6+)</option><option value="all"${f.stock==='all'?' selected':''}>All stock</option></select></label>`,
     adminSelect('Category','category',all.map(item=>item.category),f.category),adminSelect('Department','department',all.map(item=>item.department),f.department),`<label>Shop<select data-admin-filter="shop">${shopOptions}</select></label>`,adminSelect('Brand','brand',all.map(item=>item.brand),f.brand),
   ];
-  byId('content').innerHTML=`<h2>Inventory</h2>${adminFilterBar('Inventory filters',controls,filtered.length,all.length)}<table><thead><tr><th>Product</th><th>Shop / category</th><th>Variant</th><th>Stock</th><th>Action</th></tr></thead><tbody>${filtered.map(item=>{const variant=[item.size&&item.size!==DEFAULT_VARIANT_SIZE?item.size:'',item.colour&&item.colour!==DEFAULT_VARIANT_COLOUR?item.colour:''].filter(Boolean).join(' / ')||'Single stock';return `<tr><td><div class="inventory-product-cell">${inventoryThumbnail(item)}<span><strong>${escapeText(item.productName)}</strong><br><small>${escapeText(item.brand||'-')}</small></span></div></td><td>${escapeText(item.storeName||'-')}<br><small>${escapeText([item.category,item.department].filter(Boolean).join(' / '))}</small></td><td>${escapeText(variant)}<br><small>${escapeText(item.variantId)}</small></td><td><strong>${escapeText(item.stock)}</strong></td><td><button data-action="inventory" data-id="${escapeText(item.variantId)}">Adjust</button></td></tr>`;}).join('')}</tbody></table>${filtered.length?'':'<p>No inventory matches the current search and filters.</p>'}`;
+  byId('content').innerHTML=`<h2>Inventory</h2>${adminFilterBar('Inventory filters',controls,filtered.length,all.length)}<table><thead><tr><th>Product</th><th>Shop / category</th><th>Variant</th><th>Stock</th><th>Action</th></tr></thead><tbody>${page.items.map(item=>{const variant=[item.size&&item.size!==DEFAULT_VARIANT_SIZE?item.size:'',item.colour&&item.colour!==DEFAULT_VARIANT_COLOUR?item.colour:''].filter(Boolean).join(' / ')||'Single stock';return `<tr><td><div class="inventory-product-cell">${inventoryThumbnail(item)}<span><strong>${escapeText(item.productName)}</strong><br><small>${escapeText(item.brand||'-')}</small></span></div></td><td>${escapeText(item.storeName||'-')}<br><small>${escapeText([item.category,item.department].filter(Boolean).join(' / '))}</small></td><td>${escapeText(variant)}<br><small>${escapeText(item.variantId)}</small></td><td><strong>${escapeText(item.stock)}</strong></td><td><button data-action="inventory" data-id="${escapeText(item.variantId)}">Adjust</button></td></tr>`;}).join('')}</tbody></table>${filtered.length?'':'<p>No inventory matches the current search and filters.</p>'}${adminProductPager('inventory',page)}`;
 }
 function renderCustomers(items){
   const all=Array.isArray(items)?items:[]; const f=adminFilters.customers;

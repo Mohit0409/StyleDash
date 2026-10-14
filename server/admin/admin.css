@@ -31,3 +31,15 @@
 .inventory-thumbnail,.inventory-thumbnail-fallback{box-sizing:border-box;width:48px!important;height:48px!important;min-width:48px!important;max-width:48px!important;min-height:48px!important;max-height:48px!important;flex:0 0 48px!important;border:1px solid #dedfd9;border-radius:7px;background:#f5f6f2}
 img.inventory-thumbnail{display:block;object-fit:contain!important;object-position:center;padding:2px}
 .inventory-thumbnail-fallback{display:grid;place-items:center;padding:2px;color:#687064;font-size:9px;font-weight:700;line-height:1;text-align:center;overflow:hidden}
+
+/* Private Admin: product, request, and inventory page controls only. */
+.admin-product-pagination{display:flex;flex-direction:column;align-items:center;gap:12px;margin:20px 0 28px;padding:14px;border:1px solid #d5d9d0;border-radius:14px;background:#fff;max-width:100%;box-sizing:border-box}
+.admin-product-pagination .admin-page-buttons{display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:6px;max-width:100%}
+.admin-product-pagination .admin-page-button{min-height:44px;min-width:44px;max-width:100%;padding:9px 11px;border-radius:9px;border:1px solid #bfc6bb;background:#fff;color:#1b241d;cursor:pointer;font-size:13px;font-weight:650}
+.admin-product-pagination .admin-page-button.active{background:#203723;color:#fff;border-color:#203723}
+.admin-product-pagination .admin-page-button:hover:not(:disabled){border-color:#427e4c;background:#e8f5e9;color:#152a17}
+.admin-product-pagination .admin-page-button.active:hover{background:#203723;color:#fff}
+.admin-product-pagination .admin-page-button:focus-visible{outline:3px solid #609967;outline-offset:2px}
+.admin-product-pagination .admin-page-button:disabled{opacity:.4;cursor:not-allowed}
+.admin-product-pagination [role="status"]{font-size:13px;text-align:center}
+@media(max-width:540px){.admin-product-pagination{padding:10px 5px}.admin-product-pagination .admin-page-button{padding:8px;min-width:44px}}
