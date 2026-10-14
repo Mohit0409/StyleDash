@@ -102,6 +102,22 @@ describe('public store statistics', () => {
     expect(markup).toContain('data-testid="store-stat-products"');
   });
 
+  it('uses the authoritative store count when the catalogue is unavailable or partial', () => {
+    const markup = renderToStaticMarkup(
+      <StoreStatistics products={[item('only-loaded-product', ago(HOUR))]} publishedProductCount={110} />,
+    );
+    expect(markup).toContain('>110</p>');
+    expect(markup).toContain('Activity');
+    expect(markup).toContain('Not rated yet');
+  });
+
+  it('falls back to loaded unique listings for invalid metadata counts', () => {
+    const markup = renderToStaticMarkup(
+      <StoreStatistics products={[item('a'), item('b')]} publishedProductCount={-4} />,
+    );
+    expect(markup).toContain('>2</p>');
+  });
+
   it('never invents a rating when there are no verified reviews', () => {
     const markup = renderToStaticMarkup(
       <StoreStatistics products={[]} rating={5} reviewCount={0} />,

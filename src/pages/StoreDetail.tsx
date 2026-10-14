@@ -91,7 +91,7 @@ export const StoreDetail: React.FC = () => {
         </div>
       </div>
 
-      <StoreStatistics products={products} rating={store.rating} reviewCount={store.reviewCount} />
+      <StoreStatistics products={products} publishedProductCount={store.productCount} rating={store.rating} reviewCount={store.reviewCount} />
 
       <StoreReviews storeId={store.id} onSummaryChange={updateReviewSummary} />
 

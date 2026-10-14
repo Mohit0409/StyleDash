@@ -17,6 +17,7 @@ test('store profile displays published products, verified rating and catalogue a
     approved: true,
     rating: 0,
     reviewCount: 0,
+    productCount: 4,
     createdAt: new Date(Date.now() - 100 * 24 * 60 * 60 * 1000).toISOString(),
   };
   const day = 24 * 60 * 60 * 1000;

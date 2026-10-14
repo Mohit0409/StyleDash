@@ -9,7 +9,7 @@ A new **Store at a glance** section appears directly below the cover banner of e
 
 The section shows:
 
-1. **Published products:** count of unique active published product listings returned by the store catalogue API. Sizes/colour variants do not multiply the count. This is a **listing count**, not a guarantee every size is in stock.
+1. **Published products:** authoritative backend productCount for the active store, with a fallback to the number of unique loaded listings if that metadata is missing. This avoids falsely showing zero products when the per-store catalogue response is temporarily incomplete. Sizes/colour variants do not multiply the count. This is a **listing count**, not a guarantee every size is in stock.
 2. **Store rating:** the existing verified customer-review rating (out of 5) and total published/verified review count. If no verified reviews, show **Not rated yet**, not an invented star rating.
 3. **Catalogue activity:** **Daily active**, **Weekly active**, **Monthly active**, **No recent updates**, or **Activity unavailable**. Activity refers strictly to public product listing updates, **not seller login/online status, visits, store operating hours or order volume**.
 4. **Most recent product update date** in the India timezone where a valid timestamp exists.
@@ -44,8 +44,8 @@ The live `/api/shop-products/published?vendorId=...` and `/api/store-reviews` en
 
 ## Completed local validations
 
-- 8 new utility/component tests: **PASS**.
-- 190 full frontend Vitest tests (34 test files): **PASS**.
+- 10 utility/component tests: **PASS**.
+- 192 full frontend Vitest tests (34 test files): **PASS**.
 - TypeScript project build: **PASS**.
 - Focused ESLint for all modified/added frontend files: **PASS**.
 - Vite production bundle build: **PASS**.

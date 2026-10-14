@@ -7,6 +7,7 @@ interface StoreStatisticsProps {
   products: readonly Pick<Product, 'id' | 'active' | 'updatedAt'>[];
   rating?: number;
   reviewCount?: number;
+  publishedProductCount?: number;
 }
 
 const activityLabels: Record<StoreActivityLevel, string> = {
@@ -31,8 +32,12 @@ export const StoreStatistics: React.FC<StoreStatisticsProps> = ({
   products,
   rating,
   reviewCount,
+  publishedProductCount,
 }) => {
   const summary = getStoreStatistics(products);
+  const productCount = typeof publishedProductCount === 'number'
+    && Number.isSafeInteger(publishedProductCount) && publishedProductCount >= 0
+    ? publishedProductCount : summary.productCount;
   const validRating = typeof rating === 'number' && Number.isFinite(rating) && rating >= 1 && rating <= 5
     ? rating : null;
   const validReviewCount = typeof reviewCount === 'number' && Number.isInteger(reviewCount) && reviewCount > 0
@@ -66,7 +71,7 @@ export const StoreStatistics: React.FC<StoreStatisticsProps> = ({
             <span className="text-xs font-bold">Published products</span>
           </div>
           <p className="text-2xl font-black tabular-nums text-neutral-950 dark:text-white">
-            {formatCount(summary.productCount)}
+            {formatCount(productCount)}
           </p>
           <p className="mt-1 text-xs text-neutral-500 dark:text-neutral-400">
             Products listed on Vibe4You
