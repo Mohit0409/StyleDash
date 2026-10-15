@@ -1,4 +1,4 @@
-import React, { useId, useState } from 'react';
+import React, { useEffect, useId, useRef, useState } from 'react';
 import { Activity, Info, ChevronDown, Clock3, Package, Star } from 'lucide-react';
 import type { Product } from '../types';
 import { StoreReviews } from './StoreReviews';
@@ -49,6 +49,19 @@ export const StoreStatistics: React.FC<StoreStatisticsProps> = ({
   const [reviewsExpanded, setReviewsExpanded] = useState(false);
   const panelId = useId();
   const reviewsId = useId();
+  const triggerRef = useRef<HTMLButtonElement>(null);
+
+  useEffect(() => {
+    if (!expanded) return;
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') return;
+      setReviewsExpanded(false);
+      setExpanded(false);
+      triggerRef.current?.focus();
+    };
+    document.addEventListener('keydown', handleEscape);
+    return () => document.removeEventListener('keydown', handleEscape);
+  }, [expanded]);
 
   const summary = getStoreStatistics(products);
   const productCount = typeof publishedProductCount === 'number'
@@ -74,6 +87,7 @@ export const StoreStatistics: React.FC<StoreStatisticsProps> = ({
     <section data-testid="store-statistics" aria-label="Store statistics">
       <button
         type="button"
+        ref={triggerRef}
         className="absolute top-4 left-4 z-30 flex h-10 w-10 items-center justify-center rounded-xl border border-white/40 bg-neutral-950/80 text-white shadow-lg backdrop-blur-md transition-colors hover:bg-neutral-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-lime-400 focus-visible:ring-offset-2"
         aria-label={expanded ? 'Hide store statistics' : 'Show store statistics'}
         title="Store statistics"

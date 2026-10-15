@@ -15,7 +15,7 @@ The large three-card "Store at a glance" and always-visible customer reviews occ
   - **Store rating**: displays the verified review summary as `5/5`, `4.5/5`, etc., or **Not rated yet**. Clicking this row expands the original full **Store Reviews** experience *inside the dropdown*, including real customer reviews, sorting, verified-purchaser submission/edit/delete and sign-in eligibility. Closing collapses it; a later open reinitializes the review panel closed.
   - **Catalogue activity**: unchanged rolling product-update logic, shows Daily/Weekly/Monthly/No recent updates/Unavailable, latest update date and three clearly spaced counts for updates in 24h/7d/30d. Explicitly says activity is NOT seller login or online status.
 - Ratings use a new shared formatter `getStoreRatingLabel` used by the public store cards, cover badge and dropdown, avoiding inconsistent formatting and fabricated ratings. It requires **positive review count and rating 1–5**. Rated cards show `5/5`, `4/5` or `4.5/5`; unrated cards show **Not rated**, not "New".
-- Stat and review controls expose `aria-expanded`, `aria-controls`, keyboard-focus styling, button type and accessible labels; review requests are **lazy** until expanded.
+- Stat and review controls expose `aria-expanded`, `aria-controls`, keyboard-focus styling, button type and accessible labels; pressing Escape dismisses the statistics panel and restores focus to the info trigger; review requests are **lazy** until expanded.
 - No changes to backend API, payment/checkout, refund, authentication rules, store product data, review moderation, admin portal, database or commission.
 
 ## Files

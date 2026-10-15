@@ -166,4 +166,9 @@ test('compact store statistics open nested verified reviews without occupying de
   await expect(page.getByTestId('store-stat-panel')).toHaveCount(0);
   await trigger.click();
   await expect(page.getByTestId('store-rating-toggle')).toHaveAttribute('aria-expanded', 'false');
+  await page.getByTestId('store-rating-toggle').click();
+  await page.keyboard.press('Escape');
+  await expect(trigger).toHaveAttribute('aria-expanded', 'false');
+  await expect(page.getByTestId('store-stat-panel')).toHaveCount(0);
+  await expect(trigger).toBeFocused();
 });
