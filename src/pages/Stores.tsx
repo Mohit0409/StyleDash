@@ -7,6 +7,7 @@ import { vendorRepository } from '../repositories/vendorRepository';
 import { VendorStore } from '../types';
 import { CONFIG } from '../config';
 import { rankStoresByProductCount } from '../utils/storeRanking';
+import { getStoreRatingLabel } from '../utils/storeRating';
 
 export const Stores: React.FC = () => {
   const [searchParams] = useSearchParams();
@@ -117,8 +118,9 @@ export const Stores: React.FC = () => {
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
                   <h3 className="font-extrabold text-base text-neutral-900 dark:text-white line-clamp-1">{store.storeName}</h3>
-                  <span className="flex items-center gap-1 text-xs font-bold text-amber-500 bg-amber-50 dark:bg-amber-950/40 px-2 py-0.5 rounded-full border border-amber-200 dark:border-amber-800">
-                    <Star className="w-3 h-3 fill-amber-400" /> {store.rating && store.reviewCount ? store.rating : 'New'}
+                  <span data-testid="store-card-rating" className="flex items-center gap-1 text-xs font-bold text-amber-500 bg-amber-50 dark:bg-amber-950/40 px-2 py-0.5 rounded-full border border-amber-200 dark:border-amber-800">
+                    {getStoreRatingLabel(store.rating, store.reviewCount) && <Star className="w-3 h-3 fill-amber-400" aria-hidden="true" />}
+                    {getStoreRatingLabel(store.rating, store.reviewCount) ?? 'Not rated'}
                   </span>
                 </div>
 

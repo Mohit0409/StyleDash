@@ -11,6 +11,7 @@ import {
 interface StoreReviewsProps {
   storeId: string;
   onSummaryChange?: (rating: number, reviewCount: number) => void;
+  compact?: boolean;
 }
 
 const emptyData = (storeId: string): StoreReviewsData => ({
@@ -18,7 +19,7 @@ const emptyData = (storeId: string): StoreReviewsData => ({
   distribution: { '5': 0, '4': 0, '3': 0, '2': 0, '1': 0 }, reviews: [],
 });
 
-export const StoreReviews: React.FC<StoreReviewsProps> = ({ storeId, onSummaryChange }) => {
+export const StoreReviews: React.FC<StoreReviewsProps> = ({ storeId, onSummaryChange, compact = false }) => {
   const { user } = useAuth();
   const { showToast } = useToast();
   const [data, setData] = useState<StoreReviewsData>(() => emptyData(storeId));
@@ -104,7 +105,7 @@ export const StoreReviews: React.FC<StoreReviewsProps> = ({ storeId, onSummaryCh
   ) : user ? <p className="rounded-2xl border border-neutral-200 dark:border-neutral-800 p-4 text-xs text-neutral-500">{eligibility?.reason === 'own_store_review_forbidden' ? 'Store owners cannot review their own store.' : 'You can review this store after a delivered purchase from it.'}</p>
     : <p className="rounded-2xl border border-neutral-200 dark:border-neutral-800 p-4 text-xs text-neutral-500"><Link to="/login" className="font-black underline text-neutral-900 dark:text-white">Sign in</Link> to review a delivered local-store purchase.</p>;
 
-  return <section className="border-t border-neutral-200 dark:border-neutral-800 pt-8 space-y-5" aria-labelledby="store-reviews-heading">
+  return <section className={compact ? "space-y-4 pt-3" : "border-t border-neutral-200 dark:border-neutral-800 pt-8 space-y-5"} aria-labelledby="store-reviews-heading">
     <div className="flex flex-wrap items-end justify-between gap-3"><div><h2 id="store-reviews-heading" className="text-xl font-black">Store Reviews</h2>{data.reviewCount ? <p className="mt-1 text-xs text-neutral-500"><strong className="text-neutral-900 dark:text-white">{data.rating} / 5</strong> from {data.reviewCount} verified customer review{data.reviewCount === 1 ? '' : 's'}</p> : <p className="mt-1 text-xs text-neutral-500">No customer reviews yet.</p>}</div>{data.reviewCount > 1 && <label className="text-xs font-bold">Sort <select value={sort} onChange={event => setSort(event.target.value as ReviewSort)} className="ml-1 rounded-lg border border-neutral-300 dark:border-neutral-700 bg-transparent p-1"><option value="newest">Newest</option><option value="highest">Highest rated</option><option value="lowest">Lowest rated</option></select></label>}</div>
     {form}
     {loading ? <p className="text-xs text-neutral-500">Loading reviews…</p> : data.reviews.length ? <div className="space-y-3">{data.reviews.map(review => <article key={review.id} className="rounded-2xl bg-neutral-50 dark:bg-neutral-900/50 border border-neutral-200 dark:border-neutral-800 p-4"><div className="flex items-start justify-between gap-3"><div><p className="font-black text-sm">{review.userName}</p><p className="mt-1 flex gap-0.5 text-amber-400" aria-label={`${review.rating} out of 5 stars`}>{[1,2,3,4,5].map(value => <Star key={value} className={`w-3.5 h-3.5 ${value <= review.rating ? 'fill-amber-400' : ''}`} />)}</p></div><time className="text-[11px] text-neutral-400" dateTime={review.createdAt}>{new Date(review.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}</time></div>{review.title && <h3 className="font-black text-sm mt-3">{review.title}</h3>}<p className="mt-2 whitespace-pre-wrap break-words text-sm text-neutral-600 dark:text-neutral-300">{review.comment}</p></article>)}</div> : <p className="text-xs text-neutral-500">Be the first verified customer to review this local store.</p>}

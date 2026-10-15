@@ -6,7 +6,7 @@ import { ProductCard } from '../components/ProductCard';
 import { ProductPagination } from '../components/ProductPagination';
 import { useProductPagination } from '../hooks/useProductPagination';
 import { StoreImage } from '../components/StoreImage';
-import { StoreReviews } from '../components/StoreReviews';
+import { getStoreRatingLabel } from '../utils/storeRating';
 import { StoreStatistics } from '../components/StoreStatistics';
 import { vendorRepository } from '../repositories/vendorRepository';
 import { productRepository } from '../repositories/productRepository';
@@ -59,41 +59,48 @@ export const StoreDetail: React.FC = () => {
       <SEO title={`${store.storeName} - Local Store in Neemuch`} description={store.description} />
 
       {/* Store Cover Banner */}
-      <div className="relative rounded-3xl overflow-hidden aspect-[21/9] bg-neutral-900 border border-neutral-200 dark:border-neutral-800 shadow-xl">
-        <StoreImage
-          src={store.bannerImage}
-          alt={store.storeName}
-          storeName={store.storeName}
-          kind="cover"
-          className="h-full w-full object-cover opacity-60"
-        />
-        <StoreImage
-          src={store.logoImage}
-          alt={`${store.storeName} logo`}
-          storeName={store.storeName}
-          kind="logo"
-          className="absolute right-5 top-5 z-10 h-16 w-16 rounded-2xl border-2 border-white bg-white object-cover shadow-xl sm:h-20 sm:w-20"
-        />
-        <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/40 to-transparent flex flex-col justify-end p-6 sm:p-10 space-y-2 text-white">
-          <div className="flex items-center gap-2">
-            <span className="px-3 py-1 bg-lime-400 text-neutral-950 text-xs font-black rounded-full uppercase">{store.category}</span>
-            <span className="flex items-center gap-1 text-xs font-bold text-amber-400 bg-black/60 backdrop-blur-md px-2.5 py-1 rounded-full border border-amber-500/30">
-              <Star className="w-3.5 h-3.5 fill-amber-400" /> {store.rating && store.reviewCount ? `${store.rating} (${store.reviewCount} ratings)` : 'New store'}
-            </span>
-          </div>
-          <h1 className="text-2xl sm:text-4xl font-black">{store.storeName}</h1>
-          <p className="text-xs sm:text-sm text-neutral-300 max-w-xl">{store.description}</p>
+      <div className="relative">
+        <div className="relative rounded-3xl overflow-hidden aspect-[21/9] bg-neutral-900 border border-neutral-200 dark:border-neutral-800 shadow-xl">
+          <StoreImage
+            src={store.bannerImage}
+            alt={store.storeName}
+            storeName={store.storeName}
+            kind="cover"
+            className="h-full w-full object-cover opacity-60"
+          />
+          <StoreImage
+            src={store.logoImage}
+            alt={`${store.storeName} logo`}
+            storeName={store.storeName}
+            kind="logo"
+            className="absolute right-5 top-5 z-10 h-16 w-16 rounded-2xl border-2 border-white bg-white object-cover shadow-xl sm:h-20 sm:w-20"
+          />
+          <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/40 to-transparent flex flex-col justify-end p-6 sm:p-10 space-y-2 text-white">
+            <div className="flex items-center gap-2">
+              <span className="px-3 py-1 bg-lime-400 text-neutral-950 text-xs font-black rounded-full uppercase">{store.category}</span>
+              <span className="flex items-center gap-1 text-xs font-bold text-amber-400 bg-black/60 backdrop-blur-md px-2.5 py-1 rounded-full border border-amber-500/30">
+                {getStoreRatingLabel(store.rating, store.reviewCount) && <Star className="w-3.5 h-3.5 fill-amber-400" />}{' '}{getStoreRatingLabel(store.rating, store.reviewCount) ? `${getStoreRatingLabel(store.rating, store.reviewCount)} (${store.reviewCount} reviews)` : 'Not rated'}
+              </span>
+            </div>
+            <h1 className="text-2xl sm:text-4xl font-black">{store.storeName}</h1>
+            <p className="text-xs sm:text-sm text-neutral-300 max-w-xl">{store.description}</p>
 
-          <div className="flex flex-wrap gap-4 text-xs text-neutral-300 pt-2">
-            <span className="flex items-center gap-1"><MapPin className="w-4 h-4 text-lime-400" /> {store.address}</span>
-            <span className="flex items-center gap-1 text-lime-400 font-bold"><Zap className="w-4 h-4 fill-lime-400" /> Same Day Delivery</span>
+            <div className="flex flex-wrap gap-4 text-xs text-neutral-300 pt-2">
+              <span className="flex items-center gap-1"><MapPin className="w-4 h-4 text-lime-400" /> {store.address}</span>
+              <span className="flex items-center gap-1 text-lime-400 font-bold"><Zap className="w-4 h-4 fill-lime-400" /> Same Day Delivery</span>
+            </div>
           </div>
         </div>
+        <StoreStatistics
+          key={store.id}
+          storeId={store.id}
+          products={products}
+          publishedProductCount={store.productCount}
+          rating={store.rating}
+          reviewCount={store.reviewCount}
+          onReviewSummaryChange={updateReviewSummary}
+        />
       </div>
-
-      <StoreStatistics products={products} publishedProductCount={store.productCount} rating={store.rating} reviewCount={store.reviewCount} />
-
-      <StoreReviews storeId={store.id} onSummaryChange={updateReviewSummary} />
 
       {/* Store Inventory Section */}
       <div id="store-inventory" className="space-y-6 scroll-mt-24">

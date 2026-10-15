@@ -86,45 +86,22 @@ describe('public store statistics', () => {
     expect(result.activityLevel).toBe('daily');
   });
 
-  it('renders published count and verified ratings without implying online presence', () => {
+  it('renders only the compact trigger when collapsed and keeps all details hidden', () => {
     const markup = renderToStaticMarkup(
       <StoreStatistics
+        storeId="test-store"
         products={[item('one', ago(HOUR)), item('two', ago(3 * DAY))]}
+        publishedProductCount={110}
         rating={4.35}
         reviewCount={12}
       />,
     );
-    expect(markup).toContain('Published products');
-    expect(markup).toContain('4.3 / 5');
-    expect(markup).toContain('12 verified customer reviews');
-    expect(markup).toContain('Catalogue activity');
-    expect(markup).toContain('not seller login');
-    expect(markup).toContain('data-testid="store-stat-products"');
-  });
-
-  it('uses the authoritative store count when the catalogue is unavailable or partial', () => {
-    const markup = renderToStaticMarkup(
-      <StoreStatistics products={[item('only-loaded-product', ago(HOUR))]} publishedProductCount={110} />,
-    );
-    expect(markup).toContain('>110</p>');
-    expect(markup).toContain('Activity');
-    expect(markup).toContain('Not rated yet');
-  });
-
-  it('falls back to loaded unique listings for invalid metadata counts', () => {
-    const markup = renderToStaticMarkup(
-      <StoreStatistics products={[item('a'), item('b')]} publishedProductCount={-4} />,
-    );
-    expect(markup).toContain('>2</p>');
-  });
-
-  it('never invents a rating when there are no verified reviews', () => {
-    const markup = renderToStaticMarkup(
-      <StoreStatistics products={[]} rating={5} reviewCount={0} />,
-    );
-    expect(markup).toContain('Not rated yet');
-    expect(markup).toContain('No verified customer ratings yet');
-    expect(markup).toContain('Activity unavailable');
-    expect(markup).not.toContain('5.0 / 5');
+    expect(markup).toContain('data-testid="store-stat-trigger"');
+    expect(markup).toContain('aria-label="Show store statistics"');
+    expect(markup).toContain('aria-expanded="false"');
+    expect(markup).not.toContain('data-testid="store-stat-panel"');
+    expect(markup).not.toContain('Published products');
+    expect(markup).not.toContain('Store Reviews');
+    expect(markup).not.toContain('110');
   });
 });
