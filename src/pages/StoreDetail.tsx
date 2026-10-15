@@ -7,6 +7,7 @@ import { ProductPagination } from '../components/ProductPagination';
 import { useProductPagination } from '../hooks/useProductPagination';
 import { StoreImage } from '../components/StoreImage';
 import { StoreReviews } from '../components/StoreReviews';
+import { StoreStatistics } from '../components/StoreStatistics';
 import { vendorRepository } from '../repositories/vendorRepository';
 import { productRepository } from '../repositories/productRepository';
 import { VendorStore, Product } from '../types';
@@ -89,6 +90,8 @@ export const StoreDetail: React.FC = () => {
           </div>
         </div>
       </div>
+
+      <StoreStatistics products={products} publishedProductCount={store.productCount} rating={store.rating} reviewCount={store.reviewCount} />
 
       <StoreReviews storeId={store.id} onSummaryChange={updateReviewSummary} />
 
