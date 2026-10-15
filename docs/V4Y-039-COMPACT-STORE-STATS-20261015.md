@@ -9,7 +9,7 @@ The large three-card "Store at a glance" and always-visible customer reviews occ
 
 ## UI behavior
 
-- On `/store/:slug`, a 40 × 40 pixel chart/info control appears in the top-left of the existing cover image. **Closed by default**; the entire statistics section has **zero height** below the cover while collapsed. This preserves existing imagery, store logo, name, and inventory.
+- On `/store/:slug`, a 40 × 40 pixel info (i) icon button appears in the top-left of the existing cover image. **Closed by default**; the entire statistics section has **zero height** below the cover while collapsed. This preserves existing imagery, store logo, name, and inventory.
 - Clicking the control shows one compact responsive dropdown below the cover. Three clearly separated rows are visible:
   - **Published products**: uses the authoritative per-store `productCount` when valid, otherwise counts unique published loaded listings.
   - **Store rating**: displays the verified review summary as `5/5`, `4.5/5`, etc., or **Not rated yet**. Clicking this row expands the original full **Store Reviews** experience *inside the dropdown*, including real customer reviews, sorting, verified-purchaser submission/edit/delete and sign-in eligibility. Closing collapses it; a later open reinitializes the review panel closed.

@@ -97,6 +97,7 @@ describe('public store statistics', () => {
       />,
     );
     expect(markup).toContain('data-testid="store-stat-trigger"');
+    expect(markup).toContain('lucide-info');
     expect(markup).toContain('aria-label="Show store statistics"');
     expect(markup).toContain('aria-expanded="false"');
     expect(markup).not.toContain('data-testid="store-stat-panel"');

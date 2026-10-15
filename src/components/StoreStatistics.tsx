@@ -1,5 +1,5 @@
 import React, { useId, useState } from 'react';
-import { Activity, BarChart3, ChevronDown, Clock3, Package, Star } from 'lucide-react';
+import { Activity, Info, ChevronDown, Clock3, Package, Star } from 'lucide-react';
 import type { Product } from '../types';
 import { StoreReviews } from './StoreReviews';
 import { getStoreStatistics, StoreActivityLevel } from '../utils/storeStatistics';
@@ -82,7 +82,7 @@ export const StoreStatistics: React.FC<StoreStatisticsProps> = ({
         data-testid="store-stat-trigger"
         onClick={toggleStatistics}
       >
-        <BarChart3 className="h-5 w-5" aria-hidden="true" />
+        <Info className="h-5 w-5" aria-hidden="true" />
       </button>
 
       {expanded && (
