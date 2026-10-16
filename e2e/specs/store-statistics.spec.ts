@@ -24,7 +24,7 @@ test('compact store statistics open nested verified reviews without occupying de
     ...store,
     id: 'store-unrated-vendor',
     slug: 'store-unrated-test',
-    storeName: 'Unrated Local Store',
+    storeName: 'Unrated Local Store With An Extraordinarily Long Neighbourhood Business Name',
     rating: 0,
     reviewCount: 0,
     productCount: 0,
@@ -127,8 +127,11 @@ test('compact store statistics open nested verified reviews without occupying de
   await page.goto('/stores');
   await expect(page.getByTestId('store-card-rating')).toHaveCount(2);
   await expect(page.getByTestId('store-card-rating').first()).toContainText('5/5');
+  await expect(page.getByTestId('store-card-rating').first()).toContainText('(2)');
   await expect(page.getByTestId('store-card-rating').last()).toContainText('Not rated');
   await expect(page.getByTestId('store-card-rating').first()).not.toContainText('New');
+  const longNameRow = page.getByTestId('store-card-rating').last().locator('..');
+  expect(await longNameRow.evaluate(element => element.scrollWidth <= element.clientWidth + 1)).toBe(true);
 
   await page.goto('/store/store-stats-test');
   const trigger = page.getByTestId('store-stat-trigger');
@@ -145,9 +148,21 @@ test('compact store statistics open nested verified reviews without occupying de
   await expect(page.getByTestId('store-stat-products')).toContainText('4');
   await expect(page.getByTestId('store-stat-rating')).toContainText('5/5');
   await expect(page.getByTestId('store-stat-activity')).toContainText('Daily active');
-  await expect(page.getByTestId('store-stat-update-counts')).toContainText('1 updated in 24h');
-  await expect(page.getByTestId('store-stat-update-counts')).toContainText('2 updated in 7 days');
-  await expect(page.getByTestId('store-stat-update-counts')).toContainText('3 updated in 30 days');
+  const activityToggle = page.getByTestId('store-activity-toggle');
+  await expect(activityToggle).toHaveAttribute('aria-expanded', 'false');
+  await expect(page.getByTestId('store-stat-update-counts')).toHaveCount(0);
+  await activityToggle.click();
+  await expect(activityToggle).toHaveAttribute('aria-expanded', 'true');
+  await expect(page.getByTestId('store-activity-details')).toContainText('Latest product update');
+  await expect(page.getByTestId('store-stat-update-counts').locator('strong').nth(0)).toHaveText('1');
+  await expect(page.getByTestId('store-stat-update-counts').locator('p').nth(0)).toContainText('updated in 24h');
+  await expect(page.getByTestId('store-stat-update-counts').locator('strong').nth(1)).toHaveText('2');
+  await expect(page.getByTestId('store-stat-update-counts').locator('p').nth(1)).toContainText('updated in 7 days');
+  await expect(page.getByTestId('store-stat-update-counts').locator('strong').nth(2)).toHaveText('3');
+  await expect(page.getByTestId('store-stat-update-counts').locator('p').nth(2)).toContainText('updated in 30 days');
+  await activityToggle.click();
+  await expect(page.getByTestId('store-activity-details')).toHaveCount(0);
+  await activityToggle.click();
   const ratingToggle = page.getByTestId('store-rating-toggle');
   await expect(ratingToggle).toHaveAttribute('aria-expanded', 'false');
   expect(reviewFetches).toBe(0);
@@ -162,6 +177,10 @@ test('compact store statistics open nested verified reviews without occupying de
 
   await ratingToggle.click();
   await expect(page.getByTestId('store-rating-reviews')).toHaveCount(0);
+  await page.getByRole('heading', { name: 'Store Inventory Catalogue' }).click();
+  await expect(page.getByTestId('store-stat-panel')).toHaveCount(0);
+  await trigger.click();
+  await expect(page.getByTestId('store-activity-toggle')).toHaveAttribute('aria-expanded', 'false');
   await trigger.click();
   await expect(page.getByTestId('store-stat-panel')).toHaveCount(0);
   await trigger.click();

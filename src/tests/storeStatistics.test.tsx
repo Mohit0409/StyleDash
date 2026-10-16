@@ -86,6 +86,13 @@ describe('public store statistics', () => {
     expect(result.activityLevel).toBe('daily');
   });
 
+  it('handles empty stores and more than 1,000 unique published products', () => {
+    expect(getStoreStatistics([], NOW).productCount).toBe(0);
+    const many = Array.from({ length: 1039 }, (_, index) => item(`product-${index}`, ago(HOUR)));
+    expect(getStoreStatistics(many, NOW).productCount).toBe(1039);
+    expect(getStoreStatistics(many, NOW).updatedLast24Hours).toBe(1039);
+  });
+
   it('renders only the compact trigger when collapsed and keeps all details hidden', () => {
     const markup = renderToStaticMarkup(
       <StoreStatistics

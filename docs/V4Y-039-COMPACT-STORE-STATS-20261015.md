@@ -53,3 +53,21 @@ Read-only live check of October 15 found that all 51 entries in GET /api/stores/
 The existing ShopWorkflow.list_active_stores now projects published-only store-review AVG(rating) rounded to one decimal and COUNT(*) from the same SQLite database using one grouped read query. Missing review table and unrated stores safely return rating=0 and reviewCount=0. Pending, rejected and hidden reviews never enter the summary. The query does not create a backend API or database migration.
 
 A regression test in server/tests/test_shop_workflow.py validates the exact review publication policy and both rated/unrated fallbacks. Python 3.12 focused shop workflow tests 35/35 PASS. This source change is NOT deployed. The previously built static-only candidate is NOT READY, because production needs this existing API response field enhancement for the store badges to show true scores. Before deployment, both frontend compatibility and the minimal backend change must pass the stronger guarded deployment procedure and explicit owner approval.
+
+
+## October 16, 2026 — follow-up UI refinement (review only)
+
+Continued in the existing isolated `feature/store-compact-statistics-20261015` worktree after verifying that PR #150 already implemented V4Y-039, to avoid a duplicate PR or disturbing the heavily modified root worktree.
+
+- `src/components/StoreStatistics.tsx`: Catalogue activity now expands independently, with neatly separated 24h/7d/30d figures. Added outside-pointer dismissal, reset of nested expansion states and Escape-driven focus restoration. No API, activity logic or review workflow changes.
+- `src/pages/Stores.tsx`: Ratings show verified review count in parentheses when available; long names shrink/truncate independently of the rating badge.
+- `e2e/specs/store-statistics.spec.ts`: Added independent activity toggle, outside-click, review-count and long-name layout checks.
+- `src/tests/storeStatistics.test.tsx`: Added zero-product and 1,039-product cases using the unchanged authoritative count/calculation logic.
+
+### Focused verification
+- TypeScript, ESLint, git diff --check: PASS.
+- Frontend Vitest: **192/192 PASS** across 35 files.
+- Vite production build: PASS (pre-existing duplicate `overrides` warning).
+- Playwright focused test: desktop Chromium PASS, Android/Pixel Chromium PASS, iPhone WebKit PASS, using local mock APIs, no real payment/order activity.
+- The earlier v2/v3/v4 offline production overlay packages predate this source change and **must not be deployed**. Any future release requires rebuilding source-faithful production-compatible immutable assets and revalidating source/runtime parity, live backend and COD/Razorpay preservation, fresh drift/backup checks, independently reviewed rollback and explicit owner approval to merge/deploy.
+- This work is confined to PR #150. **NOT MERGED. NOT DEPLOYED.**

@@ -47,8 +47,11 @@ export const StoreStatistics: React.FC<StoreStatisticsProps> = ({
 }) => {
   const [expanded, setExpanded] = useState(false);
   const [reviewsExpanded, setReviewsExpanded] = useState(false);
+  const [activityExpanded, setActivityExpanded] = useState(false);
   const panelId = useId();
   const reviewsId = useId();
+  const activityId = useId();
+  const containerRef = useRef<HTMLElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
@@ -56,11 +59,24 @@ export const StoreStatistics: React.FC<StoreStatisticsProps> = ({
     const handleEscape = (event: KeyboardEvent) => {
       if (event.key !== 'Escape') return;
       setReviewsExpanded(false);
+      setActivityExpanded(false);
       setExpanded(false);
       triggerRef.current?.focus();
     };
     document.addEventListener('keydown', handleEscape);
     return () => document.removeEventListener('keydown', handleEscape);
+  }, [expanded]);
+
+  useEffect(() => {
+    if (!expanded) return;
+    const handleOutsidePointer = (event: PointerEvent) => {
+      if (containerRef.current?.contains(event.target as Node)) return;
+      setExpanded(false);
+      setReviewsExpanded(false);
+      setActivityExpanded(false);
+    };
+    document.addEventListener('pointerdown', handleOutsidePointer);
+    return () => document.removeEventListener('pointerdown', handleOutsidePointer);
   }, [expanded]);
 
   const summary = getStoreStatistics(products);
@@ -79,12 +95,15 @@ export const StoreStatistics: React.FC<StoreStatisticsProps> = ({
     : null;
 
   const toggleStatistics = () => {
-    if (expanded) setReviewsExpanded(false);
+    if (expanded) {
+      setReviewsExpanded(false);
+      setActivityExpanded(false);
+    }
     setExpanded(!expanded);
   };
 
   return (
-    <section data-testid="store-statistics" aria-label="Store statistics">
+    <section ref={containerRef} data-testid="store-statistics" aria-label="Store statistics">
       <button
         type="button"
         ref={triggerRef}
@@ -157,25 +176,47 @@ export const StoreStatistics: React.FC<StoreStatisticsProps> = ({
               )}
             </div>
 
-            <div className="flex flex-wrap items-start justify-between gap-2 px-4 py-3 sm:px-5" data-testid="store-stat-activity">
-              <div className="flex items-center gap-2 text-sm font-semibold text-neutral-700 dark:text-neutral-200">
-                <Activity className="h-4 w-4 shrink-0 text-emerald-500" aria-hidden="true" />
-                <span>Catalogue activity</span>
-              </div>
-              <div className="text-left sm:text-right">
-                <p className="text-sm font-black text-neutral-950 dark:text-white">{activityLabels[summary.activityLevel]}</p>
-                <p className="mt-0.5 text-xs text-neutral-500 dark:text-neutral-400">{activityDetails[summary.activityLevel]}</p>
-                {updatedDate && (
-                  <p className="mt-1 inline-flex items-center gap-1 text-xs text-neutral-500 dark:text-neutral-400">
-                    <Clock3 className="h-3 w-3" aria-hidden="true" /> Latest update: {updatedDate}
+            <div data-testid="store-stat-activity">
+              <button
+                type="button"
+                data-testid="store-activity-toggle"
+                aria-expanded={activityExpanded}
+                aria-controls={activityId}
+                onClick={() => setActivityExpanded(value => !value)}
+                className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left transition-colors hover:bg-neutral-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-lime-500 dark:hover:bg-neutral-800 sm:px-5"
+              >
+                <span className="flex min-w-0 items-center gap-2 text-sm font-semibold text-neutral-700 dark:text-neutral-200">
+                  <Activity className="h-4 w-4 shrink-0 text-emerald-500" aria-hidden="true" />
+                  Catalogue activity
+                </span>
+                <span className="flex shrink-0 items-center gap-2 text-right text-sm font-black text-neutral-950 dark:text-white">
+                  {activityLabels[summary.activityLevel]}
+                  <ChevronDown className={`h-4 w-4 text-neutral-500 transition-transform ${activityExpanded ? 'rotate-180' : ''}`} aria-hidden="true" />
+                </span>
+              </button>
+              {activityExpanded && (
+                <div id={activityId} data-testid="store-activity-details" className="space-y-3 px-4 pb-4 sm:px-5">
+                  <p className="text-xs text-neutral-500 dark:text-neutral-400">{activityDetails[summary.activityLevel]}</p>
+                  <p className="flex items-center gap-1.5 text-xs text-neutral-600 dark:text-neutral-300">
+                    <Clock3 className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                    Latest product update: {updatedDate ?? 'Not available'}
                   </p>
-                )}
-              </div>
-              <div className="flex w-full flex-wrap gap-x-4 gap-y-1 pt-1 text-xs text-neutral-600 dark:text-neutral-300" data-testid="store-stat-update-counts">
-                <span><strong className="tabular-nums">{formatCount(summary.updatedLast24Hours)}</strong> updated in 24h</span>
-                <span><strong className="tabular-nums">{formatCount(summary.updatedLast7Days)}</strong> updated in 7 days</span>
-                <span><strong className="tabular-nums">{formatCount(summary.updatedLast30Days)}</strong> updated in 30 days</span>
-              </div>
+                  <div className="grid grid-cols-1 gap-2 sm:grid-cols-3" data-testid="store-stat-update-counts">
+                    <p className="rounded-lg bg-neutral-50 px-3 py-2 text-xs text-neutral-600 dark:bg-neutral-800 dark:text-neutral-300">
+                      <strong className="block text-sm tabular-nums text-neutral-950 dark:text-white">{formatCount(summary.updatedLast24Hours)}</strong>
+                      updated in 24h
+                    </p>
+                    <p className="rounded-lg bg-neutral-50 px-3 py-2 text-xs text-neutral-600 dark:bg-neutral-800 dark:text-neutral-300">
+                      <strong className="block text-sm tabular-nums text-neutral-950 dark:text-white">{formatCount(summary.updatedLast7Days)}</strong>
+                      updated in 7 days
+                    </p>
+                    <p className="rounded-lg bg-neutral-50 px-3 py-2 text-xs text-neutral-600 dark:bg-neutral-800 dark:text-neutral-300">
+                      <strong className="block text-sm tabular-nums text-neutral-950 dark:text-white">{formatCount(summary.updatedLast30Days)}</strong>
+                      updated in 30 days
+                    </p>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
           <p className="border-t border-neutral-100 px-4 py-2.5 text-[11px] text-neutral-500 dark:border-neutral-800 dark:text-neutral-400 sm:px-5">
