@@ -7,13 +7,16 @@ on:
   push:
     branches:
       - main
+  # GitHub cron is UTC. Daily at 12:05 PM IST; actual start can be delayed.
+  schedule:
+    - cron: '35 6 * * *'
   workflow_dispatch:
 
 permissions:
   contents: read
 
 concurrency:
-  group: styledash-ci-${{ github.workflow }}-${{ github.ref }}
+  group: styledash-ci-${{ github.workflow }}-${{ github.event_name }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -68,6 +71,16 @@ jobs:
       - run: python -m pip install -r server/requirements.txt
       - run: npx playwright install --with-deps chromium
       - run: npm run test:e2e:desktop
+      - name: Archive browser report on schedule or failure
+        if: always() && (github.event_name == 'schedule' || failure())
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-desktop-report
+          path: |
+            playwright-report/
+            test-results/
+          retention-days: 7
+          if-no-files-found: ignore
 
   playwright-mobile:
     name: Playwright mobile
@@ -88,6 +101,37 @@ jobs:
       - run: python -m pip install -r server/requirements.txt
       - run: npx playwright install --with-deps chromium
       - run: npm run test:e2e:mobile
+      - name: Archive browser report on schedule or failure
+        if: always() && (github.event_name == 'schedule' || failure())
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-mobile-report
+          path: |
+            playwright-report/
+            test-results/
+          retention-days: 7
+          if-no-files-found: ignore
+
+  live-readonly:
+    name: Daily public-site health
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Check public routes and built-in GA4 without writes
+        run: python qa/ci_public_health.py
+      - name: Upload read-only health evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: public-health-report
+          path: qa-results/ci-public-health.json
+          retention-days: 14
+          if-no-files-found: warn
 
   required:
     name: StyleDash Required CI
