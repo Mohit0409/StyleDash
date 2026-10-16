@@ -125,12 +125,16 @@ jobs:
           python-version: '3.12'
       - name: Check public routes and built-in GA4 without writes
         run: python qa/ci_public_health.py
+      - name: Audit published customer price against MRP (public GET only)
+        run: python qa/ci_public_catalogue.py
       - name: Upload read-only health evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: public-health-report
-          path: qa-results/ci-public-health.json
+          path: |
+            qa-results/ci-public-health.json
+            qa-results/ci-public-catalogue.json
           retention-days: 14
           if-no-files-found: warn
 
