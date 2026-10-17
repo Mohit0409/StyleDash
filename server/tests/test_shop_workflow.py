@@ -7,6 +7,7 @@ from pathlib import Path
 
 from scripts.styledash_security import SecurityError
 from scripts.styledash_shops import ShopWorkflow
+from scripts.styledash_reviews import ReviewWorkflow
 
 
 OLD_VENDOR_SCHEMA = """
@@ -333,6 +334,46 @@ class ShopWorkflowTests(unittest.TestCase):
         self.assertEqual(self.store.get_application("user-b")["bannerImage"], other_banner)
         self.assertEqual(self.store.get_application("user-a")["bannerImage"], banner)
         self.assertNotEqual(other["id"], approved["id"])
+
+    def test_public_store_ratings_include_only_published_verified_reviews(self) -> None:
+        first = self.create_active_shop("user-a", "Rated Local Store")
+        second = self.create_active_shop("user-b", "Unrated Local Store")
+        initial = {store["id"]: store for store in self.store.list_active_stores()}
+        self.assertEqual((initial[first["id"]]["rating"], initial[first["id"]]["reviewCount"]), (0, 0))
+        self.assertEqual((initial[second["id"]]["rating"], initial[second["id"]]["reviewCount"]), (0, 0))
+
+        # Create the ordinary verified review schema; no production migration
+        # or new endpoint is introduced by the public summary projection.
+        ReviewWorkflow(self.path)
+        examples = [
+            ("r1", first["id"], "buyer-1", 5, "published"),
+            ("r2", first["id"], "buyer-2", 4, "published"),
+            ("r3", first["id"], "buyer-3", 1, "pending"),
+            ("r4", first["id"], "buyer-4", 1, "hidden"),
+            ("r5", first["id"], "buyer-5", 1, "rejected"),
+            ("r6", second["id"], "buyer-6", 3, "published"),
+        ]
+        with self.store.connect() as db:
+            for _, store_id, buyer_id, rating, status in examples:
+                db.execute(
+                    "INSERT INTO users(id,email,phone,name,is_active) VALUES(?,?,?,?,1)",
+                    (buyer_id, None, None, buyer_id),
+                )
+            for review_id, store_id, buyer_id, rating, status in examples:
+                db.execute(
+                    """INSERT INTO store_reviews(
+                           id,store_id,user_id,order_id,rating,comment,status,created_at,updated_at
+                       ) VALUES(?,?,?,?,?,?,?,?,?)""",
+                    (review_id, store_id, buyer_id, "delivered-test-order",
+                     rating, "Test review", status,
+                     "2026-10-15T00:00:00Z", "2026-10-15T00:00:00Z"),
+                )
+            db.commit()
+
+        public = {store["id"]: store for store in self.store.list_active_stores()}
+        self.assertEqual((public[first["id"]]["rating"], public[first["id"]]["reviewCount"]), (4.5, 2))
+        self.assertEqual((public[second["id"]]["rating"], public[second["id"]]["reviewCount"]), (3.0, 1))
+        self.assertEqual(len(public), 2)
 
     def test_variant_migration_repairs_marker_schema_mismatch(self) -> None:
         self.create_active_shop("user-a", "Repair Shop")
