@@ -66,7 +66,9 @@ browsers; delivery links carry the raw token only in the URL fragment.
 
 The private admin **Shop Products** tab supports CSV bulk import for active local stores. Use **Download CSV Template**, fill one product per row, then choose **Bulk Upload CSV** and select the shop by name.
 
-Required columns: `name`, `description`, `department`, `category`, `price`, `variants`, `colourName`, `imageUrls`. Optional columns: `brand`, `originalPrice`, `colourHex`. Use `S:5, M:8` for size/stock variants and separate multiple HTTPS image URLs with `|`.
+Required columns: name, description, department, category, price, variants, colourName, and at least one of imageFile or imageUrls. Optional columns include brand, originalPrice, colourHex, subcategory, and deliveryType. Use S:5, M:8 for size/stock variants.
 
-Imports are all-or-nothing, limited to 100 products / 1 MB per upload, revalidated on the server, audited per product, and reject duplicate product-name + colour combinations for the same shop.
+To upload several **local photos of the same product**, put filenames in imageFile separated with |, e.g. "watch_main.jpg|watch_side.jpg|watch_back.jpg". Select **all** referenced image files when importing. The first image becomes the product's primary image; the remaining files become gallery images in the specified order. imageUrls can additionally contain direct HTTPS image URLs separated with | (these appear after local images). A product can have **up to eight images total**. Single-file imageFile values and URL-only CSVs still work. ZIP files must be extracted before selecting local images; the admin importer does not directly unpack ZIP archives.
+
+Imports are all-or-nothing, limited to 100 products / 1 MB CSV per upload, revalidated on the server, audited per product, and reject duplicate product-name + colour combinations for the same shop. The image upload step happens before the product import; failures can leave unreferenced uploaded image files, but will not partially publish the CSV products.
 
