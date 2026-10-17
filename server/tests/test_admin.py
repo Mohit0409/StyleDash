@@ -1655,6 +1655,52 @@ class AdminHttpTests(unittest.TestCase):
         self.assertEqual(by_name["Mapped Campus"]["imageUrls"][0],image_path)
         self.assertEqual(by_name["Direct URL Shoe"]["imageUrls"],["https://example.test/direct.jpg"])
 
+        # Multiple local images in imageFile preserve their CSV order, followed by HTTPS links.
+        gallery_paths = [image_path]
+        for index in (2, 3):
+            status, extra_upload, _ = self.request(
+                "/api/admin/product-images",
+                {"fileName":f"gallery{index}.png","contentType":"image/png","dataBase64":base64.b64encode(png).decode()},
+                headers={"X-CSRF-Token":csrf}, method="POST",
+            )
+            self.assertEqual(status, 201)
+            gallery_paths.append(extra_upload["image"]["url"])
+        multi_header = "name,description,department,category,price,originalPrice,variants,colourName,imageFile,imageUrls"
+        multi_row = 'Gallery Shoe,Product with multiple local image files,unisex,Footwear,500,650,8:5,Blue,"product1.png|gallery2.png|gallery3.png",https://example.test/detail.jpg'
+        multi_csv = multi_header + "\n" + multi_row + "\n"
+        gallery_map = dict(zip(("product1.png","gallery2.png","gallery3.png"), gallery_paths))
+        status, multi_bulk, _ = self.request(
+            "/api/admin/shop-products/bulk",
+            {"applicationId":application["id"],"csvText":multi_csv,"images":gallery_map},
+            headers={"X-CSRF-Token":csrf}, method="POST",
+        )
+        self.assertEqual((status, multi_bulk["created"]), (201, 1))
+        self.assertEqual(multi_bulk["products"][0]["imageUrls"], gallery_paths + ["https://example.test/detail.jpg"])
+
+        count_after_gallery = len(shops.admin_list_products(admin_id))
+        bad_image_cases = [
+            ("product1.png|not-selected.png", gallery_map, 'Image file "not-selected.png" was not selected.'),
+            ("product1.png|product1.png", gallery_map, "The same local image is listed more than once."),
+            ("product1.png||gallery2.png", gallery_map, "Image filenames must not be empty."),
+            ("|".join(f"extra{index}.png" for index in range(9)),
+             {f"extra{index}.png":image_path for index in range(9)},
+             "A product can have at most 8 images"),
+            ("../product1.png", gallery_map, "is invalid."),
+        ]
+        for index, (file_value, file_mapping, expected_error) in enumerate(bad_image_cases):
+            with self.subTest(case=index):
+                bad_csv = multi_header + "\n" + (
+                    f'Invalid Gallery {index},Product with invalid gallery images,unisex,Footwear,500,650,8:5,Blue,"{file_value}",'
+                ) + "\n"
+                status, result, _ = self.request(
+                    "/api/admin/shop-products/bulk",
+                    {"applicationId":application["id"],"csvText":bad_csv,"images":file_mapping},
+                    headers={"X-CSRF-Token":csrf}, method="POST",
+                )
+                self.assertEqual((status, result["code"]), (400, "invalid_product_import"))
+                self.assertIn(expected_error, result["error"])
+                self.assertEqual(len(shops.admin_list_products(admin_id)), count_after_gallery)
+
         fifteen_header = "name,description,brand,department,category,price,originalPrice,variants,colourName,colourHex,imageFile,imageUrls"
         fifteen_rows = [
             f'Bulk Shoe {index},Bulk shoe {index},Brand,unisex,Footwear,1099,2000,"6:5, 7:5",Color {index},,product{index}.png,'
