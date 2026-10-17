@@ -145,10 +145,30 @@ async function prepareCheckout(page: Page, label: string) {
   await loginCustomer(page, USER_A);
   await addKnownProduct(page);
 
+  // A hard navigation recreates AuthProvider and CartProvider. Wait for the
+  // authenticated cart rehydration API, not just the URL/initial React shell.
+  // If the server lost a line, fail with an explicit persisted-cart contract
+  // error rather than a misleading "Secure Checkout" heading timeout.
+  const hydratedAccountState = page.waitForResponse(response => {
+    const pathname = new URL(response.url()).pathname;
+    return pathname === '/api/account-state' && response.request().method() === 'GET';
+  }, { timeout: 20_000 });
   await page.goto('/checkout');
+  const stateResponse = await hydratedAccountState;
+  expect(stateResponse.status(), 'Account cart rehydration must be authorized').toBe(200);
+  const savedState = await stateResponse.json() as {
+    cart?: Array<{ productId: string; variantId: string; quantity: number }>;
+  };
+  expect(
+    savedState.cart?.some(line =>
+      line.productId === 'sd-prod-001' && Number.isInteger(line.quantity) && line.quantity >= 1
+    ),
+    'Account cart must preserve the selected product across checkout navigation',
+  ).toBe(true);
 
   await expect(
     page.getByRole('heading', { name: 'Secure Checkout' }),
+    'Checkout should render the persisted authenticated cart, not an empty-cart shell',
   ).toBeVisible();
   await expect(page.getByText('Ordering and payments are temporarily unavailable.', { exact: false })).toHaveCount(0);
   await expect(page.getByRole('button', { name: 'Place COD Order' })).toBeEnabled();
