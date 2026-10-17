@@ -985,6 +985,124 @@ class ShopWorkflowTests(unittest.TestCase):
         self.assertEqual(len({item["id"] for item in raw}), len(raw))
 
 
+    def test_admin_bulk_product_features_preserve_pricing_stock_status_and_other_flags(self) -> None:
+        self.create_active_shop("user-a", "Bulk Product Features")
+        payload = self.complete_product("Bulk Feature Shirt")
+        payload.pop("inventory")
+        payload.pop("size")
+        payload["variants"] = [{"size": "M", "inventory": 4}, {"size": "L", "inventory": 3}]
+        first = self.store.create_product_draft("user-a", payload)
+        second = self.store.create_product_draft("user-a", {**payload, "name": "Bulk Feature Jacket"})
+        ids = [first["id"], second["id"]]
+        with self.store.connect() as db:
+            before = {
+                row["id"]: dict(row)
+                for row in db.execute(
+                    "SELECT * FROM shop_product_submissions WHERE id IN (?, ?)", ids
+                )
+            }
+        for feature in ("outsideNeemuchDeliveryEnabled", "exchangeAvailable", "tryAtHomeEnabled"):
+            result = self.store.admin_bulk_set_product_feature("admin-a", ids, feature, True)
+            self.assertEqual(result, {"updated": 2, "changed": 2, "unchanged": 0})
+            repeated = self.store.admin_bulk_set_product_feature("admin-a", ids, feature, True)
+            self.assertEqual(repeated["changed"], 0)
+        for row in self.store.admin_list_products("admin-a"):
+            if row["id"] in ids:
+                self.assertTrue(row["outsideNeemuchDeliveryEnabled"])
+                self.assertTrue(row["exchangeAvailable"])
+                self.assertTrue(row["tryAtHomeEnabled"])
+        result = self.store.admin_bulk_set_product_feature(
+            "admin-a", ids, "tryAtHomeEnabled", False
+        )
+        self.assertEqual(result["changed"], 2)
+        with self.store.connect() as db:
+            after = {
+                row["id"]: dict(row)
+                for row in db.execute(
+                    "SELECT * FROM shop_product_submissions WHERE id IN (?, ?)", ids
+                )
+            }
+            audit_count = db.execute(
+                "SELECT COUNT(*) FROM local_admin_audit_log "
+                "WHERE action='shop_product_feature_bulk_updated'"
+            ).fetchone()[0]
+        self.assertEqual(audit_count, 8)
+        for product_id in ids:
+            for key in (
+                "status", "price_paise", "original_price_paise", "inventory",
+                "variants_json", "image_urls_json", "brand", "size", "reviewed_by",
+            ):
+                self.assertEqual(after[product_id][key], before[product_id][key], key)
+            self.assertTrue(after[product_id]["exchange_available"])
+            self.assertFalse(after[product_id]["try_at_home_enabled"])
+            attrs_before = json.loads(before[product_id]["attributes_json"])
+            attrs_after = json.loads(after[product_id]["attributes_json"])
+            self.assertEqual(attrs_after.pop("outsideNeemuchDeliveryEnabled"), "true")
+            attrs_before.pop("outsideNeemuchDeliveryEnabled", None)
+            self.assertEqual(attrs_after, attrs_before)
+
+    def test_admin_bulk_feature_validates_entire_batch_before_writing(self) -> None:
+        self.create_active_shop("user-a", "Bulk Feature Eligibility")
+        eligible = self.complete_product("Two Sizes")
+        eligible.pop("inventory")
+        eligible.pop("size")
+        eligible["variants"] = [{"size": "M", "inventory": 2}, {"size": "L", "inventory": 2}]
+        good = self.store.create_product_draft("user-a", eligible)
+        bad = self.store.create_product_draft(
+            "user-a", self.complete_product("One Size")
+        )
+        ids = [good["id"], bad["id"]]
+        for feature in ("exchangeAvailable", "tryAtHomeEnabled"):
+            self.assert_error(
+                "invalid_bulk_product_eligibility",
+                lambda: self.store.admin_bulk_set_product_feature("admin-a", ids, feature, True)
+            )
+        products = {
+            item["id"]: item for item in self.store.admin_list_products("admin-a")
+        }
+        for product_id in ids:
+            self.assertFalse(products[product_id]["exchangeAvailable"])
+            self.assertFalse(products[product_id]["tryAtHomeEnabled"])
+        self.assert_error(
+            "product_not_found",
+            lambda: self.store.admin_bulk_set_product_feature(
+                "admin-a", [good["id"], "shopprod_missing"], "outsideNeemuchDeliveryEnabled", True
+            ),
+        )
+        self.assert_error(
+            "invalid_bulk_product_selection",
+            lambda: self.store.admin_bulk_set_product_feature(
+                "admin-a", [good["id"], good["id"]], "outsideNeemuchDeliveryEnabled", True
+            ),
+        )
+        self.assert_error(
+            "invalid_bulk_product_feature",
+            lambda: self.store.admin_bulk_set_product_feature(
+                "admin-a", ids, "pricePaise", True
+            ),
+        )
+        self.assert_error(
+            "invalid_bulk_product_feature",
+            lambda: self.store.admin_bulk_set_product_feature(
+                "admin-a", ids, "exchangeAvailable", 1
+            ),
+        )
+        self.assertEqual(
+            self.store.admin_bulk_set_product_feature(
+                "admin-a", ids, "outsideNeemuchDeliveryEnabled", True
+            )["changed"], 2
+        )
+        self.assertEqual(
+            self.store.admin_bulk_set_product_feature(
+                "admin-a", ids, "outsideNeemuchDeliveryEnabled", False
+            )["changed"], 2
+        )
+        self.assertEqual(
+            self.store.admin_bulk_set_product_feature(
+                "admin-a", ids, "exchangeAvailable", False
+            )["changed"], 0
+        )
+
     def test_try_at_home_requires_two_sizes_same_colour_and_defaults_off(self) -> None:
         self.create_active_shop("user-a", "Try Home Shop")
         payload = self.complete_product("Try Home Shirt")

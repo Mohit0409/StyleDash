@@ -2232,6 +2232,86 @@ class ShopWorkflow:
             ).fetchone()
         return self._serialize_product(row, admin=True)
 
+    def admin_bulk_set_product_feature(
+        self, admin_id: str, product_ids: Any, feature: Any, enabled: Any
+    ) -> dict[str, Any]:
+        """Change only one customer-facing product option on selected listings."""
+        features = {
+            "outsideNeemuchDeliveryEnabled": "attributes_json",
+            "exchangeAvailable": "exchange_available",
+            "tryAtHomeEnabled": "try_at_home_enabled",
+        }
+        if not isinstance(feature, str) or feature not in features:
+            raise SecurityError(400, "Choose a valid product feature.", "invalid_bulk_product_feature")
+        if type(enabled) is not bool:
+            raise SecurityError(400, "Enabled must be true or false.", "invalid_bulk_product_feature")
+        if (not isinstance(product_ids, list) or not 1 <= len(product_ids) <= 100
+                or any(not isinstance(pid, str) or not 1 <= len(pid) <= 128 or pid.strip() != pid for pid in product_ids)
+                or len(set(product_ids)) != len(product_ids)):
+            raise SecurityError(400, "Select 1 to 100 unique products.", "invalid_bulk_product_selection")
+
+        with self.connect() as db:
+            db.execute("BEGIN IMMEDIATE")
+            self._require_admin(db, admin_id)
+            products = []
+            for product_id in product_ids:
+                row = db.execute(
+                    "SELECT * FROM shop_product_submissions WHERE id=?", (product_id,)
+                ).fetchone()
+                if row is None:
+                    raise SecurityError(404, "One of the selected products no longer exists.", "product_not_found")
+                products.append(row)
+
+            # Preflight the entire selection. An invalid product must not leave a
+            # partially enabled batch or silently alter another product's settings.
+            if enabled and feature in {"exchangeAvailable", "tryAtHomeEnabled"}:
+                for row in products:
+                    sizes_by_colour: dict[str, set[str]] = {}
+                    for variant in _row_variants(row):
+                        if not variant.get("active", True):
+                            continue
+                        size = str(variant.get("size") or "").strip()
+                        if not size or size.casefold() == "one size":
+                            continue
+                        colour = str(variant.get("colourName") or "Default").strip().casefold()
+                        sizes_by_colour.setdefault(colour, set()).add(size.casefold())
+                    if not any(len(sizes) >= 2 for sizes in sizes_by_colour.values()):
+                        raise SecurityError(
+                            409,
+                            f"{row['name']} cannot enable this option: at least two different "
+                            "active sizes of the same colour are required. Nothing was changed.",
+                            "invalid_bulk_product_eligibility",
+                        )
+
+            now = iso(utc_now())
+            changed = 0
+            for row in products:
+                if feature == "outsideNeemuchDeliveryEnabled":
+                    attributes = json.loads(row["attributes_json"] or "{}")
+                    existing = str(attributes.get(feature, "false")).casefold() == "true"
+                    if existing == enabled:
+                        continue
+                    attributes[feature] = "true" if enabled else "false"
+                    db.execute(
+                        "UPDATE shop_product_submissions SET attributes_json=?,updated_at=? WHERE id=?",
+                        (json.dumps(attributes, separators=(",", ":"), sort_keys=True), now, row["id"]),
+                    )
+                else:
+                    column = features[feature]  # Whitelisted SQL column, never user input.
+                    if bool(row[column]) == enabled:
+                        continue
+                    db.execute(
+                        f"UPDATE shop_product_submissions SET {column}=?,updated_at=? WHERE id=?",
+                        (int(enabled), now, row["id"]),
+                    )
+                changed += 1
+                self._audit_if_available(
+                    db, admin_id, "shop_product_feature_bulk_updated", "shop_product", row["id"],
+                    {"feature": feature, "from": not enabled, "to": enabled},
+                )
+            db.commit()
+        return {"updated": len(products), "changed": changed, "unchanged": len(products) - changed}
+
     def admin_list_products(self, admin_id: str) -> list[dict[str, Any]]:
         with self.connect() as db:
             self._require_admin(db, admin_id)

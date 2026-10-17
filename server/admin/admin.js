@@ -528,13 +528,40 @@ async function rejectOutsideDelivery(request){
   status('Outside delivery request rejected and the reason is visible to the customer.');
   return true;
 }
-function bulkToolbar(resource,statuses){return `<div class="actions bulk-toolbar"><label class="bulk-select bulk-select-all"><input type="checkbox" id="bulk-select-all-${resource}" data-bulk-select-all="${resource}"> Select all</label><span><strong id="bulk-count-${resource}">0</strong> selected</span><select data-bulk-target="${resource}"><option value="">Bulk action...</option>${statuses.map(value=>`<option value="${value}">${escapeText(value.replaceAll('_',' '))}</option>`).join('')}</select><button data-action="bulk-transition" data-resource="${resource}">Apply once</button></div>`;}
+const BULK_PRODUCT_FEATURE_ACTIONS={
+  'outside-delivery-enable':{feature:'outsideNeemuchDeliveryEnabled',enabled:true,label:'Enable Outside Delivery'},
+  'outside-delivery-disable':{feature:'outsideNeemuchDeliveryEnabled',enabled:false,label:'Disable Outside Delivery'},
+  'exchange-enable':{feature:'exchangeAvailable',enabled:true,label:'Enable Exchange'},
+  'exchange-disable':{feature:'exchangeAvailable',enabled:false,label:'Disable Exchange'},
+  'try-at-home-enable':{feature:'tryAtHomeEnabled',enabled:true,label:'Enable Try at Home'},
+  'try-at-home-disable':{feature:'tryAtHomeEnabled',enabled:false,label:'Disable Try at Home'},
+};
+function bulkToolbar(resource,statuses){
+  const features=resource==='products'
+    ? Object.entries(BULK_PRODUCT_FEATURE_ACTIONS).map(([value,setting])=>`<option value="${value}">${escapeText(setting.label)}</option>`).join('')
+    : '';
+  return `<div class="actions bulk-toolbar"><label class="bulk-select bulk-select-all"><input type="checkbox" id="bulk-select-all-${resource}" data-bulk-select-all="${resource}"> Select all</label><span><strong id="bulk-count-${resource}">0</strong> selected</span><select data-bulk-target="${resource}"><option value="">Bulk action...</option>${statuses.map(value=>`<option value="${value}">${escapeText(value.replaceAll('_',' '))}</option>`).join('')}${features}</select><button data-action="bulk-transition" data-resource="${resource}">Apply once</button></div>`;
+}
 function syncBulkSelectionUi(resource){const boxes=[...byId('content').querySelectorAll(`[data-bulk-select="${resource}"]`)];const selected=boxes.filter(box=>box.checked).length;const count=byId(`bulk-count-${resource}`);if(count)count.textContent=String(selected);const selectAll=byId(`bulk-select-all-${resource}`);if(selectAll){selectAll.checked=boxes.length>0&&selected===boxes.length;selectAll.indeterminate=selected>0&&selected<boxes.length;selectAll.disabled=boxes.length===0;}}
 function addBulkControls(resource,statuses,selector){for(const key of [...bulkSelection])if(key.startsWith(`${resource}:`))bulkSelection.delete(key);const root=byId('content');root.querySelector('h2')?.insertAdjacentHTML('afterend',bulkToolbar(resource,statuses));const seen=new Set();root.querySelectorAll(selector).forEach(container=>{const id=resource==='orders'?container.querySelector('h3')?.textContent:container.querySelector('[data-id]')?.dataset.id;if(!id||seen.has(id))return;seen.add(id);container.insertAdjacentHTML('afterbegin',`<label class="bulk-select"><input type="checkbox" data-bulk-select="${resource}" value="${escapeText(id)}"> Select</label>`);});syncBulkSelectionUi(resource);}
 async function bulkTransition(resource){
   const ids=[...bulkSelection].filter(value=>value.startsWith(`${resource}:`)).map(value=>value.slice(resource.length+1));
   const target=document.querySelector(`[data-bulk-target="${resource}"]`)?.value;
   if(!ids.length)throw new Error('Select one or more records first.');if(!target)throw new Error('Choose a bulk action.');
+  if(resource==='products'&&Object.prototype.hasOwnProperty.call(BULK_PRODUCT_FEATURE_ACTIONS,target)){
+    if(ids.length>100)throw new Error('Select no more than 100 products at a time.');
+    const setting=BULK_PRODUCT_FEATURE_ACTIONS[target];
+    const confirmation=await formDialog(`${setting.label} for ${ids.length} selected product(s)`,[
+      {name:'confirmation',label:`Confirm ${setting.label.toLowerCase()} for all ${ids.length} selected product(s)`,type:'select',required:true,value:'',options:[
+        {value:'',label:'Choose confirmation'},{value:'confirm',label:'Yes, apply this setting to the selected products'}
+      ],help:'Other product settings, commission, MRP and inventory will not change. Exchange and Try at Home require at least two active sizes of the same colour.'}
+    ],'Apply to selected products');
+    if(!confirmation||confirmation.confirmation!=='confirm')return false;
+    const result=await api('/api/admin/shop-products/bulk-features',{method:'PATCH',body:JSON.stringify({ids,feature:setting.feature,enabled:setting.enabled})});
+    ids.forEach(id=>bulkSelection.delete(`products:${id}`));
+    status(`${setting.label}: ${result.changed} of ${result.updated} product(s) changed; ${result.unchanged} already had that setting.`);
+    return;
+  }
   if(resource==='orders'&&target==='cancelled'){
     const paidOnline=ids.map(id=>currentOrders.find(order=>order.id===id)).filter(isPaidOnlineOrder);
     if(paidOnline.length)throw new Error('Paid online orders must be refunded and cancelled individually so each real Razorpay refund is explicitly confirmed.');
@@ -645,7 +672,7 @@ byId('content').addEventListener('click', async event => {
     if(action==='mark-cancellation-fee-paid') { const collectionMethod=await feeCollectionMethodFor('Collect cancellation fee'); if(!collectionMethod)return; await api(`/api/admin/orders/${encodeURIComponent(button.dataset.id)}/cancellation-fee`,{method:'PATCH',body:JSON.stringify({collectionMethod})}); status('Cancellation fee marked paid after collection.'); }
     if(action==='mark-exchange-fee-paid') { const collectionMethod=await feeCollectionMethodFor('Collect exchange fee'); if(!collectionMethod)return; await api(`/api/admin/orders/${encodeURIComponent(button.dataset.orderId)}/exchanges/${encodeURIComponent(button.dataset.id)}/fee`,{method:'PATCH',body:JSON.stringify({collectionMethod})}); status('Exchange fee marked paid after collection.'); }
     if(action==='exchange-status') { await api(`/api/admin/orders/${encodeURIComponent(button.dataset.orderId)}/exchanges/${encodeURIComponent(button.dataset.id)}/status`,{method:'PATCH',body:JSON.stringify({status:button.dataset.value})}); status(`Exchange ${button.dataset.value}.`); }
-    if(action==='bulk-transition') await bulkTransition(button.dataset.resource);
+    if(action==='bulk-transition'){const completed=await bulkTransition(button.dataset.resource);if(completed===false)return;}
     if(action==='refund-cancel') {
       const order=currentOrders.find(item=>item.id===button.dataset.id);if(!order)throw new Error('Order details are no longer available. Refresh and try again.');
       const reason=await refundCancellationReasonFor(order);if(!reason)return;

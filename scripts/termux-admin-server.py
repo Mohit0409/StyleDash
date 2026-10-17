@@ -1537,6 +1537,15 @@ class AdminHandler(BaseHTTPRequestHandler):
                     admin["id"], request_id, payload.get("status"), payload.get("reason")
                 )
                 self._json(200, {"success": True, "request": result}); return
+            if path == "/api/admin/shop-products/bulk-features":
+                if not isinstance(payload, dict) or set(payload) != {"ids", "feature", "enabled"}:
+                    raise SecurityError(
+                        400, "Supply ids, feature and enabled only.", "invalid_bulk_product_feature"
+                    )
+                result = self._shops().admin_bulk_set_product_feature(
+                    admin["id"], payload["ids"], payload["feature"], payload["enabled"]
+                )
+                self._json(200, {"success": True, **result}); return
             if path.startswith("/api/admin/shop-products/") and path.endswith("/details"):
                 product_id = unquote(path.removeprefix("/api/admin/shop-products/").removesuffix("/details"))
                 require_existing_admin_product_media(payload, self.application.product_image_directory)
