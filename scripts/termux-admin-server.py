@@ -110,7 +110,7 @@ def parse_admin_product_csv(csv_text: Any, image_map: Any, product_image_directo
         raise SecurityError(400, "CSV is missing or too large.", "invalid_product_import")
     if image_map is None:
         image_map = {}
-    if not isinstance(image_map, dict) or len(image_map) > 100:
+    if not isinstance(image_map, dict) or len(image_map) > 800:
         raise SecurityError(400, "Invalid image selection map.", "invalid_product_import")
     stream = io.StringIO(csv_text, newline="")
     try:
@@ -150,21 +150,31 @@ def parse_admin_product_csv(csv_text: Any, image_map: Any, product_image_directo
         if not math.isfinite(price) or not math.isfinite(original) or price < 1 or original < price or price > 10000000 or original > 10000000:
             _import_error(row_number, "Invalid price.")
         image_urls = [value.strip() for value in values.get("imageUrls", "").split("|") if value.strip()]
-        image_file = values.get("imageFile", "")
-        if image_file:
-            if len(image_file) > 120 or "/" in image_file or "\\" in image_file or any(ord(ch) < 32 for ch in image_file):
-                _import_error(row_number, f'Image file "{image_file}" is invalid.')
-            mapped_path = image_map.get(image_file)
-            if mapped_path is None:
-                _import_error(row_number, f'Image file "{image_file}" was not selected.')
-            if not isinstance(mapped_path, str) or not PRODUCT_MEDIA_PATH_PATTERN.fullmatch(mapped_path):
-                _import_error(row_number, f'Image file "{image_file}" has an invalid uploaded path.')
-            target = (product_image_directory / Path(mapped_path).name).resolve()
-            if target.parent != image_root or not target.is_file():
-                _import_error(row_number, f'Image file "{image_file}" was not uploaded successfully.')
-            image_urls.insert(0, mapped_path)
+        image_file_field = values.get("imageFile", "")
+        local_images: list[str] = []
+        if image_file_field:
+            image_files = [part.strip() for part in image_file_field.split("|")]
+            if any(not name for name in image_files):
+                _import_error(row_number, "Image filenames must not be empty.")
+            if len(set(image_files)) != len(image_files):
+                _import_error(row_number, "The same local image is listed more than once.")
+            for image_file in image_files:
+                if len(image_file) > 120 or "/" in image_file or "\\" in image_file or any(ord(ch) < 32 for ch in image_file):
+                    _import_error(row_number, f'Image file "{image_file}" is invalid.')
+                mapped_path = image_map.get(image_file)
+                if mapped_path is None:
+                    _import_error(row_number, f'Image file "{image_file}" was not selected.')
+                if not isinstance(mapped_path, str) or not PRODUCT_MEDIA_PATH_PATTERN.fullmatch(mapped_path):
+                    _import_error(row_number, f'Image file "{image_file}" has an invalid uploaded path.')
+                target = (product_image_directory / Path(mapped_path).name).resolve()
+                if target.parent != image_root or not target.is_file():
+                    _import_error(row_number, f'Image file "{image_file}" was not uploaded successfully.')
+                local_images.append(mapped_path)
+        image_urls = local_images + image_urls
         if not image_urls:
             _import_error(row_number, "At least one product image is required.")
+        if len(image_urls) > 8:
+            _import_error(row_number, "A product can have at most 8 images (local files and image URLs combined).")
         product = {
             "name": name, "description": values.get("description", ""), "brand": values.get("brand") or None,
             "department": values.get("department", ""), "category": values.get("category", ""),

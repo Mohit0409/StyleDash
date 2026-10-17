@@ -378,7 +378,7 @@ const DELIVERY_OPTIONS=[{value:'normal',label:'Site-wide: Normal Mon-Fri; Normal
 
 function downloadProductCsvTemplate(){
   const header=['name','description','brand','department','category','subcategory','deliveryType','price','originalPrice','variants','colourName','colourHex','imageFile','imageUrls'];
-  const sample=['Campus Sports Shoes','Sports shoes','Campus','unisex','Footwear','','normal','1720','1720','6:5, 7:5, 8:5, 9:5, 10:5','Multi Color (White/Blue/Green)','','product1.jpg',''];
+  const sample=['Campus Sports Shoes','Sports shoes','Campus','unisex','Footwear','','normal','1720','1720','6:5, 7:5, 8:5, 9:5, 10:5','Multi Color (White/Blue/Green)','','product1_main.jpg|product1_side.jpg|product1_back.jpg',''];
   const quote=value=>`"${String(value).replaceAll('"','""')}"`;const blob=new Blob([[header,sample].map(row=>row.map(quote).join(',')).join('\r\n')],{type:'text/csv;charset=utf-8'});const link=document.createElement('a');link.href=URL.createObjectURL(blob);link.download='vibe4you-product-import-template.csv';link.click();URL.revokeObjectURL(link.href);
 }
 function parseCsv(text){
@@ -387,7 +387,21 @@ function parseCsv(text){
 function csvImageRequirements(text){
   const rows=parseCsv(text);if(rows.length<2)throw new Error('CSV needs a header row and at least one product.');const headers=rows[0].map((value,index)=>(index===0?value.replace(/^\uFEFF/,''):value).trim());if(new Set(headers).size!==headers.length)throw new Error('CSV headers must be unique.');
   const required=['name','description','department','category','price','variants','colourName'];for(const key of required)if(!headers.includes(key))throw new Error(`CSV is missing required column: ${key}`);if(!headers.includes('imageFile')&&!headers.includes('imageUrls'))throw new Error('CSV requires imageFile or imageUrls.');const requirements=[];let productRows=0;
-  for(const row of rows.slice(1)){if(!row.some(value=>value.trim()))continue;productRows+=1;const values=Object.fromEntries(headers.map((key,index)=>[key,(row[index]??'').trim()]));const imageFile=values.imageFile||'';const direct=(values.imageUrls||'').split('|').map(value=>value.trim()).filter(Boolean);if(imageFile){if(imageFile.includes('/')||imageFile.includes('\\'))throw new Error(`Row ${productRows}: Image file "${imageFile}" is invalid.`);requirements.push({row:productRows,fileName:imageFile});}else if(!direct.length)throw new Error(`Row ${productRows}: At least one product image is required.`);}
+  for(const row of rows.slice(1)){
+    if(!row.some(value=>value.trim()))continue;
+    productRows+=1;
+    const values=Object.fromEntries(headers.map((key,index)=>[key,(row[index]??'').trim()]));
+    const local=values.imageFile?values.imageFile.split('|').map(value=>value.trim()):[];
+    const direct=(values.imageUrls||'').split('|').map(value=>value.trim()).filter(Boolean);
+    if(local.some(fileName=>!fileName))throw new Error('Row '+productRows+': Image filenames must not be empty.');
+    if(new Set(local).size!==local.length)throw new Error('Row '+productRows+': The same local image is listed more than once.');
+    if(!local.length&&!direct.length)throw new Error('Row '+productRows+': At least one product image is required.');
+    if(local.length+direct.length>8)throw new Error('Row '+productRows+': A product can have at most 8 images (local files and image URLs combined).');
+    for(const fileName of local){
+      if(fileName.length>120||fileName.includes('/')||fileName.includes('\\')||/[\x00-\x1f]/.test(fileName))throw new Error('Row '+productRows+': Image file "'+fileName+'" is invalid.');
+      requirements.push({row:productRows,fileName});
+    }
+  }
   if(!productRows)throw new Error('CSV needs at least one product row.');if(productRows>100)throw new Error('Upload a maximum of 100 products at a time.');return {productRows,requirements};
 }
 function selectedImageMap(files){const map=new Map();for(const file of files||[]){if(map.has(file.name))throw new Error(`More than one selected image is named "${file.name}".`);map.set(file.name,file);}return map;}
@@ -395,8 +409,8 @@ async function bulkUploadStoreProducts(){
   const applications=(await api('/api/admin/vendors')).applications.filter(item=>item.status==='ACTIVE');if(!applications.length)throw new Error('There are no active shops available for product import.');
   const values=await formDialog('Bulk upload products',[
     {name:'applicationId',label:'Publish products for',type:'select',required:true,options:applications.map(item=>({value:item.id,label:`${item.shopName} - ${item.ownerName}`}))},
-    {name:'csv',label:'Product CSV',type:'file',accept:'.csv,text/csv',required:true,help:'Use imageFile values such as product1.jpg. Keep deliveryType as normal; the site automatically offers Normal Mon-Fri and Normal + Express Sat-Sun for every product.'},
-    {name:'imageFiles',label:'Select the local product images referenced by the CSV',type:'file',accept:ADMIN_IMAGE_ACCEPT,multiple:true,previewImages:true,help:'Filenames are matched exactly to imageFile. Images upload automatically before products are published.'},
+    {name:'csv',label:'Product CSV',type:'file',accept:'.csv,text/csv',required:true,help:'Use imageFile as main.jpg|side.jpg|back.jpg (up to 8 images total per product). The first file is the main image. Keep deliveryType as normal; the site automatically offers Normal Mon-Fri and Normal + Express Sat-Sun for every product.'},
+    {name:'imageFiles',label:'Select the local product images referenced by the CSV',type:'file',accept:ADMIN_IMAGE_ACCEPT,multiple:true,previewImages:true,help:'Select ALL local files named in imageFile, including gallery images. Use | to separate filenames in the CSV. Extract ZIP archives before selecting files; images upload before publishing.'},
   ],'Review import');if(!values)return;
   const csvFile=values.csv;if(!(csvFile instanceof File)||!csvFile.size)throw new Error('Choose a CSV file.');if(csvFile.size>1024*1024)throw new Error('CSV must be 1 MB or smaller.');const csvText=await csvFile.text();const plan=csvImageRequirements(csvText);const selected=selectedImageMap(values.imageFiles||[]);const requiredFiles=new Map();
   for(const requirement of plan.requirements){const file=selected.get(requirement.fileName);if(!file)throw new Error(`Row ${requirement.row}: Image file "${requirement.fileName}" was not selected.`);validateAdminImageFile(file,`Row ${requirement.row}: `);requiredFiles.set(requirement.fileName,file);}
