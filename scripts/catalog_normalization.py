@@ -11,10 +11,7 @@ except ModuleNotFoundError:
 
 CANONICAL_DEPARTMENTS = {"men", "women", "kids", "unisex"}
 LEGACY_DEPARTMENT_CLASSES = {"footwear", "accessories"}
-PRODUCT_CATEGORIES = {
-    "Clothing & Fashion", "Footwear", "Accessories", "Beauty & Personal Care",
-    "Electronics", "Gifts", "Home & Living",
-}
+PRODUCT_CATEGORIES = {"Clothing & Fashion", "Footwear", "Accessories", "Beauty & Personal Care", "Electronics", "Gifts", "Groceries", "Home & Living", "Health & Pharmacy", "Health & Nutrition", "Baby Care", "Pet Supplies", "Mobile Accessories", "Automotive Accessories", "Toys & Games", "Stationery & Books", "Sports & Fitness", "Hardware & Tools", "General Store"}
 
 
 def _key(value: Any) -> str:
@@ -71,6 +68,7 @@ CATEGORY_TAG_ALIASES = {
     "Electronics": ("electronics", "gadgets"),
     "Gifts": ("gifts", "gift items"),
     "Home & Living": ("home and living", "home essentials"),
+    "Health & Nutrition": ("nutrition", "sports nutrition", "health supplements", "protein supplements"),
 }
 
 DEPARTMENT_TAG_ALIASES = {
@@ -82,7 +80,21 @@ DEPARTMENT_TAG_ALIASES = {
 
 
 def infer_product_category(name: str, description: str) -> str | None:
-    text = f"{name} {description}".casefold()
+    name_text = name.casefold()
+    if re.search(r"\b(perfumes?|fragrances?|deodorants?|deos?|face\s*wash|face\s*cream|skin\s*care|skincare|hair\s*care|haircare|grooming|cosmetics?|makeup|beauty|personal\s*care)\b", name_text):
+        return "Beauty & Personal Care"
+    if re.search(r"\b(sliders?|sneakers?|shoes?|sandals?|loafers?|footwear)\b", name_text):
+        return "Footwear"
+    if re.search(r"\b(earrings?|jhumk(?:a|i)s?|jewell?ery|necklaces?|bracelets?|bangles?|belts?|handbags?|bags?)\b", name_text):
+        return "Accessories"
+    if re.search(r"\b(gifts?|gift\s*(?:box|boxes|hamper|hampers|wrap|wrapping)|teddy\s*bear|soft\s*toy|greeting\s*cards?)\b", name_text):
+        return "Gifts"
+    if re.search(r"\b(home\s*(?:decor|décor|living)|kitchen(?:ware)?|cookware|bedding|bedsheets?|cushions?|curtains?|storage|organis(?:er|ers|ation)|furniture|household)\b", name_text):
+        return "Home & Living"
+    if re.search(r"\b(kurtas?|shirts?|t-?shirts?|tees?|jeans?|trousers?|dresses?|tops?|apparel|clothing)\b", name_text):
+        return "Clothing & Fashion"
+
+    text = description.casefold()
     if re.search(r"\b(perfumes?|fragrances?|deodorants?|deos?|face\s*wash|face\s*cream|skin\s*care|skincare|hair\s*care|haircare|grooming|cosmetics?|makeup|beauty|personal\s*care)\b", text):
         return "Beauty & Personal Care"
     if re.search(r"\b(sliders?|sneakers?|shoes?|sandals?|loafers?|footwear)\b", text):
@@ -106,6 +118,8 @@ def normalize_product_category(value: Any, *, name: str, description: str, legac
     key = _key(raw)
     aliases = {
         **{_key(item): item for item in PRODUCT_CATEGORIES},
+        "nutrition": "Health & Nutrition", "sports nutrition": "Health & Nutrition",
+        "protein supplements": "Health & Nutrition",
         "shoe": "Footwear", "shoes": "Footwear", "sneaker": "Footwear",
         "sneakers": "Footwear", "slider": "Footwear", "sliders": "Footwear",
         "accessory": "Accessories", "jewellery": "Accessories", "jewelry": "Accessories",
@@ -129,7 +143,13 @@ def normalize_product_category(value: Any, *, name: str, description: str, legac
         if inferred is None:
             raise SecurityError(400, "Invalid product category.", "invalid_product")
         return inferred
+    if re.search(r"\b(?:t-?shirts?|tees?|shirts?)\b", name.casefold()):
+        return "Clothing & Fashion"
     if normalized == "Clothing & Fashion" and inferred in {"Footwear", "Accessories", "Beauty & Personal Care", "Gifts", "Home & Living"}:
+        return inferred
+    if normalized == "Footwear" and inferred == "Clothing & Fashion":
+        if re.search(r"\bboots?\b", name.casefold()):
+            return "Footwear"
         return inferred
     if normalized == "Accessories" and inferred == "Beauty & Personal Care":
         return inferred

@@ -95,13 +95,25 @@ class CatalogNormalizationTests(unittest.TestCase):
             'Beauty & Personal Care',
             'Electronics',
             'Gifts',
+            'Groceries',
             'Home & Living',
+            'Health & Pharmacy',
+            'Health & Nutrition',
+            'Baby Care',
+            'Pet Supplies',
+            'Mobile Accessories',
+            'Automotive Accessories',
+            'Toys & Games',
+            'Stationery & Books',
+            'Sports & Fitness',
+            'Hardware & Tools',
+            'General Store',
         }
         self.assertEqual(PRODUCT_CATEGORIES, expected)
         self.assertEqual(ALLOWED_CATEGORIES, expected)
         self.assertEqual(set(STORE_CATEGORIES), expected)
-        self.assertNotIn('General Store', PRODUCT_CATEGORIES)
-        self.assertNotIn('General Store', ALLOWED_CATEGORIES)
+        self.assertIn('General Store', PRODUCT_CATEGORIES)
+        self.assertIn('General Store', ALLOWED_CATEGORIES)
         self.assertEqual(
             normalize_product_category(
                 'Clothing & Fashion',
@@ -206,6 +218,30 @@ class CatalogNormalizationTests(unittest.TestCase):
         self.assertIn('slides', tags)
         self.assertEqual(len(tags), len(set(tags)))
         self.assertLessEqual(len(tags), 24)
+
+    def test_health_nutrition_and_high_top_boots_match_live_taxonomy(self) -> None:
+        self.assertIn("Health & Nutrition", PRODUCT_CATEGORIES)
+        self.assertEqual(
+            normalize_product_category(
+                "nutrition", name="Creatine Monohydrate", description="Gym supplement"
+            ),
+            "Health & Nutrition",
+        )
+        self.assertEqual(
+            normalize_product_category(
+                "Footwear", name="Men's High-Top Boots", description="Leather boots"
+            ),
+            "Footwear",
+        )
+        tags = build_product_tags(
+            name="Creatine Monohydrate",
+            brand="",
+            store_name="Fitness Shop",
+            department="unisex",
+            category="Health & Nutrition",
+            subcategory="Creatine",
+        )
+        self.assertTrue({"health & nutrition", "nutrition", "creatine"}.issubset(set(tags)))
 
 
 if __name__ == '__main__':

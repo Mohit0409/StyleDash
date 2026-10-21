@@ -92,7 +92,7 @@ byId('content').addEventListener('change', event => {
 function status(message) { byId('app-status').textContent = message || ''; }
 const DEFAULT_VARIANT_SIZE='One Size';
 const DEFAULT_VARIANT_COLOUR='Default';
-const STORE_CATEGORIES=['Clothing & Fashion','Footwear','Accessories','Beauty & Personal Care','Electronics','Gifts','Home & Living'];
+const STORE_CATEGORIES=['Clothing & Fashion','Footwear','Accessories','Beauty & Personal Care','Electronics','Gifts','Groceries','Home & Living','Health & Pharmacy','Health & Nutrition','Baby Care','Pet Supplies','Mobile Accessories','Automotive Accessories','Toys & Games','Stationery & Books','Sports & Fitness','Hardware & Tools','General Store'];
 const PRODUCT_OPTION_MODE_VALUES=new Set(['single','size','colour','both']);
 function defaultProductOptionMode(category){return ['Clothing & Fashion','Footwear'].includes(category)?'both':'single';}
 function inferProductOptionMode(item){
@@ -367,7 +367,7 @@ async function editStore(button){
 }
 
 const PRODUCT_DEPARTMENTS=['men','women','kids','unisex'];
-const PRODUCT_CATEGORIES=['Clothing & Fashion','Footwear','Accessories','Beauty & Personal Care','Electronics','Gifts','Home & Living'];
+const PRODUCT_CATEGORIES=['Clothing & Fashion','Footwear','Accessories','Beauty & Personal Care','Electronics','Gifts','Groceries','Home & Living','Health & Pharmacy','Health & Nutrition','Baby Care','Pet Supplies','Mobile Accessories','Automotive Accessories','Toys & Games','Stationery & Books','Sports & Fitness','Hardware & Tools','General Store'];
 const PRODUCT_OPTION_MODES=[
   {value:'single',label:'Single stock - no size or colour'},
   {value:'size',label:'Size / volume only'},

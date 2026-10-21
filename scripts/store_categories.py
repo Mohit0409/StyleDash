@@ -4,18 +4,8 @@ Store categories intentionally mirror the public product catalogue taxonomy
 defined in ``catalog_normalization.PRODUCT_CATEGORIES``. The frontend renders
 the same vocabulary from ``src/data/categories.ts`` (``STORE_CATEGORIES``).
 
-Legacy values such as "General Store" are NOT valid store categories; the
-server rejects them while older drafts keep their stored value untouched.
+"General Store" remains valid for older shops; other legacy labels stay
+preserved until explicitly reviewed.
 """
 
-STORE_CATEGORIES = frozenset(
-    {
-        "Clothing & Fashion",
-        "Footwear",
-        "Accessories",
-        "Beauty & Personal Care",
-        "Electronics",
-        "Gifts",
-        "Home & Living",
-    }
-)
+STORE_CATEGORIES = frozenset({"Clothing & Fashion", "Footwear", "Accessories", "Beauty & Personal Care", "Electronics", "Gifts", "Groceries", "Home & Living", "Health & Pharmacy", "Health & Nutrition", "Baby Care", "Pet Supplies", "Mobile Accessories", "Automotive Accessories", "Toys & Games", "Stationery & Books", "Sports & Fitness", "Hardware & Tools", "General Store"})
