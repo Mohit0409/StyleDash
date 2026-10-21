@@ -204,7 +204,7 @@ export const FilterSidebar: React.FC<FilterSidebarProps> = ({
       {/* Mobile Drawer */}
       {isOpenMobile && (
         <div
-          className="fixed inset-0 z-50 lg:hidden flex bg-black/60 backdrop-blur-sm animate-fade-in"
+          className="fixed inset-0 z-[1010] flex h-[100dvh] max-h-[100dvh] overflow-hidden bg-black/60 backdrop-blur-sm animate-fade-in lg:hidden"
           onClick={onCloseMobile}
           data-testid="mobile-filter-backdrop"
         >
@@ -212,10 +212,11 @@ export const FilterSidebar: React.FC<FilterSidebarProps> = ({
             role="dialog"
             aria-modal="true"
             aria-labelledby="mobile-filter-heading"
-            className="w-80 bg-white dark:bg-neutral-900 h-full p-6 overflow-y-auto shadow-2xl flex flex-col justify-between"
+            className="flex h-[100dvh] max-h-[100dvh] min-h-0 w-80 max-w-[calc(100vw-0.5rem)] flex-col overflow-hidden bg-white px-6 pt-6 shadow-2xl dark:bg-neutral-900"
+            style={{ paddingBottom: "max(1rem, env(safe-area-inset-bottom))" }}
             onClick={(event) => event.stopPropagation()}
           >
-            <div>
+            <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
               <div className="flex items-center justify-between mb-6">
                 <span id="mobile-filter-heading" className="font-extrabold text-lg text-neutral-900 dark:text-white">Filter & Sort</span>
                 <button aria-label="Close filters" onClick={onCloseMobile} className="p-2 rounded-full hover:bg-neutral-100 dark:hover:bg-neutral-800">
@@ -226,7 +227,7 @@ export const FilterSidebar: React.FC<FilterSidebarProps> = ({
             </div>
             <button
               onClick={onCloseMobile}
-              className="mt-6 w-full py-3 bg-neutral-950 dark:bg-lime-400 text-white dark:text-neutral-950 font-bold text-sm rounded-xl"
+              className="mt-4 w-full shrink-0 rounded-xl bg-neutral-950 py-3 text-sm font-bold text-white dark:bg-lime-400 dark:text-neutral-950"
             >
               Apply Filters
             </button>

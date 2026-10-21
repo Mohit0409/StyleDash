@@ -11,6 +11,7 @@ import { productRepository } from '../repositories/productRepository';
 import { vendorRepository } from '../repositories/vendorRepository';
 import type { Product, VendorStore } from '../types';
 import { buildSearchSuggestions, highlightSearchMatch, type SearchSuggestion } from '../utils/searchSuggestions';
+import { MOBILE_CATEGORY_SHORTCUTS } from '../data/mobileCategoryShortcuts';
 import categoryArtwork from '../assets/category-artwork.jpg';
 import './Header.css';
 
@@ -281,14 +282,7 @@ export const Header: React.FC<{ onOpenCart: () => void }> = ({ onOpenCart }) => 
     );
   };
 
-  const mobileCategories = [
-    { label: 'Women', href: '/products?dept=women', position: '0% 0%' },
-    { label: 'Men', href: '/products?dept=men', position: '50% 0%' },
-    { label: 'Kids', href: '/products?dept=kids', position: '100% 0%' },
-    { label: 'Footwear', href: '/products?category=Footwear', position: '0% 100%' },
-    { label: 'Beauty', href: '/products?category=Beauty%20%26%20Personal%20Care', position: '50% 100%' },
-    { label: 'Jewellery', href: '/products?category=Accessories', position: '100% 100%' },
-  ];
+  const mobileCategories = MOBILE_CATEGORY_SHORTCUTS;
 
   return (
     <header data-mobile-header-collapsed={isMobileCollapsed ? 'true' : 'false'} className="site-header relative z-40 md:sticky md:top-0 md:border-b md:border-neutral-200 md:bg-white md:shadow-sm dark:md:border-neutral-800 dark:md:bg-neutral-900">
@@ -313,7 +307,18 @@ export const Header: React.FC<{ onOpenCart: () => void }> = ({ onOpenCart }) => 
 
         <nav aria-label="Browse departments" aria-hidden={isMobileCollapsed} className="mobile-header-categories">
           <div className="no-scrollbar flex h-[76px] gap-1 overflow-x-auto px-3 py-1.5">
-            {mobileCategories.map(({ label, href, position }) => <Link key={label} to={href} tabIndex={isMobileCollapsed ? -1 : undefined} className="group flex min-w-[56px] flex-1 shrink-0 flex-col items-center gap-0.5 text-center"><span aria-hidden="true" className="h-12 w-12 shrink-0 rounded-full bg-white bg-[length:300%_200%] transition-transform group-active:scale-95 motion-reduce:transition-none" style={{ backgroundImage: `url(${categoryArtwork})`, backgroundPosition: position }} /><span className="text-[10px] font-semibold leading-[14px] text-neutral-800 dark:text-neutral-100">{label}</span></Link>)}
+            {mobileCategories.map(({ label, href, position, icon, backgroundColor }) => (
+              <Link key={label} to={href} tabIndex={isMobileCollapsed ? -1 : undefined} aria-label={"Shop " + label} className="group flex min-w-[56px] flex-1 shrink-0 flex-col items-center gap-0.5 text-center">
+                <span
+                  aria-hidden="true"
+                  className={"flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-white transition-transform group-active:scale-95 motion-reduce:transition-none " + (icon ? "text-2xl" : "bg-[length:300%_200%]")}
+                  style={icon ? { backgroundColor } : { backgroundImage: "url(" + categoryArtwork + ")", backgroundPosition: position }}
+                >
+                  {icon}
+                </span>
+                <span className="text-[10px] font-semibold leading-[14px] text-neutral-800 dark:text-neutral-100">{label}</span>
+              </Link>
+            ))}
           </div>
         </nav>
         </div>
