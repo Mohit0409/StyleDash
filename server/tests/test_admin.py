@@ -1083,7 +1083,7 @@ class AdminStoreTests(unittest.TestCase):
             admin_ui,
         )
         self.assertIn("Choose a current category", admin_ui)
-        self.assertNotIn("General Store", admin_ui)
+        self.assertIn("General Store", admin_ui)
         self.assertIn("{name:'category',label:'Category',type:'select',required:true,value:STORE_CATEGORIES[0]", admin_ui)
         self.assertIn("field-required", admin_ui)
         self.assertIn(".dialog-field-wide{", admin_css)
