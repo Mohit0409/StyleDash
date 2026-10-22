@@ -1551,6 +1551,12 @@ class AdminHandler(BaseHTTPRequestHandler):
                 user_id = unquote(path.removeprefix("/api/admin/customers/").removesuffix("/password"))
                 result = self.application.identity.set_customer_password(admin["id"], user_id, payload.get("password"))
                 self._json(200, {"success": True, "customer": result}); return
+            if path == "/api/admin/shop-products/manage":
+                result = self._shops().admin_bulk_manage_products(
+                    admin["id"], payload.get("ids"), payload.get("action")
+                )
+                self.application.payments.refresh_shop_products()
+                self._json(200, {"success": True, **result}); return
             if path.startswith("/api/admin/shop-products/"):
                 product_id = unquote(path.removeprefix("/api/admin/shop-products/"))
                 result = self._shops().admin_transition_product(

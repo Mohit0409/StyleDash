@@ -332,6 +332,13 @@ class ShopWorkflow:
             self._migrate_product_exchange(db)
             self._migrate_product_change_summaries(db)
             self._migrate_catalog_version(db)
+            db.execute(
+                """CREATE TABLE IF NOT EXISTS admin_removed_shop_products(
+                    product_id TEXT PRIMARY KEY REFERENCES shop_product_submissions(id),
+                    removed_by TEXT NOT NULL,
+                    removed_at TEXT NOT NULL
+                )"""
+            )
             integrity = [row[0] for row in db.execute("PRAGMA integrity_check").fetchall()]
             if integrity != ["ok"]:
                 raise RuntimeError("Shop migration failed SQLite integrity validation")
@@ -2236,9 +2243,73 @@ class ShopWorkflow:
         with self.connect() as db:
             self._require_admin(db, admin_id)
             rows = db.execute(
-                "SELECT * FROM shop_product_submissions ORDER BY updated_at DESC LIMIT 1000"
+                "SELECT * FROM shop_product_submissions WHERE NOT EXISTS (SELECT 1 FROM admin_removed_shop_products r WHERE r.product_id=shop_product_submissions.id) ORDER BY updated_at DESC LIMIT 1000"
             ).fetchall()
         return [self._serialize_product(row, admin=True) for row in rows]
+
+    def admin_bulk_manage_products(
+        self, admin_id: str, product_ids: Any, action: Any
+    ) -> dict[str, Any]:
+        """All-or-nothing admin unpublish or archival; never delete order references."""
+        if action not in {"UNPUBLISH", "REMOVE"}:
+            raise SecurityError(400, "Invalid bulk product action.", "invalid_bulk_product_action")
+        if (
+            not isinstance(product_ids, list)
+            or not 1 <= len(product_ids) <= 100
+            or any(not isinstance(value, str) or not value.strip() or len(value) > 128 for value in product_ids)
+            or len(product_ids) != len(set(product_ids))
+        ):
+            raise SecurityError(400, "Select 1 to 100 unique products.", "invalid_bulk_product_ids")
+        now = iso(utc_now())
+        with self.connect() as db:
+            db.execute("BEGIN IMMEDIATE")
+            self._require_admin(db, admin_id)
+            placeholders = ",".join("?" for _ in product_ids)
+            rows = db.execute(
+                f"SELECT id,status FROM shop_product_submissions WHERE id IN ({placeholders})",
+                tuple(product_ids),
+            ).fetchall()
+            row_map = {row["id"]: row for row in rows}
+            removed = {
+                row["product_id"] for row in db.execute(
+                    f"SELECT product_id FROM admin_removed_shop_products WHERE product_id IN ({placeholders})",
+                    tuple(product_ids),
+                ).fetchall()
+            }
+            if len(rows) != len(product_ids) or removed:
+                raise SecurityError(409, "A selected product is missing or already removed.", "bulk_product_conflict")
+            if action == "UNPUBLISH" and any(row_map[pid]["status"] != "PUBLISHED" for pid in product_ids):
+                raise SecurityError(409, "Bulk unpublish requires every selected product to be published.", "bulk_product_not_published")
+            for product_id in product_ids:
+                prior_status = row_map[product_id]["status"]
+                if action == "UNPUBLISH":
+                    db.execute(
+                        """UPDATE shop_product_submissions
+                              SET status='APPROVED', published_at=NULL,
+                                  reviewed_by=?, reviewed_at=?, updated_at=?
+                            WHERE id=?""",
+                        (admin_id, now, now, product_id),
+                    )
+                else:
+                    db.execute(
+                        """UPDATE shop_product_submissions
+                              SET status=CASE WHEN status='PUBLISHED' THEN 'APPROVED' ELSE status END,
+                                  published_at=NULL, reviewed_by=?, reviewed_at=?, updated_at=?
+                            WHERE id=?""",
+                        (admin_id, now, now, product_id),
+                    )
+                    db.execute(
+                        "INSERT INTO admin_removed_shop_products(product_id,removed_by,removed_at) VALUES(?,?,?)",
+                        (product_id, admin_id, now),
+                    )
+                self._audit_if_available(
+                    db, admin_id,
+                    "shop_product_admin_unpublished" if action == "UNPUBLISH" else "shop_product_admin_removed",
+                    "shop_product", product_id,
+                    {"from": prior_status, "action": action, "preservedRecord": True},
+                )
+            db.commit()
+        return {"action": action, "count": len(product_ids), "updatedIds": product_ids}
 
     def admin_transition_product(
         self,
@@ -2263,6 +2334,8 @@ class ShopWorkflow:
             if current is None:
                 db.rollback()
                 raise SecurityError(404, "Product submission not found.", "product_not_found")
+            if db.execute("SELECT 1 FROM admin_removed_shop_products WHERE product_id=?", (product_id,)).fetchone():
+                raise SecurityError(409, "Removed product cannot be published or changed.", "product_removed")
             if target not in PRODUCT_ADMIN_TRANSITIONS.get(current["status"], set()):
                 db.rollback()
                 raise SecurityError(
