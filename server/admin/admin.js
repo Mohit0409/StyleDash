@@ -436,6 +436,25 @@ async function createStoreProduct(){
   const payload={applicationId:values.applicationId,name:values.name,description:values.description,brand:values.brand||undefined,department:values.department,category:values.category,subcategory:values.subcategory||undefined,deliveryType:values.deliveryType,pricePaise:Math.round(price*100),originalPricePaise:Math.round(originalPrice*100),colourVariants,attributes:{optionMode:values.optionMode},tryAtHomeEnabled:values.tryAtHomeEnabled==='true',exchangeAvailable:values.exchangeAvailable==='true',outsideNeemuchDeliveryEnabled:values.outsideNeemuchDeliveryEnabled==='true'};
   await api('/api/admin/shop-products',{method:'POST',body:JSON.stringify(payload)});status(`${values.name} published successfully (${productOptionModeLabel(values.optionMode)}).`);
 }
+async function editProductCommission(button){
+  const item=currentShopProducts.find(product=>product.id===button.dataset.id);
+  if(!item)throw new Error('Product not found. Refresh and try again.');
+  const isCustom=item.commissionOverrideBasisPoints!==null&&item.commissionOverrideBasisPoints!==undefined;
+  const currentBasis=Number(item.commissionBasisPoints??500);
+  const values=await formDialog('Product commission — private admin only',[
+    {name:'mode',label:'Commission',type:'select',required:true,value:isCustom?'custom':'default',options:[{value:'default',label:'Default (5%)'},{value:'custom',label:'Custom rate for this product'}]},
+    {name:'rate',label:'Custom commission (%)',type:'number',required:true,value:(currentBasis/100).toFixed(2),min:0,max:100,step:'0.01',help:'Applies only to this product. Reset to Default (5%) at any time.'},
+  ],'Save commission');if(!values)return;
+  if(!['default','custom'].includes(values.mode))throw new Error('Choose default or custom commission.');
+  const value=Number(values.rate);
+  if(values.mode==='custom'&&(!Number.isFinite(value)||value<0||value>100||Math.round(value*100)!==value*100))throw new Error('Enter a commission between 0 and 100 with at most two decimal places.');
+  const override=values.mode==='default'?null:Math.round(value*100);
+  const effective=override===null?500:override;
+  const preview=item.pricePaise+Math.floor((item.pricePaise*effective+5000)/10000);
+  if(preview>item.originalPricePaise)throw new Error('Commission would take the customer price above this product’s recorded MRP. Reduce the rate or review the genuine MRP first.');
+  await api(`/api/admin/shop-products/${encodeURIComponent(item.id)}/commission`,{method:'PATCH',body:JSON.stringify({commissionBasisPoints:override})});
+  status(`Commission saved for ${item.name}: ${(effective/100).toFixed(2)}% (${override===null?'default':'custom'}).`);
+}
 async function editStoreProduct(button){
   const item=currentShopProducts.find(product=>product.id===button.dataset.id);if(!item)throw new Error('Product details are no longer available. Refresh and try again.');
   const live=(await api(`/api/admin/inventory?low=0&q=${encodeURIComponent(item.id)}`)).inventory||[];const liveById=new Map(live.map(row=>[row.variantId,Number(row.stock)]));
@@ -528,13 +547,45 @@ async function rejectOutsideDelivery(request){
   status('Outside delivery request rejected and the reason is visible to the customer.');
   return true;
 }
-function bulkToolbar(resource,statuses){return `<div class="actions bulk-toolbar"><label class="bulk-select bulk-select-all"><input type="checkbox" id="bulk-select-all-${resource}" data-bulk-select-all="${resource}"> Select all</label><span><strong id="bulk-count-${resource}">0</strong> selected</span><select data-bulk-target="${resource}"><option value="">Bulk action...</option>${statuses.map(value=>`<option value="${value}">${escapeText(value.replaceAll('_',' '))}</option>`).join('')}</select><button data-action="bulk-transition" data-resource="${resource}">Apply once</button></div>`;}
+function bulkToolbar(resource,statuses){return `<div class="actions bulk-toolbar"><label class="bulk-select bulk-select-all"><input type="checkbox" id="bulk-select-all-${resource}" data-bulk-select-all="${resource}"> Select all</label><span><strong id="bulk-count-${resource}">0</strong> selected</span><select data-bulk-target="${resource}"><option value="">Bulk action...</option>${statuses.map(value=>`<option value="${value}">${escapeText(value==='SET_COMMISSION'?'Set commission':value.replaceAll('_',' '))}</option>`).join('')}</select><button data-action="bulk-transition" data-resource="${resource}">Apply once</button></div>`;}
 function syncBulkSelectionUi(resource){const boxes=[...byId('content').querySelectorAll(`[data-bulk-select="${resource}"]`)];const selected=boxes.filter(box=>box.checked).length;const count=byId(`bulk-count-${resource}`);if(count)count.textContent=String(selected);const selectAll=byId(`bulk-select-all-${resource}`);if(selectAll){selectAll.checked=boxes.length>0&&selected===boxes.length;selectAll.indeterminate=selected>0&&selected<boxes.length;selectAll.disabled=boxes.length===0;}}
 function addBulkControls(resource,statuses,selector){for(const key of [...bulkSelection])if(key.startsWith(`${resource}:`))bulkSelection.delete(key);const root=byId('content');root.querySelector('h2')?.insertAdjacentHTML('afterend',bulkToolbar(resource,statuses));const seen=new Set();root.querySelectorAll(selector).forEach(container=>{const id=resource==='orders'?container.querySelector('h3')?.textContent:container.querySelector('[data-id]')?.dataset.id;if(!id||seen.has(id))return;seen.add(id);container.insertAdjacentHTML('afterbegin',`<label class="bulk-select"><input type="checkbox" data-bulk-select="${resource}" value="${escapeText(id)}"> Select</label>`);});syncBulkSelectionUi(resource);}
+async function bulkSetProductCommission(ids){
+  const items=ids.map(id=>currentShopProducts.find(product=>product.id===id));
+  if(items.some(item=>!item))throw new Error('Selected products changed. Refresh and select them again.');
+  const values=await formDialog(`Set commission for ${items.length} selected product(s)`,[
+    {name:'mode',label:'Commission mode',type:'select',required:true,value:'custom',
+      options:[{value:'custom',label:'Custom rate for selected products'},{value:'default',label:'Reset selected products to default (5%)'}],
+      help:`Applies only to these ${items.length} selected products. Every customer price must remain within its recorded MRP.`},
+    {name:'rate',label:'Custom commission (%)',type:'number',required:true,value:'5.00',min:0,max:100,step:'0.01',
+      help:'Enter 0 to 100, with up to two decimal places. Ignored when resetting to default.'},
+  ],'Apply commission to selection');
+  if(!values)return false;
+  if(!['custom','default'].includes(values.mode))throw new Error('Choose a valid commission mode.');
+  const entered=String(values.rate).trim();
+  if(values.mode==='custom'&&!/^(?:100(?:\.0{1,2})?|\d{1,2}(?:\.\d{1,2})?)$/.test(entered))
+    throw new Error('Enter a rate between 0% and 100% with at most two decimal places.');
+  const override=values.mode==='default'?null:Math.round(Number(entered)*100);
+  const basis=override??500;
+  const overMrp=items.filter(item=>(
+    item.pricePaise+Math.floor((item.pricePaise*basis+5000)/10000)>item.originalPricePaise
+  ));
+  if(overMrp.length)throw new Error(`This commission would exceed the recorded MRP for ${overMrp.length} selected product(s), including ${overMrp.slice(0,2).map(item=>item.name).join(', ')}. Nothing was changed. Lower the rate.`);
+  const result=await api('/api/admin/shop-products/bulk-commission',{
+    method:'PATCH',body:JSON.stringify({ids,commissionBasisPoints:override}),
+  });
+  for(const id of ids)bulkSelection.delete(`products:${id}`);
+  status(`Bulk commission saved: ${result.updatedCount} of ${result.selectedCount} selected product(s) changed to ${(basis/100).toFixed(2)}% (${override===null?'default':'custom'}).${result.unchangedCount?' '+result.unchangedCount+' already matched.':''}`);
+}
 async function bulkTransition(resource){
   const ids=[...bulkSelection].filter(value=>value.startsWith(`${resource}:`)).map(value=>value.slice(resource.length+1));
   const target=document.querySelector(`[data-bulk-target="${resource}"]`)?.value;
   if(!ids.length)throw new Error('Select one or more records first.');if(!target)throw new Error('Choose a bulk action.');
+  if(resource==='products'&&target==='SET_COMMISSION'){
+    const completed=await bulkSetProductCommission(ids);
+    if(completed===false)return false;
+    return true;
+  }
   if(resource==='orders'&&target==='cancelled'){
     const paidOnline=ids.map(id=>currentOrders.find(order=>order.id===id)).filter(isPaidOnlineOrder);
     if(paidOnline.length)throw new Error('Paid online orders must be refunded and cancelled individually so each real Razorpay refund is explicitly confirmed.');
@@ -637,6 +688,7 @@ byId('content').addEventListener('click', async event => {
     if(action==='bulk-shop-products') await bulkUploadStoreProducts();
     if(action==='download-product-template') downloadProductCsvTemplate();
     if(action==='edit-shop-product') await editStoreProduct(button);
+    if(action==='edit-product-commission') await editProductCommission(button);
     if(action==='toggle-outside-delivery') await toggleOutsideNeemuchDelivery(button);
     if(action==='outside-delivery-quote'){const request=(window.__outsideDeliveryRequests||[]).find(item=>item.id===button.dataset.id);if(!request)throw new Error('Delivery request not found.');if(!await quoteOutsideDelivery(request))return;}
     if(action==='outside-delivery-reject'){const request=(window.__outsideDeliveryRequests||[]).find(item=>item.id===button.dataset.id);if(!request)throw new Error('Delivery request not found.');if(!await rejectOutsideDelivery(request))return;}
@@ -645,7 +697,7 @@ byId('content').addEventListener('click', async event => {
     if(action==='mark-cancellation-fee-paid') { const collectionMethod=await feeCollectionMethodFor('Collect cancellation fee'); if(!collectionMethod)return; await api(`/api/admin/orders/${encodeURIComponent(button.dataset.id)}/cancellation-fee`,{method:'PATCH',body:JSON.stringify({collectionMethod})}); status('Cancellation fee marked paid after collection.'); }
     if(action==='mark-exchange-fee-paid') { const collectionMethod=await feeCollectionMethodFor('Collect exchange fee'); if(!collectionMethod)return; await api(`/api/admin/orders/${encodeURIComponent(button.dataset.orderId)}/exchanges/${encodeURIComponent(button.dataset.id)}/fee`,{method:'PATCH',body:JSON.stringify({collectionMethod})}); status('Exchange fee marked paid after collection.'); }
     if(action==='exchange-status') { await api(`/api/admin/orders/${encodeURIComponent(button.dataset.orderId)}/exchanges/${encodeURIComponent(button.dataset.id)}/status`,{method:'PATCH',body:JSON.stringify({status:button.dataset.value})}); status(`Exchange ${button.dataset.value}.`); }
-    if(action==='bulk-transition') await bulkTransition(button.dataset.resource);
+    if(action==='bulk-transition'){const completed=await bulkTransition(button.dataset.resource);if(completed===false)return;}
     if(action==='refund-cancel') {
       const order=currentOrders.find(item=>item.id===button.dataset.id);if(!order)throw new Error('Order details are no longer available. Refresh and try again.');
       const reason=await refundCancellationReasonFor(order);if(!reason)return;
@@ -676,7 +728,7 @@ async function loadTab(tab) {
     if(tab==='shop-products'){
       const [productResult,vendorResult]=await Promise.all([api('/api/admin/shop-products'),api('/api/admin/vendors')]);
       currentShopProducts=productResult.products; shopProductStores=vendorResult.applications;
-      renderShopProducts(currentShopProducts,shopProductStores);addBulkControls('products',['UNDER_REVIEW','APPROVED','REJECTED','PUBLISHED'],'.card');return;
+      renderShopProducts(currentShopProducts,shopProductStores);addBulkControls('products',['UNDER_REVIEW','APPROVED','REJECTED','PUBLISHED','SET_COMMISSION'],'.card');return;
     }
     if(tab==='shop-product-requests'){renderShopProductRequests((await api('/api/admin/shop-product-requests')).requests);addBulkControls('requests',['UNDER_REVIEW','APPROVED','REJECTED'],'.card');return;}
     if(tab==='inventory'){const snapshot=await api(`/api/admin/inventory?low=0&q=${query}`);inventoryShops=Array.isArray(snapshot.shops)?snapshot.shops:[];renderInventory(snapshot.inventory,inventoryShops);addBulkControls('inventory',['1','5','-1','-5'],'tbody tr');return;}
@@ -792,7 +844,7 @@ function renderShopProducts(items,applications=shopProductStores){
   const filtered=items.filter(item=>(shopProductFilter==='all'||item.applicationId===shopProductFilter)&&(f.status==='all'||item.status===f.status)&&(f.category==='all'||item.category===f.category)&&matchesAdminSearch({...item,storeName:storeMap.get(item.applicationId)},['name','brand','category','department','description','id','applicationId','storeName']));
   const options=['<option value="all"'+(shopProductFilter==='all'?' selected':'')+'>All Shops</option>',...stores.map(store=>`<option value="${escapeText(store.id)}"${shopProductFilter===store.id?' selected':''}>${escapeText(store.name)}</option>`)].join('');
   const extra=[adminSelect('Status','status',items.map(item=>item.status),f.status),adminSelect('Category','category',items.map(item=>item.category),f.category)].join('');
-  byId('content').innerHTML=`<h2>Shop product submissions</h2><div class="actions"><button class="success" data-action="create-shop-product">Add Product for Local Store</button><button class="success" data-action="bulk-shop-products">Bulk Upload CSV</button><button class="secondary" data-action="download-product-template">Download CSV Template</button></div><section class="order-filters" aria-label="Shop product filters"><label>Shop<select data-shop-product-filter>${options}</select></label>${extra}<div class="order-filter-summary"><span><strong>${filtered.length}</strong> of ${items.length} products</span></div></section><div class="grid">${filtered.map(item=>`<article class="card"><div class="inventory-product-heading">${inventoryThumbnail(item)}<div><h3>${escapeText(item.name)}</h3><small>${escapeText(storeMap.get(item.applicationId)||item.applicationId)} · ${escapeText(item.id)}</small></div></div><p>${escapeText(item.category)} | Store price Rs ${escapeText((item.pricePaise/100).toFixed(2))} | Customer price Rs ${escapeText(((item.customerPricePaise??item.pricePaise)/100).toFixed(2))} | Commission Rs ${escapeText(((item.commissionPaise??0)/100).toFixed(2))} | total stock ${escapeText(item.inventory)}</p>${item.tryAtHomeEnabled===true?'<p><strong>Try at Home enabled</strong> | two sizes | Rs 50 initial fee | 15-minute decision window</p>':''}<p>${(item.variants||[]).map(variant=>`${escapeText(variant.size)}: <strong>${escapeText(variant.inventory)}</strong>`).join(' · ')}</p><p class="muted">${escapeText(item.description)}</p>${item.rejectionReason?`<p class="error">${escapeText(item.rejectionReason)}</p>`:''}<strong>${escapeText(item.status)}</strong><div class="actions"><button data-action="edit-shop-product" data-id="${escapeText(item.id)}" data-name="${escapeText(item.name)}" data-description="${escapeText(item.description)}" data-price="${escapeText((item.pricePaise/100).toFixed(2))}" data-original="${escapeText((item.originalPricePaise/100).toFixed(2))}">Edit Details</button><button class="${item.outsideNeemuchDeliveryEnabled===true?'secondary':'success'}" data-action="toggle-outside-delivery" data-id="${escapeText(item.id)}">${item.outsideNeemuchDeliveryEnabled===true?'Disable Outside Delivery':'Enable Outside Delivery'}</button>${productTransitions(item.status).map(status=>`<button class="${status==='REJECTED'?'danger':'success'}" data-action="shop-product" data-id="${escapeText(item.id)}" data-value="${status}">${escapeText(status==='APPROVED'&&item.status==='PUBLISHED'?'UNPUBLISH':status.replaceAll('_',' '))}</button>`).join('')}</div></article>`).join('')||'<p>No products match the current search and filters.</p>'}</div>`;
+  byId('content').innerHTML=`<h2>Shop product submissions</h2><div class="actions"><button class="success" data-action="create-shop-product">Add Product for Local Store</button><button class="success" data-action="bulk-shop-products">Bulk Upload CSV</button><button class="secondary" data-action="download-product-template">Download CSV Template</button></div><section class="order-filters" aria-label="Shop product filters"><label>Shop<select data-shop-product-filter>${options}</select></label>${extra}<div class="order-filter-summary"><span><strong>${filtered.length}</strong> of ${items.length} products</span></div></section><div class="grid">${filtered.map(item=>`<article class="card"><div class="inventory-product-heading">${inventoryThumbnail(item)}<div><h3>${escapeText(item.name)}</h3><small>${escapeText(storeMap.get(item.applicationId)||item.applicationId)} · ${escapeText(item.id)}</small></div></div><p>${escapeText(item.category)} | Store price Rs ${escapeText((item.pricePaise/100).toFixed(2))} | Customer price Rs ${escapeText(((item.customerPricePaise??item.pricePaise)/100).toFixed(2))} | Commission ${escapeText(((item.commissionBasisPoints??500)/100).toFixed(2))}% ${item.commissionOverrideBasisPoints==null?'(default)':'(custom)'} (Rs ${escapeText(((item.commissionPaise??0)/100).toFixed(2))}) | total stock ${escapeText(item.inventory)}</p>${item.tryAtHomeEnabled===true?'<p><strong>Try at Home enabled</strong> | two sizes | Rs 50 initial fee | 15-minute decision window</p>':''}<p>${(item.variants||[]).map(variant=>`${escapeText(variant.size)}: <strong>${escapeText(variant.inventory)}</strong>`).join(' · ')}</p><p class="muted">${escapeText(item.description)}</p>${item.rejectionReason?`<p class="error">${escapeText(item.rejectionReason)}</p>`:''}<strong>${escapeText(item.status)}</strong><div class="actions"><button data-action="edit-shop-product" data-id="${escapeText(item.id)}" data-name="${escapeText(item.name)}" data-description="${escapeText(item.description)}" data-price="${escapeText((item.pricePaise/100).toFixed(2))}" data-original="${escapeText((item.originalPricePaise/100).toFixed(2))}">Edit Details</button><button data-action="edit-product-commission" data-id="${escapeText(item.id)}">Set commission</button><button class="${item.outsideNeemuchDeliveryEnabled===true?'secondary':'success'}" data-action="toggle-outside-delivery" data-id="${escapeText(item.id)}">${item.outsideNeemuchDeliveryEnabled===true?'Disable Outside Delivery':'Enable Outside Delivery'}</button>${productTransitions(item.status).map(status=>`<button class="${status==='REJECTED'?'danger':'success'}" data-action="shop-product" data-id="${escapeText(item.id)}" data-value="${status}">${escapeText(status==='APPROVED'&&item.status==='PUBLISHED'?'UNPUBLISH':status.replaceAll('_',' '))}</button>`).join('')}</div></article>`).join('')||'<p>No products match the current search and filters.</p>'}</div>`;
   byId('content').querySelectorAll('.card').forEach(card=>{const id=card.querySelector('[data-action="edit-shop-product"]')?.dataset.id;const item=filtered.find(product=>product.id===id);const heading=card.querySelector('h3');if(item?.exchangeAvailable===true)heading?.insertAdjacentHTML('afterend','<p><strong>Size exchange enabled</strong> | Rs 50 fee</p>');if(item?.outsideNeemuchDeliveryEnabled===true)heading?.insertAdjacentHTML('afterend','<p><strong>Outside Neemuch delivery requests enabled</strong></p>');});
 }
 function renderShopProductRequests(items){
