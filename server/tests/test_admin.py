@@ -1060,7 +1060,7 @@ class AdminStoreTests(unittest.TestCase):
         self.assertIn("Admin changes take effect immediately after save.", admin_ui)
         map_ui = (ROOT / "server/admin/delivery-zone-map.js").read_text(encoding="utf-8")
         admin_css = (ROOT / "server/admin/admin.css").read_text(encoding="utf-8")
-        self.assertIn('/admin.js?v=commission-ui-parity-20261022-1', admin_index)
+        self.assertIn('/admin.js?v=csv-commission-parity-20261022-1', admin_index)
         self.assertIn('/admin.css?v=thumbnail-20260916-4', admin_index)
         self.assertIn('id="admin-dialog"', admin_index)
         self.assertIn('role="status"', admin_index)
@@ -1145,8 +1145,8 @@ class AdminHttpTests(unittest.TestCase):
         status, index, headers = self.request("/")
         self.assertEqual(status, 200)
         self.assertEqual(headers.get("Cache-Control"), "no-store")
-        self.assertIn("/admin.js?v=commission-ui-parity-20261022-1", index)
-        status, script, headers = self.request("/admin.js?v=commission-ui-parity-20261022-1")
+        self.assertIn("/admin.js?v=csv-commission-parity-20261022-1", index)
+        status, script, headers = self.request("/admin.js?v=csv-commission-parity-20261022-1")
         self.assertEqual(status, 200)
         self.assertEqual(headers.get("Cache-Control"), "no-store")
         self.assertIn('width="48" height="48"', script)
@@ -1760,6 +1760,84 @@ class AdminHttpTests(unittest.TestCase):
         for product_id, original in before.items():
             after=next(product for product in shops.admin_list_products(admin_id) if product["id"]==product_id)
             self.assertEqual((after["name"],after["imageUrls"]),(original["name"],original["imageUrls"]))
+
+        # Only private admin CSV can specify a per-product rate. The whole
+        # batch must validate before publishing, and MRP never changes.
+        rate_header = (
+            "name,description,department,category,price,originalPrice,"
+            "variants,colourName,commissionPercent,imageUrls"
+        )
+        def rates_csv(rows):
+            return rate_header + "\n" + "\n".join(rows) + "\n"
+        rate_rows = [
+            "CSV Default Fixture,Local product,unisex,Footwear,100,130,8:5,Black,,https://example.test/default.jpg",
+            "CSV Zero Fixture,Local product,unisex,Footwear,100,130,8:5,Blue,0,https://example.test/zero.jpg",
+            "CSV 3.25 Fixture,Local product,unisex,Footwear,100,130,8:5,Green,3.25,https://example.test/custom.jpg",
+            "CSV 100 Fixture,Local product,unisex,Footwear,100,210,8:5,Red,100.00,https://example.test/full.jpg",
+        ]
+        rate_before = len(shops.admin_list_products(admin_id))
+        status, rate_response, _ = self.request(
+            "/api/admin/shop-products/bulk",
+            {"applicationId":application["id"],"csvText":rates_csv(rate_rows),"images":{}},
+            headers={"X-CSRF-Token":csrf}, method="POST"
+        )
+        self.assertEqual((status,rate_response["created"]),(201,4))
+        csv_by_name = {p["name"]:p for p in rate_response["products"]}
+        for name,bps,customer in (
+            ("CSV Default Fixture",None,10500),
+            ("CSV Zero Fixture",0,10000),
+            ("CSV 3.25 Fixture",325,10325),
+            ("CSV 100 Fixture",10000,20000),
+        ):
+            result = csv_by_name[name]
+            self.assertEqual(result["commissionOverrideBasisPoints"],bps)
+            self.assertEqual(result["customerPricePaise"],customer)
+            self.assertEqual(result["pricePaise"],10000)
+            self.assertEqual(result["originalPricePaise"],21000 if bps==10000 else 13000)
+        self.assertEqual(len(shops.admin_list_products(admin_id)),rate_before+4)
+        rate_count = len(shops.admin_list_products(admin_id))
+        # Do not silently publish grouped-colour rows as separate products:
+        # grouped import is a separate live feature, not yet backported.
+        status, group_unsupported, _ = self.request(
+            "/api/admin/shop-products/bulk",
+            {"applicationId":application["id"],"csvText":rates_csv([
+                "CSV Grouped Not Supported,Local product,unisex,Footwear,100,130,8:5,Black,3.25,https://example.test/group.jpg"
+            ]).replace("commissionPercent,imageUrls","commissionPercent,imageUrls,productGroup").replace(
+                "https://example.test/group.jpg","https://example.test/group.jpg,GROUP-1"
+            ),"images":{}},
+            headers={"X-CSRF-Token":csrf},method="POST"
+        )
+        self.assertEqual((status,group_unsupported["code"]),(400,"invalid_product_import"))
+        self.assertIn("Grouped-colour CSV imports",group_unsupported["error"])
+        self.assertEqual(len(shops.admin_list_products(admin_id)),rate_count)
+        for index,invalid_rate in enumerate(("100.01","-1","5.555","NaN","1e2","2%","101")):
+            with self.subTest(invalid_commission=index):
+                bad_line = (
+                    f"CSV Rate Invalid {index},Local product,unisex,Footwear,"
+                    f"100,130,8:5,Grey,{invalid_rate},https://example.test/invalid.jpg"
+                )
+                status, failed, _ = self.request(
+                    "/api/admin/shop-products/bulk",
+                    {"applicationId":application["id"],"csvText":rates_csv([bad_line]),"images":{}},
+                    headers={"X-CSRF-Token":csrf}, method="POST"
+                )
+                self.assertEqual((status,failed["code"]),(400,"invalid_product_import"))
+                self.assertIn("Commission must be a percentage",failed["error"])
+                self.assertEqual(len(shops.admin_list_products(admin_id)),rate_count)
+        status, mrp_failure, _ = self.request(
+            "/api/admin/shop-products/bulk",
+            {"applicationId":application["id"],"csvText":rates_csv([
+                "CSV Candidate No Partial,Local product,unisex,Footwear,100,130,8:5,Brown,3.25,https://example.test/ok.jpg",
+                "CSV MRP Too Low,Local product,unisex,Footwear,100,100,8:5,Pink,10,https://example.test/over.jpg",
+            ]),"images":{}},
+            headers={"X-CSRF-Token":csrf},method="POST"
+        )
+        self.assertEqual((status,mrp_failure["code"]),(400,"invalid_bulk_products"))
+        self.assertEqual(len(shops.admin_list_products(admin_id)),rate_count)
+        self.assertNotIn(
+            "CSV Candidate No Partial",
+            {p["name"] for p in shops.admin_list_products(admin_id)}
+        )
 
         count_before=len(shops.admin_list_products(admin_id))
         missing_csv='name,description,department,category,price,variants,colourName,imageFile\nMissing Image,Should fail,unisex,Footwear,999,"8:5",Black,missing.jpg\n'

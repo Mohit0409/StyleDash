@@ -887,6 +887,63 @@ class ShopWorkflowTests(unittest.TestCase):
         self.assert_error("invalid_bulk_products", lambda: self.store.admin_bulk_create_products("admin-a", application["id"], [duplicate_a, duplicate_b]))
         self.assertNotIn("Duplicate Name", [item["name"] for item in self.store.list_published_products()])
 
+    def test_admin_bulk_csv_commission_overrides_are_private_and_atomic(self) -> None:
+        application = self.create_active_shop("user-a", "CSV Commission Rate Test Shop")
+        created_payloads = []
+        for name,rate,price,mrp in (
+            ("CSV Default Rate",None,10_000,12_000),
+            ("CSV Rate Zero",0,10_000,12_000),
+            ("CSV Rate Three Quarter",325,10_000,12_000),
+            ("CSV Full Rate",10_000,10_000,22_000),
+        ):
+            payload = self.complete_product(name)
+            payload["pricePaise"] = price
+            payload["originalPricePaise"] = mrp
+            if rate is not None:
+                payload["commissionBasisPoints"] = rate
+            created_payloads.append(payload)
+        results = self.store.admin_bulk_create_products(
+            "admin-a", application["id"], created_payloads
+        )
+        self.assertEqual([p["commissionOverrideBasisPoints"] for p in results], [None,0,325,10000])
+        self.assertEqual([p["customerPricePaise"] for p in results], [10500,10000,10325,20000])
+        self.assertEqual([p["originalPricePaise"] for p in results], [12000,12000,12000,22000])
+        for result in results:
+            public = next(p for p in self.store.list_published_products() if p["id"] == result["id"])
+            self.assertEqual(public["price"], result["customerPricePaise"] / 100)
+            for private in ("commissionOverrideBasisPoints","commissionBasisPoints","commissionPaise"):
+                self.assertNotIn(private, public)
+        self.assertEqual(
+            {p["price"] for p in self.store.payment_catalog_products()},
+            {105.0,100.0,103.25,200.0},
+        )
+        initial = {p["id"] for p in self.store.admin_list_products("admin-a")}
+        candidate = self.complete_product("CSV Safe Candidate")
+        candidate.update({"pricePaise":10_000,"originalPricePaise":12_000,"commissionBasisPoints":100})
+        too_high = self.complete_product("CSV Beyond MRP")
+        too_high.update({"pricePaise":10_000,"originalPricePaise":10_000,"commissionBasisPoints":300})
+        self.assert_error(
+            "invalid_bulk_products",
+            lambda: self.store.admin_bulk_create_products(
+                "admin-a", application["id"], [candidate,too_high]
+            ),
+        )
+        self.assertEqual(
+            {p["id"] for p in self.store.admin_list_products("admin-a")}, initial
+        )
+        for invalid in (True,False,-1,10001,2.5,"300",None):
+            payload = self.complete_product("CSV Invalid Commission")
+            payload["commissionBasisPoints"] = invalid
+            self.assert_error(
+                "invalid_bulk_products",
+                lambda row=payload: self.store.admin_bulk_create_products(
+                    "admin-a", application["id"], [row]
+                ),
+            )
+        self.assertEqual(
+            {p["id"] for p in self.store.admin_list_products("admin-a")}, initial
+        )
+
     def test_admin_bulk_create_products_rejects_existing_name_without_partial_insert(self) -> None:
         application = self.create_active_shop("user-a", "Existing Product Shop")
         self.store.admin_create_product("admin-a", application["id"], self.complete_product("Existing Kurta"))
