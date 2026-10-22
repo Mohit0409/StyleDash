@@ -377,8 +377,8 @@ const PRODUCT_OPTION_MODES=[
 const DELIVERY_OPTIONS=[{value:'normal',label:'Site-wide: Normal Mon-Fri; Normal + Express Sat-Sun'}];
 
 function downloadProductCsvTemplate(){
-  const header=['name','description','brand','department','category','subcategory','deliveryType','price','originalPrice','variants','colourName','colourHex','imageFile','imageUrls'];
-  const sample=['Campus Sports Shoes','Sports shoes','Campus','unisex','Footwear','','normal','1720','1720','6:5, 7:5, 8:5, 9:5, 10:5','Multi Color (White/Blue/Green)','','product1_main.jpg|product1_side.jpg|product1_back.jpg',''];
+  const header=['name','description','brand','department','category','subcategory','deliveryType','price','originalPrice','variants','colourName','colourHex','commissionPercent','imageFile','imageUrls'];
+  const sample=['Campus Sports Shoes','Sports shoes','Campus','unisex','Footwear','','normal','1720','1999','6:5, 7:5, 8:5, 9:5, 10:5','Multi Color (White/Blue/Green)','','','product1_main.jpg|product1_side.jpg|product1_back.jpg',''];
   const quote=value=>`"${String(value).replaceAll('"','""')}"`;const blob=new Blob([[header,sample].map(row=>row.map(quote).join(',')).join('\r\n')],{type:'text/csv;charset=utf-8'});const link=document.createElement('a');link.href=URL.createObjectURL(blob);link.download='vibe4you-product-import-template.csv';link.click();URL.revokeObjectURL(link.href);
 }
 function parseCsv(text){
@@ -391,6 +391,10 @@ function csvImageRequirements(text){
     if(!row.some(value=>value.trim()))continue;
     productRows+=1;
     const values=Object.fromEntries(headers.map((key,index)=>[key,(row[index]??'').trim()]));
+    if((values.productGroup||'').trim())throw new Error('Row '+productRows+': Grouped-colour CSV imports are not yet supported in this editable admin release.');
+    const commission=(values.commissionPercent||'').trim();
+    if(commission&&!/^(?:100(?:\.0{1,2})?|\d{1,2}(?:\.\d{1,2})?)$/.test(commission))
+      throw new Error('Row '+productRows+': Commission must be a percentage between 0 and 100, with up to two decimals.');
     const local=values.imageFile?values.imageFile.split('|').map(value=>value.trim()):[];
     const direct=(values.imageUrls||'').split('|').map(value=>value.trim()).filter(Boolean);
     if(local.some(fileName=>!fileName))throw new Error('Row '+productRows+': Image filenames must not be empty.');
@@ -409,7 +413,7 @@ async function bulkUploadStoreProducts(){
   const applications=(await api('/api/admin/vendors')).applications.filter(item=>item.status==='ACTIVE');if(!applications.length)throw new Error('There are no active shops available for product import.');
   const values=await formDialog('Bulk upload products',[
     {name:'applicationId',label:'Publish products for',type:'select',required:true,options:applications.map(item=>({value:item.id,label:`${item.shopName} - ${item.ownerName}`}))},
-    {name:'csv',label:'Product CSV',type:'file',accept:'.csv,text/csv',required:true,help:'Use imageFile as main.jpg|side.jpg|back.jpg (up to 8 images total per product). The first file is the main image. Keep deliveryType as normal; the site automatically offers Normal Mon-Fri and Normal + Express Sat-Sun for every product.'},
+    {name:'csv',label:'Product CSV',type:'file',accept:'.csv,text/csv',required:true,help:'Optional commissionPercent (for example 3.25) overrides the default 5% for that product. Customer price must remain within genuine MRP. Use imageFile as main.jpg|side.jpg|back.jpg (up to 8 images total per product). The first file is the main image. Keep deliveryType as normal; the site automatically offers Normal Mon-Fri and Normal + Express Sat-Sun for every product.'},
     {name:'imageFiles',label:'Select the local product images referenced by the CSV',type:'file',accept:ADMIN_IMAGE_ACCEPT,multiple:true,previewImages:true,help:'Select ALL local files named in imageFile, including gallery images. Use | to separate filenames in the CSV. Extract ZIP archives before selecting files; images upload before publishing.'},
   ],'Review import');if(!values)return;
   const csvFile=values.csv;if(!(csvFile instanceof File)||!csvFile.size)throw new Error('Choose a CSV file.');if(csvFile.size>1024*1024)throw new Error('CSV must be 1 MB or smaller.');const csvText=await csvFile.text();const plan=csvImageRequirements(csvText);const selected=selectedImageMap(values.imageFiles||[]);const requiredFiles=new Map();

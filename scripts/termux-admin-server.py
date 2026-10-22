@@ -139,6 +139,8 @@ def parse_admin_product_csv(csv_text: Any, image_map: Any, product_image_directo
         if row_number > 100:
             raise SecurityError(400, "Upload a maximum of 100 products at a time.", "invalid_product_import")
         values = {key: str(value or "").strip() for key, value in row.items() if key is not None}
+        if values.get("productGroup", "").strip():
+            _import_error(row_number, "Grouped-colour CSV imports are not supported by this editable release. Use the verified production importer or a future grouped-variant update.")
         name = values.get("name", "")
         if not name:
             _import_error(row_number, "Product name is required.")
@@ -184,6 +186,11 @@ def parse_admin_product_csv(csv_text: Any, image_map: Any, product_image_directo
             "colourName": values.get("colourName", ""), "colourHex": values.get("colourHex") or None,
             "imageUrls": image_urls, "attributes": {},
         }
+        commission_text = values.get("commissionPercent", "")
+        if commission_text:
+            if not re.fullmatch(r"(?:100(?:\.0{1,2})?|\d{1,2}(?:\.\d{1,2})?)", commission_text):
+                _import_error(row_number, "Commission must be a percentage from 0 to 100, with at most two decimals.")
+            product["commissionBasisPoints"] = round(float(commission_text) * 100)
         require_existing_admin_product_media(product, product_image_directory, row_number)
         products.append(product)
     if not products:

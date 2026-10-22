@@ -150,11 +150,11 @@ test('private product listing visibly labels custom versus default and provides 
   assert.equal((fx.content.innerHTML.match(/data-action="edit-product-commission"/g)||[]).length,2);
   assert.match(fx.content.innerHTML,/data-id="sku-one">Set commission/);
 });
-test('bulk UI dropdown and action click wiring are present without unrelated CSV commission support',()=>{
+test('bulk UI dropdown and action click wiring are preserved with optional CSV commission support',()=>{
   const fx=fixture();
   const html=fx.ui.bulkToolbar('products',['APPROVED','SET_COMMISSION']);
   assert.match(html,/value="SET_COMMISSION">Set commission/);
   assert.match(original,/if\(action==='edit-product-commission'\) await editProductCommission\(button\)/);
   assert.match(original,/addBulkControls\('products',\['UNDER_REVIEW','APPROVED','REJECTED','PUBLISHED','SET_COMMISSION'\]/);
-  assert.doesNotMatch(original,/commissionPercent/);
+  assert.match(original,/Optional commissionPercent/);
 });

@@ -1286,6 +1286,7 @@ class ShopWorkflow:
         *,
         allow_legacy_current_images: bool = False,
         trusted_variant_metadata: bool = False,
+        bulk_commission_override_bps: int | None = None,
     ) -> dict[str, Any]:
         if not isinstance(payload, dict) or set(payload) - PRODUCT_PAYLOAD_FIELDS:
             raise SecurityError(400, "Unsupported product field.", "invalid_product")
@@ -1362,7 +1363,7 @@ class ShopWorkflow:
             original_price = price
         if isinstance(price, bool) or not isinstance(price, int) or not 100 <= price <= 100_000_000:
             raise SecurityError(400, "Enter a valid product price.", "invalid_product")
-        customer_price = _customer_price_paise(price, _row_commission_override(current) if current is not None else None)
+        customer_price = _customer_price_paise(price, _row_commission_override(current) if current is not None else bulk_commission_override_bps)
         if (
             isinstance(original_price, bool)
             or not isinstance(original_price, int)
@@ -2046,19 +2047,30 @@ class ShopWorkflow:
     ) -> list[dict[str, Any]]:
         if not isinstance(products, list) or not 1 <= len(products) <= 100:
             raise SecurityError(400, "Upload between 1 and 100 products at a time.", "invalid_bulk_products")
-        validated: list[tuple[int, dict[str, Any]]] = []
+        validated: list[tuple[int, dict[str, Any], int | None]] = []
         seen_keys: set[tuple[str, str]] = set()
         errors: list[str] = []
         for index, payload in enumerate(products, start=1):
             try:
-                values = self._product_payload(payload)
+                if not isinstance(payload, dict):
+                    raise SecurityError(400, "Invalid product import row.", "invalid_bulk_products")
+                commission_bps = payload.get("commissionBasisPoints")
+                if "commissionBasisPoints" in payload and (
+                    isinstance(commission_bps, bool) or
+                    not isinstance(commission_bps, int) or not 0 <= commission_bps <= 10000
+                ):
+                    raise SecurityError(400, "Invalid commission percentage.", "invalid_product_commission")
+                sanitized = {k:v for k,v in payload.items() if k != "commissionBasisPoints"}
+                values = self._product_payload(
+                    sanitized, bulk_commission_override_bps=commission_bps
+                )
                 if not json.loads(values["image_urls_json"]):
                     raise SecurityError(400, "Add at least one product image.", "product_image_required")
                 key = (values["name"].strip().casefold(), values["colour_name"].strip().casefold())
                 if key in seen_keys:
                     raise SecurityError(409, "Duplicate product name and colour in this upload.", "duplicate_product")
                 seen_keys.add(key)
-                validated.append((index, values))
+                validated.append((index, values, commission_bps))
             except SecurityError as error:
                 errors.append(f"Row {index}: {error.message}")
         if errors:
@@ -2087,13 +2099,13 @@ class ShopWorkflow:
             }
             duplicates = [
                 f"Row {index}: A product named '{values['name']}' in colour '{values['colour_name']}' already exists for this shop."
-                for index, values in validated
+                for index, values, _commission_bps in validated
                 if (values["name"].strip().casefold(), values["colour_name"].strip().casefold()) in existing
             ]
             if duplicates:
                 db.rollback()
                 raise SecurityError(409, "Fix these rows: " + " | ".join(duplicates[:20]), "duplicate_product")
-            for _index, values in validated:
+            for _index, values, commission_bps in validated:
                 product_id = "shopprod_" + secrets.token_hex(12)
                 variants_json = _created_variants_json(product_id, values["variants_json"])
                 slug = self._product_slug(values["name"], product_id)
@@ -2104,6 +2116,12 @@ class ShopWorkflow:
                     (product_id,slug,application_id,application["submitted_by_user_id"],values["name"],values["description"],values["brand"],values["department"],values["category"],values["price_paise"],values["original_price_paise"],values["inventory"],values["size"],variants_json,values["colour_name"],values["colour_hex"],values["image_urls_json"],values["attributes_json"],admin_id,now,now,now,now,now),
                 )
                 db.execute("UPDATE shop_product_submissions SET try_at_home_enabled=?,exchange_available=? WHERE id=?", (values["try_at_home_enabled"], values["exchange_available"], product_id))
+                if commission_bps is not None:
+                    # Set the override in the SAME transaction, before publishing.
+                    db.execute(
+                        "UPDATE shop_product_submissions SET commission_override_bps=? WHERE id=?",
+                        (commission_bps, product_id),
+                    )
                 created_ids.append(product_id)
                 self._audit_if_available(db,admin_id,"shop_product_admin_bulk_created","shop_product",product_id,{"applicationId":application_id,"status":"PUBLISHED"})
             db.commit()

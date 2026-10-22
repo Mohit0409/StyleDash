@@ -41,3 +41,35 @@ test('rejects empty, duplicate and path traversal filenames', () => {
 test('URL only products remain supported', () => {
   assert.equal(plan(csv('', 'https://example.com/front.jpg')).requirements.length, 0);
 });
+
+
+test('optional per-row commissionPercent allows default zero and two-decimal rates', () => {
+  const headerRate = header + ',commissionPercent';
+  const csvRate = value => headerRate + '\n' +
+    'CSV Watch,Description,unisex,Accessories,100,One Size:5,Black,front.jpg,,' + value + '\n';
+  for (const rate of ['', '0', '0.00', '3.25', '5', '99.99', '100', '100.00']) {
+    assert.equal(plan(csvRate(rate)).productRows, 1);
+  }
+});
+
+test('commissionPercent client validation rejects malformed and dangerous rates', () => {
+  const headerRate = header + ',commissionPercent';
+  const csvRate = value => headerRate + '\n' +
+    'CSV Watch,Description,unisex,Accessories,100,One Size:5,Black,front.jpg,,' + value + '\n';
+  for (const rate of ['-1','100.01','101','1.234','NaN','Infinity','1e2','5%']) {
+    assert.throws(() => plan(csvRate(rate)), /Commission must be a percentage/);
+  }
+});
+
+test('CSV template exposes optional commissionPercent with an MRP above default customer price', () => {
+  assert.match(script, /'commissionPercent','imageFile','imageUrls'/);
+  assert.match(script, /'1720','1999'/);
+  assert.match(script, /Optional commissionPercent/);
+});
+
+
+test('grouped-colour imports fail explicitly until variant grouping is separately backported', () => {
+  const heading=header+',productGroup';
+  const row='CSV Bag,Description,women,Accessories,100,One Size:5,Black,front.jpg,,BAG-GROUP-1';
+  assert.throws(() => plan(heading+'\n'+row+'\n'), /Grouped-colour CSV imports are not yet supported/);
+});
