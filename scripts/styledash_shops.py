@@ -119,18 +119,25 @@ PRODUCT_MEDIA_PATH_PATTERN = re.compile(r"^/media/product-images/[0-9a-f]{32}\.(
 EXCHANGE_WINDOW_DAYS = 2
 
 
-def _commission_rate_basis_points(price_paise: int) -> int:
-    """Customer-paid commission; this rate must never be exposed publicly."""
-    if price_paise < 50_000:
-        return 1_000
-    if price_paise <= 100_000:
-        return 800
-    return 600
+DEFAULT_PRODUCT_COMMISSION_BPS = 500  # 5%; private administration only.
 
 
-def _customer_price_paise(price_paise: int) -> int:
-    rate = _commission_rate_basis_points(price_paise)
+def _commission_rate_basis_points(price_paise: int, override_bps: int | None = None) -> int:
+    """Return the default or admin-selected product commission (never public)."""
+    return DEFAULT_PRODUCT_COMMISSION_BPS if override_bps is None else override_bps
+
+
+def _customer_price_paise(price_paise: int, override_bps: int | None = None) -> int:
+    rate = _commission_rate_basis_points(price_paise, override_bps)
     return price_paise + ((price_paise * rate + 5_000) // 10_000)
+
+
+def _row_commission_override(row: sqlite3.Row) -> int | None:
+    return row["commission_override_bps"] if "commission_override_bps" in row.keys() else None
+
+
+def _row_customer_price_paise(row: sqlite3.Row) -> int:
+    return _customer_price_paise(row["price_paise"], _row_commission_override(row))
 
 
 _SIMILAR_GENERIC_TAGS = {"local-shop"}
@@ -332,6 +339,7 @@ class ShopWorkflow:
             self._migrate_product_exchange(db)
             self._migrate_product_change_summaries(db)
             self._migrate_catalog_version(db)
+            self._migrate_product_commission(db)
             integrity = [row[0] for row in db.execute("PRAGMA integrity_check").fetchall()]
             if integrity != ["ok"]:
                 raise RuntimeError("Shop migration failed SQLite integrity validation")
@@ -766,6 +774,34 @@ class ShopWorkflow:
                     )
             if db.execute("SELECT 1 FROM shop_schema_migrations WHERE version=10").fetchone() is None:
                 db.execute("INSERT INTO shop_schema_migrations(version,applied_at) VALUES(10,?)", (now,))
+            db.commit()
+        except Exception:
+            db.rollback()
+            raise
+
+    @staticmethod
+    def _migrate_product_commission(db: sqlite3.Connection) -> None:
+        """Add a private, optional per-product rate; existing products inherit 5%."""
+        now = iso(utc_now())
+        db.execute("BEGIN IMMEDIATE")
+        try:
+            columns = {row["name"] for row in db.execute(
+                "PRAGMA table_info(shop_product_submissions)"
+            ).fetchall()}
+            if "commission_override_bps" not in columns:
+                db.execute(
+                    "ALTER TABLE shop_product_submissions ADD COLUMN "
+                    "commission_override_bps INTEGER "
+                    "CHECK(commission_override_bps IS NULL OR "
+                    "(commission_override_bps BETWEEN 0 AND 10000))"
+                )
+            if db.execute(
+                "SELECT 1 FROM shop_schema_migrations WHERE version=11"
+            ).fetchone() is None:
+                db.execute(
+                    "INSERT INTO shop_schema_migrations(version,applied_at) VALUES(11,?)",
+                    (now,),
+                )
             db.commit()
         except Exception:
             db.rollback()
@@ -1326,7 +1362,7 @@ class ShopWorkflow:
             original_price = price
         if isinstance(price, bool) or not isinstance(price, int) or not 100 <= price <= 100_000_000:
             raise SecurityError(400, "Enter a valid product price.", "invalid_product")
-        customer_price = _customer_price_paise(price)
+        customer_price = _customer_price_paise(price, _row_commission_override(current) if current is not None else None)
         if (
             isinstance(original_price, bool)
             or not isinstance(original_price, int)
@@ -1646,13 +1682,16 @@ class ShopWorkflow:
             "publishedAt": row["published_at"],
         }
         if admin:
-            customer_price_paise = _customer_price_paise(row["price_paise"])
+            override_bps = _row_commission_override(row)
+            customer_price_paise = _row_customer_price_paise(row)
             result.update({
                 "submittedByUserId": row["submitted_by_user_id"],
                 "reviewedBy": row["reviewed_by"],
                 "reviewedAt": row["reviewed_at"],
                 "commissionPaise": customer_price_paise - row["price_paise"],
                 "customerPricePaise": customer_price_paise,
+                "commissionBasisPoints": _commission_rate_basis_points(row["price_paise"], override_bps),
+                "commissionOverrideBasisPoints": override_bps,
             })
         return result
 
@@ -2231,6 +2270,162 @@ class ShopWorkflow:
                 "SELECT * FROM shop_product_submissions WHERE id=?", (product_id,)
             ).fetchone()
         return self._serialize_product(row, admin=True)
+
+    def admin_set_product_commission(
+        self, admin_id: str, product_id: str, override_bps: Any
+    ) -> dict[str, Any]:
+        """Admin-only commission override. None resets to the global 5% default."""
+        if override_bps is not None and (
+            isinstance(override_bps, bool)
+            or not isinstance(override_bps, int)
+            or not 0 <= override_bps <= 10_000
+        ):
+            raise SecurityError(
+                400, "Commission must be a percentage between 0 and 100, with at most two decimals.",
+                "invalid_product_commission",
+            )
+        with self.connect() as db:
+            db.execute("BEGIN IMMEDIATE")
+            self._require_admin(db, admin_id)
+            current = db.execute(
+                "SELECT * FROM shop_product_submissions WHERE id=?", (product_id,)
+            ).fetchone()
+            if current is None:
+                raise SecurityError(404, "Product not found.", "product_not_found")
+            customer = _customer_price_paise(current["price_paise"], override_bps)
+            if customer > current["original_price_paise"]:
+                raise SecurityError(
+                    409,
+                    "The customer price including commission would exceed the recorded MRP. "
+                    "Reduce the commission or correct the actual product price; do not inflate MRP.",
+                    "product_commission_exceeds_mrp",
+                )
+            old_override = _row_commission_override(current)
+            if old_override != override_bps:
+                now = iso(utc_now())
+                db.execute(
+                    "UPDATE shop_product_submissions "
+                    "SET commission_override_bps=?,updated_at=? WHERE id=?",
+                    (override_bps, now, product_id),
+                )
+                self._audit_if_available(
+                    db, admin_id, "shop_product_commission_updated", "shop_product",
+                    product_id,
+                    {"previousBasisPoints": old_override,
+                     "newBasisPoints": override_bps,
+                     "effectiveBasisPoints": _commission_rate_basis_points(
+                         current["price_paise"], override_bps
+                     )},
+                )
+            db.commit()
+            row = db.execute(
+                "SELECT * FROM shop_product_submissions WHERE id=?", (product_id,)
+            ).fetchone()
+        return self._serialize_product(row, admin=True)
+
+    def admin_bulk_set_product_commission(
+        self, admin_id: str, product_ids: Any, override_bps: Any
+    ) -> dict[str, Any]:
+        """Apply one commission to selected products as one atomic transaction.
+
+        Validate every selected product against its recorded MRP before writing.
+        A null override returns the selection to the private 5% default.
+        """
+        if (
+            not isinstance(product_ids, list)
+            or not 1 <= len(product_ids) <= 1000
+            or any(
+                not isinstance(product_id, str)
+                or not product_id.strip()
+                or product_id != product_id.strip()
+                or len(product_id) > 128
+                for product_id in product_ids
+            )
+            or len(set(product_ids)) != len(product_ids)
+        ):
+            raise SecurityError(
+                400, "Select between 1 and 1000 unique products for bulk commission.",
+                "invalid_bulk_product_selection",
+            )
+        if override_bps is not None and (
+            isinstance(override_bps, bool)
+            or not isinstance(override_bps, int)
+            or not 0 <= override_bps <= 10_000
+        ):
+            raise SecurityError(
+                400, "Commission must be an integer basis-point rate from 0 to 10000, or null.",
+                "invalid_product_commission",
+            )
+        with self.connect() as db:
+            db.execute("BEGIN IMMEDIATE")
+            self._require_admin(db, admin_id)
+            selected_rows = {}
+            violating = []
+            for product_id in product_ids:
+                row = db.execute(
+                    "SELECT id,name,price_paise,original_price_paise,"
+                    "commission_override_bps FROM shop_product_submissions WHERE id=?",
+                    (product_id,),
+                ).fetchone()
+                if row is None:
+                    raise SecurityError(
+                        404, "One of the selected products no longer exists. Refresh and select again.",
+                        "product_not_found",
+                    )
+                selected_rows[product_id] = row
+                if _customer_price_paise(row["price_paise"], override_bps) > row["original_price_paise"]:
+                    violating.append(row["name"])
+            if violating:
+                sample = ", ".join(violating[:3])
+                raise SecurityError(
+                    409,
+                    f"Commission would exceed the recorded MRP for {len(violating)} "
+                    f"selected product(s): {sample}. No products were changed. "
+                    "Lower the rate or verify the genuine MRP; do not inflate MRP.",
+                    "bulk_product_commission_exceeds_mrp",
+                )
+            now = iso(utc_now())
+            changed = 0
+            for product_id in product_ids:
+                row = selected_rows[product_id]
+                previous = _row_commission_override(row)
+                if previous == override_bps:
+                    continue
+                result = db.execute(
+                    "UPDATE shop_product_submissions "
+                    "SET commission_override_bps=?,updated_at=? "
+                    "WHERE id=? AND commission_override_bps IS ?",
+                    (override_bps, now, product_id, previous),
+                )
+                if result.rowcount != 1:
+                    raise SecurityError(
+                        409,
+                        "A selected product changed during the update. No products were changed.",
+                        "bulk_product_commission_conflict",
+                    )
+                self._audit_if_available(
+                    db, admin_id, "shop_product_commission_updated", "shop_product",
+                    product_id, {
+                        "previousBasisPoints": previous,
+                        "newBasisPoints": override_bps,
+                        "effectiveBasisPoints": _commission_rate_basis_points(
+                            row["price_paise"], override_bps
+                        ),
+                        "bulkUpdate": True,
+                        "selectionSize": len(product_ids),
+                    },
+                )
+                changed += 1
+            db.commit()
+        return {
+            "selectedCount": len(product_ids),
+            "updatedCount": changed,
+            "unchangedCount": len(product_ids) - changed,
+            "commissionBasisPoints": (
+                DEFAULT_PRODUCT_COMMISSION_BPS if override_bps is None else override_bps
+            ),
+            "commissionOverrideBasisPoints": override_bps,
+        }
 
     def admin_list_products(self, admin_id: str) -> list[dict[str, Any]]:
         with self.connect() as db:
@@ -2840,7 +3035,7 @@ class ShopWorkflow:
             category=row["category"],
             subcategory=subcategory,
         )
-        price = _customer_price_paise(row["price_paise"]) / 100
+        price = _row_customer_price_paise(row) / 100
         # MRP is set by the shop owner.  Commission is charged only on the
         # shop's selling price, never on the MRP/reference price.
         original_price = row["original_price_paise"] / 100
@@ -3008,7 +3203,7 @@ class ShopWorkflow:
             ).fetchall()
         products = []
         for row in rows:
-            price = _customer_price_paise(row["price_paise"]) / 100
+            price = _row_customer_price_paise(row) / 100
             images = json.loads(row["image_urls_json"]) if row["image_urls_json"] else []
             attributes = json.loads(row["attributes_json"]) if row["attributes_json"] else {}
             attributes.pop("hsnCode", None)

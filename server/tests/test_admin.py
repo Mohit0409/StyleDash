@@ -1539,6 +1539,53 @@ class AdminHttpTests(unittest.TestCase):
         self.assertEqual((status, body["created"], body["products"][0]["status"]), (201, 1, "PUBLISHED"))
         self.assertEqual(shops.list_published_products()[0]["name"], "Bulk HTTP Tee")
 
+        # This HTTP fixture is already authenticated with a private admin
+        # session. The new routes MUST still independently enforce CSRF.
+        product_id = body["products"][0]["id"]
+        endpoint = f"/api/admin/shop-products/{product_id}/commission"
+        status, csrf_denied, _headers = self.request(
+            endpoint, {"commissionBasisPoints": 300}, method="PATCH"
+        )
+        self.assertEqual(status, 403)
+        status, invalid, _headers = self.request(
+            endpoint, {"commissionBasisPoints":300, "other": True},
+            headers={"X-CSRF-Token":csrf}, method="PATCH",
+        )
+        self.assertEqual((status,invalid["code"]),(400,"invalid_product_commission"))
+        status, changed, _headers = self.request(
+            endpoint, {"commissionBasisPoints":300},
+            headers={"X-CSRF-Token":csrf}, method="PATCH",
+        )
+        self.assertEqual(status,200)
+        self.assertEqual(changed["product"]["commissionOverrideBasisPoints"],300)
+        self.assertEqual(changed["product"]["customerPricePaise"],82_297)
+
+        bulk_endpoint = "/api/admin/shop-products/bulk-commission"
+        status, rejected, _headers = self.request(
+            bulk_endpoint, {"ids":[product_id], "commissionBasisPoints":4000},
+            headers={"X-CSRF-Token":csrf}, method="PATCH",
+        )
+        self.assertEqual((status,rejected["code"]),(409,"bulk_product_commission_exceeds_mrp"))
+        self.assertEqual(
+            shops.admin_list_products(admin_id)[0]["commissionOverrideBasisPoints"],300
+        )
+        status, bulk, _headers = self.request(
+            bulk_endpoint, {"ids":[product_id], "commissionBasisPoints":200},
+            headers={"X-CSRF-Token":csrf}, method="PATCH",
+        )
+        self.assertEqual((status,bulk["updatedCount"]),(200,1))
+        self.assertEqual(
+            shops.admin_list_products(admin_id)[0]["customerPricePaise"],81_498
+        )
+        status, reset, _headers = self.request(
+            bulk_endpoint, {"ids":[product_id], "commissionBasisPoints":None},
+            headers={"X-CSRF-Token":csrf}, method="PATCH",
+        )
+        self.assertEqual((status,reset["updatedCount"]),(200,1))
+        self.assertEqual(
+            shops.admin_list_products(admin_id)[0]["customerPricePaise"],83_895
+        )
+
     def test_admin_product_image_upload_is_content_addressed(self):
         import base64
         self.request("/api/admin/login", {"username": "local-owner", "password": "long administrator password 123"}, method="POST")

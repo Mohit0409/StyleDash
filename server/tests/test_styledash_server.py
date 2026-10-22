@@ -3240,7 +3240,7 @@ class HttpApiTests(unittest.TestCase):
         status, live_while_pending, _headers = self.get_json("/api/shop-products/published")
         self.assertEqual(
             (live_while_pending["products"][0]["name"], live_while_pending["products"][0]["price"]),
-            ("HTTP Published Kurta", 1694.94),
+            ("HTTP Published Kurta", 1678.95),
         )
         self.service.shops.admin_transition_product_change_request(
             "http-admin", change_id, "UNDER_REVIEW"
@@ -3251,7 +3251,7 @@ class HttpApiTests(unittest.TestCase):
         status, live_after_approval, _headers = self.get_json("/api/shop-products/published")
         self.assertEqual(
             (live_after_approval["products"][0]["name"], live_after_approval["products"][0]["price"]),
-            ("HTTP Reviewed Kurta", 1588.94),
+            ("HTTP Reviewed Kurta", 1573.95),
         )
         status, seller_products_after, _headers = self.get_json(
             "/api/shop-products", {"Cookie": session_headers["Cookie"]}
