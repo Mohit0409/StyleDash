@@ -173,7 +173,7 @@ class ShopWorkflowTests(unittest.TestCase):
                 [row[0] for row in db.execute(
                     "SELECT version FROM shop_schema_migrations ORDER BY version"
                 )],
-                [1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
+                [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11],
             )
             self.assertEqual(db.execute("PRAGMA integrity_check").fetchone()[0], "ok")
             self.assertEqual(db.execute("PRAGMA foreign_key_check").fetchall(), [])
@@ -277,7 +277,7 @@ class ShopWorkflowTests(unittest.TestCase):
         db = sqlite3.connect(concurrent_path)
         self.assertEqual(
             db.execute("SELECT version,COUNT(*) FROM shop_schema_migrations GROUP BY version").fetchall(),
-            [(1, 1), (2, 1), (3, 1), (4, 1), (5, 1), (6, 1), (7, 1), (8, 1), (9, 1), (10, 1)],
+            [(1, 1), (2, 1), (3, 1), (4, 1), (5, 1), (6, 1), (7, 1), (8, 1), (9, 1), (10, 1), (11, 1)],
         )
         self.assertEqual(db.execute("PRAGMA integrity_check").fetchone()[0], "ok")
         self.assertEqual(db.execute("PRAGMA foreign_key_check").fetchall(), [])
@@ -732,7 +732,7 @@ class ShopWorkflowTests(unittest.TestCase):
             product = self.store.admin_transition_product("admin-a", product["id"], target)
 
         original_public = self.store.list_published_products()[0]
-        self.assertEqual((original_public["name"], original_public["price"]), ("Original Live Kurta", 1694.94))
+        self.assertEqual((original_public["name"], original_public["price"]), ("Original Live Kurta", 1678.95))
         self.assert_error(
             "product_not_found",
             lambda: self.store.create_product_edit_request(
@@ -754,7 +754,7 @@ class ShopWorkflowTests(unittest.TestCase):
         )
         self.assertEqual((first["action"], first["status"]), ("EDIT", "SUBMITTED"))
         still_live = self.store.list_published_products()[0]
-        self.assertEqual((still_live["name"], still_live["price"]), ("Original Live Kurta", 1694.94))
+        self.assertEqual((still_live["name"], still_live["price"]), ("Original Live Kurta", 1678.95))
         self.assert_error(
             "product_change_pending",
             lambda: self.store.create_product_unpublish_request("user-a", product["id"]),
@@ -838,7 +838,7 @@ class ShopWorkflowTests(unittest.TestCase):
         self.store.admin_transition_product_change_request("admin-a", second["id"], "UNDER_REVIEW")
         self.store.admin_transition_product_change_request("admin-a", second["id"], "APPROVED")
         changed_public = self.store.list_published_products()[0]
-        self.assertEqual((changed_public["name"], changed_public["price"]), ("Approved Live Kurta", 1588.94))
+        self.assertEqual((changed_public["name"], changed_public["price"]), ("Approved Live Kurta", 1573.95))
 
         unpublish = self.store.create_product_unpublish_request("user-a", product["id"])
         self.store.admin_transition_product_change_request("admin-a", unpublish["id"], "UNDER_REVIEW")
@@ -1066,9 +1066,9 @@ class ShopWorkflowTests(unittest.TestCase):
         self.assertEqual(preserved["hsnCode"], "6109")
         self.assertEqual(preserved["gstRate"], "5")
 
-    def test_customer_commission_boundaries_are_hidden_outside_private_admin(self) -> None:
+    def test_customer_five_percent_commission_is_hidden_outside_private_admin(self) -> None:
         self.create_active_shop("user-a", "Commission Shop")
-        cases = [(49900, 54890), (50000, 54000), (100000, 108000), (100100, 106106)]
+        cases = [(49900, 52395), (50000, 52500), (100000, 105000), (100100, 105105)]
         for index, (base_price, customer_price) in enumerate(cases, start=1):
             payload = self.complete_product(f"Commission Product {index}")
             payload["pricePaise"] = base_price
@@ -1091,6 +1091,180 @@ class ShopWorkflowTests(unittest.TestCase):
             # customer selling price includes the hidden commission.
             self.assertEqual(public["originalPrice"], payload["originalPricePaise"] / 100)
 
+    def test_admin_product_commission_override_is_private_and_mrp_safe(self) -> None:
+        self.create_active_shop("user-a", "Private Commission Override Shop")
+        payload = self.complete_product("Override Compliant Product")
+        payload["pricePaise"] = 100_000
+        payload["originalPricePaise"] = 130_000
+        product = self.store.create_product_draft("user-a", payload)
+        self.store.submit_product("user-a", product["id"])
+        for status in ("UNDER_REVIEW", "APPROVED", "PUBLISHED"):
+            self.store.admin_transition_product("admin-a", product["id"], status)
+        initial_admin = next(
+            item for item in self.store.admin_list_products("admin-a")
+            if item["id"] == product["id"]
+        )
+        self.assertEqual(initial_admin["commissionBasisPoints"], 500)
+        self.assertIsNone(initial_admin["commissionOverrideBasisPoints"])
+        self.assertEqual(initial_admin["customerPricePaise"], 105_000)
+
+        # Changing a published product's private commission updates public and
+        # checkout customer prices, but does not reveal private commission data.
+        updated = self.store.admin_set_product_commission("admin-a", product["id"], 300)
+        self.assertEqual(updated["commissionBasisPoints"], 300)
+        self.assertEqual(updated["commissionOverrideBasisPoints"], 300)
+        self.assertEqual(updated["commissionPaise"], 3_000)
+        self.assertEqual(updated["customerPricePaise"], 103_000)
+        public = next(
+            item for item in self.store.list_published_products()
+            if item["id"] == product["id"]
+        )
+        checkout = next(
+            item for item in self.store.payment_catalog_products()
+            if item["id"] == product["id"]
+        )
+        seller = next(
+            item for item in self.store.list_products("user-a")
+            if item["id"] == product["id"]
+        )
+        self.assertEqual(public["price"], 1030.0)
+        self.assertEqual(public["originalPrice"], 1300.0)
+        self.assertEqual(checkout["price"], 1030.0)
+        for item in (public, checkout, seller):
+            for secret_field in (
+                "commissionPaise", "customerPricePaise",
+                "commissionBasisPoints", "commissionOverrideBasisPoints",
+            ):
+                self.assertNotIn(secret_field, item)
+
+        # Invalid inputs and attempts to exceed real MRP must not change data.
+        for invalid in (True, False, -1, 10_001, 300.5, "300"):
+            self.assert_error(
+                "invalid_product_commission",
+                lambda val=invalid: self.store.admin_set_product_commission(
+                    "admin-a", product["id"], val
+                ),
+            )
+        self.assert_error(
+            "product_commission_exceeds_mrp",
+            lambda: self.store.admin_set_product_commission("admin-a", product["id"], 4000),
+        )
+        with self.assertRaises(SecurityError):
+            self.store.admin_set_product_commission("user-a", product["id"], 100)
+        self.assert_error(
+            "product_not_found",
+            lambda: self.store.admin_set_product_commission("admin-a", "missing-product", 100),
+        )
+        unchanged = next(
+            x for x in self.store.admin_list_products("admin-a")
+            if x["id"] == product["id"]
+        )
+        self.assertEqual(unchanged["commissionOverrideBasisPoints"], 300)
+
+        self.store.admin_set_product_commission("admin-a", product["id"], 0)
+        no_commission = next(
+            x for x in self.store.list_published_products() if x["id"] == product["id"]
+        )
+        self.assertEqual(no_commission["price"], 1000)
+        reverted = self.store.admin_set_product_commission("admin-a", product["id"], None)
+        self.assertEqual(reverted["commissionBasisPoints"], 500)
+        self.assertIsNone(reverted["commissionOverrideBasisPoints"])
+        self.assertEqual(reverted["customerPricePaise"], 105_000)
+
+    def test_private_commission_migration_is_idempotent_and_rejects_invalid_db_rate(self) -> None:
+        with self.store.connect() as db:
+            cols = {r["name"] for r in db.execute(
+                "PRAGMA table_info(shop_product_submissions)"
+            ).fetchall()}
+            self.assertIn("commission_override_bps", cols)
+            versions = [
+                row["version"] for row in db.execute(
+                    "SELECT version FROM shop_schema_migrations WHERE version=11"
+                )
+            ]
+            self.assertEqual(versions, [11])
+        # Initializing against the same database again must not lose audit data
+        # or re-add the private commission field.
+        ShopWorkflow(self.path)
+        with self.store.connect() as db:
+            count = db.execute(
+                "SELECT COUNT(*) FROM shop_schema_migrations WHERE version=11"
+            ).fetchone()[0]
+            self.assertEqual(count, 1)
+
+    def test_bulk_commission_is_atomic_mrp_capped_and_admin_only(self) -> None:
+        self.create_active_shop("user-a", "Bulk Commission Fixture Shop")
+        ids = []
+        for name, price, mrp in (
+            ("Bulk Rate Fixture A", 100_000, 125_000),
+            ("Bulk Rate Fixture B", 50_000, 53_000),
+        ):
+            payload = self.complete_product(name)
+            payload["pricePaise"] = price
+            payload["originalPricePaise"] = mrp
+            row = self.store.create_product_draft("user-a", payload)
+            self.store.submit_product("user-a", row["id"])
+            for status in ("UNDER_REVIEW", "APPROVED", "PUBLISHED"):
+                self.store.admin_transition_product("admin-a", row["id"], status)
+            ids.append(row["id"])
+
+        self.assert_error(
+            "bulk_product_commission_exceeds_mrp",
+            lambda: self.store.admin_bulk_set_product_commission("admin-a", ids, 1000),
+        )
+        self.assertTrue(all(
+            p["commissionOverrideBasisPoints"] is None
+            for p in self.store.admin_list_products("admin-a") if p["id"] in ids
+        ))
+        for invalid_ids in ([], ids+ids[:1], "not-a-list", [None]):
+            self.assert_error(
+                "invalid_bulk_product_selection",
+                lambda value=invalid_ids: self.store.admin_bulk_set_product_commission(
+                    "admin-a", value, 300
+                ),
+            )
+        self.assert_error(
+            "product_not_found",
+            lambda: self.store.admin_bulk_set_product_commission(
+                "admin-a", ids+["missing-fixture"], 300
+            ),
+        )
+        for invalid in (True, -1, 10_001, "300", 300.5):
+            self.assert_error(
+                "invalid_product_commission",
+                lambda value=invalid: self.store.admin_bulk_set_product_commission(
+                    "admin-a", ids, value
+                ),
+            )
+        with self.assertRaises(SecurityError):
+            self.store.admin_bulk_set_product_commission("user-a", ids, 300)
+
+        changed = self.store.admin_bulk_set_product_commission("admin-a", ids, 300)
+        self.assertEqual(
+            (changed["selectedCount"], changed["updatedCount"], changed["unchangedCount"]),
+            (2,2,0),
+        )
+        self.assertEqual(changed["commissionBasisPoints"], 300)
+        products = {x["id"]:x for x in self.store.admin_list_products("admin-a")}
+        self.assertEqual(products[ids[0]]["customerPricePaise"], 103_000)
+        self.assertEqual(products[ids[1]]["customerPricePaise"], 51_500)
+        self.assertEqual(
+            {x["price"] for x in self.store.list_published_products() if x["id"] in ids},
+            {1030.0,515.0},
+        )
+        self.assertEqual(
+            {x["price"] for x in self.store.payment_catalog_products() if x["id"] in ids},
+            {1030.0,515.0},
+        )
+        repeated = self.store.admin_bulk_set_product_commission("admin-a", ids, 300)
+        self.assertEqual((repeated["updatedCount"],repeated["unchangedCount"]), (0,2))
+        reset = self.store.admin_bulk_set_product_commission("admin-a", ids, None)
+        self.assertEqual((reset["updatedCount"],reset["commissionBasisPoints"]), (2,500))
+        self.assertTrue(all(
+            x["commissionOverrideBasisPoints"] is None
+            for x in self.store.admin_list_products("admin-a") if x["id"] in ids
+        ))
+
     def test_payment_catalogue_applies_commission_only_to_selling_price(self) -> None:
         self.create_active_shop("user-a", "Checkout Commission Shop")
         payload = self.complete_product("Commissioned Selling Price")
@@ -1104,24 +1278,24 @@ class ShopWorkflowTests(unittest.TestCase):
         public = next(item for item in self.store.list_published_products() if item["id"] == product["id"])
         payment_product = next(item for item in self.store.payment_catalog_products() if item["id"] == product["id"])
 
-        self.assertEqual(public["price"], 540)
+        self.assertEqual(public["price"], 525)
         self.assertEqual(public["originalPrice"], 750)
-        self.assertEqual(payment_product["price"], 540)
+        self.assertEqual(payment_product["price"], 525)
 
     def test_owner_mrp_must_cover_customer_selling_price_after_commission(self) -> None:
         self.create_active_shop("user-a", "MRP Validation Shop")
         payload = self.complete_product("MRP Validation Product")
         payload["pricePaise"] = 50_000
-        payload["originalPricePaise"] = 53_999
+        payload["originalPricePaise"] = 52_499
 
         self.assert_error(
             "invalid_product",
             lambda: self.store.create_product_draft("user-a", payload),
         )
 
-        payload["originalPricePaise"] = 54_000
+        payload["originalPricePaise"] = 52_500
         product = self.store.create_product_draft("user-a", payload)
-        self.assertEqual(product["originalPricePaise"], 54_000)
+        self.assertEqual(product["originalPricePaise"], 52_500)
 
     def test_legacy_published_product_below_final_customer_price_remains_visible(self) -> None:
         self.create_active_shop("user-a", "Legacy MRP Preservation Shop")
@@ -1142,7 +1316,7 @@ class ShopWorkflowTests(unittest.TestCase):
         public_product = next(
             item for item in self.store.list_published_products() if item["id"] == product["id"]
         )
-        self.assertEqual(public_product["price"], 540)
+        self.assertEqual(public_product["price"], 525)
         self.assertEqual(public_product["originalPrice"], 500)
         payment_product = next(
             item for item in self.store.payment_catalog_products() if item["id"] == product["id"]

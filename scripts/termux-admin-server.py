@@ -1537,6 +1537,28 @@ class AdminHandler(BaseHTTPRequestHandler):
                     admin["id"], request_id, payload.get("status"), payload.get("reason")
                 )
                 self._json(200, {"success": True, "request": result}); return
+            if path == "/api/admin/shop-products/bulk-commission":
+                if not isinstance(payload, dict) or set(payload) != {"ids", "commissionBasisPoints"}:
+                    raise SecurityError(
+                        400, "Supply only ids and commissionBasisPoints.",
+                        "invalid_product_commission",
+                    )
+                result = self._shops().admin_bulk_set_product_commission(
+                    admin["id"], payload["ids"], payload["commissionBasisPoints"]
+                )
+                self._json(200, {"success": True, **result}); return
+            commission_match = re.fullmatch(r"/api/admin/shop-products/([^/]+)/commission", path)
+            if commission_match:
+                if not isinstance(payload, dict) or set(payload) != {"commissionBasisPoints"}:
+                    raise SecurityError(
+                        400, "Supply only commissionBasisPoints (integer or null).",
+                        "invalid_product_commission",
+                    )
+                product_id = unquote(commission_match.group(1))
+                result = self._shops().admin_set_product_commission(
+                    admin["id"], product_id, payload["commissionBasisPoints"]
+                )
+                self._json(200, {"success": True, "product": result}); return
             if path.startswith("/api/admin/shop-products/") and path.endswith("/details"):
                 product_id = unquote(path.removeprefix("/api/admin/shop-products/").removesuffix("/details"))
                 require_existing_admin_product_media(payload, self.application.product_image_directory)
