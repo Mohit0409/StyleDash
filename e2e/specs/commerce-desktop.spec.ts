@@ -100,20 +100,39 @@ async function loginCustomer(
   await expect(page).toHaveURL(/\/profile$/);
 
   if (resetAccountState) {
-    const statuses = await page.evaluate(async () => {
-      const me = await fetch('/api/auth/me');
-      const auth = await me.json();
+    // Reset the synthetic account from a document WITHOUT the React app.
+    // Performing direct account-state PATCH calls on /profile races with the
+    // mounted CartProvider hydration/focus-refresh effects, which may write a
+    // previous in-memory cart back over our test fixture reset.
+    const health = await page.goto('/api/health');
+    expect(health?.status(), 'Fixture reset requires the isolated healthy server').toBe(200);
+    const reset = await page.evaluate(async () => {
+      const authResponse = await fetch('/api/auth/me', { credentials: 'same-origin' });
+      if (authResponse.status !== 200) return { statuses: [authResponse.status], empty: false };
+      const auth = await authResponse.json() as { csrfToken: string };
       const headers = { 'Content-Type': 'application/json', 'X-CSRF-Token': auth.csrfToken };
       const cart = await fetch('/api/account-state/cart', {
-        method: 'PATCH', headers, body: JSON.stringify({ items: [] }),
+        method: 'PATCH', credentials: 'same-origin', headers, body: JSON.stringify({ items: [] }),
       });
       const wishlist = await fetch('/api/account-state/wishlist', {
-        method: 'PATCH', headers, body: JSON.stringify({ productIds: [] }),
+        method: 'PATCH', credentials: 'same-origin', headers, body: JSON.stringify({ productIds: [] }),
       });
-      return [cart.status, wishlist.status];
+      const stateResponse = await fetch('/api/account-state', {
+        credentials: 'same-origin', cache: 'no-store',
+      });
+      const state = stateResponse.status === 200
+        ? await stateResponse.json() as { cart?: unknown[]; wishlist?: unknown[] }
+        : null;
+      return {
+        statuses: [cart.status, wishlist.status, stateResponse.status],
+        empty: Boolean(state && Array.isArray(state.cart) && !state.cart.length &&
+          Array.isArray(state.wishlist) && !state.wishlist.length),
+      };
     });
-    expect(statuses).toEqual([200, 200]);
-    await page.reload();
+    expect(reset.statuses, 'Synthetic fixture reset requests must all succeed').toEqual([200, 200, 200]);
+    expect(reset.empty, 'Synthetic server cart and wishlist must be empty before React mounts').toBe(true);
+    await page.goto('/profile');
+    await expect(page.getByRole('heading', { name: 'My profile' })).toBeVisible();
     await expect(page.getByRole('button', { name: /^Cart\s+0$/ })).toBeVisible();
   }
 }
