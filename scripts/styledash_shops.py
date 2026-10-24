@@ -2779,6 +2779,28 @@ class ShopWorkflow:
                  WHERE status='PUBLISHED'
                 """
             ).fetchall()
+            # The public stores listing must show the same approved-review
+            # summary as GET /api/store-reviews, without one request per card.
+            # Legacy shop-only fixtures may not have the reviews table yet.
+            review_summaries: dict[str, tuple[float, int]] = {}
+            if db.execute(
+                "SELECT 1 FROM sqlite_master WHERE type='table' AND name='store_reviews'"
+            ).fetchone() is not None:
+                summary_rows = db.execute(
+                    """
+                    SELECT store_id,COUNT(*) AS review_count,AVG(rating) AS average_rating
+                      FROM store_reviews
+                     WHERE status='published'
+                     GROUP BY store_id
+                    """
+                ).fetchall()
+                for summary in summary_rows:
+                    count = int(summary["review_count"] or 0)
+                    if count:
+                        review_summaries[summary["store_id"]] = (
+                            round(float(summary["average_rating"]), 1),
+                            count,
+                        )
         product_counts: dict[str, int] = {}
         for product in published_products:
             application_id = product["application_id"]
@@ -2787,6 +2809,7 @@ class ShopWorkflow:
         for row in rows:
             images = json.loads(row["image_urls_json"]) if row["image_urls_json"] else []
             image = images[0] if images else None
+            rating, review_count = review_summaries.get(row["id"], (0, 0))
             stores.append({
                 "id": row["id"], "slug": _store_slug(row["id"]),
                 "storeName": row["shop_name"], "category": row["category"],
@@ -2796,6 +2819,7 @@ class ShopWorkflow:
                 "bannerImage": row["banner_image_url"] or image,
                 "logoImage": row["logo_image_url"] or image,
                 "productCount": product_counts.get(row["id"], 0),
+                "rating": rating, "reviewCount": review_count,
                 "active": True, "approved": True, "createdAt": row["created_at"],
             })
         return stores
