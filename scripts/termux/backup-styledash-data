@@ -20,6 +20,18 @@ PRIVATE_CONFIG_DIR="$HOME/.config/styledash"
 SECRETS_FILE="$PRIVATE_CONFIG_DIR/secrets.env"
 RUN_DIR="$HOME/run"
 LOCK_DIR="$RUN_DIR/styledash-backup.lock"
+PROGRESS_FILE="${STYLEDASH_BACKUP_PROGRESS_FILE:-}"
+
+progress() {
+  [ -n "$PROGRESS_FILE" ] || return 0
+  case "$PROGRESS_FILE" in
+    "$RUN_DIR"/*|"$HOME/.local/share/styledash/deployments"/*) ;;
+    *) echo "unsafe backup progress path" >&2; exit 1 ;;
+  esac
+  printf '%s\n' "$1" > "$PROGRESS_FILE.tmp"
+  chmod 600 "$PROGRESS_FILE.tmp"
+  mv -f -- "$PROGRESS_FILE.tmp" "$PROGRESS_FILE"
+}
 
 mkdir -p "$BACKUP_ROOT" "$RUN_DIR"
 chmod 700 "$BACKUP_ROOT"
@@ -81,6 +93,7 @@ stamp="$(date -u +%Y%m%dT%H%M%SZ)"
 target="$BACKUP_ROOT/$stamp"
 mkdir -p "$target"
 chmod 700 "$target"
+progress BACKUP_LOCAL
 
 if [ -f "$DB" ]; then
   python3 - "$DB" "$target/styledash.db" <<'PY'
@@ -161,10 +174,12 @@ if [ "$LOCAL_ONLY" = false ]; then
     fi
 
     remote_target="${remote%/}/$stamp"
+    progress BACKUP_PRIMARY_COPY
     run_rclone copy "$target" "$remote_target" \
       --immutable \
       --create-empty-src-dirs \
       --transfers 1 --checkers 1 --contimeout 15s --timeout 60s --retries 2 --low-level-retries 2
+    progress BACKUP_PRIMARY_VERIFY
     verify_remote "$target" "$remote_target" "Primary off-device backup"
 
     printf '%s\n' "$stamp" > "$RUN_DIR/styledash-last-offdevice-backup"
@@ -178,7 +193,9 @@ if [ "$LOCAL_ONLY" = false ]; then
       # The Windows/SFTP secondary can normalize mtimes even when file bytes are
       # unchanged. Compare content rather than timestamps for the immutable copy;
       # verify_remote still performs a full --download byte check afterwards.
+      progress BACKUP_SECONDARY_COPY
       run_rclone copy "$target" "$secondary_target" --immutable --checksum --create-empty-src-dirs --transfers 1 --checkers 1 --contimeout 15s --timeout 60s --retries 2 --low-level-retries 2
+      progress BACKUP_SECONDARY_VERIFY
       verify_remote "$target" "$secondary_target" "Secondary off-device backup"
 
       printf '%s\n' "$stamp" > "$RUN_DIR/styledash-last-secondary-backup"
