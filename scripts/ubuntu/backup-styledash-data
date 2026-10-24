@@ -1,0 +1,318 @@
+#!/usr/bin/env bash
+set -euo pipefail
+export PATH="/opt/vibe4you-production/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+RCLONE_CONFIG_SOURCE="/etc/vibe4you-production/rclone.conf"
+
+MODE="full"
+case "${1:-}" in
+  "")
+    ;;
+  --local-only)
+    MODE="local-only"
+    shift
+    ;;
+  --deployment)
+    MODE="deployment"
+    shift
+    ;;
+  *)
+    echo "usage: backup-styledash-data [--local-only|--deployment]" >&2
+    exit 2
+    ;;
+esac
+if [ "$#" -ne 0 ]; then
+  echo "usage: backup-styledash-data [--local-only|--deployment]" >&2
+  exit 2
+fi
+
+DEPLOYMENT_MAX_PRIMARY_AGE_SECONDS="${STYLEDASH_DEPLOYMENT_MAX_PRIMARY_AGE_SECONDS:-86400}"
+
+DATA_ROOT="/var/lib/vibe4you-production"
+BACKUP_ROOT="/var/backups/vibe4you-production/data"
+RCLONE_RUNTIME_DIR="$BACKUP_ROOT/.runtime"
+RCLONE_CONFIG="$RCLONE_RUNTIME_DIR/rclone.conf"
+WINDOWS_BACKUP_KEY="$RCLONE_RUNTIME_DIR/windows_backup_ed25519"
+WINDOWS_KNOWN_HOSTS="$RCLONE_RUNTIME_DIR/known_hosts"
+export RCLONE_CONFIG
+DB="$DATA_ROOT/styledash.db"
+STATE="$DATA_ROOT/runtime/orders.json"
+PRODUCT_IMAGES="$DATA_ROOT/product-images"
+PRIVATE_CONFIG_DIR="/etc/vibe4you-production"
+SECRETS_FILE="$PRIVATE_CONFIG_DIR/backup.env"
+RUN_DIR="$DATA_ROOT/run"
+LOCK_DIR="$RUN_DIR/styledash-backup.lock"
+
+mkdir -p "$BACKUP_ROOT" "$RUN_DIR"
+chmod 700 "$BACKUP_ROOT"
+mkdir -p "$RCLONE_RUNTIME_DIR"
+chmod 700 "$RCLONE_RUNTIME_DIR"
+if [ ! -f "$RCLONE_CONFIG" ]; then
+  cp "$RCLONE_CONFIG_SOURCE" "$RCLONE_CONFIG"
+  chmod 600 "$RCLONE_CONFIG"
+fi
+if [ ! -f "$WINDOWS_BACKUP_KEY" ]; then
+  ssh-keygen -q -t ed25519 -N "" -C vibe4you-ubuntu-backup -f "$WINDOWS_BACKUP_KEY"
+  chmod 600 "$WINDOWS_BACKUP_KEY"
+  chmod 644 "$WINDOWS_BACKUP_KEY.pub"
+fi
+if [ ! -s "$WINDOWS_KNOWN_HOSTS" ]; then
+  ssh-keyscan -T 5 -t ed25519 192.168.1.3 > "$WINDOWS_KNOWN_HOSTS"
+  chmod 600 "$WINDOWS_KNOWN_HOSTS"
+fi
+sed -i "s#^key_file = .*#key_file = $WINDOWS_BACKUP_KEY#" "$RCLONE_CONFIG"
+sed -i "/^known_hosts_file = /d" "$RCLONE_CONFIG"
+sed -i "s#^host = 192.168.1.3#host = 192.168.1.3#" "$RCLONE_CONFIG"
+setfacl -m u:vibeadmin:rx "$BACKUP_ROOT" "$RCLONE_RUNTIME_DIR"
+setfacl -m u:vibeadmin:r "$WINDOWS_BACKUP_KEY.pub"
+
+if ! mkdir "$LOCK_DIR" 2>/dev/null; then
+  echo "A Vibe4You backup is already running; refusing an overlapping run" >&2
+  exit 75
+fi
+printf '%s\n' "$$" > "$LOCK_DIR/pid"
+chmod 600 "$LOCK_DIR/pid"
+release_lock() {
+  rm -f -- "$LOCK_DIR/pid"
+  rmdir -- "$LOCK_DIR" 2>/dev/null || true
+}
+trap release_lock EXIT
+trap 'exit 143' HUP INT TERM
+
+if [ -f "$SECRETS_FILE" ]; then
+  set -a
+  . "$SECRETS_FILE"
+  set +a
+fi
+
+enabled() {
+  case "$(printf '%s' "${1:-}" | tr '[:upper:]' '[:lower:]')" in
+    1|true|yes|on) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
+assert_recent_primary_backup() {
+  local marker="$RUN_DIR/styledash-last-offdevice-backup"
+  local max_age="$DEPLOYMENT_MAX_PRIMARY_AGE_SECONDS"
+
+  case "$max_age" in
+    ''|*[!0-9]*)
+      echo "STYLEDASH_DEPLOYMENT_MAX_PRIMARY_AGE_SECONDS must be a positive integer" >&2
+      return 1
+      ;;
+  esac
+  if [ "$max_age" -le 0 ]; then
+    echo "STYLEDASH_DEPLOYMENT_MAX_PRIMARY_AGE_SECONDS must be greater than zero" >&2
+    return 1
+  fi
+  if [ ! -s "$marker" ]; then
+    echo "Deployment backup requires an existing verified primary off-device backup marker" >&2
+    return 1
+  fi
+
+  python3 - "$marker" "$max_age" <<'PY'
+from datetime import datetime, timezone
+from pathlib import Path
+import sys
+
+marker = Path(sys.argv[1])
+max_age = int(sys.argv[2])
+stamp = marker.read_text(encoding="utf-8").strip()
+try:
+    verified_at = datetime.strptime(stamp, "%Y%m%dT%H%M%SZ").replace(tzinfo=timezone.utc)
+except ValueError as exc:
+    raise SystemExit("Primary off-device backup marker has an invalid timestamp") from exc
+
+age = (datetime.now(timezone.utc) - verified_at).total_seconds()
+if age < -300:
+    raise SystemExit("Primary off-device backup marker is unexpectedly in the future")
+if age > max_age:
+    raise SystemExit(
+        f"Primary off-device backup is too old for deployment: "
+        f"{int(age)}s > {max_age}s"
+    )
+
+print(f"deployment_primary_backup_stamp={stamp}")
+print(f"deployment_primary_backup_age_seconds={max(0, int(age))}")
+PY
+}
+
+run_rclone() {
+  if command -v ionice >/dev/null 2>&1; then
+    nice -n 10 ionice -c 3 rclone --config "$RCLONE_CONFIG" --sftp-host-keys "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIK+p7tYUHoYIqoaggv94GcYFVakfoVpXan6uGTwDE+/q" "$@"
+  else
+    nice -n 10 rclone --config "$RCLONE_CONFIG" --sftp-host-keys "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIK+p7tYUHoYIqoaggv94GcYFVakfoVpXan6uGTwDE+/q" "$@"
+  fi
+}
+
+verify_remote() {
+  local source="$1"
+  local destination="$2"
+  local label="$3"
+  local attempt=1
+  while true; do
+    if run_rclone check "$source" "$destination" --one-way --download --checkers 4 --contimeout 15s --timeout 60s --retries 2 --low-level-retries 2; then
+      return 0
+    fi
+    if [ "$attempt" -ge 3 ]; then
+      echo "$label verification failed after retries" >&2
+      return 1
+    fi
+    attempt=$((attempt + 1))
+    echo "$label verification retry $attempt/3" >&2
+    sleep 10
+  done
+}
+
+if [ "$MODE" = "deployment" ]; then
+  assert_recent_primary_backup
+fi
+
+stamp="$(date -u +%Y%m%dT%H%M%SZ)"
+target="$BACKUP_ROOT/$stamp"
+mkdir -p "$target"
+chmod 700 "$target"
+
+if [ -f "$DB" ]; then
+  python3 - "$DB" "$target/styledash.db" <<'PY'
+import sqlite3
+import sys
+
+source = sqlite3.connect(sys.argv[1])
+target = sqlite3.connect(sys.argv[2])
+try:
+    source.backup(target)
+finally:
+    target.close()
+    source.close()
+
+check = sqlite3.connect(sys.argv[2])
+try:
+    integrity = check.execute("PRAGMA integrity_check").fetchone()[0]
+finally:
+    check.close()
+if integrity != "ok":
+    raise SystemExit("SQLite backup integrity check failed")
+PY
+  chmod 600 "$target/styledash.db"
+fi
+
+if [ -f "$STATE" ]; then
+  cp -p "$STATE" "$target/orders.json"
+  chmod 600 "$target/orders.json"
+fi
+
+if [ -d "$PRODUCT_IMAGES" ]; then
+  mkdir -p "$target/product-images"
+  cp -a "$PRODUCT_IMAGES/." "$target/product-images/"
+  chmod 700 "$target/product-images"
+  find "$target" -type d -exec chmod 700 {} +
+  find "$target" -type f -exec chmod 600 {} +
+  echo "BACKUP_TARGET_PERMISSIONS_NORMALIZED"
+fi
+
+python3 - "$BACKUP_ROOT" <<'PY'
+from pathlib import Path
+import re
+import shutil
+import sys
+
+root = Path(sys.argv[1]).resolve()
+pattern = re.compile(r"^\d{8}T\d{6}Z$")
+backups = sorted(
+    (
+        path
+        for path in root.iterdir()
+        if path.is_dir() and pattern.fullmatch(path.name)
+    ),
+    reverse=True,
+)
+for path in backups[14:]:
+    resolved = path.resolve()
+    if resolved.parent != root:
+        raise SystemExit("Refusing unsafe backup retention target")
+    shutil.rmtree(resolved)
+PY
+
+printf '%s\n' "$stamp" > "$RUN_DIR/styledash-last-local-backup"
+chmod 600 "$RUN_DIR/styledash-last-local-backup"
+
+if [ "$MODE" = "deployment" ]; then
+  secondary="${STYLEDASH_BACKUP_REMOTE_SECONDARY:-}"
+  if [ -z "$secondary" ]; then
+    echo "Deployment backup requires STYLEDASH_BACKUP_REMOTE_SECONDARY" >&2
+    exit 1
+  fi
+  case "$secondary" in
+    *:*) ;;
+    *)
+      echo "STYLEDASH_BACKUP_REMOTE_SECONDARY must be an rclone remote:path" >&2
+      exit 1
+      ;;
+  esac
+  if ! command -v rclone >/dev/null 2>&1; then
+    echo "rclone is required for the deployment secondary backup" >&2
+    exit 1
+  fi
+
+  secondary_target="${secondary%/}/$stamp"
+  run_rclone copy "$target" "$secondary_target" \
+    --immutable \
+    --checksum \
+    --create-empty-src-dirs \
+    --transfers 4 --checkers 4 --contimeout 15s --timeout 60s --retries 2 --low-level-retries 2
+  verify_remote "$target" "$secondary_target" "Deployment secondary off-device backup"
+
+  printf '%s\n' "$stamp" > "$RUN_DIR/styledash-last-secondary-backup"
+  chmod 600 "$RUN_DIR/styledash-last-secondary-backup"
+  echo "Deployment Windows secondary backup verified: $stamp"
+  echo "Deployment backup skipped primary cloud upload; recent verified primary marker accepted"
+elif [ "$MODE" = "full" ]; then
+  remote="${STYLEDASH_BACKUP_REMOTE:-}"
+  require_remote="${STYLEDASH_REQUIRE_OFFDEVICE_BACKUP:-false}"
+
+  if [ -n "$remote" ]; then
+    case "$remote" in
+      *:*) ;;
+      *)
+        echo "STYLEDASH_BACKUP_REMOTE must be an rclone remote:path" >&2
+        exit 1
+        ;;
+    esac
+    if ! command -v rclone >/dev/null 2>&1; then
+      echo "rclone is required for configured off-device backups" >&2
+      exit 1
+    fi
+
+    remote_target="${remote%/}/$stamp"
+    run_rclone copy "$target" "$remote_target" \
+      --immutable \
+      --create-empty-src-dirs \
+      --transfers 4 --checkers 4 --contimeout 15s --timeout 60s --retries 2 --low-level-retries 2
+    verify_remote "$target" "$remote_target" "Primary off-device backup"
+
+    printf '%s\n' "$stamp" > "$RUN_DIR/styledash-last-offdevice-backup"
+    chmod 600 "$RUN_DIR/styledash-last-offdevice-backup"
+    echo "Primary off-device Vibe4You backup verified: $stamp"
+
+    secondary="${STYLEDASH_BACKUP_REMOTE_SECONDARY:-}"
+    if [ -n "$secondary" ]; then
+      secondary_target="${secondary%/}/$stamp"
+
+      # The Windows/SFTP secondary can normalize mtimes even when file bytes are
+      # unchanged. Compare content rather than timestamps for the immutable copy;
+      # verify_remote still performs a full --download byte check afterwards.
+      run_rclone copy "$target" "$secondary_target" --immutable --checksum --create-empty-src-dirs --transfers 4 --checkers 4 --contimeout 15s --timeout 60s --retries 2 --low-level-retries 2
+      verify_remote "$target" "$secondary_target" "Secondary off-device backup"
+
+      printf '%s\n' "$stamp" > "$RUN_DIR/styledash-last-secondary-backup"
+      chmod 600 "$RUN_DIR/styledash-last-secondary-backup"
+      echo "Secondary off-device Vibe4You backup verified: $stamp"
+    fi
+  elif enabled "$require_remote"; then
+    echo "Off-device backup is required but STYLEDASH_BACKUP_REMOTE is not configured" >&2
+    exit 1
+  fi
+fi
+
+echo "Private Vibe4You backup completed: $stamp"

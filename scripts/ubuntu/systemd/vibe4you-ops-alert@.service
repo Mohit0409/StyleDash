@@ -1,0 +1,17 @@
+[Unit]
+Description=Vibe4You Production Operations Alert for %i
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=vibe4you
+Group=vibe4you
+EnvironmentFile=-/etc/vibe4you-production/ops-alert.env
+ExecStart=/opt/vibe4you-production/bin/vibe4you_ops_alert.py %i
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/vibe4you-production/run
+UMask=0077
