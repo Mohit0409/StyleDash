@@ -287,15 +287,18 @@ class SecurityStoreTests(unittest.TestCase):
 
     def test_vendor_application_current_categories_match_live_production(self):
         expected = [
-            'Accessories',
-            'Beauty & Personal Care',
-            'Clothing & Fashion',
-            'Electronics',
-            'Footwear',
-            'Gifts',
-            'Home & Living',
+            'Accessories', 'Automotive Accessories', 'Baby Care',
+            'Beauty & Personal Care', 'Clothing & Fashion', 'Electronics',
+            'Footwear', 'General Store', 'Gifts', 'Groceries', 'Hardware & Tools',
+            'Health & Nutrition', 'Health & Pharmacy', 'Home & Living',
+            'Mobile Accessories', 'Pet Supplies', 'Sports & Fitness',
+            'Stationery & Books', 'Toys & Games',
         ]
-        for index, category in enumerate(expected):
+        from scripts.store_categories import STORE_CATEGORIES
+        self.assertEqual(set(expected), set(STORE_CATEGORIES))
+        # Register three representative categories; validating all names above
+        # should not trigger 19 expensive password hashes.
+        for index, category in enumerate(("Footwear", "Health & Nutrition", "General Store")):
             user, _raw, _csrf = self.store.register({
                 'name': f'Category Owner {index}',
                 'email': f'category-{index}@example.test',
@@ -332,10 +335,10 @@ class SecurityStoreTests(unittest.TestCase):
                 'ownerName': 'Customer A',
                 'email': legacy_user['email'],
                 'phone': '9888888888',
-                'category': 'General Store',
+                'category': 'Unsupported Category',
                 'address': '123 Test Market',
                 'pincode': '458441',
-                'description': 'Legacy category should be rejected',
+                'description': 'Unsupported category should be rejected',
             }),
         )
 

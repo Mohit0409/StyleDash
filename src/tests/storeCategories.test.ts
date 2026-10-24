@@ -9,14 +9,27 @@ const CANONICAL_STORE_CATEGORIES = [
   'Beauty & Personal Care',
   'Electronics',
   'Gifts',
+  'Groceries',
   'Home & Living',
+  'Health & Pharmacy',
+  'Health & Nutrition',
+  'Baby Care',
+  'Pet Supplies',
+  'Mobile Accessories',
+  'Automotive Accessories',
+  'Toys & Games',
+  'Stationery & Books',
+  'Sports & Fitness',
+  'Hardware & Tools',
+  'General Store',
 ];
 
 describe('store categories', () => {
   it('exposes the full canonical store category list shared with the backend', () => {
     expect([...STORE_CATEGORIES]).toEqual(CANONICAL_STORE_CATEGORIES);
     expect(STORE_CATEGORIES).toBe(CATEGORY_DISPLAY_ORDER);
-    expect(STORE_CATEGORIES).not.toContain('General Store');
+    expect(STORE_CATEGORIES).toContain('General Store');
+    expect(STORE_CATEGORIES).toContain('Health & Nutrition');
   });
 
   it('always returns every canonical category for the partner form', () => {
@@ -26,8 +39,8 @@ describe('store categories', () => {
   });
 
   it('preserves a legacy draft category as an additional first option', () => {
-    const options = storeCategoryOptions('General Store');
-    expect(options[0]).toBe('General Store');
+    const options = storeCategoryOptions('Legacy Cafe');
+    expect(options[0]).toBe('Legacy Cafe');
     expect(options.slice(1)).toEqual(CANONICAL_STORE_CATEGORIES);
     expect(new Set(options).size).toBe(options.length);
   });

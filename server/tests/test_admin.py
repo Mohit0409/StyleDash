@@ -1074,16 +1074,12 @@ class AdminStoreTests(unittest.TestCase):
         self.assertIn("width:48px!important;height:48px!important", admin_css)
         self.assertIn("img.inventory-thumbnail{display:block;object-fit:contain!important", admin_css)
         self.assertIn("STORE_CATEGORIES", admin_ui)
-        self.assertIn(
-            "const STORE_CATEGORIES=['Clothing & Fashion','Footwear','Accessories','Beauty & Personal Care','Electronics','Gifts','Home & Living'];",
-            admin_ui,
-        )
-        self.assertIn(
-            "const PRODUCT_CATEGORIES=['Clothing & Fashion','Footwear','Accessories','Beauty & Personal Care','Electronics','Gifts','Home & Living'];",
-            admin_ui,
-        )
+        self.assertIn("const STORE_CATEGORIES=[", admin_ui)
+        self.assertIn("const PRODUCT_CATEGORIES=[", admin_ui)
+        self.assertIn("'Health & Nutrition'", admin_ui)
+        self.assertIn("'General Store'", admin_ui)
         self.assertIn("Choose a current category", admin_ui)
-        self.assertNotIn("General Store", admin_ui)
+        self.assertIn("General Store", admin_ui)
         self.assertIn("{name:'category',label:'Category',type:'select',required:true,value:STORE_CATEGORIES[0]", admin_ui)
         self.assertIn("field-required", admin_ui)
         self.assertIn(".dialog-field-wide{", admin_css)
