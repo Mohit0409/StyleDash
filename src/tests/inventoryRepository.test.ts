@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { productRepository } from '../repositories/productRepository';
+import { productRepository, resetPublicProductCachesForTests } from '../repositories/productRepository';
 import { canAddVariantsToCart, canAddVariantToCart, canIncreaseCartQuantity, inventoryRepository } from '../repositories/inventoryRepository';
 
 const response = (availability: unknown, status = 200) => new Response(JSON.stringify({ success: true, availability }), {
@@ -18,6 +18,7 @@ const reviewResponse = (summaries: Record<string, unknown> = {}) => new Response
 });
 
 afterEach(() => {
+  resetPublicProductCachesForTests();
   vi.unstubAllGlobals();
   vi.restoreAllMocks();
 });
@@ -124,8 +125,10 @@ describe('authoritative inventory repository', () => {
     expect(new Set(requestedIds)).toEqual(new Set(products.map(product => product.id)));
   });
 
-  it('refreshes displayed availability when server stock changes', async () => {
-    let availabilityRequest = 0;
+  it('coalesces display-only inventory requests then refreshes after the short TTL', async () => {
+    let now = Date.now() + 80_000;
+    vi.spyOn(Date, 'now').mockImplementation(() => now);
+    let inventoryCalls = 0;
     const fetcher = vi.fn<typeof fetch>(async input => {
       const url = String(input);
       if (url === '/api/shop-products/published') return productsResponse();
@@ -134,15 +137,75 @@ describe('authoritative inventory repository', () => {
           status: 404, headers: { 'Content-Type': 'application/json' },
         });
       }
-      availabilityRequest += 1;
-      return response([{ productId: 'sd-prod-001', variantId: 'sd-prod-001-var-2', available: availabilityRequest === 1 }]);
+      if (url.startsWith('/api/reviews/summaries?')) return reviewResponse();
+      inventoryCalls += 1;
+      return response([{ productId: 'sd-prod-001', variantId: 'sd-prod-001-var-2', available: inventoryCalls === 1 }]);
     });
     vi.stubGlobal('fetch', fetcher);
 
     const first = await productRepository.getProductBySlug('sd-prod-001');
     const second = await productRepository.getProductBySlug('sd-prod-001');
     expect(first?.variants.find(variant => variant.id === 'sd-prod-001-var-2')?.available).toBe(true);
-    expect(second?.variants.find(variant => variant.id === 'sd-prod-001-var-2')?.available).toBe(false);
+    expect(second?.variants.find(variant => variant.id === 'sd-prod-001-var-2')?.available).toBe(true);
+    expect(inventoryCalls).toBe(1);
+    now += 11_000;
+    const third = await productRepository.getProductBySlug('sd-prod-001');
+    expect(third?.variants.find(variant => variant.id === 'sd-prod-001-var-2')?.available).toBe(false);
+    expect(inventoryCalls).toBe(2);
+  });
+
+  it('does not retry throttled inventory until cooldown expires and keeps stock unresolved', async () => {
+    let now = Date.now() + 200_000;
+    vi.spyOn(Date, 'now').mockImplementation(() => now);
+    let inventoryCalls = 0;
+    const fetcher = vi.fn<typeof fetch>(async input => {
+      const url = String(input);
+      if (url === '/api/shop-products/published') return productsResponse();
+      if (url.startsWith('/api/shop-products/')) {
+        return new Response(JSON.stringify({ success: false, error: 'Not found.', code: 'product_not_found' }), {
+          status: 404, headers: { 'Content-Type': 'application/json' },
+        });
+      }
+      if (url.startsWith('/api/reviews/summaries?')) return reviewResponse();
+      inventoryCalls += 1;
+      if (inventoryCalls === 1) {
+        return new Response(JSON.stringify({ error: 'Too many requests', code: 'rate_limited' }), {
+          status: 429, headers: { 'Content-Type': 'application/json' },
+        });
+      }
+      return response([{ productId: 'sd-prod-001', variantId: 'sd-prod-001-var-2', available: true }]);
+    });
+    vi.stubGlobal('fetch', fetcher);
+
+    const first = await productRepository.getProductBySlug('sd-prod-001');
+    const second = await productRepository.getProductBySlug('sd-prod-001');
+    expect(first?.variants.find(variant => variant.id === 'sd-prod-001-var-2')?.available).toBeUndefined();
+    expect(second?.variants.find(variant => variant.id === 'sd-prod-001-var-2')?.available).toBeUndefined();
+    expect(inventoryCalls).toBe(1);
+    now += 61_000;
+    const third = await productRepository.getProductBySlug('sd-prod-001');
+    expect(third?.variants.find(variant => variant.id === 'sd-prod-001-var-2')?.available).toBe(true);
+    expect(inventoryCalls).toBe(2);
+  });
+
+  it('caches review batches across repeated catalogue navigation', async () => {
+    let now = Date.now() + 400_000;
+    vi.spyOn(Date, 'now').mockImplementation(() => now);
+    const fetcher = vi.fn<typeof fetch>(async input => {
+      const url = String(input);
+      if (url === '/api/shop-products/published') return productsResponse();
+      if (url.startsWith('/api/reviews/summaries?')) return reviewResponse();
+      return response([]);
+    });
+    vi.stubGlobal('fetch', fetcher);
+    await productRepository.getAllProducts();
+    const count = fetcher.mock.calls.filter(([url]) => String(url).startsWith('/api/reviews/summaries?')).length;
+    expect(count).toBeGreaterThan(0);
+    await productRepository.getAllProducts();
+    expect(fetcher.mock.calls.filter(([url]) => String(url).startsWith('/api/reviews/summaries?'))).toHaveLength(count);
+    now += 121_000;
+    await productRepository.getAllProducts();
+    expect(fetcher.mock.calls.filter(([url]) => String(url).startsWith('/api/reviews/summaries?')).length).toBeGreaterThan(count);
   });
 
   it('merges public shop products and retries a transient authoritative availability failure', async () => {
