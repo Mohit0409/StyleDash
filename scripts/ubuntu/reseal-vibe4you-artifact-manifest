@@ -1,0 +1,134 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+APP_ROOT="${VIBE4YOU_APP_ROOT:-/opt/vibe4you-production}"
+MANIFEST="$APP_ROOT/.migration/artifact-files-remediated.sha256"
+
+if [ "$#" -lt 1 ]; then
+  echo "usage: reseal-vibe4you-artifact-manifest RELATIVE_PATH [RELATIVE_PATH ...]" >&2
+  exit 2
+fi
+
+python3 - "$APP_ROOT" "$MANIFEST" "$@" <<'PY'
+from __future__ import annotations
+
+from datetime import datetime, timezone
+from pathlib import Path
+import hashlib
+import os
+import re
+import shutil
+import sys
+import tempfile
+
+root = Path(sys.argv[1]).resolve()
+manifest = Path(sys.argv[2]).resolve()
+requested = list(dict.fromkeys(sys.argv[3:]))
+
+if not root.is_dir():
+    raise SystemExit("Application root does not exist")
+if not manifest.is_file():
+    raise SystemExit("Artifact manifest does not exist")
+SAFE_PATH = re.compile(r"^[A-Za-z0-9._/-]+$")
+
+
+def allowed(relative: str) -> bool:
+    if relative == "server/index.html":
+        return True
+    return relative.startswith("server/assets/") and relative != "server/assets/"
+
+
+def hash_file(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+for relative in requested:
+    if not SAFE_PATH.fullmatch(relative) or relative.startswith("/") or ".." in Path(relative).parts:
+        raise SystemExit(f"Unsafe manifest path: {relative}")
+    if not allowed(relative):
+        raise SystemExit(f"Path is not approved for frontend manifest reseal: {relative}")
+    target = (root / relative).resolve()
+    try:
+        target.relative_to(root)
+    except ValueError as exc:
+        raise SystemExit(f"Path escapes application root: {relative}") from exc
+    if not target.is_file() or target.is_symlink():
+        raise SystemExit(f"Reseal target must be a regular non-symlink file: {relative}")
+lines = manifest.read_text(encoding="utf-8").splitlines()
+entries: dict[str, tuple[int, str]] = {}
+
+for index, line in enumerate(lines):
+    match = re.fullmatch(r"([0-9a-fA-F]{64})\s+[* ]?(.+)", line)
+    if not match:
+        raise SystemExit(f"Malformed artifact manifest line {index + 1}")
+    expected = match.group(1).lower()
+    relative = match.group(2)
+    if relative in entries:
+        raise SystemExit(f"Duplicate artifact manifest path: {relative}")
+    entries[relative] = (index, expected)
+
+unexpected = []
+for relative, (_, expected) in entries.items():
+    if relative in requested:
+        continue
+    target = root / relative
+    if not target.is_file() or hash_file(target) != expected:
+        unexpected.append(relative)
+
+if unexpected:
+    raise SystemExit(
+        "Refusing reseal because unrelated manifest entries do not match: "
+        + ", ".join(unexpected)
+    )
+
+new_lines = list(lines)
+for relative in requested:
+    digest = hash_file(root / relative)
+    if relative in entries:
+        index, _ = entries[relative]
+        new_lines[index] = f"{digest}  {relative}"
+    else:
+        if not relative.startswith("server/assets/"):
+            raise SystemExit(f"Only new server/assets files may be appended: {relative}")
+        new_lines.append(f"{digest}  {relative}")
+stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+backup = manifest.with_name(manifest.name + f".before-reseal-{stamp}")
+shutil.copy2(manifest, backup)
+
+fd, temporary_name = tempfile.mkstemp(
+    prefix=manifest.name + ".candidate.",
+    dir=manifest.parent,
+    text=True,
+)
+temporary = Path(temporary_name)
+
+try:
+    with os.fdopen(fd, "w", encoding="utf-8", newline="\n") as handle:
+        handle.write("\n".join(new_lines) + "\n")
+        handle.flush()
+        os.fsync(handle.fileno())
+    os.chmod(temporary, manifest.stat().st_mode & 0o777)
+    os.replace(temporary, manifest)
+
+    for line in new_lines:
+        match = re.fullmatch(r"([0-9a-fA-F]{64})\s+[* ]?(.+)", line)
+        expected = match.group(1).lower()
+        relative = match.group(2)
+        target = root / relative
+        if not target.is_file() or hash_file(target) != expected:
+            raise RuntimeError(f"Post-reseal verification failed: {relative}")
+except Exception:
+    if temporary.exists():
+        temporary.unlink()
+    shutil.copy2(backup, manifest)
+    raise
+
+print("ARTIFACT_MANIFEST_RESEAL=PASS")
+for relative in requested:
+    print(f"resealed={relative}")
+print(f"rollback_manifest={backup}")
+PY
