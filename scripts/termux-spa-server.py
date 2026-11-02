@@ -3859,7 +3859,22 @@ class StyleDashRequestHandler(SimpleHTTPRequestHandler):
             for product in self.payment_service.product_snapshot().values()
             if product.get("active") is True and isinstance(product.get("slug"), str)
         ]
-        urls = paths + sorted(set(product_paths))
+        # Only active storefronts with published items should be advertised
+        # as discoverable search landing pages.
+        stores = (
+            self.payment_service.shops.list_active_stores()
+            if self.payment_service.shops is not None else []
+        )
+        store_paths = [
+            f"/store/{store['slug']}"
+            for store in stores
+            if store.get("active") is True
+            and store.get("approved") is True
+            and isinstance(store.get("slug"), str)
+            and re.fullmatch(r"[a-z0-9-]+", store["slug"]) is not None
+            and (store.get("productCount") or 0) > 0
+        ]
+        urls = paths + sorted(set(product_paths + store_paths))
         items = "".join(
             f"  <url><loc>{xml_escape(origin + path)}</loc></url>\n"
             for path in urls

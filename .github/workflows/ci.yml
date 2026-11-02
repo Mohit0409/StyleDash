@@ -132,6 +132,8 @@ jobs:
         run: python qa/ci_public_health.py
       - name: Audit published customer price against MRP (public GET only)
         run: python qa/ci_public_catalogue.py
+      - name: Audit public SEO sitemap and storefront coverage (read-only)
+        run: python qa/ci_public_seo.py
       - name: Upload read-only health evidence
         if: always()
         uses: actions/upload-artifact@v4
@@ -140,6 +142,7 @@ jobs:
           path: |
             qa-results/ci-public-health.json
             qa-results/ci-public-catalogue.json
+            qa-results/ci-public-seo.json
           retention-days: 14
           if-no-files-found: warn
 

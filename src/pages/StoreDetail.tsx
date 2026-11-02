@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { MapPin, Zap, Star, Phone, Mail } from 'lucide-react';
 import { SEO } from '../components/SEO';
+import { buildStoreSeo } from '../utils/storeSeo';
 import { ProductCard } from '../components/ProductCard';
 import { ProductPagination } from '../components/ProductPagination';
 import { useProductPagination } from '../hooks/useProductPagination';
@@ -56,7 +57,7 @@ export const StoreDetail: React.FC = () => {
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
-      <SEO title={`${store.storeName} - Local Store in Neemuch`} description={store.description} />
+      <SEO {...buildStoreSeo(store)} />
 
       {/* Store Cover Banner */}
       <div className="relative rounded-3xl overflow-hidden aspect-[21/9] bg-neutral-900 border border-neutral-200 dark:border-neutral-800 shadow-xl">
