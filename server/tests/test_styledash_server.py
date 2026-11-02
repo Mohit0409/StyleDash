@@ -2537,6 +2537,22 @@ class HttpApiTests(unittest.TestCase):
             self.assertIn("<loc>https://styledash.test/products</loc>", body)
             self.assertIn("https://styledash.test/product/", body)
 
+    def test_sitemap_lists_only_active_stocked_storefronts(self) -> None:
+        candidates = [
+            {"slug": "stocked-shop-ab12", "active": True, "approved": True, "productCount": 3},
+            {"slug": "empty-shop-cd34", "active": True, "approved": True, "productCount": 0},
+            {"slug": "inactive-shop-ef56", "active": False, "approved": True, "productCount": 2},
+            {"slug": "unapproved-shop-gh78", "active": True, "approved": False, "productCount": 2},
+            {"slug": "bad/slug", "active": True, "approved": True, "productCount": 1},
+        ]
+        with patch.object(self.service.shops, "list_active_stores", return_value=candidates):
+            with urllib.request.urlopen(f"{self.base_url}/sitemap.xml") as response:
+                sitemap = response.read().decode("utf-8")
+                self.assertEqual(response.status, 200)
+        self.assertIn("<loc>https://styledash.test/store/stocked-shop-ab12</loc>", sitemap)
+        for slug in ("empty-shop-cd34", "inactive-shop-ef56", "unapproved-shop-gh78", "bad/slug"):
+            self.assertNotIn(f"/store/{slug}", sitemap)
+
     def test_live_hostname_serves_robots_and_sitemap_when_public_origin_env_is_missing(self) -> None:
         configured_origin = os.environ.pop("STYLEDASH_PUBLIC_ORIGIN", None)
         try:
