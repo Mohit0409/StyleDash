@@ -19,3 +19,17 @@ Runtime evidence is supplied as booleans by a separate authorized reviewer. The 
 Do not test by sending real payments, creating orders, sending notifications, logging into production, or accessing sensitive production data. Do not copy production secrets into staging.
 
 No production/staging service file, data, payment integration or secret is altered by this change.
+
+## Shared Firebase frontend project is a separate release blocker
+
+An independent static dependency-graph check of the actual staging and production
+entrypoint bundles found that their reachable Firebase client code uses matching
+projectId, authDomain, appId, and apiKey values. These are public client identifiers,
+but none of their raw values are recorded in reports. Simply creating a separate
+Firebase *app* in the same project would not isolate default Firebase Auth users.
+
+The gate now requires a trusted comparison of the currently referenced frontend
+bundles and explicit evidence that the staging Firebase project ID and auth
+domain differ from production. Omission or a known shared configuration fails.
+The separate frontend project check does not replace backend/provider credential
+separation checks, tenancy validation, or authorization rules review.

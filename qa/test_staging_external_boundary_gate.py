@@ -25,6 +25,11 @@ class ExternalBoundaryGateTests(unittest.TestCase):
                 "STYLEDASH_ENABLE_TEST_PRODUCT": "false",
             },
             "origin": {"is_localhost": True, "is_public_site": False},
+            "frontend_auth": {
+                "active_bundle_comparison_performed": True,
+                "stage_project_distinct_from_production": True,
+                "stage_auth_domain_distinct_from_production": True,
+            },
             "env_key_names": ["RAZORPAY_MODE", "STYLEDASH_TOTP_ENCRYPTION_KEY"],
             "listeners": {"8080": {"loopback_only": True}, "8081": {"loopback_only": True}},
             "runtime": {
@@ -82,6 +87,22 @@ class ExternalBoundaryGateTests(unittest.TestCase):
     def test_payment_keys_present_fails(self):
         x = self.run_gate(lambda d: d["env_key_names"].append("RAZORPAY_KEY_SECRET"))
         self.assertIn("payment_or_messaging_credentials_in_staging_env",x["issues"])
+
+    def test_shared_firebase_project_blocks_release(self):
+        x = self.run_gate(lambda d: d["frontend_auth"].update(
+            stage_project_distinct_from_production=False
+        ))
+        self.assertIn("firebase_project_not_isolated", x["issues"])
+
+    def test_shared_firebase_auth_domain_blocks_release(self):
+        x = self.run_gate(lambda d: d["frontend_auth"].update(
+            stage_auth_domain_distinct_from_production=False
+        ))
+        self.assertIn("firebase_auth_domain_not_isolated", x["issues"])
+
+    def test_missing_active_firebase_comparison_fails_closed(self):
+        x = self.run_gate(lambda d: d.pop("frontend_auth"))
+        self.assertIn("frontend_firebase_active_config_comparison_missing", x["issues"])
 
     def test_missing_secret_inventory_fails_closed(self):
         x = self.run_gate(lambda d: d.pop("env_key_names"))

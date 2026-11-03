@@ -40,6 +40,7 @@ def check(snapshot: dict) -> dict:
     prod = snapshot.get("production") if isinstance(snapshot.get("production"), dict) else {}
     flags = snapshot.get("flags") if isinstance(snapshot.get("flags"), dict) else {}
     origin = snapshot.get("origin") if isinstance(snapshot.get("origin"), dict) else {}
+    frontend_auth = snapshot.get("frontend_auth") if isinstance(snapshot.get("frontend_auth"), dict) else {}
     evidence = snapshot.get("runtime") if isinstance(snapshot.get("runtime"), dict) else {}
     listeners = snapshot.get("listeners") if isinstance(snapshot.get("listeners"), dict) else {}
     env_keys = snapshot.get("env_key_names")
@@ -61,6 +62,12 @@ def check(snapshot: dict) -> dict:
             issues.append("external_side_effects_enabled_or_unknown:" + key)
     if origin.get("is_localhost") is not True or origin.get("is_public_site") is not False:
         issues.append("staging_public_origin_not_local")
+    if frontend_auth.get("active_bundle_comparison_performed") is not True:
+        issues.append("frontend_firebase_active_config_comparison_missing")
+    if frontend_auth.get("stage_project_distinct_from_production") is not True:
+        issues.append("firebase_project_not_isolated")
+    if frontend_auth.get("stage_auth_domain_distinct_from_production") is not True:
+        issues.append("firebase_auth_domain_not_isolated")
     if not isinstance(env_keys, list) or any(not isinstance(k, str) for k in env_keys):
         issues.append("staging_environment_key_inventory_missing")
     else:
@@ -96,6 +103,13 @@ def check(snapshot: dict) -> dict:
             str(flags.get(k, "")).casefold() in DISABLED for k in REQUIRED_DISABLED
         ) and str(flags.get("RAZORPAY_MODE", "")).casefold() == "test",
         "network_policy_configured": network_policy,
+        "firebase_frontend_isolated": all(
+            frontend_auth.get(key) is True for key in (
+                "active_bundle_comparison_performed",
+                "stage_project_distinct_from_production",
+                "stage_auth_domain_distinct_from_production",
+            )
+        ),
         "runtime_evidence_present": all(evidence.get(key) is True for key in (
             "production_loopback_api_blocked",
             "external_egress_policy_verified",
