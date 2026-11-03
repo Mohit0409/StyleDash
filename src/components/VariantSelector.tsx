@@ -1,5 +1,6 @@
 import React from 'react';
 import { Product, ProductVariant } from '../types';
+import { shouldShowSizeGuide, shouldShowVariantChoice, variantAttributeLabel } from '../utils/productPresentation';
 
 interface VariantSelectorProps {
   product: Product;
@@ -24,6 +25,8 @@ export const VariantSelector: React.FC<VariantSelectorProps> = ({
   const sizes = Array.from(new Set(product.variants
     .filter(variant => !selectedColour || variant.colourName === selectedColour)
     .map(variant => variant.size)));
+  const attributeLabel = variantAttributeLabel(product);
+  const showVariantChoice = shouldShowVariantChoice(product);
 
   return (
     <div className="space-y-5">
@@ -64,13 +67,14 @@ export const VariantSelector: React.FC<VariantSelectorProps> = ({
         </div>
       </div>}
 
-      {/* Size Selection */}
-      <div>
+      {/* Fixed products with a single generic variant stay purchasable without
+          pretending that "Default" is a customer-selectable size. */}
+      {showVariantChoice && <div>
         <div className="flex items-center justify-between mb-2">
           <label className="text-xs font-bold text-neutral-700 dark:text-neutral-300 uppercase tracking-wider">
-            Select Size: <span className="text-lime-600 dark:text-lime-400 font-black">{selectedSize || 'Choose one'}</span>
+            Select {attributeLabel}: <span className="text-lime-600 dark:text-lime-400 font-black">{selectedSize || 'Choose one'}</span>
           </label>
-          {onOpenSizeGuide && (
+          {onOpenSizeGuide && shouldShowSizeGuide(product) && (
             <button
               onClick={onOpenSizeGuide}
               className="min-h-8 px-1 text-xs text-lime-600 dark:text-lime-400 font-bold hover:underline"
@@ -107,7 +111,7 @@ export const VariantSelector: React.FC<VariantSelectorProps> = ({
             );
           })}
         </div>
-      </div>
+      </div>}
     </div>
   );
 };

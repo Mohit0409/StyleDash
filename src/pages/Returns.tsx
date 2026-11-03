@@ -68,21 +68,28 @@ export const Returns = () => (
     <section className="space-y-2">
       <h2 className="font-black">Refund timing</h2>
       <p className="text-sm text-neutral-600">
-        Once a return or cancellation is approved, Vibe4You initiates the
-        refund within {CONFIG.LEGAL.REFUND_TIMELINE_DAYS} calendar days. Online
-        payments are refunded to the original supported payment method. Approved
-        Cash on Delivery refunds are issued by UPI after the customer supplies a
-        valid UPI ID. Your bank or payment provider may take additional time to
-        display the credit after Vibe4You initiates it.
+        Once an eligible return or cancellation is approved, Vibe4You initiates
+        the refund within {CONFIG.LEGAL.REFUND_TIMELINE_DAYS} calendar days.
+        Online payments are refunded to the original supported payment method.
+        Cash on Delivery orders need no advance payment. For COD orders placed
+        earlier with an INR 50 prepaid booking amount, that amount is refunded
+        through its original Razorpay payment only if the order is cancelled
+        before packing, after the refund is confirmed. Approved refunds for COD
+        amounts collected at delivery are issued by UPI after the customer
+        supplies a valid UPI ID.
+        Your bank or payment provider may take additional time to display the
+        credit after Vibe4You initiates it.
       </p>
     </section>
 
     <section className="space-y-2">
       <h2 className="font-black">Cancellation</h2>
       <p className="text-sm text-neutral-600">
-        A customer may submit a cancellation request before delivery. If the
-        order is already out for delivery, the cancellation costs INR 50. Any
-        required fee collection and online refund must be reconciled before the
+        A customer may submit a cancellation request before delivery. For COD
+        orders placed earlier with an INR 50 booking amount, that amount is
+        retained once the order has been packed. If the order is already out
+        for delivery, the cancellation costs INR 50. Any required
+        fee collection and eligible online refund must be reconciled before the
         order is finally marked cancelled.
       </p>
     </section>

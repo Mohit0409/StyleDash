@@ -5,7 +5,6 @@ import {
   createPaymentOrder,
   openRazorpayCheckout,
   PaymentApiError,
-  placeCodOrder,
   RazorpayConstructor,
   RazorpaySuccessResponse,
   verifyPayment,
@@ -74,16 +73,21 @@ describe('payment API', () => {
     });
   });
 
-  it('places COD through the authoritative backend endpoint', async () => {
-    const order = { id: 'SD-COD-001', paymentMethod: 'cod', paymentStatus: 'pending' };
-    const fetcher = vi.fn<typeof fetch>(async () => jsonResponse({ success: true, idempotent: false, order }, 201));
+  it('creates a server-authoritative Razorpay order for the COD booking amount', async () => {
+    const codOrder: CreatePaymentOrderResponse = {
+      ...createdOrder,
+      amount: 5000,
+      paymentDescription: 'Rs 50 COD booking amount',
+      trustedTotals: { ...createdOrder.trustedTotals, codAdvanceAmount: 50, codAmountDue: 976 },
+    };
+    const fetcher = vi.fn<typeof fetch>(async () => jsonResponse(codOrder, 201));
 
-    await placeCodOrder({ ...intent, paymentMethod: 'cod' }, 'checkout-cod-001', fetcher);
+    await expect(createPaymentOrder({ ...intent, paymentMethod: 'cod' }, 'checkout-cod-001', fetcher)).resolves.toEqual(codOrder);
 
     const [endpoint, request] = fetcher.mock.calls[0] as Parameters<typeof fetch>;
-    expect(endpoint).toBe('/api/place-cod-order');
+    expect(endpoint).toBe('/api/create-order');
     expect(new Headers(request?.headers).get('Idempotency-Key')).toBe('checkout-cod-001');
-    expect(JSON.parse(String(request?.body))).not.toHaveProperty('grandTotal');
+    expect(JSON.parse(String(request?.body))).toEqual({ ...intent, paymentMethod: 'cod' });
   });
 
   it('posts all Razorpay fields for server verification', async () => {
@@ -152,6 +156,16 @@ describe('Razorpay Checkout modal', () => {
     });
 
     await expect(openRazorpayCheckout(createdOrder, customer, 'upi', Constructor)).resolves.toEqual(payment);
+  });
+
+  it('allows UPI or card for the COD booking payment', async () => {
+    const Constructor = fakeConstructor((options) => {
+      expect(options.method).toEqual({ upi: true, card: true, netbanking: false, wallet: false });
+      (options.handler as (value: RazorpaySuccessResponse) => void)({
+        razorpay_order_id: 'order_test_001', razorpay_payment_id: 'pay_cod_advance', razorpay_signature: 'signature-test',
+      });
+    });
+    await expect(openRazorpayCheckout(createdOrder, customer, 'all', Constructor)).resolves.toMatchObject({ razorpay_payment_id: 'pay_cod_advance' });
   });
 
   it('rejects when the customer dismisses the modal', async () => {

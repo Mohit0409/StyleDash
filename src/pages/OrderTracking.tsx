@@ -34,6 +34,8 @@ export const OrderTracking: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [receiptLoading, setReceiptLoading] = useState(false);
+  const [taxInvoiceLoading, setTaxInvoiceLoading] = useState(false);
+  const [taxInvoiceAvailable, setTaxInvoiceAvailable] = useState(false);
   const [finalizingTryAtHome, setFinalizingTryAtHome] = useState<string | null>(null);
   const [clock, setClock] = useState(() => Date.now());
   const [error, setError] = useState('');
@@ -42,7 +44,10 @@ export const OrderTracking: React.FC = () => {
     else setRefreshing(true);
     setError('');
     try {
-      setOrder(await orderApi.one(orderId));
+      const updated = await orderApi.one(orderId);
+      setOrder(updated);
+      setTaxInvoiceAvailable(false);
+      try { setTaxInvoiceAvailable((await orderApi.taxInvoiceStatus(orderId)).issued); } catch { setTaxInvoiceAvailable(false); }
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'This order could not be loaded.');
     } finally {
@@ -85,6 +90,27 @@ export const OrderTracking: React.FC = () => {
     }
   };
 
+  const downloadTaxInvoice = async () => {
+    if (!order) return;
+    setTaxInvoiceLoading(true);
+    setError('');
+    try {
+      const { blob, filename } = await orderApi.taxInvoice(order.id);
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.setTimeout(() => URL.revokeObjectURL(url), 30000);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'GST invoice download failed.');
+    } finally {
+      setTaxInvoiceLoading(false);
+    }
+  };
+
   const confirmTryAtHome = async (itemIndex: number, keptVariantId: string) => {
     if (!order) return;
     const key = `${itemIndex}:${keptVariantId}`;
@@ -118,6 +144,7 @@ export const OrderTracking: React.FC = () => {
           <button type="button" onClick={() => void loadOrder(true)} disabled={refreshing} className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl border border-neutral-300 dark:border-neutral-700 font-bold">
             <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} /> {refreshing ? 'Refreshing…' : 'Refresh status'}
           </button>
+          {taxInvoiceAvailable && order.fulfillmentRequired !== false && <button type="button" onClick={() => void downloadTaxInvoice()} disabled={taxInvoiceLoading} className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl border border-neutral-300 dark:border-neutral-700 font-bold"><Download className="w-4 h-4" />{taxInvoiceLoading ? 'Preparing?' : 'Download GST invoice'}</button>}
           {delivered && order.fulfillmentRequired !== false && <button type="button" onClick={() => void downloadReceipt()} disabled={receiptLoading} className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-neutral-950 text-white dark:bg-lime-400 dark:text-neutral-950 font-black"><Download className="w-4 h-4" />{receiptLoading ? 'Preparing…' : 'Download receipt'}</button>}
         </div>
       </div>
@@ -167,7 +194,7 @@ export const OrderTracking: React.FC = () => {
         </section>
         <section className="rounded-3xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 p-5 md:p-6">
           <h2 className="text-lg font-black">Payment summary</h2>
-          <dl className="mt-4 space-y-2 text-sm"><div className="flex justify-between"><dt>Subtotal</dt><dd>{money(order.subtotal)}</dd></div>{order.discount > 0 && <div className="flex justify-between text-green-700 dark:text-green-400"><dt>Discount</dt><dd>-{money(order.discount)}</dd></div>}<div className="flex justify-between"><dt>Delivery</dt><dd>{money(order.deliveryFee)}</dd></div><div className="flex justify-between"><dt>Taxes</dt><dd>{money(order.taxes)}</dd></div><div className="flex justify-between border-t border-neutral-200 dark:border-neutral-800 pt-3 mt-3 text-base font-black"><dt>Total</dt><dd>{money(order.grandTotal)}</dd></div></dl>
+          <dl className="mt-4 space-y-2 text-sm"><div className="flex justify-between"><dt>Subtotal</dt><dd>{money(order.subtotal)}</dd></div>{order.discount > 0 && <div className="flex justify-between text-green-700 dark:text-green-400"><dt>Discount</dt><dd>-{money(order.discount)}</dd></div>}<div className="flex justify-between"><dt>Delivery</dt><dd>{money(order.deliveryFee)}</dd></div><div className="flex justify-between"><dt>Taxes</dt><dd>{money(order.taxes)}</dd></div><div className="flex justify-between border-t border-neutral-200 dark:border-neutral-800 pt-3 mt-3 text-base font-black"><dt>Total</dt><dd>{money(order.grandTotal)}</dd></div>{order.paymentMethod === 'cod' && order.codAdvancePaid && <><div className="flex justify-between pt-2 text-lime-700 dark:text-lime-300"><dt>COD booking amount paid online</dt><dd>{money(order.codAdvanceAmount || 0)}</dd></div><div className="flex justify-between font-bold"><dt>{order.paymentStatus === 'paid' && typeof order.codAmountCollected === 'number' ? 'COD balance collected at delivery' : 'Balance due on delivery'}</dt><dd>{money(order.paymentStatus === 'paid' && typeof order.codAmountCollected === 'number' ? order.codAmountCollected : order.codAmountDue || 0)}</dd></div></>}</dl>
         </section>
       </div>
 
