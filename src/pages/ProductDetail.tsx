@@ -11,6 +11,7 @@ import { ProductImageLightbox } from '../components/ProductImageLightbox';
 import { ProductReviews } from '../components/ProductReviews';
 import { OutsideDeliveryRequestDialog } from '../components/OutsideDeliveryRequestDialog';
 import { Product } from '../types';
+import { hasMeaningfulProductText, meaningfulCareInstructions, shouldShowSizeGuide } from '../utils/productPresentation';
 import { productRepository } from '../repositories/productRepository';
 import { useCart } from '../context/CartContext';
 import { useWishlist } from '../context/WishlistContext';
@@ -86,11 +87,11 @@ export const ProductDetail: React.FC = () => {
   if (!product) {
     return (
       <div className="max-w-7xl mx-auto p-12 text-center space-y-4">
-        <SEO title="Product not found - Vibe4You" description="The requested fashion item could not be found." noIndex />
+        <SEO title="Product not found - Vibe4You" description="The product you are looking for is no longer available." noIndex />
         <h1 className="text-2xl font-black">Product Not Found</h1>
-        <p className="text-xs text-neutral-500">The fashion item you are looking for is no longer available.</p>
+        <p className="text-xs text-neutral-500">The product you are looking for is no longer available.</p>
         <Link to="/products" className="inline-block px-6 py-2.5 bg-neutral-950 text-white text-xs font-bold rounded-xl">
-          Browse Fashion Catalogue
+          Browse All Products
         </Link>
       </div>
     );
@@ -109,6 +110,12 @@ export const ProductDetail: React.FC = () => {
   );
   const tryAtHomeEligible = product.tryAtHomeAvailable === true
     && new Set(tryAtHomeVariants.map(variant => variant.size)).size >= 2;
+
+  const showSizeGuide = shouldShowSizeGuide(product);
+  const careInstructions = meaningfulCareInstructions(product);
+  const hasMaterial = hasMeaningfulProductText(product.material);
+  const hasDescription = hasMeaningfulProductText(product.description)
+    && product.description.trim() !== product.shortDescription.trim();
 
   const isWishlisted = isInWishlist(product.id);
 
@@ -182,8 +189,8 @@ export const ProductDetail: React.FC = () => {
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-12">
       <SEO
-        title={`${product.name}${product.brand ? ` - ${product.brand}` : ""} | Vibe4You`}
-        description={product.shortDescription}
+        title={`Buy ${product.name} in Neemuch | Vibe4You`}
+        description={`Shop ${product.name} from Vibe4You in Neemuch. ${product.shortDescription}`}
         image={product.images[0] || product.thumbnail}
         type="product"
         jsonLd={{
@@ -193,11 +200,14 @@ export const ProductDetail: React.FC = () => {
           description: product.shortDescription,
           image: product.images.map(image => new URL(image, 'https://vibe4you.in').href),
           sku: product.id,
+          url: `https://vibe4you.in/product/${product.slug}`,
           brand: product.brand ? { '@type': 'Brand', name: product.brand } : undefined,
           offers: {
             '@type': 'Offer',
             priceCurrency: 'INR',
             price: product.price,
+            url: `https://vibe4you.in/product/${product.slug}`,
+            seller: { '@type': 'Organization', name: 'Vibe4You' },
             availability: availabilityResolved
               ? (product.variants.some(variant => variant.available === true)
                 ? 'https://schema.org/InStock'
@@ -310,7 +320,7 @@ export const ProductDetail: React.FC = () => {
                 || product.variants.find(variant => variant.colourName === c);
               setSelectedSize(firstSize?.size || null);
             }}
-            onOpenSizeGuide={() => setSizeGuideOpen(true)}
+            onOpenSizeGuide={showSizeGuide ? () => setSizeGuideOpen(true) : undefined}
           />
 
           {tryAtHomeEligible && (
@@ -393,27 +403,40 @@ export const ProductDetail: React.FC = () => {
           <div className="p-4 bg-lime-50 dark:bg-lime-950/20 rounded-2xl border border-lime-200 dark:border-lime-900 space-y-2 text-xs text-neutral-700 dark:text-neutral-300">
             <div className="flex items-center gap-2 font-black text-lime-800 dark:text-lime-300">
               <Zap className="w-4 h-4 fill-lime-500" />
-              <span>Dispatched from Neemuch Partner Boutique</span>
+              <span>Available through Vibe4You in Neemuch</span>
             </div>
-            <p>Same Day Delivery is available to pincode 458441. Weekend Express is available at checkout on Saturday and Sunday.</p>
+            <p>Same Day Delivery may be available in supported Neemuch areas. Delivery options and charges appear at checkout.</p>
           </div>
 
-          {/* Specifications */}
-          <div className="pt-6 border-t border-neutral-200 dark:border-neutral-800 space-y-2 text-xs text-neutral-600 dark:text-neutral-400">
-            <p><strong>Material:</strong> {product.material}</p>
-            {product.fit && <p><strong>Fit:</strong> {product.fit}</p>}
-            <p><strong>Care Instructions:</strong> {product.careInstructions.join(', ')}</p>
+          {/* Show meaningful specifications without placeholder claims. */}
+          <section aria-labelledby="product-information" className="pt-6 border-t border-neutral-200 dark:border-neutral-800 space-y-2 text-xs text-neutral-600 dark:text-neutral-400">
+            <h2 id="product-information" className="font-bold">Product information</h2>
+            <p><strong>Category:</strong> {product.category}{product.subcategory ? ' / ' + product.subcategory : ''}</p>
+            {product.brand && <p><strong>Brand:</strong> {product.brand}</p>}
+            {product.storeName && <p><strong>Store:</strong> {product.storeName}</p>}
+            {hasMaterial && <p><strong>Material:</strong> {product.material}</p>}
+            {hasMeaningfulProductText(product.fit) && <p><strong>Fit:</strong> {product.fit}</p>}
+            {careInstructions.length > 0 && <p><strong>Care Instructions:</strong> {careInstructions.join(', ')}</p>}
             <p><strong>Exchange:</strong> {product.exchangeAvailable ? `Eligible for size exchange within ${product.returnWindowDays} days for ₹50; replacement stock and conditions apply.` : 'Not available for this product.'}</p>
-          </div>
+            {!hasMaterial && careInstructions.length === 0 && (
+              <p className="text-amber-700 dark:text-amber-300">Additional specifications are being verified.</p>
+            )}
+          </section>
+          {hasDescription && (
+            <section aria-labelledby="about-product" className="pt-6 border-t border-neutral-200 dark:border-neutral-800">
+              <h2 id="about-product" className="font-bold">About this product</h2>
+              <p className="mt-2 whitespace-pre-line leading-5">{product.description}</p>
+            </section>
+          )}
         </div>
       </div>
 
       {/* Size Guide Modal */}
-      <SizeGuideModal
+      {showSizeGuide && <SizeGuideModal
         isOpen={sizeGuideOpen}
         onClose={() => setSizeGuideOpen(false)}
         department={product.department}
-      />
+      />}
 
       <ProductImageLightbox
         imageUrls={galleryImages}
