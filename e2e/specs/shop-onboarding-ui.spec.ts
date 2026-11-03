@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import { STORE_CATEGORIES } from '../../src/data/categories';
 
 const application = (status: string, overrides: Record<string, unknown> = {}) => ({
   id: 'shop-onboarding-1',
@@ -93,15 +94,12 @@ test('partner form exposes every canonical store category and preserves legacy d
   const categorySelect = page.getByLabel('Category');
   await expect(categorySelect.locator('option').first()).toBeAttached();
   const options = await categorySelect.locator('option').allTextContents();
-  expect(options).toEqual([
-    'Clothing & Fashion',
-    'Footwear',
-    'Accessories',
-    'Beauty & Personal Care',
-    'Electronics',
-    'Gifts',
-    'Home & Living',
-  ]);
+  // The canonical list is verified separately against the running production
+  // catalogue (19 labels); do not hardcode a stale seven-category fixture.
+  expect(STORE_CATEGORIES).toHaveLength(19);
+  expect(options).toEqual(STORE_CATEGORIES);
+  expect(options).toContain('Health & Nutrition');
+  expect(options).toContain('General Store');
   await expect(categorySelect).toHaveValue('Beauty & Personal Care');
   await categorySelect.selectOption('Gifts');
   await page.getByRole('button', { name: 'Save Draft' }).click();
@@ -116,7 +114,7 @@ test('partner form keeps a legacy draft category selectable instead of resetting
     if (path === '/api/auth/me') return void await json(authResponse);
     if (path === '/api/account-state') return void await json({ success: true, cart: [], wishlist: [] });
     if (path === '/api/vendor-applications/me') {
-      return void await json({ success: true, application: application('DRAFT', { category: 'General Store' }) });
+      return void await json({ success: true, application: application('DRAFT', { category: 'Retired Specialty Store' }) });
     }
     return void await json({ success: false, error: `Unexpected ${request.method()} ${path}` }, 500);
   });
@@ -126,10 +124,10 @@ test('partner form keeps a legacy draft category selectable instead of resetting
   const categorySelect = page.getByLabel('Category');
   await expect(categorySelect.locator('option').first()).toBeAttached();
   const options = await categorySelect.locator('option').allTextContents();
-  expect(options[0]).toBe('General Store');
-  expect(options).toContain('Gifts');
-  expect(options).toHaveLength(8);
-  await expect(categorySelect).toHaveValue('General Store');
+  expect(options[0]).toBe('Retired Specialty Store');
+  expect(options.slice(1)).toEqual(STORE_CATEGORIES);
+  expect(options).toHaveLength(20);
+  await expect(categorySelect).toHaveValue('Retired Specialty Store');
 });
 
 test('active shop progress points the seller to products', async ({ page }) => {
