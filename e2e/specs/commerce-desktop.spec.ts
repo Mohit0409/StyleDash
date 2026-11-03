@@ -362,7 +362,7 @@ test('isolated COD order succeeds and another account cannot read it', async ({
   await prepareCheckout(page, 'cod-owner-a');
 
   await expect(
-    page.getByRole('radio', { name: /Cash \/ Pay on Delivery/ }),
+    page.getByRole('radio', { name: /Cash on Delivery/ }),
   ).toBeChecked();
 
   await page
