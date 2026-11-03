@@ -210,6 +210,33 @@ async function prepareCheckout(page: Page, label: string) {
   await expect(page.getByLabel('Pincode')).toHaveAttribute('readonly', '');
 }
 
+test('does not enable add to cart until signed-in cart hydration completes', async ({ page }) => {
+  await loginCustomer(page, USER_A);
+  let releaseAuthentication: () => void = () => {};
+  const authGate = new Promise<void>(resolve => { releaseAuthentication = resolve; });
+  await page.route('**/api/auth/me', async route => {
+    await authGate;
+    await route.continue();
+  });
+  await page.goto(PRODUCT_ROUTE);
+  const addButton = page.getByRole('button', { name: /Add to Cart/ });
+  try {
+    await expect(page.getByRole('heading', { level: 1, name: PRODUCT_NAME, exact: true })).toBeVisible();
+    await expect(addButton, 'Do not allow adding to a temporary guest cart while account auth is unresolved').toBeDisabled();
+  } finally {
+    releaseAuthentication();
+  }
+  await expect(addButton).toBeEnabled();
+  await addButton.click();
+  await expect(page.getByRole('button', { name: /^Cart\s+1$/ })).toBeVisible();
+  await expect.poll(async () => page.evaluate(async () => {
+    const response = await fetch('/api/account-state', { credentials: 'same-origin', cache: 'no-store' });
+    if (response.status !== 200) return false;
+    const data = await response.json() as { cart?: Array<{ productId: string, quantity: number }> };
+    return Boolean(data.cart?.some(line => line.productId === 'sd-prod-001' && line.quantity >= 1));
+  }), { timeout: 10_000 }).toBe(true);
+});
+
 test('cart drawer proceeds to checkout without losing navigation to its temporary history entry', async ({ page }) => {
   await loginCustomer(page, USER_A);
   await addKnownProduct(page);
