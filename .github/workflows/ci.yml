@@ -9,6 +9,8 @@ on:
   push:
     branches:
       - main
+      # Temporary push validation of this draft reconciliation branch.
+      - reconcile/ci-test-repair-20261103
   # GitHub cron is UTC. Daily at 12:05 PM IST; actual start can be delayed.
   schedule:
     - cron: '35 6 * * *'

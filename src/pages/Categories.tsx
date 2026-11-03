@@ -30,7 +30,7 @@ export const Categories: React.FC = () => {
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
-      <SEO title="Product Categories - Vibe4You" />
+      <SEO title="Shopping Categories in Neemuch | Vibe4You" description="Discover the categories currently stocked by participating local shops in Neemuch. Browse available products and their subcategories." />
       <div>
         <h1 className="text-2xl sm:text-3xl font-black text-neutral-900 dark:text-white">All Product Categories</h1>
         <p className="mt-2 text-sm text-neutral-600 dark:text-neutral-400">
