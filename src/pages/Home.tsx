@@ -1,12 +1,13 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { ChevronLeft, ChevronRight, Grid2X2, Trophy } from 'lucide-react';
+import { ArrowRight, ChevronLeft, ChevronRight, Grid2X2, Trophy } from 'lucide-react';
 import { SEO } from '../components/SEO';
 import { HomepageMerchandising } from '../components/HomepageMerchandising';
 import { HomepageProductSection } from '../components/HomepageProductSection';
 import { Product } from '../types';
 import { productRepository } from '../repositories/productRepository';
 import { HomepagePromoCarousel } from '../components/HomepagePromoCarousel';
+import { NEEMUCH_SHOPPING_PAGES } from '../data/neemuchShopping';
 
 const DEPARTMENT_CATEGORIES = [
   { name: "Men's Fashion", query: 'dept=men', img: 'https://images.unsplash.com/photo-1516826957135-700dedea698c?auto=format&fit=crop&w=500&q=80' },
@@ -44,7 +45,7 @@ export const Home: React.FC = () => {
 
   return (
     <div className="space-y-10 pb-16 sm:space-y-12">
-      <SEO title="Vibe4You - Your look, delivered fast" />
+      <SEO title="Online Shopping in Neemuch | Local Shops, Shoes, Watches & More | Vibe4You" description="Browse products from participating Neemuch (NMH) shops on Vibe4You. Explore watches, shoes, clothing, groceries, pet supplies, beauty and more. Same Day Delivery is available in supported areas." />
 
       <HomepagePromoCarousel />
 
@@ -89,6 +90,28 @@ export const Home: React.FC = () => {
               </Link>
             ))}
           </div>
+        </section>
+
+        <section className="space-y-5" aria-labelledby="shop-neemuch-online">
+          <div>
+            <p className="text-xs font-black uppercase tracking-wider text-lime-700 dark:text-lime-400">Shop local</p>
+            <h2 id="shop-neemuch-online" className="mt-1 text-2xl font-black text-neutral-900 dark:text-white">Explore Shops & Products in Neemuch</h2>
+            <p className="mt-1 max-w-2xl text-sm leading-6 text-neutral-600 dark:text-neutral-300">
+              Find participating Neemuch (NMH) shops and explore current local product categories. Delivery options depend on the address and product.
+            </p>
+          </div>
+          <nav className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5" aria-label="Neemuch local shopping links">
+            {NEEMUCH_SHOPPING_PAGES.map(item => (
+              <Link
+                key={item.slug}
+                to={'/neemuch/' + item.slug}
+                className="flex min-h-16 items-center justify-between gap-2 rounded-xl border border-neutral-200 bg-white px-4 py-3 text-sm font-bold text-neutral-900 transition hover:border-lime-500 hover:shadow-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-lime-500 dark:border-neutral-800 dark:bg-neutral-900 dark:text-white"
+              >
+                <span>{item.label}</span>
+                <ArrowRight aria-hidden="true" className="h-4 w-4 shrink-0 text-lime-700 dark:text-lime-400" />
+              </Link>
+            ))}
+          </nav>
         </section>
 
         <section className="space-y-4" aria-labelledby="shop-by-budget">
