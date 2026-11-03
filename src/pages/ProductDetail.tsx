@@ -21,7 +21,7 @@ import { productGalleryImages } from '../utils/productGallery';
 export const ProductDetail: React.FC = () => {
   const { slug } = useParams<{ slug: string }>();
   const navigate = useNavigate();
-  const { addItem, addTryAtHomeItem } = useCart();
+  const { addItem, addTryAtHomeItem, cartReady } = useCart();
   const { isInWishlist, toggleWishlist, wishlistReady } = useWishlist();
   const { showToast } = useToast();
 
@@ -113,6 +113,10 @@ export const ProductDetail: React.FC = () => {
   const isWishlisted = isInWishlist(product.id);
 
   const handleAddToCart = async () => {
+    if (!cartReady) {
+      showToast('Your cart is still loading. Please try again.', 'error');
+      return false;
+    }
     if (tryAtHomeSizeIds.length > 0) {
       if (tryAtHomeSizeIds.length !== 2 || !tryAtHomeTermsAccepted) {
         showToast('Select two sizes and accept the Try at Home terms.', 'error');
@@ -342,7 +346,7 @@ export const ProductDetail: React.FC = () => {
           <div className="flex gap-4 pt-4">
             <button
               onClick={handleAddToCart}
-              disabled={!selectedVariant || selectedVariant.available !== true}
+              disabled={!cartReady || !selectedVariant || selectedVariant.available !== true}
               className="flex-1 py-4 bg-neutral-950 dark:bg-lime-400 text-white dark:text-neutral-950 font-black text-sm rounded-2xl shadow-xl hover:bg-neutral-800 dark:hover:bg-lime-300 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
             >
               <ShoppingBag className="w-4 h-4" /> Add to Cart
@@ -350,7 +354,7 @@ export const ProductDetail: React.FC = () => {
 
             <button
               onClick={handleBuyNow}
-              disabled={!selectedVariant || selectedVariant.available !== true}
+              disabled={!cartReady || !selectedVariant || selectedVariant.available !== true}
               className="px-8 py-4 bg-lime-400 text-neutral-950 font-black text-sm rounded-2xl shadow-xl hover:bg-lime-300 transition-all disabled:opacity-50"
             >
               Buy Now

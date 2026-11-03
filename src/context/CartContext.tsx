@@ -10,6 +10,7 @@ import { useAuth } from './AuthContext';
 
 interface CartContextType {
   items: CartItem[];
+  cartReady: boolean;
   addItem: (product: Product, variantId: string, quantity?: number) => Promise<boolean>;
   addTryAtHomeItem: (product: Product, variantIds: string[], termsAccepted: boolean) => Promise<boolean>;
   removeItem: (lineId: string) => void;
@@ -53,6 +54,7 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const { user, loading: authLoading } = useAuth();
   const userId = user?.uid ?? 'guest';
   const [items, setItems] = useState<CartItem[]>(readGuestCart);
+  const [readyOwner, setReadyOwner] = useState<string | null>(null);
   const [appliedCoupon, setAppliedCoupon] = useState<Coupon | null>(null);
   const [deliveryMethod, setDeliveryMethodState] = useState<'express' | 'standard'>('standard');
   const ownerRef = useRef('guest');
@@ -63,6 +65,7 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const saveQueueRef = useRef<Promise<void>>(Promise.resolve());
   const serverCartSignatureRef = useRef('');
   const itemsRef = useRef<CartItem[]>(items);
+  const cartReady = !authLoading && readyOwner === userId && hydratedRef.current && ownerRef.current === userId;
   const expressCart = cartExpressEligibility(items.map(item => item.product));
 
   // Synchronously gate hydrationPromiseRef when userId transitions to an
@@ -92,8 +95,9 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, [deliveryMethod, expressCart.eligible]);
 
   useEffect(() => {
-    if (authLoading) return;
+    if (authLoading) { setReadyOwner(null); return; }
     let cancelled = false;
+    setReadyOwner(null);
     hydratedRef.current = false;
     ownerRef.current = `loading:${userId}`;
     serverCartSignatureRef.current = '';
@@ -105,6 +109,7 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setItems(guestItems);
       ownerRef.current = 'guest';
       hydratedRef.current = true;
+      setReadyOwner('guest');
       if (hydrationResolveRef.current) { hydrationResolveRef.current(); hydrationResolveRef.current = null; }
       hydrationPromiseRef.current = Promise.resolve();
       return;
@@ -120,6 +125,7 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
         serverCartSignatureRef.current = cartSignature(nextItems);
         itemsRef.current = nextItems;
         setItems(nextItems);
+        setReadyOwner(userId);
       })
       .catch(() => {
         if (cancelled) return;
@@ -127,6 +133,7 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
         hydratedRef.current = false;
         itemsRef.current = [];
         setItems([]);
+        setReadyOwner(null);
       })
       .finally(() => {
         if (pendingResolve) pendingResolve();
@@ -181,6 +188,7 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, [authLoading, userId]);
 
   const addItem = async (product: Product, variantId: string, quantity = 1): Promise<boolean> => {
+    if (!cartReady) return false;
     await hydrationPromiseRef.current;
     if (userId !== 'guest' && (!hydratedRef.current || ownerRef.current !== userId)) return false;
     const variant = product.variants.find(v => v.id === variantId);
@@ -235,6 +243,7 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const addTryAtHomeItem = async (product: Product, variantIds: string[], termsAccepted: boolean): Promise<boolean> => {
+    if (!cartReady) return false;
     if (!product.tryAtHomeAvailable || !termsAccepted || variantIds.length !== 2 || new Set(variantIds).size !== 2) return false;
     const variants = variantIds.map(id => product.variants.find(variant => variant.id === id));
     if (variants.some(variant => !variant)) return false;
@@ -307,6 +316,7 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
   return (
     <CartContext.Provider value={{
       items,
+      cartReady,
       addItem,
       addTryAtHomeItem,
       removeItem,
