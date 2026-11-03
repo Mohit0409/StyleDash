@@ -1,22 +1,25 @@
-export const CATEGORY_DISPLAY_ORDER = [
-  'Clothing & Fashion',
-  'Footwear',
-  'Accessories',
-  'Beauty & Personal Care',
-  'Electronics',
-  'Gifts',
-  'Home & Living',
-] as const;
+import { PRODUCT_CATEGORY_TAXONOMY } from './catalogTaxonomy';
 
-/**
- * Canonical store category choices for the partner/shop-owner application.
- *
- * Store categories intentionally reuse the product catalogue taxonomy above
- * (kept in sync with scripts/store_categories.py on the backend, which is
- * the server-side source of truth). Do not maintain a separate hardcoded
- * list in the partner form.
- */
+/** Exact published production category vocabulary, keeping original order for UI. */
+export const CATEGORY_DISPLAY_ORDER = PRODUCT_CATEGORY_TAXONOMY.map(item => item.name);
 export const STORE_CATEGORIES = CATEGORY_DISPLAY_ORDER;
+
+export interface CategoryItem {
+  id: string;
+  name: string;
+  slug: string;
+  department: string;
+  subcategories: string[];
+}
+
+/** Full local taxonomy for category/subcategory browsing and shop product forms. */
+export const CATEGORIES: CategoryItem[] = PRODUCT_CATEGORY_TAXONOMY.map((item, index) => ({
+  id: String(index + 1),
+  name: item.name,
+  slug: item.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, ''),
+  department: 'all',
+  subcategories: [...item.subcategories],
+}));
 
 export const CATEGORY_DESCRIPTIONS: Record<string, string> = {
   'Clothing & Fashion': 'Clothing for every style and occasion',
@@ -26,4 +29,16 @@ export const CATEGORY_DESCRIPTIONS: Record<string, string> = {
   Electronics: 'Electronics and useful gadgets',
   Gifts: 'Gifts for every celebration',
   'Home & Living': 'Home essentials and decor',
+  Groceries: 'Food, pantry and household essentials',
+  'Health & Pharmacy': 'Health and personal-care essentials',
+  'Health & Nutrition': 'Nutrition and wellness products',
+  'Baby Care': 'Baby care and feeding essentials',
+  'Pet Supplies': 'Pet food, toys and care accessories',
+  'Mobile Accessories': 'Covers, chargers and phone accessories',
+  'Automotive Accessories': 'Car and two-wheeler accessories',
+  'Toys & Games': 'Toys, educational games and activities',
+  'Stationery & Books': 'School, office and reading essentials',
+  'Sports & Fitness': 'Sports equipment and fitness accessories',
+  'Hardware & Tools': 'Tools and home repair essentials',
+  'General Store': 'Everyday supplies and useful products',
 };
