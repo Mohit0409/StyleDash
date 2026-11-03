@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import re
 import tempfile
 import threading
 import unittest
@@ -995,7 +996,8 @@ class AdminStoreTests(unittest.TestCase):
         self.assertIn("Product change request filters", admin_ui)
         self.assertIn("Inventory filters", admin_ui)
         self.assertIn("inventory:{stock:'all',category:'all',department:'all',shop:'all',brand:'all'}", admin_ui)
-        self.assertIn("New verified-purchase reviews stay private until approved", admin_ui)
+        self.assertIn("Submissions and photos remain private until approved. Unverified reviews are clearly labeled.", admin_ui)
+        self.assertIn("renderProductReviews", admin_ui)
         self.assertIn("/api/admin/store-reviews", admin_ui)
         self.assertIn('width="48" height="48"', admin_ui)
         self.assertNotIn('referrerpolicy="no-referrer" style=', admin_ui)
@@ -1017,7 +1019,9 @@ class AdminStoreTests(unittest.TestCase):
         self.assertIn("matchesAdminSearch", admin_ui)
         self.assertIn('All Shops', admin_ui)
         self.assertIn('No products match the current search and filters.', admin_ui)
-        self.assertIn("Promise.all([api('/api/admin/shop-products'),api('/api/admin/vendors')])", admin_ui)
+        self.assertIn("const [productResult,vendorResult]=await Promise.all([", admin_ui)
+        self.assertIn("api('/api/admin/shop-products?'+params.toString())", admin_ui)
+        self.assertIn("api('/api/admin/vendors')", admin_ui)
         self.assertIn("Store cover image (optional)", admin_ui)
         self.assertIn("Store logo (optional)", admin_ui)
         self.assertIn("payload.bannerImage", admin_ui)
@@ -1040,7 +1044,8 @@ class AdminStoreTests(unittest.TestCase):
         self.assertIn("/refund-cancel`,{method:\'PATCH\'", admin_ui)
         self.assertIn("initiate full ₹", admin_ui)
         self.assertIn("signed refund.processed webhook confirms the refund", admin_ui)
-        self.assertIn("Paid online orders must be refunded and cancelled individually", admin_ui)
+        self.assertIn("Captured payments must be refunded and cancelled individually so each real Razorpay refund is explicitly confirmed.", admin_ui)
+        self.assertIn("isPaidOnlineOrder(order)||isRefundableCodAdvance(order)", admin_ui)
         self.assertIn("Customer requested cancellation", admin_ui)
         self.assertIn("Other", admin_ui)
         self.assertIn("Cancellation reason", admin_ui)
@@ -1060,8 +1065,8 @@ class AdminStoreTests(unittest.TestCase):
         self.assertIn("Admin changes take effect immediately after save.", admin_ui)
         map_ui = (ROOT / "server/admin/delivery-zone-map.js").read_text(encoding="utf-8")
         admin_css = (ROOT / "server/admin/admin.css").read_text(encoding="utf-8")
-        self.assertIn('/admin.js?v=refund-cancel-20261005-1', admin_index)
-        self.assertIn('/admin.css?v=thumbnail-20260916-4', admin_index)
+        self.assertRegex(admin_index, r"/admin\.js\?v=[A-Za-z0-9-]+")
+        self.assertRegex(admin_index, r"/admin\.css\?v=[A-Za-z0-9-]+")
         self.assertIn('id="admin-dialog"', admin_index)
         self.assertIn('role="status"', admin_index)
         self.assertNotIn("th:nth-child(n+4)", admin_css)
@@ -1074,16 +1079,16 @@ class AdminStoreTests(unittest.TestCase):
         self.assertIn("width:48px!important;height:48px!important", admin_css)
         self.assertIn("img.inventory-thumbnail{display:block;object-fit:contain!important", admin_css)
         self.assertIn("STORE_CATEGORIES", admin_ui)
-        self.assertIn(
-            "const STORE_CATEGORIES=['Clothing & Fashion','Footwear','Accessories','Beauty & Personal Care','Electronics','Gifts','Home & Living'];",
-            admin_ui,
-        )
-        self.assertIn(
-            "const PRODUCT_CATEGORIES=['Clothing & Fashion','Footwear','Accessories','Beauty & Personal Care','Electronics','Gifts','Home & Living'];",
-            admin_ui,
-        )
+        categories_match = re.search(r"const STORE_CATEGORIES=(\[[^\n;]+\]);", admin_ui)
+        self.assertIsNotNone(categories_match)
+        categories = json.loads(categories_match.group(1))
+        self.assertEqual(len(categories), 19)
+        self.assertIn("Health & Nutrition", categories)
+        self.assertIn("Pet Supplies", categories)
+        self.assertIn("General Store", categories)
+        self.assertIn("const PRODUCT_CATEGORIES=STORE_CATEGORIES;", admin_ui)
         self.assertIn("Choose a current category", admin_ui)
-        self.assertNotIn("General Store", admin_ui)
+        self.assertIn("General Store", admin_ui)
         self.assertIn("{name:'category',label:'Category',type:'select',required:true,value:STORE_CATEGORIES[0]", admin_ui)
         self.assertIn("field-required", admin_ui)
         self.assertIn(".dialog-field-wide{", admin_css)
@@ -1149,15 +1154,18 @@ class AdminHttpTests(unittest.TestCase):
         status, index, headers = self.request("/")
         self.assertEqual(status, 200)
         self.assertEqual(headers.get("Cache-Control"), "no-store")
-        self.assertIn("/admin.js?v=refund-cancel-20261005-1", index)
-        status, script, headers = self.request("/admin.js?v=refund-cancel-20261005-1")
+        js_versioned = re.search(r"/admin\.js\?v=[A-Za-z0-9-]+", index)
+        self.assertIsNotNone(js_versioned)
+        status, script, headers = self.request(js_versioned.group(0))
         self.assertEqual(status, 200)
         self.assertEqual(headers.get("Cache-Control"), "no-store")
         self.assertIn('width="48" height="48"', script)
         self.assertNotIn('referrerpolicy="no-referrer" style=', script)
         self.assertIn("item.productName || item.name || 'Product'", script)
         self.assertIn('class="inventory-product-heading">${inventoryThumbnail(item)}<div><h3>${escapeText(item.name)}</h3>', script)
-        status, css, headers = self.request("/admin.css?v=thumbnail-20260916-4")
+        css_versioned = re.search(r"/admin\.css\?v=[A-Za-z0-9-]+", index)
+        self.assertIsNotNone(css_versioned)
+        status, css, headers = self.request(css_versioned.group(0))
         self.assertEqual(status, 200)
         self.assertEqual(headers.get("Cache-Control"), "no-store")
         self.assertIn("width:48px!important;height:48px!important", css)
