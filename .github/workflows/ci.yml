@@ -4,6 +4,8 @@ on:
   pull_request:
     branches:
       - main
+      # Temporary dependent-PR validation; remove before the final main merge.
+      - reconcile/integration-20261103
   push:
     branches:
       - main
