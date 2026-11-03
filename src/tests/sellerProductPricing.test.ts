@@ -23,6 +23,17 @@ describe('seller product MRP validation', () => {
     expect(() => toPayload(form({ originalPrice: '' }))).toThrow('original/MRP price');
     expect(() => toPayload(form({ originalPrice: '499.99' }))).toThrow('original/MRP price');
   });
+
+  it('allows up to 100 size variants and rejects 101', () => {
+    const variants = Array.from({ length: 100 }, (_, index) => ({
+      size: `Size ${index + 1}`,
+      inventory: '1',
+    }));
+    expect(toPayload(form({ colours: [colour({ variants })] })).variants).toHaveLength(100);
+    expect(() => toPayload(form({
+      colours: [colour({ variants: [...variants, { size: 'Size 101', inventory: '1' }] })],
+    }))).toThrow('at most 100 sizes');
+  });
 });
 
 describe('seller product single-colour payload compatibility', () => {

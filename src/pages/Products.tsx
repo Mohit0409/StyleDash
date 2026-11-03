@@ -12,6 +12,7 @@ import { productRepository } from '../repositories/productRepository';
 import { vendorRepository } from '../repositories/vendorRepository';
 import { expressCatalogueState } from '../utils/delivery';
 import { availableBrandOptions, availableCategoryOptions, availableSizeOptions, matchesCatalogueProduct } from '../utils/catalogFilters';
+import { normalizeLocalShoppingQuery } from '../utils/localSearch';
 
 export const Products: React.FC = () => {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -165,7 +166,8 @@ export const Products: React.FC = () => {
 
   const matchingStores = searchQuery
     ? stores.filter(store => {
-        const q = searchQuery.toLowerCase();
+        const q = normalizeLocalShoppingQuery(searchQuery);
+        if (!q) return true;
         return [store.storeName, store.category, store.description, store.address, store.city]
           .some(value => value?.toLowerCase().includes(q));
       })
@@ -185,13 +187,16 @@ export const Products: React.FC = () => {
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
-      <SEO title="Browse Fashion Catalogue - Vibe4You" />
+      <SEO
+        title="Shop Products from Neemuch Stores | Vibe4You"
+        description="Browse fashion, footwear, watches, electronics, groceries, beauty and gifts from local Neemuch stores on Vibe4You. Check current prices, availability and delivery serviceability."
+      />
 
       {/* Page Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-6 border-b border-neutral-200 dark:border-neutral-800">
         <div>
           <h1 className="text-2xl sm:text-3xl font-black text-neutral-900 dark:text-white capitalize">
-            {searchQuery ? `Search results for "${searchQuery}"` : category !== 'all' ? `${category} Catalogue` : `${department} Fashion Catalogue`}
+            {searchQuery ? `Search results for "${searchQuery}"` : category !== 'all' ? `${category} Catalogue` : department !== 'all' ? `${department} Products` : 'All Products Catalogue'}
           </h1>
           <p className="text-xs text-neutral-500 mt-1">
             {searchQuery ? (

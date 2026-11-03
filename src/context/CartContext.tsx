@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useEffect, useRef, useState } from 'react';
 import { Product, CartItem, Coupon } from '../types';
 import { trackEvent } from '../services/analytics';
+import { trackCartAddition } from '../services/ecommerceAnalytics';
 import { calculateCartTotals } from './cartTotals';
 import { canAddVariantsToCart, canAddVariantToCart, canIncreaseCartQuantity } from '../repositories/inventoryRepository';
 import { cartExpressEligibility, isExpressDeliveryAvailable } from '../utils/delivery';
@@ -229,16 +230,7 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (!committed) return false;
     }
 
-    trackEvent('add_to_cart', {
-      item_id: product.id,
-      item_name: product.name,
-      item_category: product.category,
-      variant_id: variantId,
-      size: variant.size,
-      colour: variant.colourName,
-      price: variant.price ?? product.price,
-      quantity,
-    });
+    trackCartAddition(product, variant, quantity);
     return true;
   };
 

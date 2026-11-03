@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ArrowRight, ShieldCheck, Truck, Zap } from 'lucide-react';
 import { DeliveryLocationCheck } from '../components/DeliveryLocationCheck';
@@ -15,6 +15,8 @@ import {
   verifyPayment,
 } from '../services/paymentApi';
 import { CONFIG } from '../config';
+import { readAnalyticsConsent } from '../services/analytics';
+import { trackCheckoutBegin, trackVerifiedPurchase } from '../services/ecommerceAnalytics';
 import { serviceAreaRepository } from '../repositories/serviceAreaRepository';
 import type { DeliveryCoordinates, ServiceArea } from '../types';
 import { cartExpressEligibility, isExpressDeliveryAvailable } from '../utils/delivery';
@@ -53,6 +55,7 @@ export const Checkout: React.FC = () => {
   const [paymentMethod, setPaymentMethod] = useState<'cod' | 'upi' | 'card'>('cod');
   const [placing, setPlacing] = useState(false);
   const [checkoutError, setCheckoutError] = useState('');
+  const checkoutEventSent = useRef(false);
   const [deliveryCoordinates, setDeliveryCoordinates] = useState<DeliveryCoordinates | null>(null);
   const [serviceArea, setServiceArea] = useState<ServiceArea | null>(null);
 
@@ -63,6 +66,12 @@ export const Checkout: React.FC = () => {
       .catch(() => { if (!cancelled) setServiceArea(null); });
     return () => { cancelled = true; };
   }, [pincode]);
+
+  useEffect(() => {
+    if (checkoutEventSent.current || items.length === 0 || readAnalyticsConsent() !== 'accepted') return;
+    checkoutEventSent.current = true;
+    trackCheckoutBegin(items, grandTotal);
+  }, [items, grandTotal]);
 
   const polygonDeliveryRequired = serviceArea?.enforcementMode === 'polygon';
 
@@ -112,8 +121,10 @@ export const Checkout: React.FC = () => {
     try {
       let confirmedOrder: ServerOrder;
       if (paymentMethod === 'cod') {
-        const result = await placeCodOrder(intent, makeIdempotencyKey());
-        confirmedOrder = result.order;
+        // Cash on Delivery needs no online payment: the server prices the
+        // order, commits stock and records it as pay-on-delivery.
+        const placed = await placeCodOrder(intent, makeIdempotencyKey());
+        confirmedOrder = placed.order;
       } else {
         const createdOrder = await createPaymentOrder(intent, makeIdempotencyKey());
         const payment = await openRazorpayCheckout(
@@ -137,9 +148,13 @@ export const Checkout: React.FC = () => {
         confirmedOrder = result.order;
       }
 
+      // Analytics must never interfere with a verified payment or order flow.
+      try { await trackVerifiedPurchase(confirmedOrder); } catch { /* Non-critical telemetry. */ }
       clearCart();
       showToast(
-        paymentMethod === 'cod' ? 'Cash on Delivery order placed!' : 'Payment verified and order placed!',
+        paymentMethod === 'cod'
+          ? `Order placed! Pay ₹${confirmedOrder.grandTotal} on delivery.`
+          : 'Payment verified and order placed!',
         'success',
       );
       navigate(`/order-success/${confirmedOrder.id}`);
@@ -155,7 +170,7 @@ export const Checkout: React.FC = () => {
   };
 
   const paymentMethods: Array<{ id: 'cod' | 'upi' | 'card'; label: string; sub: string }> = [
-    { id: 'cod', label: 'Cash / Pay on Delivery', sub: 'Pay with cash or UPI when your runner arrives' },
+    { id: 'cod', label: 'Cash on Delivery', sub: 'No advance payment. Pay in cash or UPI when your order arrives' },
     { id: 'upi', label: 'UPI with Razorpay', sub: 'Use any supported UPI app in secure checkout' },
     { id: 'card', label: 'Credit / Debit Card with Razorpay', sub: 'Visa, Mastercard and RuPay cards' },
   ];
@@ -243,9 +258,9 @@ export const Checkout: React.FC = () => {
                 </label>
               ))}
             </div>
-            {paymentMethod !== 'cod' && (
+            {paymentMethod !== 'cod' ? (
               <p className="flex gap-2 text-[11px] text-neutral-500"><ShieldCheck className="w-4 h-4 shrink-0 text-lime-600" /> Your payment is completed in Razorpay Checkout. Vibe4You confirms fulfillment only after server-side signature and captured-payment verification.</p>
-            )}
+            ) : <p className="flex gap-2 text-[11px] text-neutral-500"><ShieldCheck className="w-4 h-4 shrink-0 text-lime-600" /> No advance payment is needed. Pay the full amount in cash or UPI when your order is delivered.</p>}
           </div>
         </div>
 
@@ -270,6 +285,7 @@ export const Checkout: React.FC = () => {
             <div className="flex justify-between pt-2 border-t border-neutral-200 dark:border-neutral-800 text-sm font-black text-neutral-900 dark:text-white">
               <span>Estimated Total</span><span className="text-lime-600 dark:text-lime-400">₹{grandTotal}</span>
             </div>
+            {paymentMethod === 'cod' && <div className="rounded-xl border border-lime-300 bg-lime-50 dark:border-lime-800 dark:bg-lime-950/20 p-3 space-y-1 text-[11px] font-semibold text-lime-950 dark:text-lime-100"><div className="flex justify-between"><span>Pay on delivery (cash or UPI)</span><span>₹{grandTotal}</span></div></div>}
             <div className="rounded-xl border border-neutral-200 dark:border-neutral-800 p-3 text-[10px] leading-relaxed text-neutral-500">
               <p className="font-bold text-neutral-700 dark:text-neutral-300">Billing details</p>
               <p>Vibe4You | GSTIN: 23JVZPM8734E1ZT</p>

@@ -81,6 +81,11 @@ export interface ServerOrder {
   deliveryFee: number;
   taxes: number;
   tryAtHomeFee?: number;
+  codAdvanceAmount?: number;
+  codAdvancePaid?: boolean;
+  codAdvancePaidAt?: string;
+  codAmountDue?: number;
+  codAmountCollected?: number;
   tryAtHomeLateFeeDue?: number;
   tryAtHomeLateFeePaid?: boolean;
   tryAtHomeLateFeeCollectionMethod?: 'cash' | 'upi_at_delivery';
@@ -133,8 +138,11 @@ export interface CreatePaymentOrderResponse {
     deliveryFee: number;
     taxes: number;
     tryAtHomeFee?: number;
+    codAdvanceAmount?: number;
+    codAmountDue?: number;
     grandTotal: number;
   };
+  paymentDescription?: string;
 }
 
 export interface RazorpaySuccessResponse {
@@ -257,7 +265,7 @@ export function verifyPayment(
 export async function openRazorpayCheckout(
   order: CreatePaymentOrderResponse,
   customer: { name: string; email?: string; phone: string },
-  paymentMethod: 'upi' | 'card',
+  paymentMethod: 'upi' | 'card' | 'all',
   Constructor?: RazorpayConstructor,
 ): Promise<RazorpaySuccessResponse> {
   const RazorpayCheckout = Constructor || await loadRazorpayCheckout();
@@ -274,13 +282,13 @@ export async function openRazorpayCheckout(
       amount: order.amount,
       currency: order.currency,
       name: 'Vibe4You',
-      description: `Vibe4You order ${order.styleDashOrderId}`,
+      description: order.paymentDescription || `Vibe4You order ${order.styleDashOrderId}`,
       order_id: order.razorpayOrderId,
       prefill: { name: customer.name, email: customer.email, contact: customer.phone },
       theme: { color: '#84cc16' },
       method: {
-        upi: paymentMethod === 'upi',
-        card: paymentMethod === 'card',
+        upi: paymentMethod === 'upi' || paymentMethod === 'all',
+        card: paymentMethod === 'card' || paymentMethod === 'all',
         netbanking: false,
         wallet: false,
       },

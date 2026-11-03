@@ -56,7 +56,34 @@ export const StoreDetail: React.FC = () => {
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
-      <SEO title={`${store.storeName} - Local Store in Neemuch`} description={store.description} />
+      <SEO
+        title={`Shop at ${store.storeName} in Neemuch | Vibe4You`}
+        description={`${store.storeName} in Neemuch on Vibe4You. ${store.description}`}
+        image={store.logoImage || store.bannerImage}
+        noIndex={products.length === 0}
+        jsonLd={{
+          '@context': 'https://schema.org',
+          '@type': 'Store',
+          name: store.storeName,
+          url: `https://vibe4you.in/store/${store.slug}`,
+          description: store.description,
+          image: store.logoImage ? new URL(store.logoImage, 'https://vibe4you.in').href : undefined,
+          telephone: store.phone || undefined,
+          address: {
+            '@type': 'PostalAddress',
+            streetAddress: store.address,
+            addressLocality: store.city || 'Neemuch',
+            addressRegion: 'Madhya Pradesh',
+            postalCode: store.pincode,
+            addressCountry: 'IN',
+          },
+          aggregateRating: store.rating && store.reviewCount ? {
+            '@type': 'AggregateRating',
+            ratingValue: store.rating,
+            reviewCount: store.reviewCount,
+          } : undefined,
+        }}
+      />
 
       {/* Store Cover Banner */}
       <div className="relative rounded-3xl overflow-hidden aspect-[21/9] bg-neutral-900 border border-neutral-200 dark:border-neutral-800 shadow-xl">
@@ -105,8 +132,15 @@ export const StoreDetail: React.FC = () => {
         </div>
 
         {products.length === 0 ? (
-          <div className="p-12 text-center bg-white dark:bg-neutral-900 rounded-3xl border border-neutral-200 dark:border-neutral-800 text-xs text-neutral-500">
-            No active products listed for this store yet.
+          <div className="p-8 sm:p-12 text-center bg-white dark:bg-neutral-900 rounded-3xl border border-neutral-200 dark:border-neutral-800 text-xs text-neutral-500 space-y-4">
+            <h3 className="text-base font-black text-neutral-900 dark:text-white">This store is preparing its online catalogue</h3>
+            <p>No active products are available from {store.storeName} right now. Browse similar products from other local Neemuch stores.</p>
+            <Link
+              to={`/products?category=${encodeURIComponent(store.category)}`}
+              className="inline-block rounded-xl bg-neutral-950 px-5 py-3 font-bold text-white dark:bg-lime-400 dark:text-neutral-950"
+            >
+              Browse {store.category}
+            </Link>
           </div>
         ) : (
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 sm:gap-6">

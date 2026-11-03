@@ -12,6 +12,7 @@ describe('production ordering availability', () => {
     expect(checkout).not.toContain('CONFIG.ORDERING_ENABLED');
     expect(checkout).toContain('disabled={placing}');
     expect(checkout).toContain("'Place COD Order'");
+    expect(checkout).not.toContain('Pay ₹50 to Place COD Order');
   });
 
   it('does not retain obsolete launch or maintenance copy on customer checkout surfaces', () => {

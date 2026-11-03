@@ -1,4 +1,5 @@
 import type { Product, VendorStore } from '../types';
+import { normalizeLocalShoppingQuery } from './localSearch';
 
 export type SearchSuggestionType = 'product' | 'store' | 'category' | 'brand';
 
@@ -62,7 +63,7 @@ export const buildSearchSuggestions = (
   stores: VendorStore[],
   limit = 10,
 ): SearchSuggestion[] => {
-  const query = normalize(queryValue);
+  const query = normalizeLocalShoppingQuery(queryValue);
   if (query.length < 2) return [];
 
   const activeProducts = products.filter(product => product.active === true);

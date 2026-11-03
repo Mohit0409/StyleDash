@@ -52,8 +52,13 @@ export const Terms = () => (
     <section className="space-y-2">
       <h2 className="font-black">Payments</h2>
       <p className="text-sm text-neutral-600">
-        Supported orders may use Cash on Delivery or Razorpay checkout. An
-        online order is treated as paid only after server-side verification.
+        Supported orders may use Cash on Delivery or Razorpay checkout. Cash on
+        Delivery orders need no advance payment; the full order total is paid
+        in cash or by UPI on delivery. For COD orders placed earlier with an
+        INR 50 prepaid booking amount, that amount is credited toward the order
+        total, is refunded through Razorpay only if the order is cancelled
+        before packing, and is not refundable after packing. An online order is
+        treated as paid only after server-side verification.
         Do not share a CVV or UPI PIN with Vibe4You support staff.
       </p>
     </section>

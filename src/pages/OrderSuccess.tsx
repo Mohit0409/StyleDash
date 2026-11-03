@@ -35,6 +35,7 @@ export const OrderSuccess: React.FC = () => {
           : order ? <div className="p-6 text-left bg-white dark:bg-neutral-900 rounded-3xl border dark:border-neutral-800 space-y-3">
             {order.items.map(item => <div key={item.variantId} className="flex justify-between text-sm"><span>{item.productName} ({item.size}, {item.colourName}) × {item.quantity}</span><strong>₹{item.lineTotal}</strong></div>)}
             <div className="border-t pt-3 flex justify-between font-black"><span>Order total</span><span>₹{order.grandTotal}</span></div>
+            {order.paymentMethod === 'cod' && order.codAdvancePaid && <div className="rounded-xl border border-lime-300 bg-lime-50 p-3 text-xs font-semibold text-lime-950 dark:border-lime-800 dark:bg-lime-950/20 dark:text-lime-100"><div className="flex justify-between"><span>COD booking amount paid online</span><span>₹{order.codAdvanceAmount}</span></div><div className="mt-1 flex justify-between"><span>Balance due on delivery</span><span>₹{order.codAmountDue}</span></div></div>}
             <div className="border-t pt-3 text-xs text-neutral-500"><strong className="text-neutral-700 dark:text-neutral-300">Billing details:</strong> Vibe4You | GSTIN: 23JVZPM8734E1ZT</div>
           </div> : <p role="alert">This order is unavailable to the current account.</p>}
       <div className="flex justify-center gap-4">

@@ -1,4 +1,5 @@
 import type { Product } from '../types';
+import { normalizeLocalShoppingQuery } from './localSearch';
 
 export interface CatalogueFilterState {
   department: string;
@@ -20,7 +21,8 @@ interface MatchOptions {
 
 const matchesSearch = (product: Product, searchQuery: string): boolean => {
   if (!searchQuery.trim()) return true;
-  const query = searchQuery.trim().toLocaleLowerCase();
+  const query = normalizeLocalShoppingQuery(searchQuery);
+  if (!query) return true;
   return (
     product.name.toLocaleLowerCase().includes(query)
     || product.brand.toLocaleLowerCase().includes(query)

@@ -125,7 +125,7 @@ const toForm = (product: SellerProduct): ProductFormState => {
   };
 };
 
-const normalizeColourGroup = (colour: ColourFormState) => {
+const normalizeColourGroup = (colour: ColourFormState, maxSizes: number) => {
   const colourName = colour.colourName.trim();
   if (!colourName) throw new Error('Every colour needs a colour name.');
   if (colourName.length > 80) throw new Error('Colour names must be 80 characters or fewer.');
@@ -138,12 +138,13 @@ const normalizeColourGroup = (colour: ColourFormState) => {
   }));
   const normalizedSizes = sizes.map(variant => variant.size.toLocaleLowerCase());
   if (
-    sizes.length < 1 || sizes.length > 20
+    sizes.length < 1 || sizes.length > maxSizes
     || sizes.some(variant => !variant.size || variant.size.length > 40)
     || sizes.some(variant => !Number.isSafeInteger(variant.inventory) || variant.inventory < 0 || variant.inventory > 100_000)
     || new Set(normalizedSizes).size !== sizes.length
   ) {
     if (sizes.length < 1) throw new Error(`Add at least one size for ${colourName}.`);
+    if (sizes.length > maxSizes) throw new Error('A product can have at most ' + maxSizes + ' sizes.');
     if (sizes.some(variant => !variant.size)) throw new Error('Every size row needs a size name.');
     if (sizes.some(variant => variant.size.length > 40)) throw new Error('Size names must be 40 characters or fewer.');
     if (sizes.some(variant => !Number.isSafeInteger(variant.inventory) || variant.inventory < 0 || variant.inventory > 100_000)) throw new Error('Stock for every size must be a whole number from 0 to 100000.');
@@ -172,7 +173,7 @@ export const toPayload = (form: ProductFormState): SellerProductDraft => {
   ) {
     throw new Error('Enter a valid original/MRP price.');
   }
-  const colours = form.colours.map(normalizeColourGroup);
+  const colours = form.colours.map(colour => normalizeColourGroup(colour, form.colours.length === 1 ? 100 : 20));
   if (colours.length < 1) throw new Error('Add at least one colour.');
   if (colours.length > 20) throw new Error('A product can have at most 20 colours.');
   const colourNames = colours.map(colour => colour.colourName.toLocaleLowerCase());
@@ -180,7 +181,7 @@ export const toPayload = (form: ProductFormState): SellerProductDraft => {
     throw new Error('Each colour can appear only once. Remove or rename the duplicate colour.');
   }
   const totalVariants = colours.reduce((total, colour) => total + colour.sizes.length, 0);
-  if (totalVariants > 20) throw new Error('A product can have at most 20 size and colour combinations.');
+  if (totalVariants > (colours.length === 1 ? 100 : 20)) throw new Error('A product can have at most 20 size and colour combinations.');
   const totalStock = colours.reduce(
     (total, colour) => total + colour.sizes.reduce((sum, variant) => sum + variant.inventory, 0), 0,
   );
@@ -657,7 +658,7 @@ export const SellerProducts: React.FC = () => {
                   <div className="space-y-2">
                     <div className="flex items-center justify-between gap-3">
                       <span className="text-[11px] font-bold text-neutral-500">{formMode === 'change' ? 'Sizes and inventory' : 'Sizes and stock'}</span>
-                      <button type="button" onClick={() => addVariant(colourIndex)} disabled={colour.variants.length >= 20} className="rounded-lg border px-3 py-1.5 font-bold disabled:opacity-50">{firstColour ? '+ Add size' : `+ Add size to ${colourLabel.toLowerCase()}`}</button>
+                      <button type="button" onClick={() => addVariant(colourIndex)} disabled={colour.variants.length >= (form.colours.length === 1 ? 100 : 20)} className="rounded-lg border px-3 py-1.5 font-bold disabled:opacity-50">{firstColour ? '+ Add size' : `+ Add size to ${colourLabel.toLowerCase()}`}</button>
                     </div>
                     {colour.variants.map((variant, index) => {
                       const existingPublishedVariant = formMode === 'change' && Boolean(variant.id);

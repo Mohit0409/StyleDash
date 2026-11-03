@@ -26,6 +26,19 @@ export const orderApi = {
       `/api/orders/${encodeURIComponent(id)}/exchange-requests`, 'POST', { itemIndex, targetVariantId },
     )).order;
   },
+  async taxInvoiceStatus(id: string): Promise<{ issued: boolean }> {
+    return apiFetch<{ success: true; issued: boolean }>(`/api/orders/${encodeURIComponent(id)}/tax-invoice-status`);
+  },
+  async taxInvoice(id: string): Promise<{ blob: Blob; filename: string }> {
+    const response = await fetch(`/api/orders/${encodeURIComponent(id)}/tax-invoice`, { credentials: 'include' });
+    if (!response.ok) {
+      const body = await response.json().catch(() => ({ error: 'GST invoice is not available.', code: 'tax_invoice_not_ready' }));
+      throw new ApiError(body.error || 'GST invoice is not available.', body.code || 'tax_invoice_not_ready', response.status);
+    }
+    const disposition = response.headers.get('Content-Disposition') || '';
+    const match = /filename="?([^";]+)"?/i.exec(disposition);
+    return { blob: await response.blob(), filename: match?.[1] || `vibe4you-tax-invoice-${id}.pdf` };
+  },
   async receipt(id: string): Promise<{ blob: Blob; filename: string }> {
     const response = await fetch(`/api/orders/${encodeURIComponent(id)}/receipt`, { credentials: 'include' });
     if (!response.ok) {

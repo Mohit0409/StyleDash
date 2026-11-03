@@ -13,6 +13,8 @@ const Home = lazy(() => import('./pages/Home').then(m => ({ default: m.Home })))
 const Products = lazy(() => import('./pages/Products').then(m => ({ default: m.Products })));
 const ProductDetail = lazy(() => import('./pages/ProductDetail').then(m => ({ default: m.ProductDetail })));
 const Categories = lazy(() => import('./pages/Categories').then(m => ({ default: m.Categories })));
+const NeemuchShopping = lazy(() => import('./pages/NeemuchShopping').then(m => ({ default: m.NeemuchShopping })));
+const NmhShoppingRedirect = lazy(() => import('./pages/NeemuchShopping').then(m => ({ default: m.NmhShoppingRedirect })));
 const Offers = lazy(() => import('./pages/Offers').then(m => ({ default: m.Offers })));
 const Stores = lazy(() => import('./pages/Stores').then(m => ({ default: m.Stores })));
 const StoreDetail = lazy(() => import('./pages/StoreDetail').then(m => ({ default: m.StoreDetail })));
@@ -55,6 +57,9 @@ export const App: React.FC = () => {
                       <Route path="products" element={<Products />} />
                       <Route path="product/:slug" element={<ProductDetail />} />
                       <Route path="categories" element={<Categories />} />
+            <Route path="neemuch/:topic" element={<NeemuchShopping />} />
+            <Route path="nmh" element={<NmhShoppingRedirect />} />
+            <Route path="nmh/:topic" element={<NmhShoppingRedirect />} />
                       <Route path="offers" element={<Offers />} />
                       <Route path="stores" element={<Stores />} />
                       <Route path="store/:slug" element={<StoreDetail />} />
