@@ -93,7 +93,9 @@ export const OutsideDeliveryRequests: React.FC = () => {
     }
   }, []);
 
-  useEffect(() => { void load(); }, [load]);
+  // A successful submission navigates back to this same route with a new
+  // location key. Reload so the just-created request appears immediately.
+  useEffect(() => { void load(); }, [load, location.key]);
 
   const cancel = async (request: OutsideDeliveryRequest) => {
     setBusyId(request.id); setError('');
