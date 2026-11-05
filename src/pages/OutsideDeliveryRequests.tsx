@@ -1,7 +1,11 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { Clock3, PackageCheck, RefreshCw, ShieldCheck, Truck, XCircle } from 'lucide-react';
 import { SEO } from '../components/SEO';
+import { OutsideDeliveryRequestDialog } from '../components/OutsideDeliveryRequestDialog';
+import { productRepository } from '../repositories/productRepository';
+import { parseDeliveryRequestSelection } from '../utils/deliveryRequestNavigation';
+import type { Product, ProductVariant } from '../types';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import {
@@ -28,12 +32,55 @@ const statusCopy: Record<string, string> = {
 };
 export const OutsideDeliveryRequests: React.FC = () => {
   const navigate = useNavigate();
+  const location = useLocation();
+  const query = new URLSearchParams(location.search);
+  const hasRequestContext = ['product', 'variant', 'qty'].some(key => query.has(key));
+  const [formSelection, setFormSelection] = useState<{ product: Product; variant: ProductVariant; quantity: number } | null>(null);
+  const [selectionLoading, setSelectionLoading] = useState(false);
+  const [selectionError, setSelectionError] = useState('');
   const { user } = useAuth();
   const { showToast } = useToast();
   const [requests, setRequests] = useState<OutsideDeliveryRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const [busyId, setBusyId] = useState('');
   const [error, setError] = useState('');
+
+  useEffect(() => {
+    let cancelled = false;
+    setFormSelection(null);
+    setSelectionError('');
+    if (!hasRequestContext) {
+      setSelectionLoading(false);
+      return;
+    }
+    const chosen = parseDeliveryRequestSelection(location.search);
+    if (!chosen) {
+      setSelectionError('The delivery request link is incomplete. Please select the product again.');
+      setSelectionLoading(false);
+      return;
+    }
+
+    setSelectionLoading(true);
+    void productRepository.getProductBySlug(chosen.product)
+      .then(product => {
+        if (cancelled) return;
+        const variant = product?.variants.find(item => item.id === chosen.variant);
+        if (!product || product.active !== true ||
+            product.outsideNeemuchDeliveryAvailable !== true ||
+            !variant || variant.available !== true) {
+          setSelectionError('This product or variant is not currently eligible for outside-Neemuch delivery. Please return to the product page and choose an available option.');
+          return;
+        }
+        setFormSelection({ product, variant, quantity: chosen.quantity });
+      })
+      .catch(() => {
+        if (!cancelled) setSelectionError('Could not load this product. Please try again from its product page.');
+      })
+      .finally(() => {
+        if (!cancelled) setSelectionLoading(false);
+      });
+    return () => { cancelled = true; };
+  }, [hasRequestContext, location.search]);
 
   const load = useCallback(async () => {
     setError('');
@@ -103,6 +150,46 @@ export const OutsideDeliveryRequests: React.FC = () => {
   return (
     <div className="mx-auto max-w-4xl space-y-6 px-4 py-8 sm:px-6">
       <SEO title="Delivery Requests - Vibe4You" noIndex />
+      {location.state?.deliveryRequestSubmitted && (
+        <div role="status" className="rounded-2xl border border-green-200 bg-green-50 p-4 text-sm font-semibold text-green-900 dark:border-green-900 dark:bg-green-950/30 dark:text-green-100">
+          {location.state.idempotent
+            ? 'Your delivery request is already active. You can follow its status below.'
+            : 'Delivery request submitted successfully! Our team will review it and confirm your delivery quote before payment.'}
+        </div>
+      )}
+      {hasRequestContext && (
+        <section aria-labelledby="delivery-request-instructions" className="space-y-4">
+          <div className="rounded-3xl border border-violet-200 bg-violet-50 p-5 text-sm dark:border-violet-900 dark:bg-violet-950/20">
+            <h2 id="delivery-request-instructions" className="text-xl font-black">Request delivery to your city</h2>
+            <p className="mt-2">Complete these steps to request delivery outside Neemuch:</p>
+            <ol className="mt-3 list-decimal space-y-2 pl-5 text-neutral-700 dark:text-neutral-200">
+              <li>Check the selected product, colour, size and quantity below.</li>
+              <li>Enter your name, mobile number, complete address, city, state and six-digit PIN code.</li>
+              <li>Submit your request. No payment is collected at this step.</li>
+              <li>Vibe4You will review availability, confirm the delivery charge and estimated date, then provide secure prepaid payment options in your account.</li>
+            </ol>
+            <p className="mt-4 rounded-xl bg-white/80 p-3 text-xs leading-relaxed dark:bg-neutral-900/70">
+              <strong>Indicative delivery:</strong> Standard Rs.100 (approximately 4-5 days), or express Rs.200 (approximately 2-3 days) where offered. These are estimates, not a guaranteed quote. Final charges and timelines are confirmed before payment. Deliveries outside Neemuch are prepaid only; Cash on Delivery (COD) is unavailable.
+            </p>
+          </div>
+          {selectionLoading ? (
+            <p role="status" className="text-sm text-neutral-500">Loading your selected product...</p>
+          ) : selectionError ? (
+            <div role="alert" className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+              <p>{selectionError}</p>
+              <Link to="/products" className="mt-2 inline-block font-bold underline">Choose another product</Link>
+            </div>
+          ) : formSelection ? (
+            <OutsideDeliveryRequestDialog
+              inline
+              product={formSelection.product}
+              variant={formSelection.variant}
+              quantity={formSelection.quantity}
+              onClose={() => navigate('/delivery-requests')}
+            />
+          ) : null}
+        </section>
+      )}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <p className="text-xs font-black uppercase tracking-widest text-violet-600">Outside Neemuch</p>

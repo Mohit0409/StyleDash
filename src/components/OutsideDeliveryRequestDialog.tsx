@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { ShieldCheck, Truck, X } from 'lucide-react';
 import type { Product, ProductVariant } from '../types';
@@ -12,6 +12,7 @@ interface Props {
   variant: ProductVariant;
   quantity: number;
   onClose: () => void;
+  inline?: boolean;
 }
 
 export const OutsideDeliveryRequestDialog: React.FC<Props> = ({
@@ -19,6 +20,7 @@ export const OutsideDeliveryRequestDialog: React.FC<Props> = ({
   variant,
   quantity,
   onClose,
+  inline = false,
 }) => {
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -31,11 +33,12 @@ export const OutsideDeliveryRequestDialog: React.FC<Props> = ({
   const [state, setState] = useState('');
   const [pincode, setPincode] = useState('');
   const [busy, setBusy] = useState(false);
+  const submitting = useRef(false);
   const [error, setError] = useState('');
 
   useEffect(() => {
     if (!user) {
-      navigate('/login', { state: { from: location.pathname }, replace: true });
+      navigate('/login', { state: { from: location.pathname + location.search }, replace: true });
     }
   }, [location.pathname, navigate, user]);
 
@@ -43,6 +46,8 @@ export const OutsideDeliveryRequestDialog: React.FC<Props> = ({
 
   const submit = async (event: React.FormEvent) => {
     event.preventDefault();
+    if (submitting.current) return;
+    submitting.current = true;
     setBusy(true); setError('');
     try {
       const result = await deliveryRequestApi.create({
@@ -64,19 +69,20 @@ export const OutsideDeliveryRequestDialog: React.FC<Props> = ({
           : 'Delivery request sent. Vibe4You will confirm the delivery charge before payment.',
         'success',
       );
-      navigate('/delivery-requests');
+      navigate('/delivery-requests', { replace: true, state: { deliveryRequestSubmitted: true, idempotent: result.idempotent } });
     } catch (cause) {
       const message = cause instanceof ApiError ? cause.message : 'Delivery request could not be submitted.';
       setError(message);
       showToast(message, 'error');
     } finally {
+      submitting.current = false;
       setBusy(false);
     }
   };
 
   return (
-    <div className="fixed inset-0 z-[80] flex items-end justify-center bg-black/60 p-0 sm:items-center sm:p-4" role="presentation">
-      <div role="dialog" aria-modal="true" aria-labelledby="outside-delivery-title" className="max-h-[95vh] w-full max-w-xl overflow-y-auto rounded-t-3xl bg-white p-5 shadow-2xl sm:rounded-3xl sm:p-6 dark:bg-neutral-900">
+    <div className={inline ? 'w-full' : 'fixed inset-0 z-[80] flex items-end justify-center bg-black/60 p-0 sm:items-center sm:p-4'} role={inline ? undefined : 'presentation'}>
+      <div role={inline ? undefined : 'dialog'} aria-modal={inline ? undefined : true} aria-labelledby="outside-delivery-title" className={inline ? 'w-full rounded-3xl border bg-white p-5 shadow-sm dark:border-neutral-800 dark:bg-neutral-900 sm:p-6' : 'max-h-[95vh] w-full max-w-xl overflow-y-auto rounded-t-3xl bg-white p-5 shadow-2xl sm:rounded-3xl sm:p-6 dark:bg-neutral-900'}>
         <div className="flex items-start justify-between gap-4">
           <div>
             <p className="text-[11px] font-black uppercase tracking-widest text-violet-600">Outside Neemuch (458441)</p>
