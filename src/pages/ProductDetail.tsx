@@ -9,7 +9,7 @@ import { ProductPagination } from '../components/ProductPagination';
 import { useProductPagination } from '../hooks/useProductPagination';
 import { ProductImageLightbox } from '../components/ProductImageLightbox';
 import { ProductReviews } from '../components/ProductReviews';
-import { OutsideDeliveryRequestDialog } from '../components/OutsideDeliveryRequestDialog';
+import { deliveryRequestHref } from '../utils/deliveryRequestNavigation';
 import { Product } from '../types';
 import { productRepository } from '../repositories/productRepository';
 import { useCart } from '../context/CartContext';
@@ -37,7 +37,6 @@ export const ProductDetail: React.FC = () => {
   const relatedPagination = useProductPagination(relatedProducts, 4, 'relatedPage', relatedProducts.length > 0, 'related-products');
   const [tryAtHomeSizeIds, setTryAtHomeSizeIds] = useState<string[]>([]);
   const [tryAtHomeTermsAccepted, setTryAtHomeTermsAccepted] = useState(false);
-  const [outsideDeliveryOpen, setOutsideDeliveryOpen] = useState(false);
 
   const handleReviewSummaryChange = useCallback((rating: number, reviewCount: number) => {
     setProduct(current => current ? { ...current, rating, reviewCount } : current);
@@ -381,7 +380,7 @@ export const ProductDetail: React.FC = () => {
             <section className="rounded-2xl border border-violet-200 bg-violet-50 p-4 text-xs text-neutral-700 dark:border-violet-900 dark:bg-violet-950/20 dark:text-neutral-200">
               <div className="flex items-center gap-2 font-black text-violet-800 dark:text-violet-300"><ShieldCheck className="h-4 w-4" /> Delivery outside Neemuch available by request</div>
               <p className="mt-1">For addresses outside 458441, do not pay at normal checkout. Send a delivery request first; Vibe4You will confirm the delivery charge and then send a secure payment request.</p>
-              <button type="button" onClick={() => setOutsideDeliveryOpen(true)} disabled={!selectedVariant || selectedVariant.available !== true} className="mt-3 inline-flex items-center gap-2 rounded-xl bg-violet-600 px-4 py-2.5 font-black text-white disabled:opacity-50"><Truck className="h-4 w-4" /> Request Delivery Outside Neemuch</button>
+              <button type="button" onClick={() => { if (selectedVariant?.available === true) navigate(deliveryRequestHref(product.slug, selectedVariant.id, quantity)); }} disabled={!selectedVariant || selectedVariant.available !== true} className="mt-3 inline-flex items-center gap-2 rounded-xl bg-violet-600 px-4 py-2.5 font-black text-white disabled:opacity-50"><Truck className="h-4 w-4" /> Request Delivery Outside Neemuch</button>
             </section>
           )}
 
@@ -419,15 +418,6 @@ export const ProductDetail: React.FC = () => {
         onSelectImage={setSelectedImage}
         onClose={() => setImageViewerOpen(false)}
       />
-
-      {outsideDeliveryOpen && product.outsideNeemuchDeliveryAvailable && selectedVariant && (
-        <OutsideDeliveryRequestDialog
-          product={product}
-          variant={selectedVariant}
-          quantity={quantity}
-          onClose={() => setOutsideDeliveryOpen(false)}
-        />
-      )}
 
       <ProductReviews productId={product.id} onSummaryChange={handleReviewSummaryChange} />
 
