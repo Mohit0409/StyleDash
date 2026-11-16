@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Vibe4You Local Administration</title>
+  <link rel="stylesheet" href="/leaflet.css" />
+  <link rel="stylesheet" href="/admin.css?v=monthend-delivery-20261115" />
+  <link rel="stylesheet" href="/admin-variants.css?v=thumbnail-20260916-4" />
+</head>
+<body>
+  <main class="shell">
+    <section id="login-view" class="auth-card">
+      <div class="brand"><span>V4</span><div><strong>Vibe4You</strong><small>Local administration</small></div></div>
+      <h1>Private sign in</h1>
+      <p>This service is available only through the Termux SSH tunnel.</p>
+      <form id="password-form">
+        <label>Username or email<input id="username" required maxlength="254" autocomplete="username" /></label>
+        <label>Password<input id="password" required type="password" minlength="12" maxlength="256" autocomplete="current-password" /></label>
+        <button type="submit">Continue</button>
+      </form>
+      <form id="totp-form" hidden>
+        <label>Authenticator or recovery code<input id="totp" required maxlength="12" autocomplete="one-time-code" /></label>
+        <button type="submit">Verify and sign in</button>
+      </form>
+      <p id="auth-error" class="error" role="alert"></p>
+    </section>
+
+    <section id="app-view" hidden>
+      <header><div class="brand"><span>V4</span><div><strong>Vibe4You Admin</strong><small id="admin-name"></small></div></div><button id="logout" class="secondary">Sign out</button></header>
+      <nav id="tabs">
+        <button data-tab="orders" class="active">Orders</button><button data-tab="outside-delivery">Outside Delivery</button><button data-tab="vendors">Shop Applications</button>
+        <button data-tab="shop-products">Shop Products</button><button data-tab="shop-product-requests">Product Requests</button>
+        <button data-tab="inventory">Inventory</button><button data-tab="billing-audit">Order Activity Preview</button><button data-tab="month-end">Month-end Bills</button><button data-tab="product-reviews">Product Reviews</button><button data-tab="store-reviews">Store Reviews</button><button data-tab="customers">Customers</button>
+        <button data-tab="payment-alerts">Payment Alerts</button><button data-tab="delivery-zone">Delivery Zones</button><button data-tab="system">System</button><button data-tab="audit">Audit</button>
+      </nav>
+      <p id="app-error" class="error" role="alert"></p>
+      <p id="app-status" class="status" role="status"></p>
+      <form id="search-form" class="toolbar"><label class="sr-only" for="search">Search this admin section</label><input id="search" maxlength="100" placeholder="Search this section" /><button type="submit">Search</button></form>
+      <section id="content" class="panel" aria-live="polite"></section>
+    </section>
+    <dialog id="admin-dialog" aria-labelledby="admin-dialog-title">
+      <form id="admin-dialog-form">
+        <h2 id="admin-dialog-title"></h2>
+        <div id="admin-dialog-fields" class="dialog-fields"></div>
+        <p id="admin-dialog-error" class="error" role="alert"></p>
+        <div class="actions"><button id="admin-dialog-submit" type="submit">Continue</button><button id="admin-dialog-cancel" type="button" class="secondary">Cancel</button></div>
+      </form>
+    </dialog>
+  </main>
+  <script src="/leaflet.js" defer></script>
+  <script src="/admin.js?v=monthend-delivery-20261115" defer></script>
+  <script src="/delivery-zone-map.js?v=thumbnail-20260916-4" defer></script>
+</body>
+</html>

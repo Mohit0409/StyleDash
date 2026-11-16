@@ -1,0 +1,306 @@
+{
+  "production_manifest_sha256": "ec13b4f28f99b26f3cf468412d77a651b8596decc1cb5afb1012170bac11a126",
+  "safe_code_file_count": 59,
+  "code_files": [
+    {
+      "path": "admin/admin/admin-variants.css",
+      "sha256": "5c7b7ebc430cdee93a616ba735b851e5787c1d7b58987d38cc1aaa3bd9050047",
+      "size": 883
+    },
+    {
+      "path": "admin/admin/admin.css",
+      "sha256": "5c35389a17af52b8e7e7df637fda8ff665f0294fd76b1877222e922feeb8f65c",
+      "size": 13525
+    },
+    {
+      "path": "admin/admin/admin.js",
+      "sha256": "93100f066de969baa6bc5eb0c8c87126cac718bd2e8ddc9b69f1115196cc010c",
+      "size": 182206
+    },
+    {
+      "path": "admin/admin/delivery-zone-map.js",
+      "sha256": "7d35c8b7d7681f1e767c9d3264d3ba7d0a88765a070a4c2ac52fea1d22d889cf",
+      "size": 5918
+    },
+    {
+      "path": "admin/admin/index.html",
+      "sha256": "11072a05283ec1da131e2a8a617ef674f7c5a9c8693fea2b9f0553b1d75e11d4",
+      "size": 3601
+    },
+    {
+      "path": "admin/billing_audit.py",
+      "sha256": "da4f44c851d13993a2f851bc256f2d3c46107a30410b714275c30197a1f00a2b",
+      "size": 36519
+    },
+    {
+      "path": "admin/admin/leaflet.css",
+      "sha256": "a7837102824184820dfa198d1ebcd109ff6d0ff9a2672a074b9a1b4d147d04c6",
+      "size": 14806
+    },
+    {
+      "path": "admin/admin/leaflet.js",
+      "sha256": "3104b526504d0d61fd3099a4521e87f732ccc3174dec54e08de6ba8bde3e15ff",
+      "size": 147557
+    },
+    {
+      "path": "admin/catalog_normalization.py",
+      "sha256": "e913bbcfed3fb730401d4394496a54f5b05bf30f1e7d0d933ceb4534d5b7d10b",
+      "size": 17562
+    },
+    {
+      "path": "admin/gst_catalog_review.py",
+      "sha256": "0ce474b085225808662c7bebe9d835f8c0442176ce48df98f435e8302fd44e0a",
+      "size": 7240
+    },
+    {
+      "path": "admin/gst_invoice_draft.py",
+      "sha256": "37cbde2a2a70c0e191a3b1ae203beaff21eb3a8cd86ca7573ce5e795265a3f3f",
+      "size": 15173
+    },
+    {
+      "path": "admin/gst_official_suggestions.py",
+      "sha256": "c03327d6d590caf09052a3cc528a7df9ac60751d689747b14005f67d5e989c8c",
+      "size": 71254
+    },
+    {
+      "path": "admin/invoice_admin_gateway.py",
+      "sha256": "65d42f6950cf825a87c79dca5793a84d518df91c54f4d63b07e117b511ea3fc5",
+      "size": 4160
+    },
+    {
+      "path": "admin/invoice_ledger.py",
+      "sha256": "fabe194d10751db13bca5d4f172788e346febbee2d056bfbe752c8f34e395a6c",
+      "size": 17076
+    },
+    {
+      "path": "admin/invoice_order_adapter.py",
+      "sha256": "7dbd74a064235cd7348744278345cafe42e6dfc90a0de1c68745543c5673d3a4",
+      "size": 6617
+    },
+    {
+      "path": "admin/receipt_pdf.py",
+      "sha256": "eee783b343739237d9bcab2e59e5fe1c0c9d6b35300733bb6edaa64db9f84c3f",
+      "size": 43823
+    },
+    {
+      "path": "admin/serve.py",
+      "sha256": "067772b76708a1e02d128a7263081ac23cacae4ca9a4b4a1c4a03b267472bee7",
+      "size": 130285
+    },
+    {
+      "path": "admin/store_categories.py",
+      "sha256": "1475a2a1c721d9801355dd5a610d8c6b26f47cd2685c75c665de55ef9ac9c66c",
+      "size": 741
+    },
+    {
+      "path": "admin/styledash_admin.py",
+      "sha256": "0aff9a1effd9989b2b4986d3896bc0129f996532bf54215f611e97a1e3547c5f",
+      "size": 28128
+    },
+    {
+      "path": "admin/styledash_delivery_zone.py",
+      "sha256": "6608eabc851df6c853f04df1c59e2ea7f4f409af7cb69975a7f5e9390a32dd29",
+      "size": 8116
+    },
+    {
+      "path": "admin/styledash_delivery_zone_store.py",
+      "sha256": "d5cb5cd7686763a121db89da463944a51f5e3814c585882160d7f28e026d3f47",
+      "size": 4249
+    },
+    {
+      "path": "admin/styledash_mail.py",
+      "sha256": "dc25f5bb4ac87b080f46b632aa99e397ffe8a80cdc68abdb358a2d1f43a6e41c",
+      "size": 8594
+    },
+    {
+      "path": "admin/styledash_notify.py",
+      "sha256": "9dbf7afcea3cb1f33cff8c03b38d0a97a8f599c427a5a3d4b4fc04728226f1de",
+      "size": 8801
+    },
+    {
+      "path": "admin/styledash_reviews.py",
+      "sha256": "fb654e67ee030de9213f23ca789b7e8f5b7a2a970d393e2529f848de8946a007",
+      "size": 39843
+    },
+    {
+      "path": "admin/styledash_security.py",
+      "sha256": "91bb82a9eaf261c229e546c0193ea7a24cb9118545f4f67608d2f6d29889f398",
+      "size": 76501
+    },
+    {
+      "path": "admin/styledash_shops.py",
+      "sha256": "e2e84b43d2db066fa064effbee7d61e2cf6d49e352229dd334501240180d6001",
+      "size": 173778
+    },
+    {
+      "path": "admin/tax_classification_registry.py",
+      "sha256": "de1edf7e00874930d8543c124884b780847995f253d38c810a4a3a70ce6cca6d",
+      "size": 10012
+    },
+    {
+      "path": "admin/tax_document_pdf.py",
+      "sha256": "3d2419054a968901463905670b179713ca1d8497535eab392c4a8a709235f186",
+      "size": 13484
+    },
+    {
+      "path": "admin/test_admin_host_validation.py",
+      "sha256": "c4db6c2e63d25940c1c201e17803d6009c0b1f207fab0fa7912dd12f600f8232",
+      "size": 2124
+    },
+    {
+      "path": "admin/tools/create_admin.py",
+      "sha256": "d92f055e89c5620eb5d142cea45fd89d8cca38ba7f7601ef214e35f8231aa05b",
+      "size": 2572
+    },
+    {
+      "path": "server/audit_identity_duplicates.py",
+      "sha256": "34d46263ba8c553e6e59d4fecc990a43511e9d46bfe7ab23b834e631e5a96b99",
+      "size": 6126
+    },
+    {
+      "path": "server/catalog_normalization.py",
+      "sha256": "de318ae192e0d2c799a4c38695349818734fd69043f8d98f2289bf063744eeb3",
+      "size": 17725
+    },
+    {
+      "path": "server/gst_invoice_draft.py",
+      "sha256": "37cbde2a2a70c0e191a3b1ae203beaff21eb3a8cd86ca7573ce5e795265a3f3f",
+      "size": 15173
+    },
+    {
+      "path": "server/index.html",
+      "sha256": "31499f2378058c320158b98d6be88940a54e87799545b96d78a7d65004557080",
+      "size": 2809
+    },
+    {
+      "path": "server/invoice_admin_gateway.py",
+      "sha256": "5b4f184ef5170f723eaa8dbf966093c71d5b193d9cee1eef80b0ded0e19bdc27",
+      "size": 4238
+    },
+    {
+      "path": "server/invoice_ledger.py",
+      "sha256": "fabe194d10751db13bca5d4f172788e346febbee2d056bfbe752c8f34e395a6c",
+      "size": 17076
+    },
+    {
+      "path": "server/invoice_order_adapter.py",
+      "sha256": "7dbd74a064235cd7348744278345cafe42e6dfc90a0de1c68745543c5673d3a4",
+      "size": 6617
+    },
+    {
+      "path": "server/manifest.json",
+      "sha256": "f3682e5425fbc42ee45612b920e90de27b397bdbbaa62cad893e2d6755cfb6a0",
+      "size": 503
+    },
+    {
+      "path": "server/receipt_pdf.py",
+      "sha256": "eee783b343739237d9bcab2e59e5fe1c0c9d6b35300733bb6edaa64db9f84c3f",
+      "size": 43823
+    },
+    {
+      "path": "server/serve.py",
+      "sha256": "3870012927ce8cb2c159cd6347d5a416364bc9cec674c8cd280bcc6ec18863bd",
+      "size": 383090
+    },
+    {
+      "path": "server/store_categories.py",
+      "sha256": "2e2a7ba757d1e2b5ea301e8c9295928beea05326ff3a6bad38411d00c38219c4",
+      "size": 805
+    },
+    {
+      "path": "server/styledash_delivery_zone.py",
+      "sha256": "6608eabc851df6c853f04df1c59e2ea7f4f409af7cb69975a7f5e9390a32dd29",
+      "size": 8116
+    },
+    {
+      "path": "server/styledash_delivery_zone_store.py",
+      "sha256": "d5cb5cd7686763a121db89da463944a51f5e3814c585882160d7f28e026d3f47",
+      "size": 4249
+    },
+    {
+      "path": "server/styledash_firebase.py",
+      "sha256": "5a18168d383099a744d20ed2d4937f7103d6590f110da0b63b9563a4b1d563ed",
+      "size": 6002
+    },
+    {
+      "path": "server/styledash_mail.py",
+      "sha256": "dc25f5bb4ac87b080f46b632aa99e397ffe8a80cdc68abdb358a2d1f43a6e41c",
+      "size": 8594
+    },
+    {
+      "path": "server/styledash_notify.py",
+      "sha256": "9dbf7afcea3cb1f33cff8c03b38d0a97a8f599c427a5a3d4b4fc04728226f1de",
+      "size": 8801
+    },
+    {
+      "path": "server/styledash_registration_email.py",
+      "sha256": "85ca90c7603a978414d606d2396a5c7dcc7dd4822c5330fa4253c3aa26bc448d",
+      "size": 14095
+    },
+    {
+      "path": "server/styledash_reviews.py",
+      "sha256": "fb654e67ee030de9213f23ca789b7e8f5b7a2a970d393e2529f848de8946a007",
+      "size": 39843
+    },
+    {
+      "path": "server/styledash_security.py",
+      "sha256": "e4404801000fcda0829c15c144704407ccd2d3fb4015e1508ee095224ea27538",
+      "size": 85493
+    },
+    {
+      "path": "server/styledash_shops.py",
+      "sha256": "d309a0f0690705f98854c8b8ec295ad0e96993bce0a171225a7215a21339b9e6",
+      "size": 151467
+    },
+    {
+      "path": "server/tax_classification_registry.py",
+      "sha256": "38ed3f9a358f23d507aaad158179f2939a94a3128429344225649d70d1ff8fb5",
+      "size": 6831
+    },
+    {
+      "path": "server/tax_document_pdf.py",
+      "sha256": "3d2419054a968901463905670b179713ca1d8497535eab392c4a8a709235f186",
+      "size": 13484
+    },
+    {
+      "path": "server/verify-email.html",
+      "sha256": "a16634547e31f09ae5021ca5efe7cc317ace7ad94f7a076b31e397de95188107",
+      "size": 1751
+    },
+    {
+      "path": "server/verify-email.js",
+      "sha256": "ea5178314c0615a82230b4dea737a917ddf60c0abd7ea45f7a940fead8e9b600",
+      "size": 1940
+    },
+    {
+      "path": "server/account-deletion.html",
+      "sha256": "8db59d235bb8a0b20d0073bde365c81f825cfbda93b848b21ef1f170c7a15d24",
+      "size": 5484
+    },
+    {
+      "path": "server/account-deletion.js",
+      "sha256": "b8bb5a02afe63fac6beebc6fc89de93395c2848a728b63f3976d610d41857afa",
+      "size": 3225
+    },
+    {
+      "path": "admin/order_documents.py",
+      "sha256": "9d1de4ea01b0cc80741a010af7c827acd829ec611c1d9350ea934cb5cc9a7205",
+      "size": 29111
+    },
+    {
+      "path": "server/.well-known/assetlinks.json",
+      "sha256": "eefc6823c917a4529e36d8deeddb757aad10b0bb2f84fe9f8d32406836ed10a4",
+      "size": 430
+    },
+    {
+      "path": "admin/order_profit.py",
+      "sha256": "8cdedc322c9171303ac8cf253e42c2123413fdeea0badbe6fff6b1d86d167a2e",
+      "size": 18565
+    }
+  ],
+  "unreadable_paths": [
+    "admin/gst_phase1_registry.py",
+    "server/gst_phase1_registry.py"
+  ],
+  "excluded_sensitive_and_built_assets": true
+}

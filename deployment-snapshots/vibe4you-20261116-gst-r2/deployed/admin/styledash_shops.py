@@ -1,0 +1,3577 @@
+"""Server-authoritative shop applications and seller product submissions.
+
+This module deliberately contains no HTTP or administrator authentication
+logic.  The public and loopback-only admin servers authenticate requests and
+enforce CSRF before calling these methods.  All ownership and state-transition
+checks are repeated here so a handler mistake cannot grant seller/admin powers.
+"""
+
+from __future__ import annotations
+
+import json
+import re
+import secrets
+import sqlite3
+from pathlib import Path
+from typing import Any
+from urllib.parse import urlsplit
+
+try:
+    from styledash_security import ClosingConnection, SecurityError, clean_text, iso, utc_now
+except ModuleNotFoundError:  # Repository test import path.
+    from scripts.styledash_security import ClosingConnection, SecurityError, clean_text, iso, utc_now
+
+
+try:
+    from catalog_normalization import (
+        CANONICAL_DEPARTMENTS, PRODUCT_CATEGORIES, build_product_tags, normalize_brand, normalize_delivery_type,
+        normalize_department, normalize_product_category, normalize_size_label, normalize_subcategory,
+    )
+except ModuleNotFoundError:
+    from scripts.catalog_normalization import (
+        CANONICAL_DEPARTMENTS, PRODUCT_CATEGORIES, build_product_tags, normalize_brand, normalize_delivery_type,
+        normalize_department, normalize_product_category, normalize_size_label, normalize_subcategory,
+    )
+
+try:
+    from store_categories import STORE_CATEGORIES
+except ModuleNotFoundError:  # Repository test import path.
+    from scripts.store_categories import STORE_CATEGORIES
+
+
+APPLICATION_STATUSES = (
+    "DRAFT",
+    "SUBMITTED",
+    "UNDER_REVIEW",
+    "APPROVED",
+    "REJECTED",
+    "ACTIVE",
+    "SUSPENDED",
+)
+PRODUCT_STATUSES = (
+    "DRAFT",
+    "SUBMITTED",
+    "UNDER_REVIEW",
+    "APPROVED",
+    "PUBLISHED",
+    "REJECTED",
+)
+PRODUCT_CHANGE_ACTIONS = ("EDIT", "UNPUBLISH")
+PRODUCT_CHANGE_STATUSES = ("SUBMITTED", "UNDER_REVIEW", "APPROVED", "REJECTED")
+PRODUCT_CHANGE_ADMIN_TRANSITIONS = {
+    "SUBMITTED": {"UNDER_REVIEW"},
+    "UNDER_REVIEW": {"APPROVED", "REJECTED"},
+}
+ALLOWED_CATEGORIES = STORE_CATEGORIES
+APPLICATION_ADMIN_TRANSITIONS = {
+    "SUBMITTED": {"UNDER_REVIEW"},
+    "UNDER_REVIEW": {"APPROVED", "REJECTED"},
+    "APPROVED": {"ACTIVE"},
+    "ACTIVE": {"SUSPENDED"},
+    "SUSPENDED": {"ACTIVE"},
+    "REJECTED": {"UNDER_REVIEW"},  # Reopen a rejected vendor in admin review.
+}
+PRODUCT_ADMIN_TRANSITIONS = {
+    "SUBMITTED": {"UNDER_REVIEW"},
+    "UNDER_REVIEW": {"APPROVED", "REJECTED"},
+    "APPROVED": {"PUBLISHED"},
+    "PUBLISHED": {"APPROVED"},  # Explicit unpublish.
+}
+PINCODE_PATTERN = re.compile(r"^\d{6}$")
+APPLICATION_PAYLOAD_FIELDS = {
+    "shopName",
+    "ownerName",
+    "category",
+    "description",
+    "address",
+    "city",
+    "state",
+    "pincode",
+    "businessInformation",
+}
+PRODUCT_PAYLOAD_FIELDS = {
+    "name",
+    "description",
+    "brand",
+    "department",
+    "category",
+    "pricePaise",
+    "originalPricePaise",
+    "inventory",
+    "imageUrls",
+    "attributes",
+    "subcategory",
+    "deliveryType",
+    "size",
+    "colourName",
+    "colourHex",
+    "variants",
+    "colourVariants",
+    "tryAtHomeEnabled",
+    "exchangeAvailable",
+    "outsideNeemuchDeliveryEnabled",
+    "hsnCode",
+    "gstRate",
+}
+PRODUCT_CHANGE_PAYLOAD_FIELDS = PRODUCT_PAYLOAD_FIELDS - {"inventory", "size"}
+DEPARTMENTS = CANONICAL_DEPARTMENTS
+COLOUR_HEX_PATTERN = re.compile(r"^#[0-9A-Fa-f]{6}$")
+PRODUCT_MEDIA_PATH_PATTERN = re.compile(r"^/media/product-images/[0-9a-f]{32}\.(?:webp|jpg|png)$")
+EXCHANGE_WINDOW_DAYS = 2
+
+
+DEFAULT_PRODUCT_COMMISSION_BPS = 500  # 5%; private administration only.
+
+
+def _commission_rate_basis_points(price_paise: int, override_bps: int | None = None) -> int:
+    """Return the default or admin-selected product commission (never public)."""
+    return DEFAULT_PRODUCT_COMMISSION_BPS if override_bps is None else override_bps
+
+
+def _customer_price_paise(price_paise: int, override_bps: int | None = None) -> int:
+    rate = _commission_rate_basis_points(price_paise, override_bps)
+    return price_paise + ((price_paise * rate + 5_000) // 10_000)
+
+
+def _row_commission_override(row: sqlite3.Row) -> int | None:
+    return row["commission_override_bps"] if "commission_override_bps" in row.keys() else None
+
+
+def _row_customer_price_paise(row: sqlite3.Row) -> int:
+    return _customer_price_paise(row["price_paise"], _row_commission_override(row))
+
+
+_SIMILAR_GENERIC_TAGS = {"local-shop"}
+
+
+def _similar_product_score(
+    current: dict[str, Any], candidate: dict[str, Any]
+) -> int:
+    """Deterministic relevance score for Similar Products ranking."""
+    score = 0
+    subcategory = str(current.get("subcategory") or "").strip()
+    if subcategory and subcategory.casefold() == str(
+        candidate.get("subcategory") or ""
+    ).strip().casefold():
+        score += 100
+    if current.get("category") and current.get("category") == candidate.get("category"):
+        score += 50
+    if current.get("department") and current.get("department") == candidate.get(
+        "department"
+    ):
+        score += 25
+    brand = str(current.get("brand") or "").strip()
+    if brand and brand.casefold() == str(candidate.get("brand") or "").strip().casefold():
+        score += 10
+    current_tags = {
+        str(tag).casefold() for tag in current.get("tags") or []
+    } - _SIMILAR_GENERIC_TAGS
+    candidate_tags = {
+        str(tag).casefold() for tag in candidate.get("tags") or []
+    } - _SIMILAR_GENERIC_TAGS
+    score += min(len(current_tags & candidate_tags), 5) * 4
+    current_price = float(current.get("price") or 0)
+    candidate_price = float(candidate.get("price") or 0)
+    if current_price > 0 and candidate_price > 0:
+        ratio = candidate_price / current_price
+        if 0.8 <= ratio <= 1.25:
+            score += 10
+        elif 0.5 <= ratio <= 2.0:
+            score += 5
+    return score
+
+
+def _optional_text(value: Any, label: str, maximum: int) -> str | None:
+    if value is None or value == "":
+        return None
+    return clean_text(value, label, 1, maximum)
+
+
+def _row_dict(row: sqlite3.Row) -> dict[str, Any]:
+    return {key: row[key] for key in row.keys()}
+
+
+def _store_slug(application_id: str) -> str:
+    return f"local-shop-{application_id[-12:]}"
+
+def _created_variants_json(product_id: str, raw_json: str) -> str:
+    """Persist server-owned stable IDs for variants created after migration v6."""
+    variants = json.loads(raw_json)
+    canonical = []
+    seen_ids: set[str] = set()
+    for index, item in enumerate(variants):
+        variant_id = item.get("id")
+        if not isinstance(variant_id, str) or not variant_id.strip() or variant_id in seen_ids:
+            variant_id = f"{product_id}-var-{index + 1}"
+        seen_ids.add(variant_id)
+        canonical.append({
+            "id": variant_id,
+            "size": item["size"],
+            "inventory": item["inventory"],
+            "active": item.get("active", True),
+            "colourName": item["colourName"],
+            "colourHex": item.get("colourHex"),
+            "imageUrls": item.get("imageUrls") or [],
+        })
+    return json.dumps(canonical, separators=(",", ":"))
+
+def _row_variants(row: sqlite3.Row) -> list[dict[str, Any]]:
+    raw = row["variants_json"] if "variants_json" in row.keys() else None
+    try:
+        variants = json.loads(raw or "[]")
+    except (TypeError, json.JSONDecodeError):
+        variants = []
+    try:
+        legacy_images = json.loads(row["image_urls_json"] or "[]")
+    except (TypeError, json.JSONDecodeError):
+        legacy_images = []
+    legacy_colour = row["colour_name"]
+    legacy_hex = row["colour_hex"]
+    clean: list[dict[str, Any]] = []
+    seen_ids: set[str] = set()
+    if isinstance(variants, list):
+        for index, item in enumerate(variants):
+            if not isinstance(item, dict):
+                continue
+            size = item.get("size")
+            inventory = item.get("inventory")
+            if not (isinstance(size, str) and size.strip() and isinstance(inventory, int) and not isinstance(inventory, bool)):
+                continue
+            variant_id = item.get("id")
+            if not isinstance(variant_id, str) or not variant_id.strip() or len(variant_id) > 128 or variant_id in seen_ids:
+                variant_id = f"{row['id']}-var-{index + 1}"
+            seen_ids.add(variant_id)
+            colour_name = item.get("colourName", legacy_colour)
+            if not isinstance(colour_name, str) or not colour_name.strip():
+                colour_name = legacy_colour
+            images = item.get("imageUrls", legacy_images)
+            if not isinstance(images, list):
+                images = legacy_images
+            clean.append({
+                "id": variant_id,
+                "size": size.strip(),
+                "inventory": max(0, inventory),
+                "active": item.get("active") is not False,
+                "colourName": colour_name.strip(),
+                "colourHex": item.get("colourHex", legacy_hex),
+                "imageUrls": images,
+            })
+    if clean:
+        return clean
+    return [{
+        "id": f"{row['id']}-var-1",
+        "size": row["size"],
+        "inventory": row["inventory"],
+        "active": True,
+        "colourName": legacy_colour,
+        "colourHex": legacy_hex,
+        "imageUrls": legacy_images,
+    }]
+
+
+def _group_colour_variants(variants: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    groups: list[dict[str, Any]] = []
+    by_colour: dict[str, dict[str, Any]] = {}
+    for variant in variants:
+        if not variant.get("active", True):
+            continue
+        key = variant["colourName"].casefold()
+        group = by_colour.get(key)
+        if group is None:
+            group = {
+                "id": f"colour-{variant['id']}",
+                "colourName": variant["colourName"],
+                "colourHex": variant.get("colourHex"),
+                "imageUrls": list(variant.get("imageUrls") or []),
+                "sizes": [],
+            }
+            by_colour[key] = group
+            groups.append(group)
+        group["sizes"].append({
+            "id": variant["id"],
+            "size": variant["size"],
+            "inventory": variant["inventory"],
+        })
+    return groups
+
+
+
+
+class ShopWorkflow:
+    """SQLite-backed shop workflow with customer ownership enforcement."""
+
+    def __init__(self, path: Path) -> None:
+        self.path = path
+        self.path.parent.mkdir(parents=True, exist_ok=True)
+        self._migrate()
+
+    def connect(self) -> sqlite3.Connection:
+        connection = sqlite3.connect(
+            self.path, timeout=5, isolation_level=None, factory=ClosingConnection
+        )
+        connection.row_factory = sqlite3.Row
+        connection.execute("PRAGMA foreign_keys=ON")
+        connection.execute("PRAGMA busy_timeout=5000")
+        return connection
+
+    def _migrate(self) -> None:
+        with self.connect() as db:
+            mode = db.execute("PRAGMA journal_mode=WAL").fetchone()[0]
+            if str(mode).lower() != "wal":
+                raise RuntimeError("SQLite WAL mode is unavailable")
+            if db.execute(
+                "SELECT 1 FROM sqlite_master WHERE type='table' AND name='users'"
+            ).fetchone() is None:
+                raise RuntimeError("Shop migration requires the customer users table")
+            db.execute(
+                "CREATE TABLE IF NOT EXISTS shop_schema_migrations("
+                "version INTEGER PRIMARY KEY,applied_at TEXT NOT NULL)"
+            )
+            # Each migration rechecks its marker only after BEGIN IMMEDIATE.
+            # This is required because the public and private services may
+            # start concurrently against the same SQLite database.
+            self._migrate_applications(db)
+            self._migrate_products(db)
+            self._migrate_product_change_requests(db)
+            self._migrate_product_variants(db)
+            self._migrate_store_branding(db)
+            self._migrate_colour_variant_metadata(db)
+            self._migrate_product_try_at_home(db)
+            self._migrate_product_exchange(db)
+            self._migrate_product_change_summaries(db)
+            self._migrate_catalog_version(db)
+            self._migrate_product_commission(db)
+            db.execute(
+                """CREATE TABLE IF NOT EXISTS admin_removed_shop_products(
+                    product_id TEXT PRIMARY KEY REFERENCES shop_product_submissions(id),
+                    removed_by TEXT NOT NULL,
+                    removed_at TEXT NOT NULL
+                )"""
+            )
+            integrity = [row[0] for row in db.execute("PRAGMA integrity_check").fetchall()]
+            if integrity != ["ok"]:
+                raise RuntimeError("Shop migration failed SQLite integrity validation")
+            check = db.execute("PRAGMA foreign_key_check").fetchall()
+            if check:
+                raise RuntimeError("Shop migration failed foreign key validation")
+
+    @staticmethod
+    def _application_table_sql(name: str) -> str:
+        if name not in {"vendor_applications", "vendor_applications_v2"}:
+            raise ValueError("invalid migration table name")
+        statuses = ",".join(f"'{status}'" for status in APPLICATION_STATUSES)
+        return f"""
+            CREATE TABLE {name}(
+              id TEXT PRIMARY KEY,
+              submitted_by_user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+              shop_name TEXT NOT NULL,
+              owner_name TEXT NOT NULL,
+              email TEXT,
+              phone TEXT,
+              category TEXT NOT NULL,
+              description TEXT NOT NULL,
+              address TEXT NOT NULL,
+              city TEXT NOT NULL,
+              state TEXT NOT NULL,
+              pincode TEXT NOT NULL,
+              business_information TEXT,
+              banner_image_url TEXT,
+              logo_image_url TEXT,
+              status TEXT NOT NULL DEFAULT 'DRAFT' CHECK(status IN ({statuses})),
+              rejection_reason TEXT,
+              suspension_reason TEXT,
+              reviewed_by TEXT,
+              created_at TEXT NOT NULL,
+              updated_at TEXT NOT NULL,
+              submitted_at TEXT,
+              reviewed_at TEXT,
+              approved_at TEXT,
+              activated_at TEXT,
+              suspended_at TEXT
+            )
+        """
+
+    def _migrate_applications(self, db: sqlite3.Connection) -> None:
+        now = iso(utc_now())
+        db.execute("BEGIN IMMEDIATE")
+        try:
+            if db.execute(
+                "SELECT 1 FROM shop_schema_migrations WHERE version=1"
+            ).fetchone() is not None:
+                db.commit()
+                return
+            existing = db.execute(
+                "SELECT 1 FROM sqlite_master WHERE type='table' AND name='vendor_applications'"
+            ).fetchone()
+            if existing is not None:
+                duplicates = db.execute(
+                    "SELECT submitted_by_user_id,COUNT(*) AS count "
+                    "FROM vendor_applications GROUP BY submitted_by_user_id HAVING COUNT(*)>1"
+                ).fetchall()
+                if duplicates:
+                    raise RuntimeError(
+                        "Shop migration blocked: duplicate applications exist for "
+                        f"{len(duplicates)} customer account(s)"
+                    )
+            if existing is None:
+                db.execute(self._application_table_sql("vendor_applications"))
+            else:
+                db.execute(self._application_table_sql("vendor_applications_v2"))
+                db.execute(
+                    """
+                    INSERT INTO vendor_applications_v2(
+                      id,submitted_by_user_id,shop_name,owner_name,email,phone,
+                      category,description,address,city,state,pincode,status,
+                      reviewed_by,created_at,updated_at,submitted_at,reviewed_at,
+                      approved_at
+                    )
+                    SELECT id,submitted_by_user_id,shop_name,owner_name,email,phone,
+                           category,description,address,'Neemuch','Madhya Pradesh',pincode,
+                           CASE status
+                             WHEN 'pending' THEN 'SUBMITTED'
+                             WHEN 'approved' THEN 'APPROVED'
+                             WHEN 'rejected' THEN 'REJECTED'
+                             ELSE 'SUBMITTED'
+                           END,
+                           reviewed_by,created_at,updated_at,created_at,
+                           CASE WHEN status IN ('approved','rejected') THEN updated_at END,
+                           CASE WHEN status='approved' THEN updated_at END
+                    FROM vendor_applications
+                    """
+                )
+                db.execute("DROP TABLE vendor_applications")
+                db.execute(
+                    "ALTER TABLE vendor_applications_v2 RENAME TO vendor_applications"
+                )
+            db.execute(
+                "CREATE UNIQUE INDEX IF NOT EXISTS vendor_application_customer_unique_idx "
+                "ON vendor_applications(submitted_by_user_id)"
+            )
+            db.execute(
+                "CREATE INDEX IF NOT EXISTS vendor_application_status_idx "
+                "ON vendor_applications(status,updated_at)"
+            )
+            db.execute(
+                "INSERT INTO shop_schema_migrations(version,applied_at) VALUES(1,?)",
+                (now,),
+            )
+            db.commit()
+        except Exception:
+            db.rollback()
+            raise
+
+    @staticmethod
+    def _migrate_products(db: sqlite3.Connection) -> None:
+        now = iso(utc_now())
+        statuses = ",".join(f"'{status}'" for status in PRODUCT_STATUSES)
+        db.execute("BEGIN IMMEDIATE")
+        try:
+            if db.execute(
+                "SELECT 1 FROM shop_schema_migrations WHERE version=2"
+            ).fetchone() is not None:
+                db.commit()
+                return
+            db.execute(
+                f"""
+                CREATE TABLE IF NOT EXISTS shop_product_submissions(
+                  id TEXT PRIMARY KEY,
+                  slug TEXT NOT NULL UNIQUE,
+                  application_id TEXT NOT NULL REFERENCES vendor_applications(id) ON DELETE CASCADE,
+                  submitted_by_user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                  name TEXT NOT NULL,
+                  description TEXT NOT NULL,
+                  brand TEXT,
+                  department TEXT NOT NULL CHECK(department IN ('men','women','kids','unisex','footwear','accessories')),
+                  category TEXT NOT NULL,
+                  price_paise INTEGER NOT NULL CHECK(price_paise BETWEEN 100 AND 100000000),
+                  original_price_paise INTEGER NOT NULL CHECK(original_price_paise BETWEEN 100 AND 100000000),
+                  inventory INTEGER NOT NULL CHECK(inventory BETWEEN 0 AND 100000),
+                  size TEXT NOT NULL,
+                  colour_name TEXT NOT NULL,
+                  colour_hex TEXT,
+                  image_urls_json TEXT NOT NULL DEFAULT '[]',
+                  attributes_json TEXT NOT NULL DEFAULT '{{}}',
+                  status TEXT NOT NULL DEFAULT 'DRAFT' CHECK(status IN ({statuses})),
+                  rejection_reason TEXT,
+                  reviewed_by TEXT,
+                  created_at TEXT NOT NULL,
+                  updated_at TEXT NOT NULL,
+                  submitted_at TEXT,
+                  reviewed_at TEXT,
+                  published_at TEXT
+                )
+                """
+            )
+            db.execute(
+                "CREATE INDEX IF NOT EXISTS shop_products_customer_idx "
+                "ON shop_product_submissions(submitted_by_user_id,updated_at)"
+            )
+            db.execute(
+                "CREATE INDEX IF NOT EXISTS shop_products_public_idx "
+                "ON shop_product_submissions(status,published_at)"
+            )
+            db.execute(
+                "INSERT INTO shop_schema_migrations(version,applied_at) VALUES(2,?)",
+                (now,),
+            )
+            db.commit()
+        except Exception:
+            db.rollback()
+            raise
+
+    @staticmethod
+    def _migrate_product_change_requests(db: sqlite3.Connection) -> None:
+        now = iso(utc_now())
+        actions = ",".join(f"'{action}'" for action in PRODUCT_CHANGE_ACTIONS)
+        statuses = ",".join(f"'{status}'" for status in PRODUCT_CHANGE_STATUSES)
+        db.execute("BEGIN IMMEDIATE")
+        try:
+            if db.execute(
+                "SELECT 1 FROM shop_schema_migrations WHERE version=3"
+            ).fetchone() is not None:
+                db.commit()
+                return
+            db.execute(
+                f"""
+                CREATE TABLE IF NOT EXISTS shop_product_change_requests(
+                  id TEXT PRIMARY KEY,
+                  product_id TEXT NOT NULL REFERENCES shop_product_submissions(id) ON DELETE CASCADE,
+                  application_id TEXT NOT NULL REFERENCES vendor_applications(id) ON DELETE CASCADE,
+                  submitted_by_user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                  action TEXT NOT NULL CHECK(action IN ({actions})),
+                  payload_json TEXT,
+                  status TEXT NOT NULL DEFAULT 'SUBMITTED' CHECK(status IN ({statuses})),
+                  rejection_reason TEXT,
+                  reviewed_by TEXT,
+                  created_at TEXT NOT NULL,
+                  updated_at TEXT NOT NULL,
+                  submitted_at TEXT NOT NULL,
+                  reviewed_at TEXT
+                )
+                """
+            )
+            db.execute(
+                "CREATE INDEX IF NOT EXISTS shop_product_change_customer_idx "
+                "ON shop_product_change_requests(submitted_by_user_id,updated_at)"
+            )
+            db.execute(
+                "CREATE INDEX IF NOT EXISTS shop_product_change_admin_idx "
+                "ON shop_product_change_requests(status,updated_at)"
+            )
+            db.execute(
+                "CREATE UNIQUE INDEX IF NOT EXISTS shop_product_change_pending_idx "
+                "ON shop_product_change_requests(product_id) "
+                "WHERE status IN ('SUBMITTED','UNDER_REVIEW')"
+            )
+            db.execute(
+                "INSERT INTO shop_schema_migrations(version,applied_at) VALUES(3,?)",
+                (now,),
+            )
+            db.commit()
+        except Exception:
+            db.rollback()
+            raise
+
+    @staticmethod
+    def _migrate_product_variants(db: sqlite3.Connection) -> None:
+        now = iso(utc_now())
+        db.execute("BEGIN IMMEDIATE")
+        try:
+            # Historical production databases may already contain a version-4
+            # marker from an older migration sequence while still lacking the
+            # variants_json column. Treat the physical schema as authoritative
+            # and repair it idempotently instead of trusting the marker alone.
+            marker_exists = db.execute(
+                "SELECT 1 FROM shop_schema_migrations WHERE version=4"
+            ).fetchone() is not None
+            columns = {row["name"] for row in db.execute(
+                "PRAGMA table_info(shop_product_submissions)"
+            ).fetchall()}
+            if "variants_json" not in columns:
+                db.execute(
+                    "ALTER TABLE shop_product_submissions "
+                    "ADD COLUMN variants_json TEXT NOT NULL DEFAULT '[]'"
+                )
+            rows = db.execute(
+                "SELECT id,size,inventory,variants_json FROM shop_product_submissions"
+            ).fetchall()
+            for row in rows:
+                try:
+                    existing = json.loads(row["variants_json"] or "[]")
+                except (TypeError, json.JSONDecodeError):
+                    existing = []
+                if existing:
+                    continue
+                db.execute(
+                    "UPDATE shop_product_submissions SET variants_json=? WHERE id=?",
+                    (json.dumps([{"size": row["size"], "inventory": row["inventory"]}], separators=(",", ":")), row["id"]),
+                )
+            if not marker_exists:
+                db.execute(
+                    "INSERT INTO shop_schema_migrations(version,applied_at) VALUES(4,?)",
+                    (now,),
+                )
+            db.commit()
+        except Exception:
+            db.rollback()
+            raise
+
+    @staticmethod
+    def _migrate_store_branding(db: sqlite3.Connection) -> None:
+        now = iso(utc_now())
+        db.execute("BEGIN IMMEDIATE")
+        try:
+            marker_exists = db.execute(
+                "SELECT 1 FROM shop_schema_migrations WHERE version=5"
+            ).fetchone() is not None
+            columns = {row["name"] for row in db.execute(
+                "PRAGMA table_info(vendor_applications)"
+            ).fetchall()}
+            if "banner_image_url" not in columns:
+                db.execute("ALTER TABLE vendor_applications ADD COLUMN banner_image_url TEXT")
+            if "logo_image_url" not in columns:
+                db.execute("ALTER TABLE vendor_applications ADD COLUMN logo_image_url TEXT")
+            if not marker_exists:
+                db.execute(
+                    "INSERT INTO shop_schema_migrations(version,applied_at) VALUES(5,?)",
+                    (now,),
+                )
+            db.commit()
+        except Exception:
+            db.rollback()
+            raise
+
+    @staticmethod
+    def _migrate_colour_variant_metadata(db: sqlite3.Connection) -> None:
+        """Backfill stable IDs and colour metadata after store-branding migration v5."""
+        now = iso(utc_now())
+        db.execute("BEGIN IMMEDIATE")
+        try:
+            rows = db.execute(
+                "SELECT id,size,inventory,colour_name,colour_hex,image_urls_json,variants_json "
+                "FROM shop_product_submissions"
+            ).fetchall()
+            for row in rows:
+                try:
+                    raw = json.loads(row["variants_json"] or "[]")
+                except (TypeError, json.JSONDecodeError):
+                    raw = []
+                if not isinstance(raw, list) or not raw:
+                    raw = [{"size": row["size"], "inventory": row["inventory"], "active": True}]
+                try:
+                    legacy_images = json.loads(row["image_urls_json"] or "[]")
+                except (TypeError, json.JSONDecodeError):
+                    legacy_images = []
+                normalized = []
+                seen_ids: set[str] = set()
+                for index, item in enumerate(raw):
+                    if not isinstance(item, dict):
+                        continue
+                    variant_id = item.get("id")
+                    if not isinstance(variant_id, str) or not variant_id.strip() or len(variant_id) > 128 or variant_id in seen_ids:
+                        variant_id = f"{row['id']}-var-{index + 1}"
+                    seen_ids.add(variant_id)
+                    images = item.get("imageUrls") if isinstance(item.get("imageUrls"), list) else legacy_images
+                    normalized.append({
+                        "id": variant_id,
+                        "size": item.get("size", row["size"]),
+                        "inventory": item.get("inventory", row["inventory"]),
+                        "active": item.get("active") is not False,
+                        "colourName": item.get("colourName") or row["colour_name"],
+                        "colourHex": item.get("colourHex", row["colour_hex"]),
+                        "imageUrls": images,
+                    })
+                encoded = json.dumps(normalized, separators=(",", ":"))
+                if encoded != (row["variants_json"] or ""):
+                    db.execute("UPDATE shop_product_submissions SET variants_json=? WHERE id=?", (encoded, row["id"]))
+            if db.execute("SELECT 1 FROM shop_schema_migrations WHERE version=6").fetchone() is None:
+                db.execute("INSERT INTO shop_schema_migrations(version,applied_at) VALUES(6,?)", (now,))
+            db.commit()
+        except Exception:
+            db.rollback()
+            raise
+
+    @staticmethod
+    def _migrate_product_try_at_home(db: sqlite3.Connection) -> None:
+        """Add product-level Try at Home opt-in without changing existing listings."""
+        now = iso(utc_now())
+        db.execute("BEGIN IMMEDIATE")
+        try:
+            columns = {row["name"] for row in db.execute(
+                "PRAGMA table_info(shop_product_submissions)"
+            ).fetchall()}
+            if "try_at_home_enabled" not in columns:
+                db.execute(
+                    "ALTER TABLE shop_product_submissions "
+                    "ADD COLUMN try_at_home_enabled INTEGER NOT NULL DEFAULT 0 "
+                    "CHECK(try_at_home_enabled IN (0,1))"
+                )
+            if db.execute("SELECT 1 FROM shop_schema_migrations WHERE version=7").fetchone() is None:
+                db.execute("INSERT INTO shop_schema_migrations(version,applied_at) VALUES(7,?)", (now,))
+            db.commit()
+        except Exception:
+            db.rollback()
+            raise
+
+    @staticmethod
+    def _migrate_product_exchange(db: sqlite3.Connection) -> None:
+        """Add product-level exchange eligibility; existing products remain ineligible."""
+        now = iso(utc_now())
+        db.execute("BEGIN IMMEDIATE")
+        try:
+            columns = {row["name"] for row in db.execute(
+                "PRAGMA table_info(shop_product_submissions)"
+            ).fetchall()}
+            if "exchange_available" not in columns:
+                db.execute(
+                    "ALTER TABLE shop_product_submissions "
+                    "ADD COLUMN exchange_available INTEGER NOT NULL DEFAULT 0 "
+                    "CHECK(exchange_available IN (0,1))"
+                )
+            if db.execute("SELECT 1 FROM shop_schema_migrations WHERE version=8").fetchone() is None:
+                db.execute("INSERT INTO shop_schema_migrations(version,applied_at) VALUES(8,?)", (now,))
+            db.commit()
+        except Exception:
+            db.rollback()
+            raise
+
+    @staticmethod
+    def _migrate_product_change_summaries(db: sqlite3.Connection) -> None:
+        """Persist the exact before/after review snapshot for readable Admin approval."""
+        now = iso(utc_now())
+        db.execute("BEGIN IMMEDIATE")
+        try:
+            columns = {row["name"] for row in db.execute(
+                "PRAGMA table_info(shop_product_change_requests)"
+            ).fetchall()}
+            if "change_summary_json" not in columns:
+                db.execute("ALTER TABLE shop_product_change_requests ADD COLUMN change_summary_json TEXT")
+            if db.execute("SELECT 1 FROM shop_schema_migrations WHERE version=9").fetchone() is None:
+                db.execute("INSERT INTO shop_schema_migrations(version,applied_at) VALUES(9,?)", (now,))
+            db.commit()
+        except Exception:
+            db.rollback()
+            raise
+
+    @staticmethod
+    def _migrate_catalog_version(db: sqlite3.Connection) -> None:
+        """Track catalogue-affecting writes with a monotonic version counter.
+
+        Triggers catch every insert/update/delete from any process (public
+        server, private admin server, scripts) so the public runtime can skip
+        full catalogue rebuilds when nothing changed.
+        """
+        now = iso(utc_now())
+        db.execute("BEGIN IMMEDIATE")
+        try:
+            db.execute(
+                "CREATE TABLE IF NOT EXISTS shop_catalog_meta("
+                "key TEXT PRIMARY KEY,value INTEGER NOT NULL)"
+            )
+            db.execute(
+                "INSERT OR IGNORE INTO shop_catalog_meta(key,value) VALUES('product_version',0)"
+            )
+            for table in ("shop_product_submissions", "vendor_applications"):
+                for action in ("insert", "update", "delete"):
+                    db.execute(
+                        f"CREATE TRIGGER IF NOT EXISTS shop_catalog_version_{table}_{action} "
+                        f"AFTER {action.upper()} ON {table} "
+                        "BEGIN "
+                        "UPDATE shop_catalog_meta SET value=value+1 WHERE key='product_version'; "
+                        "END"
+                    )
+            if db.execute("SELECT 1 FROM shop_schema_migrations WHERE version=10").fetchone() is None:
+                db.execute("INSERT INTO shop_schema_migrations(version,applied_at) VALUES(10,?)", (now,))
+            db.commit()
+        except Exception:
+            db.rollback()
+            raise
+
+    def catalog_version(self) -> int:
+        """Monotonic counter bumped by every catalogue-affecting DB write."""
+        with self.connect() as db:
+            row = db.execute(
+                "SELECT value FROM shop_catalog_meta WHERE key='product_version'"
+            ).fetchone()
+        return int(row[0]) if row else 0
+
+    @staticmethod
+    def _migrate_product_commission(db: sqlite3.Connection) -> None:
+        """Add a private, optional per-product rate; existing products inherit 5%."""
+        now = iso(utc_now())
+        db.execute("BEGIN IMMEDIATE")
+        try:
+            columns = {row["name"] for row in db.execute(
+                "PRAGMA table_info(shop_product_submissions)"
+            ).fetchall()}
+            if "commission_override_bps" not in columns:
+                db.execute(
+                    "ALTER TABLE shop_product_submissions ADD COLUMN "
+                    "commission_override_bps INTEGER "
+                    "CHECK(commission_override_bps IS NULL OR "
+                    "(commission_override_bps BETWEEN 0 AND 10000))"
+                )
+            if db.execute(
+                "SELECT 1 FROM shop_schema_migrations WHERE version=11"
+            ).fetchone() is None:
+                db.execute(
+                    "INSERT INTO shop_schema_migrations(version,applied_at) VALUES(11,?)",
+                    (now,),
+                )
+            db.commit()
+        except Exception:
+            db.rollback()
+            raise
+
+    @staticmethod
+    def _application_payload(
+        payload: dict[str, Any],
+        current: sqlite3.Row | None = None,
+        *,
+        require_complete: bool = False,
+    ) -> dict[str, Any]:
+        if not isinstance(payload, dict) or set(payload) - APPLICATION_PAYLOAD_FIELDS:
+            raise SecurityError(
+                400, "Unsupported shop application field.", "invalid_vendor_application"
+            )
+
+        def supplied(key: str, column: str) -> Any:
+            if key in payload:
+                return payload[key]
+            return current[column] if current is not None else None
+
+        def draft_text(
+            key: str, column: str, label: str, minimum: int, maximum: int
+        ) -> str:
+            value = supplied(key, column)
+            if not require_complete and (value is None or value == ""):
+                return ""
+            return clean_text(value, label, minimum, maximum)
+
+        category = supplied("category", "category")
+        if not require_complete and (category is None or category == ""):
+            category = ""
+        elif category not in ALLOWED_CATEGORIES:
+            raise SecurityError(400, "Invalid store category.", "invalid_vendor_application")
+        raw_pincode = supplied("pincode", "pincode")
+        if not require_complete and (raw_pincode is None or raw_pincode == ""):
+            pincode = ""
+        else:
+            pincode = clean_text(raw_pincode, "pincode", 6, 6)
+        if pincode and not PINCODE_PATTERN.fullmatch(pincode):
+            raise SecurityError(400, "Enter a valid pincode.", "invalid_pincode")
+        return {
+            "shop_name": draft_text("shopName", "shop_name", "store name", 2, 100),
+            "owner_name": draft_text("ownerName", "owner_name", "owner name", 2, 80),
+            "category": category,
+            "description": draft_text(
+                "description", "description", "description", 10, 1000
+            ),
+            "address": draft_text("address", "address", "address", 5, 250),
+            "city": draft_text("city", "city", "city", 2, 80),
+            "state": draft_text("state", "state", "state", 2, 80),
+            "pincode": pincode,
+            "business_information": _optional_text(
+                supplied("businessInformation", "business_information"),
+                "business information",
+                1000,
+            ),
+        }
+
+    @staticmethod
+    def _registered_customer(db: sqlite3.Connection, user_id: str) -> sqlite3.Row:
+        user = db.execute(
+            "SELECT id,email,phone,name,is_active FROM users WHERE id=?", (user_id,)
+        ).fetchone()
+        if user is None:
+            raise SecurityError(404, "Customer not found.", "customer_not_found")
+        if not user["is_active"]:
+            raise SecurityError(403, "Customer account is disabled.", "account_disabled")
+        if not user["email"] and not user["phone"]:
+            raise SecurityError(
+                409,
+                "Add a verified email address or mobile number before applying.",
+                "registered_contact_required",
+            )
+        return user
+
+    @staticmethod
+    def _customer_application(db: sqlite3.Connection, user_id: str) -> sqlite3.Row | None:
+        return db.execute(
+            "SELECT * FROM vendor_applications WHERE submitted_by_user_id=?",
+            (user_id,),
+        ).fetchone()
+
+    @staticmethod
+    def _serialize_application(row: sqlite3.Row, *, admin: bool = False) -> dict[str, Any]:
+        result = {
+            "id": row["id"],
+            "status": row["status"],
+            "shopName": row["shop_name"],
+            "ownerName": row["owner_name"],
+            "registeredEmail": row["email"],
+            "registeredMobile": row["phone"],
+            "category": row["category"],
+            "description": row["description"],
+            "address": row["address"],
+            "city": row["city"],
+            "state": row["state"],
+            "pincode": row["pincode"],
+            "businessInformation": row["business_information"],
+            "bannerImage": row["banner_image_url"],
+            "logoImage": row["logo_image_url"],
+            "rejectionReason": row["rejection_reason"] if row["status"] == "REJECTED" else None,
+            "createdAt": row["created_at"],
+            "updatedAt": row["updated_at"],
+            "submittedAt": row["submitted_at"],
+            "approvedAt": row["approved_at"],
+            "activatedAt": row["activated_at"],
+        }
+        if admin:
+            result.update(
+                {
+                    "submittedByUserId": row["submitted_by_user_id"],
+                    "reviewedBy": row["reviewed_by"],
+                    "reviewedAt": row["reviewed_at"],
+                    "suspensionReason": row["suspension_reason"],
+                    "suspendedAt": row["suspended_at"],
+                }
+            )
+        return result
+
+    def get_application(self, user_id: str) -> dict[str, Any] | None:
+        with self.connect() as db:
+            row = self._customer_application(db, user_id)
+        return self._serialize_application(row) if row is not None else None
+
+    def update_store_branding(self, user_id: str, payload: dict[str, Any]) -> dict[str, Any]:
+        allowed = {"bannerImage", "logoImage"}
+        if not isinstance(payload, dict) or not payload or set(payload) - allowed:
+            raise SecurityError(400, "Invalid store branding update.", "invalid_store_branding")
+
+        def clean_image(value: Any, label: str) -> str | None:
+            if value is None or value == "":
+                return None
+            if not isinstance(value, str) or not PRODUCT_MEDIA_PATH_PATTERN.fullmatch(value):
+                raise SecurityError(400, f"Upload a valid {label} image.", "invalid_store_branding")
+            return value
+
+        now = iso(utc_now())
+        with self.connect() as db:
+            db.execute("BEGIN IMMEDIATE")
+            current = self._customer_application(db, user_id)
+            if current is None:
+                db.rollback()
+                raise SecurityError(404, "Shop application not found.", "vendor_application_not_found")
+            if current["status"] not in {"APPROVED", "ACTIVE"}:
+                db.rollback()
+                raise SecurityError(409, "Store branding can be changed after shop approval.", "approved_shop_required")
+            banner = clean_image(payload.get("bannerImage", current["banner_image_url"]), "store cover")
+            logo = clean_image(payload.get("logoImage", current["logo_image_url"]), "store logo")
+            db.execute(
+                "UPDATE vendor_applications SET banner_image_url=?,logo_image_url=?,updated_at=? "
+                "WHERE id=? AND submitted_by_user_id=?",
+                (banner, logo, now, current["id"], user_id),
+            )
+            db.commit()
+            row = db.execute("SELECT * FROM vendor_applications WHERE id=?", (current["id"],)).fetchone()
+        return self._serialize_application(row)
+
+    def create_draft(self, user_id: str, payload: dict[str, Any]) -> dict[str, Any]:
+        values = self._application_payload(payload)
+        now = iso(utc_now())
+        # Preserve the existing public identifier prefix for compatibility
+        # with notifications and operational tooling.
+        application_id = "vendor_" + secrets.token_hex(12)
+        with self.connect() as db:
+            db.execute("BEGIN IMMEDIATE")
+            user = self._registered_customer(db, user_id)
+            if self._customer_application(db, user_id) is not None:
+                db.rollback()
+                raise SecurityError(
+                    409,
+                    "A shop application already exists for this account.",
+                    "vendor_application_exists",
+                )
+            try:
+                db.execute(
+                    """
+                    INSERT INTO vendor_applications(
+                      id,submitted_by_user_id,shop_name,owner_name,email,phone,
+                      category,description,address,city,state,pincode,
+                      business_information,status,created_at,updated_at
+                    ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,'DRAFT',?,?)
+                    """,
+                    (
+                        application_id,
+                        user_id,
+                        values["shop_name"],
+                        values["owner_name"],
+                        user["email"],
+                        user["phone"],
+                        values["category"],
+                        values["description"],
+                        values["address"],
+                        values["city"],
+                        values["state"],
+                        values["pincode"],
+                        values["business_information"],
+                        now,
+                        now,
+                    ),
+                )
+            except sqlite3.IntegrityError as exc:
+                db.rollback()
+                raise SecurityError(
+                    409,
+                    "A shop application already exists for this account.",
+                    "vendor_application_exists",
+                ) from exc
+            db.commit()
+            row = db.execute(
+                "SELECT * FROM vendor_applications WHERE id=?", (application_id,)
+            ).fetchone()
+        return self._serialize_application(row)
+
+    def update_draft(self, user_id: str, payload: dict[str, Any]) -> dict[str, Any]:
+        with self.connect() as db:
+            db.execute("BEGIN IMMEDIATE")
+            user = self._registered_customer(db, user_id)
+            current = self._customer_application(db, user_id)
+            if current is None:
+                db.rollback()
+                raise SecurityError(404, "Shop application not found.", "vendor_application_not_found")
+            if current["status"] not in {"DRAFT", "REJECTED"}:
+                db.rollback()
+                raise SecurityError(
+                    409,
+                    "This shop application cannot be edited in its current state.",
+                    "invalid_vendor_transition",
+                )
+            values = self._application_payload(payload, current)
+            now = iso(utc_now())
+            db.execute(
+                """
+                UPDATE vendor_applications
+                   SET shop_name=?,owner_name=?,email=?,phone=?,category=?,description=?,
+                       address=?,city=?,state=?,pincode=?,business_information=?,
+                       status='DRAFT',rejection_reason=NULL,reviewed_by=NULL,
+                       reviewed_at=NULL,updated_at=?
+                 WHERE id=? AND submitted_by_user_id=?
+                """,
+                (
+                    values["shop_name"],
+                    values["owner_name"],
+                    user["email"],
+                    user["phone"],
+                    values["category"],
+                    values["description"],
+                    values["address"],
+                    values["city"],
+                    values["state"],
+                    values["pincode"],
+                    values["business_information"],
+                    now,
+                    current["id"],
+                    user_id,
+                ),
+            )
+            db.commit()
+            row = db.execute(
+                "SELECT * FROM vendor_applications WHERE id=?", (current["id"],)
+            ).fetchone()
+        return self._serialize_application(row)
+
+    def submit_application(self, user_id: str) -> dict[str, Any]:
+        now = iso(utc_now())
+        with self.connect() as db:
+            db.execute("BEGIN IMMEDIATE")
+            current = self._customer_application(db, user_id)
+            if current is None:
+                db.rollback()
+                raise SecurityError(404, "Shop application not found.", "vendor_application_not_found")
+            if current["status"] not in {"DRAFT", "REJECTED"}:
+                db.rollback()
+                raise SecurityError(
+                    409,
+                    "This shop application cannot be submitted in its current state.",
+                    "invalid_vendor_transition",
+                )
+            # Drafts may be saved incrementally, but submission is the trust
+            # boundary: every required business field must be valid here.
+            self._application_payload({}, current, require_complete=True)
+            db.execute(
+                """
+                UPDATE vendor_applications
+                   SET status='SUBMITTED',submitted_at=?,updated_at=?,
+                       rejection_reason=NULL,reviewed_by=NULL,reviewed_at=NULL
+                 WHERE id=? AND submitted_by_user_id=?
+                """,
+                (now, now, current["id"], user_id),
+            )
+            db.commit()
+            row = db.execute(
+                "SELECT * FROM vendor_applications WHERE id=?", (current["id"],)
+            ).fetchone()
+        return self._serialize_application(row)
+
+    def admin_create_application(
+        self, admin_id: str, user_id: str, payload: dict[str, Any]
+    ) -> dict[str, Any]:
+        allowed = APPLICATION_PAYLOAD_FIELDS | {"bannerImage", "logoImage"}
+        if not isinstance(payload, dict) or set(payload) - allowed:
+            raise SecurityError(400, "Unsupported shop creation field.", "invalid_vendor_application")
+
+        def clean_image(value: Any, label: str) -> str | None:
+            if value is None or value == "":
+                return None
+            if not isinstance(value, str) or not PRODUCT_MEDIA_PATH_PATTERN.fullmatch(value):
+                raise SecurityError(400, f"Upload a valid {label} image.", "invalid_store_branding")
+            return value
+
+        metadata = {key: value for key, value in payload.items() if key in APPLICATION_PAYLOAD_FIELDS}
+        values = self._application_payload(metadata, require_complete=True)
+        banner = clean_image(payload.get("bannerImage"), "store cover")
+        logo = clean_image(payload.get("logoImage"), "store logo")
+        application_id = "vendor_" + secrets.token_hex(12)
+        now = iso(utc_now())
+        with self.connect() as db:
+            db.execute("BEGIN IMMEDIATE")
+            self._require_admin(db, admin_id)
+            user = self._registered_customer(db, user_id)
+            if self._customer_application(db, user_id) is not None:
+                db.rollback()
+                raise SecurityError(409, "A shop already exists for this owner account.", "vendor_application_exists")
+            db.execute(
+                """
+                INSERT INTO vendor_applications(
+                  id,submitted_by_user_id,shop_name,owner_name,email,phone,
+                  category,description,address,city,state,pincode,business_information,
+                  banner_image_url,logo_image_url,status,reviewed_by,created_at,updated_at,submitted_at,reviewed_at,
+                  approved_at,activated_at
+                ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,'ACTIVE',?,?,?,?,?,?,?)
+                """,
+                (
+                    application_id, user_id, values["shop_name"], values["owner_name"],
+                    user["email"], user["phone"], values["category"], values["description"],
+                    values["address"], values["city"], values["state"], values["pincode"],
+                    values["business_information"], banner, logo, admin_id, now, now, now, now, now, now,
+                ),
+            )
+            self._audit_if_available(
+                db, admin_id, "shop_admin_created", "shop_application", application_id,
+                {"ownerUserId": user_id, "status": "ACTIVE"},
+            )
+            db.commit()
+            row = db.execute(
+                "SELECT * FROM vendor_applications WHERE id=?", (application_id,)
+            ).fetchone()
+        return self._serialize_application(row, admin=True)
+
+    def admin_update_application(
+        self, admin_id: str, application_id: str, payload: dict[str, Any]
+    ) -> dict[str, Any]:
+        allowed = APPLICATION_PAYLOAD_FIELDS | {"bannerImage", "logoImage"}
+        if not isinstance(payload, dict) or not payload or set(payload) - allowed:
+            raise SecurityError(400, "Unsupported shop edit field.", "invalid_vendor_application")
+
+        def clean_image(value: Any, label: str) -> str | None:
+            if value is None or value == "":
+                return None
+            if not isinstance(value, str) or not PRODUCT_MEDIA_PATH_PATTERN.fullmatch(value):
+                raise SecurityError(400, f"Upload a valid {label} image.", "invalid_store_branding")
+            return value
+
+        metadata = {key: value for key, value in payload.items() if key in APPLICATION_PAYLOAD_FIELDS}
+        now = iso(utc_now())
+        with self.connect() as db:
+            db.execute("BEGIN IMMEDIATE")
+            self._require_admin(db, admin_id)
+            current = db.execute("SELECT * FROM vendor_applications WHERE id=?", (application_id,)).fetchone()
+            if current is None:
+                db.rollback()
+                raise SecurityError(404, "Shop application not found.", "vendor_application_not_found")
+            values = self._application_payload(metadata, current, require_complete=True)
+            banner = clean_image(payload.get("bannerImage", current["banner_image_url"]), "store cover")
+            logo = clean_image(payload.get("logoImage", current["logo_image_url"]), "store logo")
+            db.execute(
+                "UPDATE vendor_applications SET shop_name=?,owner_name=?,category=?,description=?,"
+                "address=?,city=?,state=?,pincode=?,business_information=?,banner_image_url=?,"
+                "logo_image_url=?,updated_at=? WHERE id=?",
+                (values["shop_name"], values["owner_name"], values["category"], values["description"],
+                 values["address"], values["city"], values["state"], values["pincode"],
+                 values["business_information"], banner, logo, now, application_id),
+            )
+            self._audit_if_available(db, admin_id, "shop_admin_updated", "shop_application", application_id, {"fields": sorted(payload)})
+            db.commit()
+            row = db.execute("SELECT * FROM vendor_applications WHERE id=?", (application_id,)).fetchone()
+        return self._serialize_application(row, admin=True)
+
+    def admin_list_applications(self, admin_id: str) -> list[dict[str, Any]]:
+        with self.connect() as db:
+            self._require_admin(db, admin_id)
+            rows = db.execute(
+                "SELECT * FROM vendor_applications ORDER BY updated_at DESC LIMIT 500"
+            ).fetchall()
+        return [self._serialize_application(row, admin=True) for row in rows]
+
+    def admin_transition_application(
+        self,
+        admin_id: str,
+        application_id: str,
+        target_status: Any,
+        reason: Any = None,
+    ) -> dict[str, Any]:
+        if not isinstance(target_status, str):
+            raise SecurityError(400, "Invalid shop status.", "invalid_vendor_status")
+        target = target_status.strip().upper()
+        now = iso(utc_now())
+        clean_reason = _optional_text(reason, "review reason", 1000)
+        if target == "REJECTED" and clean_reason is None:
+            raise SecurityError(400, "A rejection reason is required.", "rejection_reason_required")
+        with self.connect() as db:
+            db.execute("BEGIN IMMEDIATE")
+            self._require_admin(db, admin_id)
+            current = db.execute(
+                "SELECT * FROM vendor_applications WHERE id=?", (application_id,)
+            ).fetchone()
+            if current is None:
+                db.rollback()
+                raise SecurityError(404, "Shop application not found.", "vendor_application_not_found")
+            if target not in APPLICATION_ADMIN_TRANSITIONS.get(current["status"], set()):
+                db.rollback()
+                raise SecurityError(
+                    409,
+                    "Shop application transition is not allowed.",
+                    "invalid_vendor_transition",
+                )
+            rejection_reason = clean_reason if target == "REJECTED" else None
+            suspension_reason = clean_reason if target == "SUSPENDED" else None
+            db.execute(
+                """
+                UPDATE vendor_applications
+                   SET status=?,rejection_reason=?,suspension_reason=?,reviewed_by=?,
+                       reviewed_at=?,updated_at=?,
+                       approved_at=CASE WHEN ?='APPROVED' THEN ? ELSE approved_at END,
+                       activated_at=CASE WHEN ?='ACTIVE' THEN ? ELSE activated_at END,
+                       suspended_at=CASE WHEN ?='SUSPENDED' THEN ? ELSE suspended_at END
+                 WHERE id=?
+                """,
+                (
+                    target,
+                    rejection_reason,
+                    suspension_reason,
+                    admin_id,
+                    now,
+                    now,
+                    target,
+                    now,
+                    target,
+                    now,
+                    target,
+                    now,
+                    application_id,
+                ),
+            )
+            self._audit_if_available(
+                db,
+                admin_id,
+                f"shop_{target.casefold()}",
+                "shop_application",
+                application_id,
+                {"from": current["status"], "to": target},
+            )
+            db.commit()
+            row = db.execute(
+                "SELECT * FROM vendor_applications WHERE id=?", (application_id,)
+            ).fetchone()
+        return self._serialize_application(row, admin=True)
+
+    @staticmethod
+    def _product_payload(
+        payload: dict[str, Any],
+        current: sqlite3.Row | None = None,
+        *,
+        allow_legacy_current_images: bool = False,
+        trusted_variant_metadata: bool = False,
+        bulk_commission_override_bps: int | None = None,
+    ) -> dict[str, Any]:
+        if not isinstance(payload, dict) or set(payload) - PRODUCT_PAYLOAD_FIELDS:
+            raise SecurityError(400, "Unsupported product field.", "invalid_product")
+
+        def supplied(key: str, column: str) -> Any:
+            if key in payload:
+                return payload[key]
+            return current[column] if current is not None else None
+
+        current_variants = _row_variants(current) if current is not None else []
+        current_by_id = {item["id"]: item for item in current_variants}
+        current_image_urls = {
+            image
+            for variant in current_variants
+            for image in variant.get("imageUrls", [])
+            if isinstance(image, str)
+        }
+        if current is not None:
+            try:
+                current_image_urls.update(
+                    image for image in json.loads(current["image_urls_json"] or "[]") if isinstance(image, str)
+                )
+            except (TypeError, json.JSONDecodeError):
+                pass
+
+        def clean_image_urls(value: Any) -> list[str]:
+            if not isinstance(value, list) or len(value) > 8:
+                raise SecurityError(400, "Enter valid product images.", "invalid_product")
+            has_uploaded_image = any(
+                isinstance(image, str) and PRODUCT_MEDIA_PATH_PATTERN.fullmatch(image)
+                for image in value
+            )
+            clean: list[str] = []
+            for image in value:
+                if not isinstance(image, str) or len(image) > 500:
+                    raise SecurityError(400, "Enter valid product images.", "invalid_product")
+                if PRODUCT_MEDIA_PATH_PATTERN.fullmatch(image):
+                    clean.append(image)
+                    continue
+                parsed = urlsplit(image)
+                if parsed.scheme == "https" and parsed.netloc and not re.search(r"\.html?$", parsed.path, re.IGNORECASE):
+                    clean.append(image)
+                    continue
+                if allow_legacy_current_images and image in current_image_urls:
+                    clean.append(image)
+                    continue
+                if has_uploaded_image:
+                    continue
+                raise SecurityError(
+                    400,
+                    "Product image links must point directly to an HTTPS image, not a webpage, or use an uploaded Vibe4You image.",
+                    "invalid_product",
+                )
+            return clean
+
+        name = clean_text(supplied("name", "name"), "product name", 2, 140)
+        description = clean_text(
+            supplied("description", "description"), "product description", 10, 2000
+        )
+        raw_department = supplied("department", "department")
+        category = normalize_product_category(
+            supplied("category", "category"), name=name, description=description,
+            legacy_department=raw_department,
+        )
+        allow_legacy_department = current is not None and "department" not in payload
+        department = normalize_department(
+            raw_department, name=name, description=description, category=category,
+            allow_legacy=allow_legacy_department,
+        )
+        brand = normalize_brand(supplied("brand", "brand"), name=name)
+        price = supplied("pricePaise", "price_paise")
+        original_price = supplied("originalPricePaise", "original_price_paise")
+        if original_price is None:
+            original_price = price
+        if isinstance(price, bool) or not isinstance(price, int) or not 100 <= price <= 100_000_000:
+            raise SecurityError(400, "Enter a valid product price.", "invalid_product")
+        customer_price = _customer_price_paise(price, _row_commission_override(current) if current is not None else bulk_commission_override_bps)
+        if (
+            isinstance(original_price, bool)
+            or not isinstance(original_price, int)
+            or not customer_price <= original_price <= 100_000_000
+        ):
+            raise SecurityError(400, "Enter a valid original price.", "invalid_product")
+
+        colour_variants_value = payload.get("colourVariants") if "colourVariants" in payload else None
+        if colour_variants_value is not None and "variants" in payload:
+            raise SecurityError(400, "Use either colourVariants or legacy variants, not both.", "invalid_product")
+        colour_input = colour_variants_value is not None
+        if colour_input:
+            if not isinstance(colour_variants_value, list) or not 1 <= len(colour_variants_value) <= 100:
+                raise SecurityError(400, "Add between 1 and 100 colour variants.", "invalid_product")
+            expanded: list[dict[str, Any]] = []
+            seen_colour_names: set[str] = set()
+            for colour in colour_variants_value:
+                if not isinstance(colour, dict) or set(colour) - {"colourName", "colourHex", "imageUrls", "sizes"}:
+                    raise SecurityError(400, "Enter valid colour variant details.", "invalid_product")
+                colour_name = clean_text(colour.get("colourName"), "colour name", 1, 80)
+                colour_key = colour_name.casefold()
+                if colour_key in seen_colour_names:
+                    raise SecurityError(400, "Each colour can appear only once.", "invalid_product")
+                seen_colour_names.add(colour_key)
+                colour_hex_value = _optional_text(colour.get("colourHex"), "colour", 7)
+                if colour_hex_value is not None and not COLOUR_HEX_PATTERN.fullmatch(colour_hex_value):
+                    raise SecurityError(400, "Enter a valid colour.", "invalid_product")
+                colour_images = clean_image_urls(colour.get("imageUrls"))
+                if not colour_images:
+                    raise SecurityError(400, "Each colour needs at least one product image.", "invalid_product")
+                sizes = colour.get("sizes")
+                if not isinstance(sizes, list) or not sizes:
+                    raise SecurityError(400, "Each colour needs at least one size and stock row.", "invalid_product")
+                for size in sizes:
+                    if not isinstance(size, dict) or set(size) - {"id", "size", "inventory"}:
+                        raise SecurityError(400, "Enter valid size inventory rows.", "invalid_product")
+                    expanded.append({
+                        "id": size.get("id"),
+                        "size": size.get("size"),
+                        "inventory": size.get("inventory"),
+                        "active": True,
+                        "colourName": colour_name,
+                        "colourHex": colour_hex_value,
+                        "imageUrls": colour_images,
+                    })
+            variants_value = expanded
+        else:
+            variants_value = payload.get("variants") if "variants" in payload else None
+        variants_from_current = variants_value is None and current is not None
+        legacy_variant_change = "inventory" in payload or (
+            "size" in payload and (
+                len([item for item in current_variants if item.get("active", True)]) <= 1
+                or payload.get("size") != current["size"]
+            )
+        )
+        if variants_value is not None and legacy_variant_change:
+            raise SecurityError(400, "Use either variants or legacy size/inventory fields.", "invalid_product")
+        if variants_value is None and current is not None and not legacy_variant_change:
+            variants_value = current_variants
+        elif variants_value is None:
+            variants_value = [{
+                "size": supplied("size", "size"),
+                "inventory": supplied("inventory", "inventory"),
+            }]
+        max_rows = 100
+        if not isinstance(variants_value, list) or not 1 <= len(variants_value) <= max_rows:
+            raise SecurityError(400, "Add between 1 and 100 active size variants.", "invalid_product")
+        clean_variants: list[dict[str, Any]] = []
+        seen_sizes: set[tuple[str, str]] = set()
+        seen_ids: set[str] = set()
+        total_inventory = 0
+        active_count = 0
+        metadata_allowed = trusted_variant_metadata or variants_from_current or colour_input
+        for item in variants_value:
+            allowed_fields = (
+                {"id", "size", "inventory", "active", "colourName", "colourHex", "imageUrls"}
+                if metadata_allowed else {"size", "inventory"}
+            )
+            if not isinstance(item, dict) or set(item) - allowed_fields:
+                raise SecurityError(400, "Enter valid size inventory rows.", "invalid_product")
+            size = normalize_size_label(item.get("size"), category)
+            inventory = item.get("inventory")
+            if isinstance(inventory, bool) or not isinstance(inventory, int) or not 0 <= inventory <= 100_000:
+                raise SecurityError(400, "Enter valid product inventory.", "invalid_product")
+            active = item.get("active", True) if metadata_allowed else True
+            if not isinstance(active, bool):
+                raise SecurityError(400, "Enter valid size inventory rows.", "invalid_product")
+            raw_variant_id = item.get("id") if metadata_allowed else None
+            existing = current_by_id.get(raw_variant_id) if isinstance(raw_variant_id, str) else None
+            if colour_input and not trusted_variant_metadata and raw_variant_id is not None and existing is None:
+                raw_variant_id = None
+            variant_id = raw_variant_id.strip() if isinstance(raw_variant_id, str) and raw_variant_id.strip() else None
+            if variant_id is not None and len(variant_id) > 128:
+                raise SecurityError(400, "Enter valid size inventory rows.", "invalid_product")
+            if variant_id is None and current is not None:
+                variant_id = "shopvar_" + secrets.token_hex(12)
+            if variant_id is not None:
+                if variant_id in seen_ids:
+                    raise SecurityError(400, "Duplicate product variant identity.", "invalid_product")
+                seen_ids.add(variant_id)
+
+            existing = current_by_id.get(variant_id) if variant_id is not None else None
+            if not colour_input and "colourName" in payload:
+                fallback_colour = payload.get("colourName")
+            else:
+                fallback_colour = existing.get("colourName") if existing else supplied("colourName", "colour_name")
+            colour_name = clean_text(item.get("colourName", fallback_colour), "colour name", 1, 80)
+            if not colour_input and "colourHex" in payload:
+                raw_colour_hex = payload.get("colourHex")
+            else:
+                raw_colour_hex = item.get("colourHex", existing.get("colourHex") if existing else supplied("colourHex", "colour_hex"))
+            colour_hex_value = _optional_text(raw_colour_hex, "colour", 7)
+            if colour_hex_value is not None and not COLOUR_HEX_PATTERN.fullmatch(colour_hex_value):
+                raise SecurityError(400, "Enter a valid colour.", "invalid_product")
+
+            if not colour_input and "imageUrls" in payload:
+                variant_images_value = payload.get("imageUrls")
+            elif "imageUrls" in item:
+                variant_images_value = item.get("imageUrls")
+            elif existing is not None:
+                variant_images_value = existing.get("imageUrls", [])
+            elif current is not None:
+                variant_images_value = json.loads(current["image_urls_json"] or "[]")
+            else:
+                variant_images_value = []
+            variant_images = clean_image_urls(variant_images_value)
+
+            if active:
+                key = (colour_name.casefold(), size.casefold())
+                if key in seen_sizes:
+                    raise SecurityError(400, "Each active size can appear only once per colour.", "invalid_product")
+                seen_sizes.add(key)
+                active_count += 1
+                total_inventory += inventory
+
+            clean_variant = {
+                "size": size,
+                "inventory": inventory,
+                "active": active,
+                "colourName": colour_name,
+                "colourHex": colour_hex_value,
+                "imageUrls": variant_images,
+            }
+            if variant_id is not None:
+                clean_variant["id"] = variant_id
+            clean_variants.append(clean_variant)
+        if not 1 <= active_count <= 100:
+            raise SecurityError(400, "Add between 1 and 100 active size variants.", "invalid_product")
+        if total_inventory > 100_000:
+            raise SecurityError(400, "Total active product inventory cannot exceed 100000.", "invalid_product")
+        active_variants = [item for item in clean_variants if item.get("active", True)]
+        size_summary = ", ".join(item["size"] for item in active_variants)
+        representative = active_variants[0]
+        clean_images = representative["imageUrls"]
+        colour_hex = representative["colourHex"]
+
+        attributes_value = payload.get("attributes") if "attributes" in payload else None
+        if attributes_value is None and current is not None:
+            attributes = json.loads(current["attributes_json"])
+        else:
+            attributes = attributes_value if attributes_value is not None else {}
+        if not isinstance(attributes, dict) or len(attributes) > 30:
+            raise SecurityError(400, "Enter valid product attributes.", "invalid_product")
+
+        clean_attributes: dict[str, str] = {}
+        for key, value in attributes.items():
+            if not isinstance(key, str) or not isinstance(value, str):
+                raise SecurityError(400, "Enter valid product attributes.", "invalid_product")
+            clean_attributes[clean_text(key, "attribute name", 1, 60)] = clean_text(
+                value, "attribute value", 1, 200
+            )
+
+        # Product GST/HSN collection is intentionally deferred until explicitly enabled.
+        if "hsnCode" in payload or "gstRate" in payload:
+            raise SecurityError(400, "Product GST/HSN entry is not enabled yet.", "product_tax_disabled")
+        current_attributes: dict[str, Any] = {}
+        if current is not None:
+            try:
+                current_attributes = json.loads(current["attributes_json"] or "{}")
+            except (TypeError, json.JSONDecodeError):
+                current_attributes = {}
+        for tax_key in ("hsnCode", "gstRate"):
+            if tax_key in clean_attributes and clean_attributes.get(tax_key) != current_attributes.get(tax_key):
+                raise SecurityError(400, "Product GST/HSN entry is not enabled yet.", "product_tax_disabled")
+
+        subcategory_value = payload.get("subcategory", clean_attributes.get("subcategory"))
+        subcategory = normalize_subcategory(subcategory_value, name=name, category=category)
+        if subcategory:
+            clean_attributes["subcategory"] = subcategory
+        else:
+            clean_attributes.pop("subcategory", None)
+        delivery_value = payload.get("deliveryType", clean_attributes.get("deliveryType", "normal"))
+        clean_attributes["deliveryType"] = normalize_delivery_type(delivery_value)
+        outside_neemuch_delivery = (
+            payload["outsideNeemuchDeliveryEnabled"]
+            if "outsideNeemuchDeliveryEnabled" in payload
+            else str(current_attributes.get("outsideNeemuchDeliveryEnabled", "false")).casefold() == "true"
+        )
+        if isinstance(outside_neemuch_delivery, int) and outside_neemuch_delivery in (0, 1):
+            outside_neemuch_delivery = bool(outside_neemuch_delivery)
+        if not isinstance(outside_neemuch_delivery, bool):
+            raise SecurityError(
+                400,
+                "Choose whether delivery outside Neemuch is available by request.",
+                "invalid_product",
+            )
+        clean_attributes["outsideNeemuchDeliveryEnabled"] = "true" if outside_neemuch_delivery else "false"
+        try_at_home = (
+            payload["tryAtHomeEnabled"] if "tryAtHomeEnabled" in payload
+            else (bool(current["try_at_home_enabled"]) if current is not None and "try_at_home_enabled" in current.keys() else False)
+        )
+        if isinstance(try_at_home, int) and try_at_home in (0, 1):
+            try_at_home = bool(try_at_home)
+        if not isinstance(try_at_home, bool):
+            raise SecurityError(400, "Choose whether Try at Home is available.", "invalid_product")
+        sizes_by_colour: dict[str, set[str]] = {}
+        for variant in active_variants:
+            size = str(variant.get("size") or "").strip()
+            if not size or size.casefold() == "one size":
+                continue
+            colour = str(variant.get("colourName") or "Default").strip().casefold()
+            sizes_by_colour.setdefault(colour, set()).add(size.casefold())
+        if try_at_home:
+            if not any(len(sizes) >= 2 for sizes in sizes_by_colour.values()):
+                raise SecurityError(400, "Try at Home requires at least two different sizes for the same colour.", "invalid_try_at_home_product")
+
+        exchange_available = (
+            payload["exchangeAvailable"] if "exchangeAvailable" in payload
+            else (bool(current["exchange_available"]) if current is not None and "exchange_available" in current.keys() else False)
+        )
+        if isinstance(exchange_available, int) and exchange_available in (0, 1):
+            exchange_available = bool(exchange_available)
+        if not isinstance(exchange_available, bool):
+            raise SecurityError(400, "Choose whether size exchange is available.", "invalid_product")
+        if exchange_available and not any(len(sizes) >= 2 for sizes in sizes_by_colour.values()):
+            raise SecurityError(400, "Size exchange requires at least two different sizes for the same colour.", "invalid_exchange_product")
+
+        return {
+            "name": name,
+            "description": description,
+            "brand": brand,
+            "department": department,
+            "category": category,
+            "price_paise": price,
+            "original_price_paise": original_price,
+            "inventory": total_inventory,
+            "size": size_summary,
+            "variants_json": json.dumps(clean_variants, separators=(",", ":")),
+            "colour_name": representative["colourName"],
+            "colour_hex": colour_hex,
+            "image_urls_json": json.dumps(clean_images, separators=(",", ":")),
+            "attributes_json": json.dumps(clean_attributes, separators=(",", ":"), sort_keys=True),
+            "try_at_home_enabled": int(try_at_home),
+            "exchange_available": int(exchange_available),
+        }
+
+    @staticmethod
+    def _seller_application(db: sqlite3.Connection, user_id: str) -> sqlite3.Row:
+        application = db.execute(
+            "SELECT * FROM vendor_applications WHERE submitted_by_user_id=?", (user_id,)
+        ).fetchone()
+        if application is None or application["status"] not in {"APPROVED", "ACTIVE"}:
+            raise SecurityError(
+                403,
+                "An approved shop is required before submitting products.",
+                "approved_shop_required",
+            )
+        return application
+
+    @staticmethod
+    def _serialize_product(row: sqlite3.Row, *, admin: bool = False) -> dict[str, Any]:
+        attributes = json.loads(row["attributes_json"])
+        attributes.pop("hsnCode", None)
+        attributes.pop("gstRate", None)
+        outside_neemuch_delivery = str(attributes.pop("outsideNeemuchDeliveryEnabled", "false")).casefold() == "true"
+        source_variants = _row_variants(row)
+        variants = [
+            {
+                "id": item["id"],
+                "size": item["size"],
+                "inventory": item["inventory"],
+                "colourName": item["colourName"],
+                "colourHex": item.get("colourHex"),
+                "imageUrls": item.get("imageUrls") or [],
+            }
+            for item in source_variants if item.get("active", True)
+        ]
+        result = {
+            "id": row["id"],
+            "slug": row["slug"],
+            "applicationId": row["application_id"],
+            "name": row["name"],
+            "description": row["description"],
+            "brand": row["brand"],
+            "department": row["department"],
+            "category": row["category"],
+            "subcategory": attributes.get("subcategory"),
+            "deliveryType": attributes.get("deliveryType", "normal"),
+            "pricePaise": row["price_paise"],
+            "originalPricePaise": row["original_price_paise"],
+            "inventory": sum(item["inventory"] for item in variants),
+            "size": ", ".join(item["size"] for item in variants),
+            "variants": variants,
+            "colourVariants": _group_colour_variants(source_variants),
+            "colourName": row["colour_name"],
+            "colourHex": row["colour_hex"],
+            "imageUrls": json.loads(row["image_urls_json"]),
+            "attributes": attributes,
+            "tryAtHomeEnabled": bool(row["try_at_home_enabled"]) if "try_at_home_enabled" in row.keys() else False,
+            "exchangeAvailable": bool(row["exchange_available"]) if "exchange_available" in row.keys() else False,
+            "outsideNeemuchDeliveryEnabled": outside_neemuch_delivery,
+            "status": row["status"],
+            "rejectionReason": row["rejection_reason"] if row["status"] == "REJECTED" else None,
+            "createdAt": row["created_at"],
+            "updatedAt": row["updated_at"],
+            "submittedAt": row["submitted_at"],
+            "publishedAt": row["published_at"],
+        }
+        if admin:
+            override_bps = _row_commission_override(row)
+            customer_price_paise = _row_customer_price_paise(row)
+            result.update({
+                "submittedByUserId": row["submitted_by_user_id"],
+                "reviewedBy": row["reviewed_by"],
+                "reviewedAt": row["reviewed_at"],
+                "commissionPaise": customer_price_paise - row["price_paise"],
+                "customerPricePaise": customer_price_paise,
+                "commissionBasisPoints": _commission_rate_basis_points(row["price_paise"], override_bps),
+                "commissionOverrideBasisPoints": override_bps,
+            })
+        return result
+
+    @staticmethod
+    def _product_values_to_change_payload(values: dict[str, Any]) -> dict[str, Any]:
+        attributes = json.loads(values["attributes_json"])
+        attributes.pop("hsnCode", None)
+        attributes.pop("gstRate", None)
+        outside_neemuch_delivery = str(attributes.pop("outsideNeemuchDeliveryEnabled", "false")).casefold() == "true"
+        return {
+            "name": values["name"],
+            "description": values["description"],
+            "brand": values["brand"],
+            "department": values["department"],
+            "category": values["category"],
+            "subcategory": attributes.get("subcategory"),
+            "deliveryType": attributes.get("deliveryType", "normal"),
+            "pricePaise": values["price_paise"],
+            "originalPricePaise": values["original_price_paise"],
+            "variants": [
+                {
+                    **({"id": item["id"]} if isinstance(item.get("id"), str) else {}),
+                    "size": item["size"],
+                    "inventory": item["inventory"],
+                    "active": item.get("active", True),
+                }
+                for item in json.loads(values["variants_json"])
+            ],
+            "colourName": values["colour_name"],
+            "colourHex": values["colour_hex"],
+            "imageUrls": json.loads(values["image_urls_json"]),
+            "attributes": attributes,
+            "tryAtHomeEnabled": bool(values.get("try_at_home_enabled", 0)),
+            "exchangeAvailable": bool(values.get("exchange_available", 0)),
+            "outsideNeemuchDeliveryEnabled": outside_neemuch_delivery,
+        }
+
+    @staticmethod
+    def _product_change_summary(current: dict[str, Any], proposed: dict[str, Any]) -> list[dict[str, str]]:
+        labels = {
+            "name": "Product name", "description": "Description", "brand": "Brand",
+            "department": "Department", "category": "Category", "subcategory": "Subcategory",
+            "deliveryType": "Delivery type", "pricePaise": "Store price",
+            "originalPricePaise": "Original price", "variants": "Options and stock",
+            "colourName": "Colour name", "colourHex": "Colour", "imageUrls": "Images",
+            "attributes": "Attributes", "tryAtHomeEnabled": "Try at Home",
+            "exchangeAvailable": "Size exchange",
+            "outsideNeemuchDeliveryEnabled": "Outside Neemuch delivery requests",
+        }
+
+        def display(key: str, value: Any) -> str:
+            if key in {"pricePaise", "originalPricePaise"}:
+                return f"Rs {int(value or 0) / 100:.2f}"
+            if key in {"tryAtHomeEnabled", "exchangeAvailable", "outsideNeemuchDeliveryEnabled"}:
+                return "Enabled" if value else "Disabled"
+            if key == "variants" and isinstance(value, list):
+                return ", ".join(
+                    f"{item.get('size')} ({item.get('inventory')} in stock)"
+                    + (" [removed]" if item.get("active") is False else "")
+                    for item in value if isinstance(item, dict)
+                ) or "None"
+            if key == "imageUrls" and isinstance(value, list):
+                return f"{len(value)} image(s)"
+            if key == "attributes" and isinstance(value, dict):
+                return ", ".join(f"{name}: {text}" for name, text in sorted(value.items())) or "None"
+            return str(value) if value not in (None, "") else "Not set"
+
+        return [
+            {"field": label, "before": display(key, current.get(key)), "after": display(key, proposed.get(key))}
+            for key, label in labels.items()
+            if current.get(key) != proposed.get(key)
+        ]
+
+    @staticmethod
+    def _serialize_change_request(
+        row: sqlite3.Row, *, admin: bool = False
+    ) -> dict[str, Any]:
+        result = {
+            "id": row["id"],
+            "productId": row["product_id"],
+            "applicationId": row["application_id"],
+            "action": row["action"],
+            "status": row["status"],
+            "proposedProduct": (
+                json.loads(row["payload_json"]) if row["payload_json"] else None
+            ),
+            "changeSummary": (
+                json.loads(row["change_summary_json"] or "[]")
+                if "change_summary_json" in row.keys() else []
+            ),
+            "rejectionReason": (
+                row["rejection_reason"] if row["status"] == "REJECTED" else None
+            ),
+            "createdAt": row["created_at"],
+            "updatedAt": row["updated_at"],
+            "submittedAt": row["submitted_at"],
+            "reviewedAt": row["reviewed_at"],
+        }
+        if "product_name" in row.keys():
+            result["productName"] = row["product_name"]
+        if "shop_name" in row.keys():
+            result["shopName"] = row["shop_name"]
+        if admin:
+            result.update(
+                {
+                    "submittedByUserId": row["submitted_by_user_id"],
+                    "reviewedBy": row["reviewed_by"],
+                }
+            )
+        return result
+
+    def _seller_published_product(
+        self, db: sqlite3.Connection, user_id: str, product_id: str
+    ) -> sqlite3.Row:
+        application = self._seller_application(db, user_id)
+        if application["status"] != "ACTIVE":
+            raise SecurityError(
+                403,
+                "An active shop is required to manage a live product.",
+                "active_shop_required",
+            )
+        current = db.execute(
+            "SELECT * FROM shop_product_submissions "
+            "WHERE id=? AND submitted_by_user_id=?",
+            (product_id, user_id),
+        ).fetchone()
+        if current is None:
+            raise SecurityError(404, "Product submission not found.", "product_not_found")
+        if current["status"] != "PUBLISHED":
+            raise SecurityError(
+                409,
+                "A published product is required for this action.",
+                "published_product_required",
+            )
+        return current
+
+    @staticmethod
+    def _product_slug(name: str, product_id: str) -> str:
+        stem = re.sub(r"[^a-z0-9]+", "-", name.casefold()).strip("-")[:80]
+        return f"{stem or 'local-product'}-{product_id[-12:]}"
+
+    def list_products(self, user_id: str) -> list[dict[str, Any]]:
+        with self.connect() as db:
+            rows = db.execute(
+                "SELECT * FROM shop_product_submissions "
+                "WHERE submitted_by_user_id=? ORDER BY updated_at DESC",
+                (user_id,),
+            ).fetchall()
+        return [self._serialize_product(row) for row in rows]
+
+    def create_product_draft(self, user_id: str, payload: dict[str, Any]) -> dict[str, Any]:
+        values = self._product_payload(payload)
+        now = iso(utc_now())
+        product_id = "shopprod_" + secrets.token_hex(12)
+        values["variants_json"] = _created_variants_json(product_id, values["variants_json"])
+        slug = self._product_slug(values["name"], product_id)
+        with self.connect() as db:
+            db.execute("BEGIN IMMEDIATE")
+            application = self._seller_application(db, user_id)
+            db.execute(
+                """
+                INSERT INTO shop_product_submissions(
+                  id,slug,application_id,submitted_by_user_id,name,description,brand,
+                  department,category,price_paise,original_price_paise,inventory,
+                  size,variants_json,colour_name,colour_hex,image_urls_json,attributes_json,status,
+                  created_at,updated_at
+                ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,'DRAFT',?,?)
+                """,
+                (
+                    product_id,
+                    slug,
+                    application["id"],
+                    user_id,
+                    values["name"],
+                    values["description"],
+                    values["brand"],
+                    values["department"],
+                    values["category"],
+                    values["price_paise"],
+                    values["original_price_paise"],
+                    values["inventory"],
+                    values["size"],
+                    values["variants_json"],
+                    values["colour_name"],
+                    values["colour_hex"],
+                    values["image_urls_json"],
+                    values["attributes_json"],
+                    now,
+                    now,
+                ),
+            )
+            db.execute("UPDATE shop_product_submissions SET try_at_home_enabled=?,exchange_available=? WHERE id=?", (values["try_at_home_enabled"], values["exchange_available"], product_id))
+            db.commit()
+            row = db.execute(
+                "SELECT * FROM shop_product_submissions WHERE id=?", (product_id,)
+            ).fetchone()
+        return self._serialize_product(row)
+
+    def update_product_draft(
+        self, user_id: str, product_id: str, payload: dict[str, Any]
+    ) -> dict[str, Any]:
+        with self.connect() as db:
+            db.execute("BEGIN IMMEDIATE")
+            self._seller_application(db, user_id)
+            current = db.execute(
+                "SELECT * FROM shop_product_submissions WHERE id=? AND submitted_by_user_id=?",
+                (product_id, user_id),
+            ).fetchone()
+            if current is None:
+                db.rollback()
+                raise SecurityError(404, "Product submission not found.", "product_not_found")
+            if current["status"] not in {"DRAFT", "REJECTED"}:
+                db.rollback()
+                raise SecurityError(
+                    409,
+                    "This product submission cannot be edited in its current state.",
+                    "invalid_product_transition",
+                )
+            values = self._product_payload(payload, current)
+            now = iso(utc_now())
+            db.execute(
+                """
+                UPDATE shop_product_submissions
+                   SET name=?,description=?,brand=?,department=?,category=?,price_paise=?,
+                       original_price_paise=?,inventory=?,size=?,variants_json=?,colour_name=?,colour_hex=?,
+                       image_urls_json=?,attributes_json=?,status='DRAFT',
+                       rejection_reason=NULL,reviewed_by=NULL,reviewed_at=NULL,updated_at=?
+                 WHERE id=? AND submitted_by_user_id=?
+                """,
+                (
+                    values["name"],
+                    values["description"],
+                    values["brand"],
+                    values["department"],
+                    values["category"],
+                    values["price_paise"],
+                    values["original_price_paise"],
+                    values["inventory"],
+                    values["size"],
+                    values["variants_json"],
+                    values["colour_name"],
+                    values["colour_hex"],
+                    values["image_urls_json"],
+                    values["attributes_json"],
+                    now,
+                    product_id,
+                    user_id,
+                ),
+            )
+            db.execute("UPDATE shop_product_submissions SET try_at_home_enabled=?,exchange_available=? WHERE id=?", (values["try_at_home_enabled"], values["exchange_available"], product_id))
+            db.commit()
+            row = db.execute(
+                "SELECT * FROM shop_product_submissions WHERE id=?", (product_id,)
+            ).fetchone()
+        return self._serialize_product(row)
+
+    def submit_product(self, user_id: str, product_id: str) -> dict[str, Any]:
+        now = iso(utc_now())
+        with self.connect() as db:
+            db.execute("BEGIN IMMEDIATE")
+            self._seller_application(db, user_id)
+            current = db.execute(
+                "SELECT * FROM shop_product_submissions WHERE id=? AND submitted_by_user_id=?",
+                (product_id, user_id),
+            ).fetchone()
+            if current is None:
+                db.rollback()
+                raise SecurityError(404, "Product submission not found.", "product_not_found")
+            if current["status"] not in {"DRAFT", "REJECTED"}:
+                db.rollback()
+                raise SecurityError(
+                    409,
+                    "This product submission cannot be submitted in its current state.",
+                    "invalid_product_transition",
+                )
+            if not json.loads(current["image_urls_json"]):
+                db.rollback()
+                raise SecurityError(
+                    400,
+                    "Add at least one product image before submission.",
+                    "product_image_required",
+                )
+            db.execute(
+                """
+                UPDATE shop_product_submissions
+                   SET status='SUBMITTED',submitted_at=?,updated_at=?,
+                       rejection_reason=NULL,reviewed_by=NULL,reviewed_at=NULL
+                 WHERE id=? AND submitted_by_user_id=?
+                """,
+                (now, now, product_id, user_id),
+            )
+            db.commit()
+            row = db.execute(
+                "SELECT * FROM shop_product_submissions WHERE id=?", (product_id,)
+            ).fetchone()
+        return self._serialize_product(row)
+
+    def admin_create_product(
+        self, admin_id: str, application_id: str, payload: dict[str, Any]
+    ) -> dict[str, Any]:
+        values = self._product_payload(payload)
+        product_id = "shopprod_" + secrets.token_hex(12)
+        values["variants_json"] = _created_variants_json(product_id, values["variants_json"])
+        slug = self._product_slug(values["name"], product_id)
+        now = iso(utc_now())
+        with self.connect() as db:
+            db.execute("BEGIN IMMEDIATE")
+            self._require_admin(db, admin_id)
+            application = db.execute(
+                "SELECT * FROM vendor_applications WHERE id=?", (application_id,)
+            ).fetchone()
+            if application is None:
+                db.rollback()
+                raise SecurityError(404, "Shop application not found.", "vendor_application_not_found")
+            if application["status"] != "ACTIVE":
+                db.rollback()
+                raise SecurityError(409, "Activate the shop before publishing products.", "active_shop_required")
+            if not json.loads(values["image_urls_json"]):
+                db.rollback()
+                raise SecurityError(400, "Add at least one product image.", "product_image_required")
+            db.execute(
+                """
+                INSERT INTO shop_product_submissions(
+                  id,slug,application_id,submitted_by_user_id,name,description,brand,
+                  department,category,price_paise,original_price_paise,inventory,size,
+                  variants_json,colour_name,colour_hex,image_urls_json,attributes_json,
+                  status,reviewed_by,created_at,updated_at,submitted_at,reviewed_at,published_at
+                ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,'PUBLISHED',?,?,?,?,?,?)
+                """,
+                (
+                    product_id, slug, application_id, application["submitted_by_user_id"],
+                    values["name"], values["description"], values["brand"], values["department"],
+                    values["category"], values["price_paise"], values["original_price_paise"],
+                    values["inventory"], values["size"], values["variants_json"],
+                    values["colour_name"], values["colour_hex"], values["image_urls_json"],
+                    values["attributes_json"], admin_id, now, now, now, now, now,
+                ),
+            )
+            db.execute("UPDATE shop_product_submissions SET try_at_home_enabled=?,exchange_available=? WHERE id=?", (values["try_at_home_enabled"], values["exchange_available"], product_id))
+            self._audit_if_available(
+                db, admin_id, "shop_product_admin_created", "shop_product", product_id,
+                {"applicationId": application_id, "status": "PUBLISHED"},
+            )
+            db.commit()
+            row = db.execute(
+                "SELECT * FROM shop_product_submissions WHERE id=?", (product_id,)
+            ).fetchone()
+        return self._serialize_product(row, admin=True)
+
+    def admin_bulk_create_products(
+        self, admin_id: str, application_id: str, products: Any
+    ) -> list[dict[str, Any]]:
+        if not isinstance(products, list) or not 1 <= len(products) <= 100:
+            raise SecurityError(400, "Upload between 1 and 100 products at a time.", "invalid_bulk_products")
+        validated: list[tuple[int, dict[str, Any], int | None]] = []
+        seen_keys: set[tuple[str, str]] = set()
+        errors: list[str] = []
+        for index, payload in enumerate(products, start=1):
+            try:
+                if not isinstance(payload, dict):
+                    raise SecurityError(400, "Invalid product import row.", "invalid_bulk_products")
+                commission_bps = payload.get("commissionBasisPoints")
+                if "commissionBasisPoints" in payload and (
+                    isinstance(commission_bps, bool) or
+                    not isinstance(commission_bps, int) or not 0 <= commission_bps <= 10000
+                ):
+                    raise SecurityError(400, "Invalid commission percentage.", "invalid_product_commission")
+                sanitized = {k:v for k,v in payload.items() if k != "commissionBasisPoints"}
+                values = self._product_payload(
+                    sanitized, bulk_commission_override_bps=commission_bps
+                )
+                if not json.loads(values["image_urls_json"]):
+                    raise SecurityError(400, "Add at least one product image.", "product_image_required")
+                key = (values["name"].strip().casefold(), values["colour_name"].strip().casefold())
+                if key in seen_keys:
+                    raise SecurityError(409, "Duplicate product name and colour in this upload.", "duplicate_product")
+                seen_keys.add(key)
+                validated.append((index, values, commission_bps))
+            except SecurityError as error:
+                errors.append(f"Row {index}: {error.message}")
+        if errors:
+            raise SecurityError(400, "Fix these rows: " + " | ".join(errors[:20]), "invalid_bulk_products")
+
+        now = iso(utc_now())
+        created_ids: list[str] = []
+        with self.connect() as db:
+            db.execute("BEGIN IMMEDIATE")
+            self._require_admin(db, admin_id)
+            application = db.execute(
+                "SELECT * FROM vendor_applications WHERE id=?", (application_id,)
+            ).fetchone()
+            if application is None:
+                db.rollback()
+                raise SecurityError(404, "Shop application not found.", "vendor_application_not_found")
+            if application["status"] != "ACTIVE":
+                db.rollback()
+                raise SecurityError(409, "Activate the shop before publishing products.", "active_shop_required")
+            existing = {
+                (row["name"].strip().casefold(), row["colour_name"].strip().casefold())
+                for row in db.execute(
+                    "SELECT name,colour_name FROM shop_product_submissions WHERE application_id=? AND status!='REJECTED'",
+                    (application_id,),
+                ).fetchall()
+            }
+            duplicates = [
+                f"Row {index}: A product named '{values['name']}' in colour '{values['colour_name']}' already exists for this shop."
+                for index, values, _commission_bps in validated
+                if (values["name"].strip().casefold(), values["colour_name"].strip().casefold()) in existing
+            ]
+            if duplicates:
+                db.rollback()
+                raise SecurityError(409, "Fix these rows: " + " | ".join(duplicates[:20]), "duplicate_product")
+            for _index, values, commission_bps in validated:
+                product_id = "shopprod_" + secrets.token_hex(12)
+                variants_json = _created_variants_json(product_id, values["variants_json"])
+                slug = self._product_slug(values["name"], product_id)
+                db.execute(
+                    """INSERT INTO shop_product_submissions(
+                      id,slug,application_id,submitted_by_user_id,name,description,brand,department,category,price_paise,original_price_paise,inventory,size,variants_json,colour_name,colour_hex,image_urls_json,attributes_json,status,reviewed_by,created_at,updated_at,submitted_at,reviewed_at,published_at
+                    ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,'PUBLISHED',?,?,?,?,?,?)""",
+                    (product_id,slug,application_id,application["submitted_by_user_id"],values["name"],values["description"],values["brand"],values["department"],values["category"],values["price_paise"],values["original_price_paise"],values["inventory"],values["size"],variants_json,values["colour_name"],values["colour_hex"],values["image_urls_json"],values["attributes_json"],admin_id,now,now,now,now,now),
+                )
+                db.execute("UPDATE shop_product_submissions SET try_at_home_enabled=?,exchange_available=? WHERE id=?", (values["try_at_home_enabled"], values["exchange_available"], product_id))
+                if commission_bps is not None:
+                    # Set the override in the SAME transaction, before publishing.
+                    db.execute(
+                        "UPDATE shop_product_submissions SET commission_override_bps=? WHERE id=?",
+                        (commission_bps, product_id),
+                    )
+                created_ids.append(product_id)
+                self._audit_if_available(db,admin_id,"shop_product_admin_bulk_created","shop_product",product_id,{"applicationId":application_id,"status":"PUBLISHED"})
+            db.commit()
+            rows = db.execute(
+                f"SELECT * FROM shop_product_submissions WHERE id IN ({','.join('?' for _ in created_ids)})", created_ids
+            ).fetchall()
+        by_id = {row["id"]: self._serialize_product(row, admin=True) for row in rows}
+        return [by_id[product_id] for product_id in created_ids]
+
+    def admin_update_product(
+        self, admin_id: str, product_id: str, payload: dict[str, Any]
+    ) -> dict[str, Any]:
+        with self.connect() as db:
+            db.execute("BEGIN IMMEDIATE")
+            self._require_admin(db, admin_id)
+            current = db.execute(
+                "SELECT * FROM shop_product_submissions WHERE id=?", (product_id,)
+            ).fetchone()
+            if current is None:
+                db.rollback()
+                raise SecurityError(404, "Product submission not found.", "product_not_found")
+            if db.execute("SELECT 1 FROM admin_removed_shop_products WHERE product_id=?", (product_id,)).fetchone():
+                raise SecurityError(409, "Removed product cannot be modified.", "product_removed")
+            if not isinstance(payload, dict):
+                db.rollback()
+                raise SecurityError(400, "Unsupported product field.", "invalid_product")
+            structure_fields = {"colourVariants", "variants", "inventory", "size"} & set(payload)
+            if current["status"] == "PUBLISHED" and structure_fields:
+                db.rollback()
+                raise SecurityError(
+                    409,
+                    "Unpublish this product before changing its colour or size structure. Live stock can be edited from Inventory.",
+                    "live_variant_change_blocked",
+                )
+            trusted_variant_metadata = False
+            candidate = dict(payload)
+            current_variants = _row_variants(current)
+            if "colourVariants" in payload:
+                preview = self._product_payload(payload, current)
+                proposed_active = json.loads(preview["variants_json"])
+                retained_ids = {item["id"] for item in proposed_active}
+                retired = [
+                    {
+                        "id": item["id"],
+                        "size": item["size"],
+                        "inventory": item["inventory"],
+                        "active": False,
+                        "colourName": item["colourName"],
+                        "colourHex": item.get("colourHex"),
+                        "imageUrls": item.get("imageUrls") or [],
+                    }
+                    for item in current_variants
+                    if item["id"] not in retained_ids
+                ]
+                candidate = {
+                    key: value
+                    for key, value in payload.items()
+                    if key not in {"colourVariants", "variants", "inventory", "size"}
+                }
+                candidate["variants"] = proposed_active + retired
+                trusted_variant_metadata = True
+            elif structure_fields:
+                if "variants" in payload and ({"inventory", "size"} & set(payload)):
+                    db.rollback()
+                    raise SecurityError(
+                        400,
+                        "Use either variants or legacy size/inventory fields.",
+                        "invalid_product",
+                    )
+                active_current = [item for item in current_variants if item.get("active", True)]
+                if "variants" in payload:
+                    proposed_variants = payload["variants"]
+                else:
+                    if len(active_current) != 1:
+                        db.rollback()
+                        raise SecurityError(
+                            400,
+                            "Use size variants when editing a multi-size product.",
+                            "invalid_product",
+                        )
+                    proposed_variants = [{
+                        "size": payload.get("size", active_current[0]["size"]),
+                        "inventory": payload.get("inventory", active_current[0]["inventory"]),
+                    }]
+                if not isinstance(proposed_variants, list):
+                    db.rollback()
+                    raise SecurityError(400, "Enter valid size inventory rows.", "invalid_product")
+                active_by_size = {item["size"].casefold(): item for item in active_current}
+                retained_ids: set[str] = set()
+                normalized_variants: list[dict[str, Any]] = []
+                for item in proposed_variants:
+                    if not isinstance(item, dict) or set(item) - {"size", "inventory"}:
+                        db.rollback()
+                        raise SecurityError(400, "Enter valid size inventory rows.", "invalid_product")
+                    size = clean_text(item.get("size"), "size", 1, 40)
+                    existing = active_by_size.get(size.casefold())
+                    if existing is not None and existing["id"] not in retained_ids:
+                        variant_id = existing["id"]
+                        colour_name = existing["colourName"]
+                        colour_hex = existing.get("colourHex")
+                        image_urls = existing.get("imageUrls") or []
+                    else:
+                        variant_id = "shopvar_" + secrets.token_hex(12)
+                        colour_name = current["colour_name"]
+                        colour_hex = current["colour_hex"]
+                        image_urls = json.loads(current["image_urls_json"] or "[]")
+                    retained_ids.add(variant_id)
+                    normalized_variants.append({
+                        "id": variant_id,
+                        "size": size,
+                        "inventory": item.get("inventory"),
+                        "active": True,
+                        "colourName": colour_name,
+                        "colourHex": colour_hex,
+                        "imageUrls": image_urls,
+                    })
+                normalized_variants.extend(
+                    {
+                        "id": item["id"],
+                        "size": item["size"],
+                        "inventory": item["inventory"],
+                        "active": False,
+                        "colourName": item["colourName"],
+                        "colourHex": item.get("colourHex"),
+                        "imageUrls": item.get("imageUrls") or [],
+                    }
+                    for item in current_variants
+                    if item["id"] not in retained_ids
+                )
+                candidate = {
+                    key: value
+                    for key, value in payload.items()
+                    if key not in {"variants", "inventory", "size"}
+                }
+                candidate["variants"] = normalized_variants
+                trusted_variant_metadata = True
+            values = self._product_payload(
+                candidate,
+                current,
+                trusted_variant_metadata=trusted_variant_metadata,
+            )
+            now = iso(utc_now())
+            db.execute(
+                """
+                UPDATE shop_product_submissions
+                   SET name=?,description=?,brand=?,department=?,category=?,price_paise=?,
+                       original_price_paise=?,inventory=?,size=?,variants_json=?,colour_name=?,
+                       colour_hex=?,image_urls_json=?,attributes_json=?,reviewed_by=?,reviewed_at=?,updated_at=?
+                 WHERE id=?
+                """,
+                (
+                    values["name"], values["description"], values["brand"], values["department"],
+                    values["category"], values["price_paise"], values["original_price_paise"],
+                    values["inventory"], values["size"], values["variants_json"], values["colour_name"],
+                    values["colour_hex"], values["image_urls_json"], values["attributes_json"],
+                    admin_id, now, now, product_id,
+                ),
+            )
+            db.execute("UPDATE shop_product_submissions SET try_at_home_enabled=?,exchange_available=? WHERE id=?", (values["try_at_home_enabled"], values["exchange_available"], product_id))
+            self._audit_if_available(
+                db, admin_id, "shop_product_admin_updated", "shop_product", product_id,
+                {"status": current["status"]},
+            )
+            db.commit()
+            row = db.execute(
+                "SELECT * FROM shop_product_submissions WHERE id=?", (product_id,)
+            ).fetchone()
+        return self._serialize_product(row, admin=True)
+
+    def admin_list_products(self, admin_id: str) -> list[dict[str, Any]]:
+        with self.connect() as db:
+            self._require_admin(db, admin_id)
+            rows = db.execute(
+                "SELECT * FROM shop_product_submissions WHERE NOT EXISTS (SELECT 1 FROM admin_removed_shop_products r WHERE r.product_id=shop_product_submissions.id) ORDER BY updated_at DESC LIMIT 1000"
+            ).fetchall()
+        return [self._serialize_product(row, admin=True) for row in rows]
+
+    def admin_paginate_products(
+        self, admin_id: str, *, page: int = 1, page_size: int = 25,
+        search: str = "", shop: str = "all", status: str = "all",
+        category: str = "all",
+    ) -> dict[str, Any]:
+        """Read-only pagination across every product, with global filtering."""
+        page = max(1, min(int(page), 1_000_000))
+        page_size = max(1, min(int(page_size), 100))
+        needle = str(search or "").strip().lower()[:150]
+        where = ["NOT EXISTS (SELECT 1 FROM admin_removed_shop_products r WHERE r.product_id=p.id)"]
+        params: list[Any] = []
+        if shop != "all":
+            where.append("p.application_id=?")
+            params.append(shop)
+        if status != "all":
+            where.append("p.status=?")
+            params.append(status)
+        if category != "all":
+            where.append("p.category=?")
+            params.append(category)
+        if needle:
+            fields = ["p.name", "p.brand", "p.category", "p.department",
+                      "p.description", "p.id", "p.application_id", "a.shop_name"]
+            where.append("(" + " OR ".join(
+                "instr(lower(coalesce(" + field + ",'')), ?) > 0" for field in fields
+            ) + ")")
+            params.extend([needle] * len(fields))
+        source = (" FROM shop_product_submissions p "
+                  "LEFT JOIN vendor_applications a ON a.id=p.application_id ")
+        condition = "WHERE " + " AND ".join(where) if where else ""
+        with self.connect() as db:
+            self._require_admin(db, admin_id)
+            global_total = db.execute("SELECT COUNT(*) FROM shop_product_submissions p WHERE NOT EXISTS (SELECT 1 FROM admin_removed_shop_products r WHERE r.product_id=p.id)").fetchone()[0]
+            total = db.execute("SELECT COUNT(*)" + source + condition, tuple(params)).fetchone()[0]
+            total_pages = max(1, (total + page_size - 1) // page_size)
+            current_page = min(page, total_pages)
+            rows = db.execute(
+                "SELECT p.*" + source + condition
+                + " ORDER BY p.updated_at DESC, p.id DESC LIMIT ? OFFSET ?",
+                (*params, page_size, (current_page - 1) * page_size)
+            ).fetchall()
+            stores = [{"id": row["id"], "name": row["name"]} for row in db.execute(
+                """SELECT DISTINCT p.application_id AS id,
+                          COALESCE(a.shop_name, p.application_id) AS name
+                   FROM shop_product_submissions p
+                   LEFT JOIN vendor_applications a ON a.id=p.application_id
+                   WHERE NOT EXISTS (SELECT 1 FROM admin_removed_shop_products r WHERE r.product_id=p.id)
+                   ORDER BY name COLLATE NOCASE, id"""
+            ).fetchall()]
+            statuses = [row[0] for row in db.execute(
+                "SELECT DISTINCT status FROM shop_product_submissions p WHERE NOT EXISTS (SELECT 1 FROM admin_removed_shop_products r WHERE r.product_id=p.id) ORDER BY status"
+            ).fetchall()]
+            categories = [row[0] for row in db.execute(
+                "SELECT DISTINCT category FROM shop_product_submissions p WHERE NOT EXISTS (SELECT 1 FROM admin_removed_shop_products r WHERE r.product_id=p.id) ORDER BY category"
+            ).fetchall()]
+        return {
+            "products": [self._serialize_product(row, admin=True) for row in rows],
+            "pagination": {
+                "page": current_page, "pageSize": page_size,
+                "total": total, "totalPages": total_pages, "globalTotal": global_total,
+                "filters": {"shops": stores, "statuses": statuses, "categories": categories},
+            },
+        }
+
+    def admin_bulk_set_product_feature(
+        self, admin_id: str, product_ids: Any, feature: Any, enabled: Any
+    ) -> dict[str, Any]:
+        """Change only one customer-facing product option on selected listings."""
+        features = {
+            "outsideNeemuchDeliveryEnabled": "attributes_json",
+            "exchangeAvailable": "exchange_available",
+            "tryAtHomeEnabled": "try_at_home_enabled",
+        }
+        if not isinstance(feature, str) or feature not in features:
+            raise SecurityError(400, "Choose a valid product feature.", "invalid_bulk_product_feature")
+        if type(enabled) is not bool:
+            raise SecurityError(400, "Enabled must be true or false.", "invalid_bulk_product_feature")
+        if (not isinstance(product_ids, list) or not 1 <= len(product_ids) <= 100
+                or any(not isinstance(pid, str) or not 1 <= len(pid) <= 128 or pid.strip() != pid for pid in product_ids)
+                or len(set(product_ids)) != len(product_ids)):
+            raise SecurityError(400, "Select 1 to 100 unique products.", "invalid_bulk_product_selection")
+
+        with self.connect() as db:
+            db.execute("BEGIN IMMEDIATE")
+            self._require_admin(db, admin_id)
+            products = []
+            for product_id in product_ids:
+                row = db.execute(
+                    "SELECT * FROM shop_product_submissions WHERE id=?", (product_id,)
+                ).fetchone()
+                if row is None:
+                    raise SecurityError(404, "One of the selected products no longer exists.", "product_not_found")
+                if db.execute("SELECT 1 FROM admin_removed_shop_products WHERE product_id=?", (product_id,)).fetchone():
+                    raise SecurityError(409, "One selected product has been removed.", "product_removed")
+                products.append(row)
+
+            # Preflight the entire selection. An invalid product must not leave a
+            # partially enabled batch or silently alter another product's settings.
+            if enabled and feature in {"exchangeAvailable", "tryAtHomeEnabled"}:
+                for row in products:
+                    sizes_by_colour: dict[str, set[str]] = {}
+                    for variant in _row_variants(row):
+                        if not variant.get("active", True):
+                            continue
+                        size = str(variant.get("size") or "").strip()
+                        if not size or size.casefold() == "one size":
+                            continue
+                        colour = str(variant.get("colourName") or "Default").strip().casefold()
+                        sizes_by_colour.setdefault(colour, set()).add(size.casefold())
+                    if not any(len(sizes) >= 2 for sizes in sizes_by_colour.values()):
+                        raise SecurityError(
+                            409,
+                            f"{row['name']} cannot enable this option: at least two different "
+                            "active sizes of the same colour are required. Nothing was changed.",
+                            "invalid_bulk_product_eligibility",
+                        )
+
+            now = iso(utc_now())
+            changed = 0
+            for row in products:
+                if feature == "outsideNeemuchDeliveryEnabled":
+                    attributes = json.loads(row["attributes_json"] or "{}")
+                    existing = str(attributes.get(feature, "false")).casefold() == "true"
+                    if existing == enabled:
+                        continue
+                    attributes[feature] = "true" if enabled else "false"
+                    db.execute(
+                        "UPDATE shop_product_submissions SET attributes_json=?,updated_at=? WHERE id=?",
+                        (json.dumps(attributes, separators=(",", ":"), sort_keys=True), now, row["id"]),
+                    )
+                else:
+                    column = features[feature]  # Whitelisted SQL column, never user input.
+                    if bool(row[column]) == enabled:
+                        continue
+                    db.execute(
+                        f"UPDATE shop_product_submissions SET {column}=?,updated_at=? WHERE id=?",
+                        (int(enabled), now, row["id"]),
+                    )
+                changed += 1
+                self._audit_if_available(
+                    db, admin_id, "shop_product_feature_bulk_updated", "shop_product", row["id"],
+                    {"feature": feature, "from": not enabled, "to": enabled},
+                )
+            db.commit()
+        return {"updated": len(products), "changed": changed, "unchanged": len(products) - changed}
+
+    def admin_list_published_products_for_tax(
+        self, admin_id: str
+    ) -> list[dict[str, Any]]:
+        """Full published-product GST review; existing admin UI 1000 cap unchanged.
+
+        Deliberately read-only: never updates price, commission, order, GST
+        classification or inventory. A hard upper limit avoids unbounded
+        exposure to huge catalogues; do not silently return an incomplete
+        review when the catalogue is larger than this cap.
+        """
+        with self.connect() as db:
+            self._require_admin(db, admin_id)
+            rows=db.execute(
+                "SELECT * FROM shop_product_submissions "
+                "WHERE status='PUBLISHED' ORDER BY id LIMIT 10001"
+            ).fetchall()
+        if len(rows)>10000:
+            raise SecurityError(
+                409, "Tax catalogue exceeds 10000 products; use paginated export.",
+                "tax_catalogue_export_limit",
+            )
+        return [self._serialize_product(row, admin=True) for row in rows]
+
+    def admin_set_product_commission(
+        self, admin_id: str, product_id: str, override_bps: Any
+    ) -> dict[str, Any]:
+        """Admin-only commission override. None resets to the global 5% default."""
+        if override_bps is not None and (
+            isinstance(override_bps, bool)
+            or not isinstance(override_bps, int)
+            or not 0 <= override_bps <= 10_000
+        ):
+            raise SecurityError(
+                400, "Commission must be a percentage between 0 and 100, with at most two decimals.",
+                "invalid_product_commission",
+            )
+        with self.connect() as db:
+            db.execute("BEGIN IMMEDIATE")
+            self._require_admin(db, admin_id)
+            current = db.execute(
+                "SELECT * FROM shop_product_submissions WHERE id=?", (product_id,)
+            ).fetchone()
+            if current is None:
+                raise SecurityError(404, "Product not found.", "product_not_found")
+            if db.execute("SELECT 1 FROM admin_removed_shop_products WHERE product_id=?", (product_id,)).fetchone():
+                raise SecurityError(409, "Removed product cannot be modified.", "product_removed")
+            customer = _customer_price_paise(current["price_paise"], override_bps)
+            if customer > current["original_price_paise"]:
+                raise SecurityError(
+                    409,
+                    "The customer price including commission would exceed the recorded MRP. "
+                    "Reduce the commission or correct the actual product price; do not inflate MRP.",
+                    "product_commission_exceeds_mrp",
+                )
+            old_override = _row_commission_override(current)
+            if old_override != override_bps:
+                now = iso(utc_now())
+                db.execute(
+                    "UPDATE shop_product_submissions "
+                    "SET commission_override_bps=?,updated_at=? WHERE id=?",
+                    (override_bps, now, product_id),
+                )
+                self._audit_if_available(
+                    db, admin_id, "shop_product_commission_updated", "shop_product",
+                    product_id,
+                    {"previousBasisPoints": old_override,
+                     "newBasisPoints": override_bps,
+                     "effectiveBasisPoints": _commission_rate_basis_points(
+                         current["price_paise"], override_bps
+                     )},
+                )
+            db.commit()
+            row = db.execute(
+                "SELECT * FROM shop_product_submissions WHERE id=?", (product_id,)
+            ).fetchone()
+        return self._serialize_product(row, admin=True)
+
+    def admin_bulk_set_product_commission(
+        self, admin_id: str, product_ids: Any, override_bps: Any
+    ) -> dict[str, Any]:
+        """Apply one commission to selected products as one atomic transaction.
+
+        Validate every selected product against its recorded MRP before writing.
+        A null override returns the selection to the private 5% default.
+        """
+        if (
+            not isinstance(product_ids, list)
+            or not 1 <= len(product_ids) <= 1000
+            or any(
+                not isinstance(product_id, str)
+                or not product_id.strip()
+                or product_id != product_id.strip()
+                or len(product_id) > 128
+                for product_id in product_ids
+            )
+            or len(set(product_ids)) != len(product_ids)
+        ):
+            raise SecurityError(
+                400, "Select between 1 and 1000 unique products for bulk commission.",
+                "invalid_bulk_product_selection",
+            )
+        if override_bps is not None and (
+            isinstance(override_bps, bool)
+            or not isinstance(override_bps, int)
+            or not 0 <= override_bps <= 10_000
+        ):
+            raise SecurityError(
+                400, "Commission must be an integer basis-point rate from 0 to 10000, or null.",
+                "invalid_product_commission",
+            )
+        with self.connect() as db:
+            db.execute("BEGIN IMMEDIATE")
+            self._require_admin(db, admin_id)
+            selected_rows = {}
+            violating = []
+            for product_id in product_ids:
+                row = db.execute(
+                    "SELECT id,name,price_paise,original_price_paise,"
+                    "commission_override_bps FROM shop_product_submissions WHERE id=?",
+                    (product_id,),
+                ).fetchone()
+                if row is None:
+                    raise SecurityError(
+                        404, "One of the selected products no longer exists. Refresh and select again.",
+                        "product_not_found",
+                    )
+                if db.execute("SELECT 1 FROM admin_removed_shop_products WHERE product_id=?", (product_id,)).fetchone():
+                    raise SecurityError(409, "One selected product has been removed.", "product_removed")
+                selected_rows[product_id] = row
+                if _customer_price_paise(row["price_paise"], override_bps) > row["original_price_paise"]:
+                    violating.append(row["name"])
+            if violating:
+                sample = ", ".join(violating[:3])
+                raise SecurityError(
+                    409,
+                    f"Commission would exceed the recorded MRP for {len(violating)} "
+                    f"selected product(s): {sample}. No products were changed. "
+                    "Lower the rate or verify the genuine MRP; do not inflate MRP.",
+                    "bulk_product_commission_exceeds_mrp",
+                )
+            now = iso(utc_now())
+            changed = 0
+            for product_id in product_ids:
+                row = selected_rows[product_id]
+                previous = _row_commission_override(row)
+                if previous == override_bps:
+                    continue
+                result = db.execute(
+                    "UPDATE shop_product_submissions "
+                    "SET commission_override_bps=?,updated_at=? "
+                    "WHERE id=? AND commission_override_bps IS ?",
+                    (override_bps, now, product_id, previous),
+                )
+                if result.rowcount != 1:
+                    raise SecurityError(
+                        409,
+                        "A selected product changed during the update. No products were changed.",
+                        "bulk_product_commission_conflict",
+                    )
+                self._audit_if_available(
+                    db, admin_id, "shop_product_commission_updated", "shop_product",
+                    product_id, {
+                        "previousBasisPoints": previous,
+                        "newBasisPoints": override_bps,
+                        "effectiveBasisPoints": _commission_rate_basis_points(
+                            row["price_paise"], override_bps
+                        ),
+                        "bulkUpdate": True,
+                        "selectionSize": len(product_ids),
+                    },
+                )
+                changed += 1
+            db.commit()
+        return {
+            "selectedCount": len(product_ids),
+            "updatedCount": changed,
+            "unchangedCount": len(product_ids) - changed,
+            "commissionBasisPoints": (
+                DEFAULT_PRODUCT_COMMISSION_BPS if override_bps is None else override_bps
+            ),
+            "commissionOverrideBasisPoints": override_bps,
+        }
+
+    def admin_bulk_manage_products(
+        self, admin_id: str, product_ids: Any, action: Any
+    ) -> dict[str, Any]:
+        """All-or-nothing admin unpublish or archival; never delete order references."""
+        if action not in {"UNPUBLISH", "REMOVE"}:
+            raise SecurityError(400, "Invalid bulk product action.", "invalid_bulk_product_action")
+        if (
+            not isinstance(product_ids, list)
+            or not 1 <= len(product_ids) <= 100
+            or any(not isinstance(value, str) or not value.strip() or len(value) > 128 for value in product_ids)
+            or len(product_ids) != len(set(product_ids))
+        ):
+            raise SecurityError(400, "Select 1 to 100 unique products.", "invalid_bulk_product_ids")
+        now = iso(utc_now())
+        with self.connect() as db:
+            db.execute("BEGIN IMMEDIATE")
+            self._require_admin(db, admin_id)
+            placeholders = ",".join("?" for _ in product_ids)
+            rows = db.execute(
+                f"SELECT id,status FROM shop_product_submissions WHERE id IN ({placeholders})",
+                tuple(product_ids),
+            ).fetchall()
+            row_map = {row["id"]: row for row in rows}
+            removed = {
+                row["product_id"] for row in db.execute(
+                    f"SELECT product_id FROM admin_removed_shop_products WHERE product_id IN ({placeholders})",
+                    tuple(product_ids),
+                ).fetchall()
+            }
+            if len(rows) != len(product_ids) or removed:
+                raise SecurityError(409, "A selected product is missing or already removed.", "bulk_product_conflict")
+            if action == "UNPUBLISH" and any(row_map[pid]["status"] != "PUBLISHED" for pid in product_ids):
+                raise SecurityError(409, "Bulk unpublish requires every selected product to be published.", "bulk_product_not_published")
+            for product_id in product_ids:
+                prior_status = row_map[product_id]["status"]
+                if action == "UNPUBLISH":
+                    db.execute(
+                        """UPDATE shop_product_submissions
+                              SET status='APPROVED', published_at=NULL,
+                                  reviewed_by=?, reviewed_at=?, updated_at=?
+                            WHERE id=?""",
+                        (admin_id, now, now, product_id),
+                    )
+                else:
+                    db.execute(
+                        """UPDATE shop_product_submissions
+                              SET status=CASE WHEN status='PUBLISHED' THEN 'APPROVED' ELSE status END,
+                                  published_at=NULL, reviewed_by=?, reviewed_at=?, updated_at=?
+                            WHERE id=?""",
+                        (admin_id, now, now, product_id),
+                    )
+                    db.execute(
+                        "INSERT INTO admin_removed_shop_products(product_id,removed_by,removed_at) VALUES(?,?,?)",
+                        (product_id, admin_id, now),
+                    )
+                self._audit_if_available(
+                    db, admin_id,
+                    "shop_product_admin_unpublished" if action == "UNPUBLISH" else "shop_product_admin_removed",
+                    "shop_product", product_id,
+                    {"from": prior_status, "action": action, "preservedRecord": True},
+                )
+            db.commit()
+        return {"action": action, "count": len(product_ids), "updatedIds": product_ids}
+
+    def admin_transition_product(
+        self,
+        admin_id: str,
+        product_id: str,
+        target_status: Any,
+        reason: Any = None,
+    ) -> dict[str, Any]:
+        if not isinstance(target_status, str):
+            raise SecurityError(400, "Invalid product status.", "invalid_product_status")
+        target = target_status.strip().upper()
+        clean_reason = _optional_text(reason, "review reason", 1000)
+        if target == "REJECTED" and clean_reason is None:
+            raise SecurityError(400, "A rejection reason is required.", "rejection_reason_required")
+        now = iso(utc_now())
+        with self.connect() as db:
+            db.execute("BEGIN IMMEDIATE")
+            self._require_admin(db, admin_id)
+            current = db.execute(
+                "SELECT * FROM shop_product_submissions WHERE id=?", (product_id,)
+            ).fetchone()
+            if current is None:
+                db.rollback()
+                raise SecurityError(404, "Product submission not found.", "product_not_found")
+            if db.execute("SELECT 1 FROM admin_removed_shop_products WHERE product_id=?", (product_id,)).fetchone():
+                raise SecurityError(409, "Removed product cannot be modified.", "product_removed")
+            if target not in PRODUCT_ADMIN_TRANSITIONS.get(current["status"], set()):
+                db.rollback()
+                raise SecurityError(
+                    409,
+                    "Product transition is not allowed.",
+                    "invalid_product_transition",
+                )
+            if target == "PUBLISHED" and not json.loads(current["image_urls_json"]):
+                db.rollback()
+                raise SecurityError(
+                    409,
+                    "A product image is required before publication.",
+                    "product_image_required",
+                )
+            db.execute(
+                """
+                UPDATE shop_product_submissions
+                   SET status=?,rejection_reason=?,reviewed_by=?,reviewed_at=?,updated_at=?,
+                       published_at=CASE
+                         WHEN ?='PUBLISHED' THEN ?
+                         WHEN ?='APPROVED' THEN NULL
+                         ELSE published_at
+                       END
+                 WHERE id=?
+                """,
+                (
+                    target,
+                    clean_reason if target == "REJECTED" else None,
+                    admin_id,
+                    now,
+                    now,
+                    target,
+                    now,
+                    target,
+                    product_id,
+                ),
+            )
+            self._audit_if_available(
+                db,
+                admin_id,
+                f"shop_product_{target.casefold()}",
+                "shop_product",
+                product_id,
+                {"from": current["status"], "to": target},
+            )
+            db.commit()
+            row = db.execute(
+                "SELECT * FROM shop_product_submissions WHERE id=?", (product_id,)
+            ).fetchone()
+        return self._serialize_product(row, admin=True)
+
+    def require_seller_published_product(
+        self, user_id: str, product_id: str
+    ) -> dict[str, Any]:
+        with self.connect() as db:
+            row = self._seller_published_product(db, user_id, product_id)
+        return self._serialize_product(row)
+
+    def require_seller_stock_update_allowed(
+        self, user_id: str, product_id: str
+    ) -> dict[str, Any]:
+        with self.connect() as db:
+            row = self._seller_published_product(db, user_id, product_id)
+            pending = db.execute(
+                "SELECT 1 FROM shop_product_change_requests "
+                "WHERE product_id=? AND status IN ('SUBMITTED','UNDER_REVIEW')",
+                (product_id,),
+            ).fetchone()
+            if pending is not None:
+                raise SecurityError(
+                    409,
+                    "Finish the pending product change review before updating stock.",
+                    "product_change_pending",
+                )
+        return self._serialize_product(row)
+
+    def list_product_change_requests(self, user_id: str) -> list[dict[str, Any]]:
+        with self.connect() as db:
+            rows = db.execute(
+                """
+                SELECT r.*,p.name AS product_name
+                  FROM shop_product_change_requests r
+                  JOIN shop_product_submissions p ON p.id=r.product_id
+                 WHERE r.submitted_by_user_id=?
+                 ORDER BY r.updated_at DESC
+                """,
+                (user_id,),
+            ).fetchall()
+        return [self._serialize_change_request(row) for row in rows]
+
+    def _create_product_change_request(
+        self,
+        user_id: str,
+        product_id: str,
+        action: str,
+        payload: dict[str, Any] | None = None,
+        live_inventory: dict[str, int] | None = None,
+    ) -> dict[str, Any]:
+        now = iso(utc_now())
+        request_id = "shopchg_" + secrets.token_hex(12)
+        change_summary: list[dict[str, str]] = []
+        with self.connect() as db:
+            db.execute("BEGIN IMMEDIATE")
+            current = self._seller_published_product(db, user_id, product_id)
+            pending = db.execute(
+                "SELECT id FROM shop_product_change_requests "
+                "WHERE product_id=? AND status IN ('SUBMITTED','UNDER_REVIEW')",
+                (product_id,),
+            ).fetchone()
+            if pending is not None:
+                db.rollback()
+                raise SecurityError(
+                    409,
+                    "A product change request is already pending.",
+                    "product_change_pending",
+                )
+
+            if action == "EDIT":
+                if (
+                    not isinstance(payload, dict)
+                    or set(payload) - PRODUCT_CHANGE_PAYLOAD_FIELDS
+                ):
+                    db.rollback()
+                    raise SecurityError(
+                        400,
+                        "Unsupported product change field.",
+                        "invalid_product_change",
+                    )
+                candidate = dict(payload)
+                if "variants" in candidate:
+                    proposed_variants = candidate["variants"]
+                    current_variants = _row_variants(current)
+                    current_by_id = {item["id"]: item for item in current_variants}
+                    active_current = [item for item in current_variants if item.get("active", True)]
+                    if not isinstance(proposed_variants, list):
+                        db.rollback()
+                        raise SecurityError(400, "Enter valid size inventory rows.", "invalid_product_change")
+                    normalized_active: list[dict[str, Any]] = []
+                    retained_ids: set[str] = set()
+                    for item in proposed_variants:
+                        if not isinstance(item, dict) or set(item) - {"id", "size", "inventory"}:
+                            db.rollback()
+                            raise SecurityError(400, "Enter valid size inventory rows.", "invalid_product_change")
+                        variant_id = item.get("id")
+                        if variant_id is None:
+                            normalized_active.append({"size": item.get("size"), "inventory": item.get("inventory")})
+                            continue
+                        existing = current_by_id.get(variant_id) if isinstance(variant_id, str) else None
+                        if existing is None or not existing.get("active", True) or variant_id in retained_ids:
+                            db.rollback()
+                            raise SecurityError(400, "Invalid published size selection.", "invalid_product_change")
+                        requested_size = clean_text(item.get("size"), "size", 1, 40)
+                        if requested_size != existing["size"]:
+                            db.rollback()
+                            raise SecurityError(
+                                409,
+                                "Published size labels cannot be renamed in place. Set its stock to 0, remove that size, then add the corrected size.",
+                                "published_variant_rename_blocked",
+                            )
+                        retained_ids.add(variant_id)
+                        stock = (live_inventory or {}).get(variant_id, existing["inventory"])
+                        normalized_active.append({"id": variant_id, "size": existing["size"], "inventory": stock, "active": True})
+                    retired: list[dict[str, Any]] = []
+                    for existing in active_current:
+                        if existing["id"] in retained_ids:
+                            continue
+                        stock = (live_inventory or {}).get(existing["id"], existing["inventory"])
+                        if stock != 0:
+                            db.rollback()
+                            raise SecurityError(
+                                409,
+                                f"Set stock for size {existing['size']} to 0 before removing it.",
+                                "published_variant_has_stock",
+                            )
+                        retired.append({"id": existing["id"], "size": existing["size"], "inventory": 0, "active": False})
+                    retired.extend(
+                        {"id": item["id"], "size": item["size"], "inventory": 0, "active": False}
+                        for item in current_variants if not item.get("active", True)
+                    )
+                    candidate["variants"] = normalized_active + retired
+                values = self._product_payload(candidate, current, trusted_variant_metadata="variants" in candidate)
+                if not json.loads(values["image_urls_json"]):
+                    db.rollback()
+                    raise SecurityError(
+                        400,
+                        "A product image is required for a published listing.",
+                        "product_image_required",
+                    )
+                proposed = self._product_values_to_change_payload(values)
+                compare_payload: dict[str, Any] = {}
+                if "variants" in candidate:
+                    compare_payload["variants"] = [
+                        {
+                            "id": item["id"],
+                            "size": item["size"],
+                            "inventory": (live_inventory or {}).get(item["id"], item["inventory"]) if item.get("active", True) else 0,
+                            "active": item.get("active", True),
+                        }
+                        for item in _row_variants(current)
+                    ]
+                current_values = self._product_values_to_change_payload(
+                    self._product_payload(
+                        compare_payload,
+                        current,
+                        allow_legacy_current_images=True,
+                        trusted_variant_metadata=bool(compare_payload),
+                    )
+                )
+                if proposed == current_values:
+                    db.rollback()
+                    raise SecurityError(
+                        409,
+                        "No catalogue changes were provided.",
+                        "no_product_changes",
+                    )
+                change_summary = self._product_change_summary(current_values, proposed)
+                payload_json = json.dumps(
+                    proposed, separators=(",", ":"), sort_keys=True
+                )
+            elif action == "UNPUBLISH":
+                if payload not in (None, {}):
+                    db.rollback()
+                    raise SecurityError(
+                        400,
+                        "Unpublish requests do not accept product fields.",
+                        "invalid_product_change",
+                    )
+                payload_json = None
+                change_summary = [{"field": "Listing", "before": "Published", "after": "Unpublish requested"}]
+            else:
+                db.rollback()
+                raise SecurityError(
+                    400, "Invalid product change action.", "invalid_product_change"
+                )
+
+            db.execute(
+                """
+                INSERT INTO shop_product_change_requests(
+                  id,product_id,application_id,submitted_by_user_id,action,
+                  payload_json,change_summary_json,status,created_at,updated_at,submitted_at
+                ) VALUES(?,?,?,?,?,?,?,'SUBMITTED',?,?,?)
+                """,
+                (
+                    request_id,
+                    product_id,
+                    current["application_id"],
+                    user_id,
+                    action,
+                    payload_json,
+                    json.dumps(change_summary, separators=(",", ":")),
+                    now,
+                    now,
+                    now,
+                ),
+            )
+            db.commit()
+            row = db.execute(
+                "SELECT r.*,p.name AS product_name "
+                "FROM shop_product_change_requests r "
+                "JOIN shop_product_submissions p ON p.id=r.product_id "
+                "WHERE r.id=?",
+                (request_id,),
+            ).fetchone()
+        return self._serialize_change_request(row)
+
+    def create_product_edit_request(
+        self,
+        user_id: str,
+        product_id: str,
+        payload: dict[str, Any],
+        live_inventory: dict[str, int] | None = None,
+    ) -> dict[str, Any]:
+        return self._create_product_change_request(
+            user_id, product_id, "EDIT", payload, live_inventory
+        )
+
+    def create_product_unpublish_request(
+        self, user_id: str, product_id: str
+    ) -> dict[str, Any]:
+        return self._create_product_change_request(
+            user_id, product_id, "UNPUBLISH"
+        )
+
+    def admin_list_product_change_requests(
+        self, admin_id: str
+    ) -> list[dict[str, Any]]:
+        with self.connect() as db:
+            self._require_admin(db, admin_id)
+            rows = db.execute(
+                """
+                SELECT r.*,p.name AS product_name,a.shop_name AS shop_name
+                  FROM shop_product_change_requests r
+                  JOIN shop_product_submissions p ON p.id=r.product_id
+                  JOIN vendor_applications a ON a.id=r.application_id
+                 ORDER BY
+                   CASE r.status
+                     WHEN 'SUBMITTED' THEN 0
+                     WHEN 'UNDER_REVIEW' THEN 1
+                     ELSE 2
+                   END,
+                   r.updated_at DESC
+                 LIMIT 1000
+                """
+            ).fetchall()
+        return [self._serialize_change_request(row, admin=True) for row in rows]
+
+    def admin_transition_product_change_request(
+        self,
+        admin_id: str,
+        request_id: str,
+        target_status: Any,
+        reason: Any = None,
+        live_inventory: dict[str, int] | None = None,
+    ) -> dict[str, Any]:
+        if not isinstance(target_status, str):
+            raise SecurityError(
+                400, "Invalid product change status.", "invalid_product_change_status"
+            )
+        target = target_status.strip().upper()
+        clean_reason = _optional_text(reason, "review reason", 1000)
+        if target == "REJECTED" and clean_reason is None:
+            raise SecurityError(
+                400, "A rejection reason is required.", "rejection_reason_required"
+            )
+
+        now = iso(utc_now())
+        with self.connect() as db:
+            db.execute("BEGIN IMMEDIATE")
+            self._require_admin(db, admin_id)
+            request = db.execute(
+                "SELECT * FROM shop_product_change_requests WHERE id=?",
+                (request_id,),
+            ).fetchone()
+            if request is None:
+                db.rollback()
+                raise SecurityError(
+                    404, "Product change request not found.", "product_change_not_found"
+                )
+            if target not in PRODUCT_CHANGE_ADMIN_TRANSITIONS.get(
+                request["status"], set()
+            ):
+                db.rollback()
+                raise SecurityError(
+                    409,
+                    "Product change transition is not allowed.",
+                    "invalid_product_change_transition",
+                )
+
+            if target == "APPROVED":
+                current = db.execute(
+                    "SELECT * FROM shop_product_submissions WHERE id=?",
+                    (request["product_id"],),
+                ).fetchone()
+                if current is None or current["status"] != "PUBLISHED":
+                    db.rollback()
+                    raise SecurityError(
+                        409,
+                        "The product is no longer published.",
+                        "published_product_required",
+                    )
+                if request["action"] == "EDIT":
+                    proposed = json.loads(request["payload_json"] or "{}")
+                    candidate = dict(proposed)
+                    if "variants" in candidate:
+                        current_variants = _row_variants(current)
+                        proposed_by_id = {
+                            item.get("id"): item
+                            for item in candidate["variants"]
+                            if isinstance(item, dict)
+                            and isinstance(item.get("id"), str)
+                        }
+                        retiring = [
+                            item
+                            for item in current_variants
+                            if item.get("active", True)
+                            and (
+                                item["id"] not in proposed_by_id
+                                or proposed_by_id[item["id"]].get("active") is False
+                            )
+                        ]
+                        if retiring and (
+                            live_inventory is None
+                            or any(item["id"] not in live_inventory for item in retiring)
+                        ):
+                            db.rollback()
+                            raise SecurityError(
+                                409,
+                                "Current inventory must be revalidated before retiring a size.",
+                                "inventory_revalidation_required",
+                            )
+                        for item in retiring:
+                            if live_inventory[item["id"]] != 0:
+                                db.rollback()
+                                raise SecurityError(
+                                    409,
+                                    f"Set stock for size {item['size']} to 0 before removing it.",
+                                    "published_variant_has_stock",
+                                )
+                    values = self._product_payload(
+                        candidate, current, trusted_variant_metadata="variants" in candidate
+                    )
+                    if not json.loads(values["image_urls_json"]):
+                        db.rollback()
+                        raise SecurityError(
+                            409,
+                            "A product image is required before applying changes.",
+                            "product_image_required",
+                        )
+                    db.execute(
+                        """
+                        UPDATE shop_product_submissions
+                           SET name=?,description=?,brand=?,department=?,category=?,
+                               price_paise=?,original_price_paise=?,inventory=?,size=?,variants_json=?,
+                               colour_name=?,colour_hex=?,image_urls_json=?,attributes_json=?,
+                               reviewed_by=?,reviewed_at=?,updated_at=?
+                         WHERE id=?
+                        """,
+                        (
+                            values["name"],
+                            values["description"],
+                            values["brand"],
+                            values["department"],
+                            values["category"],
+                            values["price_paise"],
+                            values["original_price_paise"],
+                            values["inventory"],
+                            values["size"],
+                            values["variants_json"],
+                            values["colour_name"],
+                            values["colour_hex"],
+                            values["image_urls_json"],
+                            values["attributes_json"],
+                            admin_id,
+                            now,
+                            now,
+                            current["id"],
+                        ),
+                    )
+                    db.execute("UPDATE shop_product_submissions SET try_at_home_enabled=?,exchange_available=? WHERE id=?", (values["try_at_home_enabled"], values["exchange_available"], current["id"]))
+                elif request["action"] == "UNPUBLISH":
+                    db.execute(
+                        """
+                        UPDATE shop_product_submissions
+                           SET status='APPROVED',published_at=NULL,
+                               reviewed_by=?,reviewed_at=?,updated_at=?
+                         WHERE id=?
+                        """,
+                        (admin_id, now, now, current["id"]),
+                    )
+
+            db.execute(
+                """
+                UPDATE shop_product_change_requests
+                   SET status=?,rejection_reason=?,reviewed_by=?,reviewed_at=?,updated_at=?
+                 WHERE id=?
+                """,
+                (
+                    target,
+                    clean_reason if target == "REJECTED" else None,
+                    admin_id,
+                    now,
+                    now,
+                    request_id,
+                ),
+            )
+            self._audit_if_available(
+                db,
+                admin_id,
+                f"shop_product_change_{target.casefold()}",
+                "shop_product_change_request",
+                request_id,
+                {
+                    "action": request["action"],
+                    "productId": request["product_id"],
+                    "from": request["status"],
+                    "to": target,
+                },
+            )
+            db.commit()
+            row = db.execute(
+                """
+                SELECT r.*,p.name AS product_name,a.shop_name AS shop_name
+                  FROM shop_product_change_requests r
+                  JOIN shop_product_submissions p ON p.id=r.product_id
+                  JOIN vendor_applications a ON a.id=r.application_id
+                 WHERE r.id=?
+                """,
+                (request_id,),
+            ).fetchone()
+        return self._serialize_change_request(row, admin=True)
+
+    def list_active_stores(self, limit: int = 200) -> list[dict[str, Any]]:
+        """Return public-safe storefront metadata for ACTIVE shops only."""
+        safe_limit = max(1, min(limit, 200))
+        with self.connect() as db:
+            rows = db.execute(
+                """
+                SELECT a.id,a.shop_name,a.category,a.description,a.address,a.city,a.pincode,
+                       a.banner_image_url,a.logo_image_url,a.created_at,a.updated_at,
+                       (SELECT p.image_urls_json FROM shop_product_submissions p
+                         WHERE p.application_id=a.id AND p.status='PUBLISHED'
+                         ORDER BY p.published_at DESC LIMIT 1) AS image_urls_json
+                  FROM vendor_applications a
+                 WHERE a.status='ACTIVE'
+                 ORDER BY a.activated_at DESC,a.updated_at DESC
+                 LIMIT ?
+                """,
+                (safe_limit,),
+            ).fetchall()
+            published_products = db.execute(
+                """
+                SELECT application_id,price_paise,original_price_paise
+                  FROM shop_product_submissions
+                 WHERE status='PUBLISHED'
+                """
+            ).fetchall()
+        product_counts: dict[str, int] = {}
+        for product in published_products:
+            application_id = product["application_id"]
+            product_counts[application_id] = product_counts.get(application_id, 0) + 1
+        stores: list[dict[str, Any]] = []
+        for row in rows:
+            images = json.loads(row["image_urls_json"]) if row["image_urls_json"] else []
+            image = images[0] if images else None
+            stores.append({
+                "id": row["id"], "slug": _store_slug(row["id"]),
+                "storeName": row["shop_name"], "category": row["category"],
+                "description": row["description"], "address": row["address"],
+                "city": row["city"], "pincode": row["pincode"],
+                "deliveryMinutes": 60,
+                "bannerImage": row["banner_image_url"] or image,
+                "logoImage": row["logo_image_url"] or image,
+                "productCount": product_counts.get(row["id"], 0),
+                "active": True, "approved": True, "createdAt": row["created_at"],
+            })
+        return stores
+
+    def _published_rows(
+        self, limit: int | None = None, application_id: str | None = None
+    ) -> list[sqlite3.Row]:
+        query = """
+                SELECT p.*,a.shop_name
+                  FROM shop_product_submissions p
+                  JOIN vendor_applications a ON a.id=p.application_id
+                 WHERE p.status='PUBLISHED' AND a.status='ACTIVE'
+                """
+        params_list: list[Any] = []
+        if application_id is not None:
+            query += " AND p.application_id=?"
+            params_list.append(application_id)
+        query += " ORDER BY p.published_at DESC"
+        if limit is not None:
+            safe_limit = max(1, min(limit, 10_000))
+            query += " LIMIT ?"
+            params_list.append(safe_limit)
+        with self.connect() as db:
+            rows = db.execute(query, tuple(params_list)).fetchall()
+        return rows
+
+    @staticmethod
+    def _public_product(row: sqlite3.Row) -> dict[str, Any]:
+        images = json.loads(row["image_urls_json"])
+        attributes = json.loads(row["attributes_json"])
+        attributes.pop("hsnCode", None)
+        attributes.pop("gstRate", None)
+        outside_neemuch_delivery = str(attributes.get("outsideNeemuchDeliveryEnabled", "false")).casefold() == "true"
+        effective_category = (
+            "Clothing & Fashion"
+            if row["category"] == "Footwear"
+            and re.search(r"\b(?:t-?shirts?|tees?|shirts?)\b", row["name"].casefold())
+            else normalize_product_category(
+                row["category"], name=row["name"], description=row["description"]
+            )
+        )
+        subcategory = normalize_subcategory(
+            attributes.get("subcategory"), name=row["name"], category=effective_category
+        )
+        tags = build_product_tags(
+            name=row["name"],
+            brand=row["brand"],
+            store_name=row["shop_name"],
+            department=row["department"],
+            category=effective_category,
+            subcategory=subcategory,
+        )
+        price = _row_customer_price_paise(row) / 100
+        # MRP is set by the shop owner.  Commission is charged only on the
+        # shop's selling price, never on the MRP/reference price.
+        original_price = row["original_price_paise"] / 100
+        discount = (
+            round((original_price - price) * 100 / original_price)
+            if original_price > price
+            else 0
+        )
+        store_slug = _store_slug(row['application_id'])
+        variants = []
+        for index, item in enumerate(item for item in _row_variants(row) if item.get("active", True)):
+            variant = {
+                "id": item["id"],
+                "sku": f"SD-SHOP-{row['id'][-12:].upper()}" if index == 0 else f"SD-SHOP-{row['id'][-12:].upper()}-{index + 1}",
+                "size": item["size"],
+                "colourName": item["colourName"],
+                "stock": item["inventory"],
+                "available": False,
+                "price": price,
+                "images": item.get("imageUrls") or images,
+            }
+            if item.get("colourHex"):
+                variant["colourHex"] = item["colourHex"]
+            variants.append(variant)
+        return {
+            "id": row["id"],
+            "slug": row["slug"],
+            "name": row["name"],
+            "brand": row["brand"] or row["shop_name"],
+            "department": row["department"],
+            "category": effective_category,
+            "subcategory": subcategory,
+            "deliveryType": attributes.get("deliveryType", "normal"),
+            "optionMode": attributes.get("optionMode"),
+            "shortDescription": row["description"][:180],
+            "description": row["description"],
+            "material": attributes.get("material", "Not specified"),
+            "careInstructions": [],
+            "price": price,
+            "originalPrice": original_price,
+            "discount": discount,
+            "images": images,
+            "thumbnail": images[0],
+            "rating": 0,
+            "reviewCount": 0,
+            "variants": variants,
+            "tags": tags,
+            "badge": "Local Shop",
+            "newArrival": True,
+            "trending": False,
+            "featured": False,
+            "expressDelivery": attributes.get("deliveryType", "normal") in {"express", "both"},
+            "returnWindowDays": EXCHANGE_WINDOW_DAYS if bool(row["exchange_available"]) else 0,
+            "exchangeAvailable": bool(row["exchange_available"]) if "exchange_available" in row.keys() else False,
+            "tryAtHomeAvailable": bool(row["try_at_home_enabled"]) if "try_at_home_enabled" in row.keys() else False,
+            "outsideNeemuchDeliveryAvailable": outside_neemuch_delivery,
+            "vendorId": row["application_id"],
+            "storeName": row["shop_name"],
+            "storeSlug": store_slug,
+            "active": True,
+            "createdAt": row["created_at"],
+            "updatedAt": row["updated_at"],
+        }
+
+    def list_published_products(self, limit: int | None = None) -> list[dict[str, Any]]:
+        """Return all published Product DTOs unless a limit is explicitly requested."""
+        # Historical products may predate the current MRP validation rule.
+        # Preserve those already-published catalogue records instead of hiding
+        # them; new/edited products are still validated before publication.
+        return [self._public_product(row) for row in self._published_rows(limit)]
+
+    def list_store_published_products(self, application_id: Any) -> list[dict[str, Any]]:
+        """Return public products for one ACTIVE store."""
+        if not isinstance(application_id, str) or not application_id.strip() or len(application_id) > 128:
+            raise SecurityError(400, "Invalid store request.", "invalid_store_request")
+        return [
+            self._public_product(row)
+            for row in self._published_rows(application_id=application_id.strip())
+        ]
+
+    def get_published_product(self, slug_or_id: Any) -> dict[str, Any]:
+        """Return one public product by slug or id."""
+        if not isinstance(slug_or_id, str) or not slug_or_id.strip() or len(slug_or_id) > 128:
+            raise SecurityError(400, "Invalid product request.", "invalid_product_request")
+        wanted = slug_or_id.strip()
+        with self.connect() as db:
+            row = db.execute(
+                """
+                SELECT p.*,a.shop_name
+                  FROM shop_product_submissions p
+                  JOIN vendor_applications a ON a.id=p.application_id
+                 WHERE p.status='PUBLISHED' AND a.status='ACTIVE'
+                   AND (p.slug=? OR p.id=?)
+                 LIMIT 1
+                """,
+                (wanted, wanted),
+            ).fetchone()
+        if row is None:
+            raise SecurityError(404, "Product not found.", "product_not_found")
+        return self._public_product(row)
+
+    def list_similar_products(
+        self, slug_or_id: Any, limit: int = 8
+    ) -> list[dict[str, Any]]:
+        """Ranked similar products for a public product detail page.
+
+        Ranking prefers close taxonomy matches first (subcategory, then
+        category, then department), then brand, shared curated tags, and
+        price proximity.  The pool itself is the public catalogue, so
+        unpublished products and products of suspended shops are excluded by
+        construction.  Results are deduplicated, never contain the current
+        product, and fall back to the newest broader catalogue entries when a
+        subcategory is sparse.  Ordering is fully deterministic for tests.
+        """
+        if not isinstance(slug_or_id, str) or not slug_or_id.strip():
+            raise SecurityError(400, "Invalid product request.", "invalid_product_request")
+        wanted = slug_or_id.strip()
+        products = self.list_published_products()
+        current = next(
+            (
+                product
+                for product in products
+                if product["slug"] == wanted or product["id"] == wanted
+            ),
+            None,
+        )
+        if current is None:
+            raise SecurityError(404, "Product not found.", "product_not_found")
+        safe_limit = max(1, min(int(limit), 24))
+        seen = {current["id"]}
+        ranked: list[tuple[int, int, str, str, dict[str, Any]]] = []
+        for position, product in enumerate(products):
+            if product["id"] in seen:
+                continue
+            seen.add(product["id"])
+            ranked.append(
+                (
+                    -_similar_product_score(current, product),
+                    position,
+                    str(product.get("name") or "").casefold(),
+                    str(product["id"]),
+                    product,
+                )
+            )
+        ranked.sort(key=lambda item: (item[0], item[1], item[2], item[3]))
+        return [item[4] for item in ranked[:safe_limit]]
+
+    def payment_catalog_products(self, limit: int = 5000) -> list[dict[str, Any]]:
+        """Return minimal records compatible with PaymentService.products.
+
+        The public server owns the atomic refresh into its in-memory catalogue;
+        this method never writes catalogue JSON or payment state.
+        """
+        safe_limit = max(1, min(limit, 10_000))
+        with self.connect() as db:
+            rows = db.execute(
+                """
+                SELECT p.*,a.status AS shop_status,a.shop_name
+                  FROM shop_product_submissions p
+                  JOIN vendor_applications a ON a.id=p.application_id
+                 ORDER BY p.created_at
+                 LIMIT ?
+                """,
+                (safe_limit,),
+            ).fetchall()
+        products = []
+        for row in rows:
+            price = _row_customer_price_paise(row) / 100
+            images = json.loads(row["image_urls_json"]) if row["image_urls_json"] else []
+            attributes = json.loads(row["attributes_json"]) if row["attributes_json"] else {}
+            attributes.pop("hsnCode", None)
+            attributes.pop("gstRate", None)
+            delivery_type = attributes.get("deliveryType", "normal")
+            if delivery_type not in {"normal", "express", "both"}:
+                delivery_type = "normal"
+            store_slug = _store_slug(row["application_id"])
+            products.append(
+                {
+                    "id": row["id"],
+                    "name": row["name"],
+                    "slug": row["slug"],
+                    "vendorId": row["application_id"],
+                    "storeName": row["shop_name"],
+                    "storeSlug": store_slug,
+                    "brand": row["brand"] or row["shop_name"],
+                    "department": row["department"],
+                    "category": row["category"],
+                    "optionMode": attributes.get("optionMode"),
+                    "deliveryType": delivery_type,
+                    "expressDelivery": delivery_type in {"express", "both"},
+                    "images": images,
+                    "thumbnail": images[0] if images else None,
+                    "active": (
+                        row["status"] == "PUBLISHED"
+                        and row["shop_status"] == "ACTIVE"
+                    ),
+                    "price": price,
+                    "tryAtHomeAvailable": bool(row["try_at_home_enabled"]) if "try_at_home_enabled" in row.keys() else False,
+                    "exchangeAvailable": bool(row["exchange_available"]) if "exchange_available" in row.keys() else False,
+                    "outsideNeemuchDeliveryAvailable": str(attributes.get("outsideNeemuchDeliveryEnabled", "false")).casefold() == "true",
+                    "variants": [
+                        {
+                            "id": item["id"],
+                            "sku": f"SD-SHOP-{row['id'][-12:].upper()}" if index == 0 else f"SD-SHOP-{row['id'][-12:].upper()}-{index + 1}",
+                            "size": item["size"],
+                            "colourName": item["colourName"],
+                            "colourHex": item.get("colourHex"),
+                            "stock": item["inventory"],
+                            "price": price,
+                            "images": item.get("imageUrls") or images,
+                            "active": item.get("active", True),
+                        }
+                        for index, item in enumerate(_row_variants(row))
+                    ],
+                }
+            )
+        return products
+
+    @staticmethod
+    def _require_admin(db: sqlite3.Connection, admin_id: str) -> None:
+        has_admins = db.execute(
+            "SELECT 1 FROM sqlite_master WHERE type='table' AND name='admin_users'"
+        ).fetchone()
+        if has_admins is None:
+            raise SecurityError(
+                403, "Administrator authorization required.", "admin_authorization_required"
+            )
+        admin = db.execute(
+            "SELECT is_active FROM admin_users WHERE id=?", (admin_id,)
+        ).fetchone()
+        if admin is None or not admin["is_active"]:
+            raise SecurityError(
+                403, "Administrator authorization required.", "admin_authorization_required"
+            )
+
+    @staticmethod
+    def _audit_if_available(
+        db: sqlite3.Connection,
+        admin_id: str,
+        action: str,
+        target_type: str,
+        target_id: str,
+        metadata: dict[str, Any],
+    ) -> None:
+        if db.execute(
+            "SELECT 1 FROM sqlite_master WHERE type='table' AND name='local_admin_audit_log'"
+        ).fetchone() is None:
+            return
+        db.execute(
+            """
+            INSERT INTO local_admin_audit_log(
+              admin_user_id,action,target_type,target_id,result,metadata_json,created_at
+            ) VALUES(?,?,?,?,?,?,?)
+            """,
+            (
+                admin_id,
+                action,
+                target_type,
+                target_id,
+                "success",
+                json.dumps(metadata, separators=(",", ":"), sort_keys=True),
+                iso(utc_now()),
+            ),
+        )

@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="referrer" content="no-referrer">
+<meta name="description" content="How to delete your Vibe4You account in the app or on the website, what is deleted, and what is kept.">
+<link rel="canonical" href="https://vibe4you.in/account-deletion">
+<title>Delete your account | Vibe4You</title>
+<style>
+body{font-family:system-ui,-apple-system,Segoe UI,Arial,sans-serif;margin:0;background:#f6f7f5;color:#141817}
+header{background:#171717;padding:14px 16px}header a{color:#fff;font-weight:800;text-decoration:none;font-size:1.15rem}
+main{box-sizing:border-box;width:min(100%,760px);margin:0 auto;padding:24px 16px 48px}
+h1{font-size:1.7rem;margin:8px 0 12px}h2{font-size:1.1rem;margin:28px 0 8px}
+p,li{line-height:1.55;color:#3d4743;font-size:.95rem}ol,ul{padding-left:22px}a{color:#18803c;font-weight:700}
+.card{background:#fff;border:1px solid #f1c7c7;border-radius:18px;padding:20px;margin-top:22px}
+.card h2{margin-top:0;color:#b42318}
+label{display:block;font-weight:600;margin:14px 0 6px;font-size:.9rem}
+input{box-sizing:border-box;width:100%;font-size:1rem;padding:12px;border:1px solid #b9c2be;border-radius:10px}
+button{cursor:pointer;color:#fff;background:#b42318;border:0;padding:14px 20px;font-weight:700;border-radius:10px;margin-top:16px;width:100%;font-size:1rem}
+button:disabled{opacity:.5;cursor:not-allowed}
+#status{min-height:22px;font-weight:600}#status.error{color:#b42318}#status.ok{color:#18803c}
+.done{background:#ecfdf3;border:1px solid #abefc6;border-radius:12px;padding:14px;color:#067647;font-weight:700}
+[hidden]{display:none!important}
+</style>
+<script src="/account-deletion.js" defer></script>
+</head>
+<body>
+<header><a href="/">Vibe4You</a></header>
+<main>
+<p id="deleted" class="done" role="status" hidden>Your Vibe4You account has been deleted and you have been signed out.</p>
+<h1>Delete your Vibe4You account</h1>
+<p>This page explains how to delete an account on Vibe4You, the website and Android app operated by Mohit Jangde, and what happens to your information.</p>
+
+<section class="card" aria-labelledby="delete-heading">
+<h2 id="delete-heading">Delete your account</h2>
+<p id="status" role="status">Checking whether you are signed in…</p>
+<p id="signed-out" hidden><a href="/login">Sign in</a>, then open My Profile and choose Delete account, or come back to this page. If you cannot sign in, see below.</p>
+<form id="delete-form" hidden>
+<p>Signed in as <strong id="account-label"></strong>. Deleting your account is permanent and cannot be undone. You will be signed out on every device.</p>
+<p id="recent-note" hidden>Your account uses Google or mobile sign-in. For your security it can be deleted only within 15 minutes of signing in. If you signed in earlier, sign out and sign in again first.</p>
+<div id="password-field" hidden>
+<label for="current-password">Current password</label>
+<input id="current-password" type="password" autocomplete="current-password" maxlength="256">
+</div>
+<label for="confirmation">Type DELETE to confirm</label>
+<input id="confirmation" autocomplete="off" autocapitalize="characters" spellcheck="false" maxlength="20">
+<button id="delete-button" type="submit" disabled>Permanently delete my account</button>
+</form>
+</section>
+
+<h2>Steps in the app or website</h2>
+<ol>
+<li>Sign in to Vibe4You in the Android app or at vibe4you.in.</li>
+<li>Open <a href="/profile">My Profile</a> and choose <strong>Delete account</strong>. This opens this page.</li>
+<li>Enter your current password if your account has one. Accounts that use Google or mobile sign-in must have signed in within the last 15 minutes.</li>
+<li>Type DELETE and select <strong>Permanently delete my account</strong>.</li>
+</ol>
+<p>Deletion happens immediately and signs you out on every device. It cannot be undone.</p>
+
+<h2>If you cannot sign in</h2>
+<p>Email <a href="mailto:vibe4yousupport@gmail.com?subject=Vibe4You%20account%20deletion%20request">vibe4yousupport@gmail.com</a> from the email address on your account, or include the mobile number you sign in with. We may need to verify that the account belongs to you before deleting it.</p>
+
+<h2>What is deleted</h2>
+<ul>
+<li>Your name, email address, mobile number, and password.</li>
+<li>Saved delivery addresses.</li>
+<li>Your saved cart and wishlist.</li>
+<li>Product and store reviews you wrote.</li>
+<li>Linked Google and mobile sign-in records, and active sessions.</li>
+<li>Draft or rejected store applications.</li>
+</ul>
+
+<h2>What is kept, and why</h2>
+<p>Records of orders you placed, including the delivery name, phone number, address, and delivery location saved with each order, payment and refund references, and invoices are kept because they are needed for payment reconciliation, fraud and security controls, support and disputes, backups, and accounting, tax, or other legal obligations. They are kept only for as long as those purposes reasonably require and are then deleted or anonymised where reasonably practicable.</p>
+
+<h2>When deletion has to wait</h2>
+<ul>
+<li>An order is still being prepared, delivered, returned, or exchanged.</li>
+<li>An outside-area delivery request is still open.</li>
+<li>Your account manages a store on Vibe4You. Contact support to close the store first.</li>
+</ul>
+
+<p>Read the full <a href="/privacy">privacy notice</a> for more about how Vibe4You handles information.</p>
+</main>
+</body>
+</html>
