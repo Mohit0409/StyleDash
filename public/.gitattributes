@@ -1,0 +1,6 @@
+# Byte-exact deployed public files retained without newline conversion.
+verify-email.html -text whitespace=-blank-at-eol,-blank-at-eof,-space-before-tab,cr-at-eol
+verify-email.js -text whitespace=-blank-at-eol,-blank-at-eof,-space-before-tab,cr-at-eol
+account-deletion.html -text whitespace=-blank-at-eol,-blank-at-eof,-space-before-tab,cr-at-eol
+account-deletion.js -text whitespace=-blank-at-eol,-blank-at-eof,-space-before-tab,cr-at-eol
+.well-known/assetlinks.json -text whitespace=-blank-at-eol,-blank-at-eof,-space-before-tab,cr-at-eol

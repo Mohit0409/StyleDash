@@ -55,6 +55,18 @@ class ProductionSnapshotParity(unittest.TestCase):
                 if other in self.hashes:
                     self.assertEqual(self.hashes[rel], self.hashes[other])
 
+    def test_exact_deployed_static_pages_in_vite_public(self):
+        locations = {
+            "server/verify-email.html": "public/verify-email.html",
+            "server/verify-email.js": "public/verify-email.js",
+            "server/account-deletion.html": "public/account-deletion.html",
+            "server/account-deletion.js": "public/account-deletion.js",
+            "server/.well-known/assetlinks.json": "public/.well-known/assetlinks.json",
+        }
+        for deployed, source in locations.items():
+            with self.subTest(deployed=deployed):
+                self.assertEqual(digest(ROOT / source), self.hashes[deployed])
+
     def test_unreadable_modules_are_explicitly_excluded(self):
         self.assertEqual(
             sorted(self.manifest.get("unreadable_paths", [])),
