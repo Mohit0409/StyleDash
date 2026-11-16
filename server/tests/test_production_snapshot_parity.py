@@ -75,6 +75,12 @@ class ProductionSnapshotParity(unittest.TestCase):
                 self.assertEqual(digest(ROOT / source), self.hashes[deployed])
         self.assertFalse((ROOT / "public/.gitattributes").exists())
 
+    def test_deployed_admin_permission_store_source_is_exact(self):
+        self.assertEqual(
+            digest(ROOT / "scripts/styledash_admin.py"),
+            self.hashes["admin/styledash_admin.py"],
+        )
+
     def test_production_admin_html_css_js_byte_identical(self):
         files = {
             "admin/admin/index.html": "server/admin/index.html",

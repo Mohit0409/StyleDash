@@ -10,8 +10,8 @@ ec13b4f28f99b26f3cf468412d77a651b8596decc1cb5afb1012170bac11a126
 ## Measured from the isolated sync worktree
 
 - 59 deployed non-sensitive code files snapshot-verified byte-for-byte.
-- 37 of these have a byte-identical mapped source file in the sync worktree.
-- 15 map to an existing but different source file.
+- 38 of these have a byte-identical mapped source file in the sync worktree.
+- 14 map to an existing but different source file.
 - 7 lack an existing source path according to the conservative mapper.
 - Two Phase 1 GST registry modules remain unreadable by nonroot SFTP, but
   an exact-SHA copy of their genuine 3720-byte source was recovered in an
@@ -50,6 +50,13 @@ These numbers describe source-path hash matches, not a production-ready build.
    assertions); full suite of 124 backend/Admin/reviews/GST tests passed.
    Admin backend serve.py is STILL divergent and not yet synchronized.
 
+2b. **Admin-only account/permissions source (RESOLVED):**
+   scripts/styledash_admin.py was recovered as an exact SHA-256
+   match for deployed admin/styledash_admin.py. Admin and security
+   suites passed 55/55, then the wider backend/receipt/review/security
+   suite passed 144/144. The deployed module is still a component
+   of the older build and not an authorized production release.
+
 3. **Admin/Public divergent modules:** some deploy targets share a filename
    but have different SHA-256 digests. Each must keep a separate build
    mapping or a reviewed common-code extraction, not a blind overwrite.
@@ -82,8 +89,8 @@ These numbers describe source-path hash matches, not a production-ready build.
 - 5 public pages/assets promoted into clean branch public/.
 - Exact SHA-256 source provenance verified for receipt and GST Phase 1.
 - 30 focused GST/receipt tests: PASS after restoring production receipt.
-- 124 backend/Admin/review/GST regression tests: PASS after restoring
-  deployed static Admin UI and matching its current contractual assertions.
+- 144 backend/Admin/security/review/GST tests: PASS after restoring
+  the deployed Admin-only store/permissions source.
 - 12 original review unit tests: PASS after restoring older module.
 - No changes to Ubuntu production, invoices, customers, backups,
   or the original Windows checkout.

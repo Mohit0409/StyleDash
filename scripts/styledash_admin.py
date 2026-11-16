@@ -316,10 +316,53 @@ class AdminStore:
             rows = db.execute(
                 "SELECT id,email,name,phone,is_active,created_at FROM users "
                 "WHERE lower(COALESCE(email,'')) LIKE ? OR lower(name) LIKE ? OR COALESCE(phone,'') LIKE ? "
-                "ORDER BY created_at DESC LIMIT 200",
+                "ORDER BY created_at DESC,id DESC",
                 (pattern, pattern, pattern),
             ).fetchall()
         return [{key: row[key] for key in row.keys()} for row in rows]
+
+    def customers_page(
+        self, query: str = "", page: int = 1, page_size: int = 50, status: str = "all"
+    ) -> dict[str, Any]:
+        """Page the entire customer directory; never silently truncate at 200."""
+        if (
+            isinstance(page, bool) or not isinstance(page, int) or page < 1
+            or isinstance(page_size, bool) or page_size not in (25, 50, 100)
+            or status not in ("all", "active", "disabled")
+        ):
+            raise SecurityError(
+                400, "Invalid customer page, page size or status.",
+                "invalid_customer_pagination",
+            )
+        search = query.strip().casefold()[:100]
+        pattern = f"%{search}%"
+        predicate = (
+            "(lower(COALESCE(email,'')) LIKE ? OR lower(name) LIKE ? "
+            "OR COALESCE(phone,'') LIKE ?)"
+        )
+        args: list[Any] = [pattern, pattern, pattern]
+        if status != "all":
+            predicate += " AND is_active=?"
+            args.append(1 if status == "active" else 0)
+        with self.connect() as db:
+            total = db.execute(
+                f"SELECT COUNT(*) FROM users WHERE {predicate}", args
+            ).fetchone()[0]
+            total_pages = max(1, (total + page_size - 1) // page_size)
+            page = min(page, total_pages)
+            rows = db.execute(
+                "SELECT id,email,name,phone,is_active,created_at FROM users "
+                f"WHERE {predicate} ORDER BY created_at DESC,id DESC "
+                "LIMIT ? OFFSET ?",
+                (*args, page_size, (page - 1) * page_size),
+            ).fetchall()
+        return {
+            "customers": [{key: row[key] for key in row.keys()} for row in rows],
+            "pagination": {
+                "page": page, "pageSize": page_size, "total": total,
+                "totalPages": total_pages,
+            },
+        }
 
     def create_customer_account(self, admin_id: str, payload: dict[str, Any]) -> dict[str, Any]:
         if not isinstance(payload, dict) or set(payload) - {"name", "email", "phone", "password"}:

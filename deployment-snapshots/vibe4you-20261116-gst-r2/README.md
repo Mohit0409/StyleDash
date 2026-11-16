@@ -100,3 +100,11 @@ isolated source at server/admin/ exactly, including the currently live
 Full backend/Admin/reviews/GST tests: 124 passed. Node syntax: PASS.
 The Admin backend server entrypoint is still divergent, and the Vite
 storefront remains non-identical to production. No production deployment.
+
+## Admin-only account model source alignment
+
+The active Ubuntu production admin/styledash_admin.py was restored
+byte-for-byte to the isolated Windows scripts/styledash_admin.py.
+The source SHA-256 agrees with the pinned deployed-code manifest.
+Admin/security 55 tests and the broader 144-test backend regression
+suite passed. No production access or writes occurred for this promotion.
