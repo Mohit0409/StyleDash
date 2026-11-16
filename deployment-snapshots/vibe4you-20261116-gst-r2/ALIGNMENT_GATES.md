@@ -139,7 +139,7 @@ complete live system build/release reproducibility is NOT established.
    The older Vite-generated JS assets are not yet reproducibly mapped. Do not assume
    copying built dist files back into src makes a valid source build.
 
-5a. **Editable Search V2 R2 source (RECOVERED; final postprocessing pending):**
+5a. **Editable Search V2 R2 source (RECOVERED; historical compiled replay verified):**
    The November 14 search release worktree had exact payload hashes
    for live Search V2 R2 homepage, main JS and Products chunk.
    Eleven TS/TSX source edits (six modified and five newly added)
@@ -147,10 +147,17 @@ complete live system build/release reproducibility is NOT established.
    candidate's normal Vite output files match our new Vite output
    by filename and SHA-256, with five further public static files
    retained from earlier sync. TypeScript and 225/225 Vitest tests
-   pass. The separately postprocessed versioned final JS and
-   overlay integration still need an auditable build path;
-   DO NOT deploy the intermediate dist. See
-   SEARCH_V2_EDITABLE_SOURCE_RECOVERY.md.
+   pass. In addition, the archived two-stage compiled Search V2 ->
+   Search V2 R2 transformation is now REPRODUCIBLE OFFLINE from a
+   hash-pinned earlier 54-file V4Y-055 R3 compiled public baseline
+   and two rebuilt TypeScript search bridges. Both stages reproduce
+   54/54 exact archived outputs; final R2 files also match Ubuntu's
+   verified public frontend runtime capture 54/54. The earlier R3
+   COMPILED baseline is not yet reproducible from editable React
+   source, and separately deployed overlays remain outside this
+   replay. DO NOT deploy intermediate dist or replay outputs.
+   See SEARCH_V2_EDITABLE_SOURCE_RECOVERY.md and
+   search-v2-replay/README.md.
 
 6. **Owner's Windows edits:** the root Windows checkout has 68 existing
    modified tracked files; a separate combined release checkout has two
@@ -180,10 +187,13 @@ complete live system build/release reproducibility is NOT established.
    historical-order test fixtures (receipt/registry source now aligned).
 3. Validate review-photo browser upload/rendering end-to-end in an isolated
    environment (source and unit-level privacy/migrations now aligned).
-4. Use frontend-runtime/ as a byte-exact public reference for
-   reproducing the currently deployed Search V2 R2 and overlay bundle
-   from editable source; separately cover the 10 unmanifested
-   public assets in a future guarded production integrity release.
+4. Finish the earlier V4Y-055 R3 editable React source-to-compiled-
+   bundle chain (Search V2 -> R2 historical patching and bridge
+   compilation now reproduce final public 54-file release output).
+   Then incorporate separately deployed marketing/review/PWA overlays
+   through a reviewed source-based build. Independently cover the
+   10 unmanifested public CSS/PWA assets in a future guarded
+   production integrity release.
 5. Run end-to-end tests, compare the complete production artifact
    manifest and require explicit owner approval before merging main.
 

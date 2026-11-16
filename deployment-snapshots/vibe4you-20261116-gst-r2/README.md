@@ -180,3 +180,18 @@ unit tests pass. The final versioned production bundle and all overlays
 still require an auditable release transformation and browser E2E.
 Do not deploy this intermediate build. See
 SEARCH_V2_EDITABLE_SOURCE_RECOVERY.md for the evidence and limits.
+
+
+## Search V2 compiled release replay
+
+search-v2-replay/ now stores only the PUBLIC compiled V4Y-055 R3
+53-module baseline plus its homepage, and source needed to recompile
+the historical Search V2 bridge. scripts/relevance-r2-runtime-bridge.ts
+uses the recovered editable Search V2 R2 modules in src/.
+scripts/replay_compiled_search_v2_r2.py recompiles the two bridges
+and replays the exact compiled R3 -> V2 -> R2 transformations.
+
+The tool passes 54/54 archived hashes for each release and 54/54
+final byte-hash comparisons with current public Ubuntu assets.
+It creates only disposable OS-temp output. The earlier R3 base remains
+already-compiled; full React-source-to-live parity is NOT yet proven.

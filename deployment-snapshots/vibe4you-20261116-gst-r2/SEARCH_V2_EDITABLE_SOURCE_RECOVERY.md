@@ -49,12 +49,25 @@ the current live server. Those files are tracked in the exact-byte
 frontend-runtime/ reference, and the three selected QA payload
 checksums are recorded in search-v2-source-build-proof.json.
 
-However the base Vite output still uses a different entrypoint
-(index-D85cLADH.js) than the live versioned Search V2 R2
-(index-MMTPd8z_-v4y-search-v2-r2.js), which has additional
-postprocessed assets and separately deployed marketing/review/cache
-overlays. The compiled release transformation is not yet
-reconstructed as an auditable source-build step.
+The recovered editable source's Vite output still uses a different
+entrypoint (index-D85cLADH.js) from live Search V2 R2
+(index-MMTPd8z_-v4y-search-v2-r2.js).
+
+**Updated evidence:** scripts/replay_compiled_search_v2_r2.py now
+independently reproduces the historical TWO-STAGE compiled search
+release from the earlier, separately archived V4Y-055 R3 compiled
+54-file baseline. Its two search runtime bridges are rebuilt from
+editable TypeScript with pinned esbuild 0.21.5. The replay matches
+54/54 first-stage and 54/54 final-stage SHA-256 output values,
+with all 54 final files additionally compared against the current
+public Ubuntu frontend snapshot. The replay is deterministic and
+isolated, with no production writes.
+
+This does not yet derive the older V4Y-055 R3 compiled baseline
+from original editable React source, nor the independently released
+GA4/review/cache/PWA and other overlays. The current intermediate
+Vite dist is NOT interchangeable with the historical compiled base.
+See search-v2-replay/README.md.
 
 Do not replace Ubuntu production with the intermediate dist or
 promote this PR to GitHub main yet.

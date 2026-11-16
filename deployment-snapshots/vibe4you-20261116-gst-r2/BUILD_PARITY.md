@@ -89,3 +89,22 @@ Those compiled assets, CSS and overlays remain separate from the
 reconstructed editable build. No one should deploy dist/ as-is.
 See SEARCH_V2_EDITABLE_SOURCE_RECOVERY.md and
 search-v2-source-build-proof.json for exact SHA evidence.
+
+
+## Deterministic Search V2 compiled release replay
+
+Newly recovered V4Y-055 R3 public compiled base (53 JS + index HTML)
+and archived editable V1 search bridge source now permit a reproducible
+two-stage release transformation from R3 -> Search V2 -> Search V2 R2.
+
+Both Search V2 bridges compile byte-exact using esbuild 0.21.5 from
+editable TS. The Search V2 and relevance R2 compiled patch outputs
+match all 54/54 historical release-manifest SHA-256 values per stage,
+and the final R2 code+homepage matches the 54 corresponding current
+Ubuntu frontend-runtime public asset hashes.
+
+This resolves the integrity/replayability of the *compiled patch chain*
+but NOT the React source build that generated the previous R3 base.
+Nor does it generate the independent installed marketing, review,
+cache, social or PWA overlays. Continue treating this as an offline
+reconciliation/test tool, not a production release candidate.

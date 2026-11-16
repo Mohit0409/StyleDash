@@ -20,3 +20,7 @@ src/tests/paymentApi.test.ts -text whitespace=-blank-at-eol,-blank-at-eof,-space
 src/utils/catalogFilters.ts -text whitespace=-blank-at-eol,-blank-at-eof,-space-before-tab,cr-at-eol
 src/utils/searchEngine.ts -text whitespace=-blank-at-eol,-blank-at-eof,-space-before-tab,cr-at-eol
 src/utils/searchSuggestions.ts -text whitespace=-blank-at-eol,-blank-at-eof,-space-before-tab,cr-at-eol
+index.html -text whitespace=-blank-at-eol,-blank-at-eof,-space-before-tab,cr-at-eol
+public/favicon.svg -text whitespace=-blank-at-eol,-blank-at-eof,-space-before-tab,cr-at-eol
+public/product-placeholder.svg -text whitespace=-blank-at-eol,-blank-at-eof,-space-before-tab,cr-at-eol
+public/robots.txt -text whitespace=-blank-at-eol,-blank-at-eof,-space-before-tab,cr-at-eol
