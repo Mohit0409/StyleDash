@@ -108,3 +108,21 @@ but NOT the React source build that generated the previous R3 base.
 Nor does it generate the independent installed marketing, review,
 cache, social or PWA overlays. Continue treating this as an offline
 reconciliation/test tool, not a production release candidate.
+
+
+## R13-to-R3 compiled release input replay
+
+The original V4Y-055 R3 Python build script is recovered byte-for-byte
+alongside the public V4Y-056 R13 compiled input (53 JS chunks + index).
+The source archive includes exact R13 payload SHA-256 and output
+SHA256SUMS. Running scripts/replay_r13_to_r3_offline.py from an isolated
+temporary folder reproduces 56/56 files of the archived R3 release.
+Its 54 website code files also match the canonical Search V2 input
+that feeds the already-verified R3 -> V2 -> R2 sequence.
+
+Combined historical public compiled-patch lineage now covers:
+R13 (54 input code files) -> R3 (56 total outputs, 54 code) ->
+Search V2 (54 code) -> Search V2 R2 (54 code, exact current live hashes).
+
+This does NOT yet establish React source -> R13 bundle reproducibility
+or independently installed overlays. No production changes.

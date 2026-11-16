@@ -195,3 +195,18 @@ The tool passes 54/54 archived hashes for each release and 54/54
 final byte-hash comparisons with current public Ubuntu assets.
 It creates only disposable OS-temp output. The earlier R3 base remains
 already-compiled; full React-source-to-live parity is NOT yet proven.
+
+
+## R13 -> R3 historical compiled builder
+
+search-v2-replay/r13-to-r3/ contains the historical public
+V4Y-056 R13 baseline and original V4Y-055 R3 builder.
+scripts/replay_r13_to_r3_offline.py reproduces all 56 archived
+R3 candidate files, including 54 source-to-Search V2 code files.
+Combined with existing Search V2/R2 replay, the full **historical
+compiled release-patch sequence** is now testable offline.
+
+This is NOT a full editable React source-to-production build,
+because its earliest R13 baseline is already compiled. The
+independently deployed overlays and payment/Admin browser E2E
+are also not yet integrated. No production deployment is allowed.
