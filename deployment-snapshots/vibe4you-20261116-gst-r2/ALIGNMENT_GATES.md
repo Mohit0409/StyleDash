@@ -1,6 +1,8 @@
 # Buildable-source alignment gates — Vibe4You, 2026-11-16
 
 **Status:** Draft integration; no production or original Windows worktree changes.
+The static Admin UI (HTML/CSS/JS) is now source-aligned, while the
+Admin request handler and storefront build are not.
 
 Source of truth: live Ubuntu production integrity manifest:
 ec13b4f28f99b26f3cf468412d77a651b8596decc1cb5afb1012170bac11a126
@@ -8,8 +10,8 @@ ec13b4f28f99b26f3cf468412d77a651b8596decc1cb5afb1012170bac11a126
 ## Measured from the isolated sync worktree
 
 - 59 deployed non-sensitive code files snapshot-verified byte-for-byte.
-- 34 of these have a byte-identical mapped source file in the sync worktree.
-- 18 map to an existing but different source file.
+- 37 of these have a byte-identical mapped source file in the sync worktree.
+- 15 map to an existing but different source file.
 - 7 lack an existing source path according to the conservative mapper.
 - Two Phase 1 GST registry modules remain unreadable by nonroot SFTP, but
   an exact-SHA copy of their genuine 3720-byte source was recovered in an
@@ -39,6 +41,14 @@ These numbers describe source-path hash matches, not a production-ready build.
    Production remains unchanged. Historical real-order validation is
    supported by the existing owner-privileged deployment logs; new unit
    fixtures are synthetic only.
+
+2a. **Admin HTML/CSS/JS (RESOLVED):** deployed index.html,
+   admin.css and admin.js now match the isolated Windows source files
+   byte-for-byte. The exact production JS passes Node syntax validation.
+   Updated legacy cache-bust, category, bulk-refund and review UI
+   assertions to match current production (without dropping safety
+   assertions); full suite of 124 backend/Admin/reviews/GST tests passed.
+   Admin backend serve.py is STILL divergent and not yet synchronized.
 
 3. **Admin/Public divergent modules:** some deploy targets share a filename
    but have different SHA-256 digests. Each must keep a separate build
@@ -72,7 +82,8 @@ These numbers describe source-path hash matches, not a production-ready build.
 - 5 public pages/assets promoted into clean branch public/.
 - Exact SHA-256 source provenance verified for receipt and GST Phase 1.
 - 30 focused GST/receipt tests: PASS after restoring production receipt.
-- 93 backend/admin/review regression tests: PASS with production receipt.
+- 124 backend/Admin/review/GST regression tests: PASS after restoring
+  deployed static Admin UI and matching its current contractual assertions.
 - 12 original review unit tests: PASS after restoring older module.
 - No changes to Ubuntu production, invoices, customers, backups,
   or the original Windows checkout.

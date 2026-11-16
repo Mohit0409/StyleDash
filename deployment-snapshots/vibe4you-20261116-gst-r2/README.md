@@ -91,3 +91,12 @@ alignment effort, not an authorized production deployment package.
 Production payments, orders, GST registry and services were not touched.
 The source snapshot is still NOT an authorized live deployment package;
 other Admin/Public and frontend source alignment gates remain.
+
+## Static Admin UI source reconciliation
+
+The deployed Admin index.html, admin.css and admin.js now match the
+isolated source at server/admin/ exactly, including the currently live
+2026-11-15 month-end-delivery cache version and moderation UI.
+Full backend/Admin/reviews/GST tests: 124 passed. Node syntax: PASS.
+The Admin backend server entrypoint is still divergent, and the Vite
+storefront remains non-identical to production. No production deployment.

@@ -75,6 +75,16 @@ class ProductionSnapshotParity(unittest.TestCase):
                 self.assertEqual(digest(ROOT / source), self.hashes[deployed])
         self.assertFalse((ROOT / "public/.gitattributes").exists())
 
+    def test_production_admin_html_css_js_byte_identical(self):
+        files = {
+            "admin/admin/index.html": "server/admin/index.html",
+            "admin/admin/admin.css": "server/admin/admin.css",
+            "admin/admin/admin.js": "server/admin/admin.js",
+        }
+        for deployed, source in files.items():
+            with self.subTest(deployed=deployed):
+                self.assertEqual(digest(ROOT / source), self.hashes[deployed])
+
     def test_unreadable_modules_are_explicitly_excluded(self):
         self.assertEqual(
             sorted(self.manifest.get("unreadable_paths", [])),

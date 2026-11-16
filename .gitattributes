@@ -5,3 +5,6 @@ public/verify-email.js -text whitespace=-blank-at-eol,-blank-at-eof,-space-befor
 public/account-deletion.html -text whitespace=-blank-at-eol,-blank-at-eof,-space-before-tab,cr-at-eol
 public/account-deletion.js -text whitespace=-blank-at-eol,-blank-at-eof,-space-before-tab,cr-at-eol
 public/.well-known/assetlinks.json -text whitespace=-blank-at-eol,-blank-at-eof,-space-before-tab,cr-at-eol
+server/admin/index.html -text whitespace=-blank-at-eol,-blank-at-eof,-space-before-tab,cr-at-eol
+server/admin/admin.css -text whitespace=-blank-at-eol,-blank-at-eof,-space-before-tab,cr-at-eol
+server/admin/admin.js -text whitespace=-blank-at-eol,-blank-at-eof,-space-before-tab,cr-at-eol
