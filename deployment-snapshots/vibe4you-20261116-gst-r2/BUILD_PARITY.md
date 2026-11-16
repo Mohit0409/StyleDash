@@ -126,3 +126,19 @@ Search V2 (54 code) -> Search V2 R2 (54 code, exact current live hashes).
 
 This does NOT yet establish React source -> R13 bundle reproducibility
 or independently installed overlays. No production changes.
+
+
+## V4Y-046 -> R13 compiled predecessor
+
+Recovered the complete 54-file public V4Y-046 Category/Social compiled
+baseline from archived releases, alongside the original SHA-pinned
+V4Y-056 R13 Python builder and an exact SHA-matched historical
+serve.py candidate. The offline replay independently reproduces
+all 56 R13 code/config outputs and the exact release candidate
+hash manifest. Its 54 public storefront outputs are byte-equal
+to the R13 input used by the previously verified R13 -> R3 stage.
+
+The compiled transformation chain from **V4Y-046 to deployed Search
+V2 R2** is now reproducible and hash-verified. The chain does NOT yet
+rebuild V4Y-046 from editable React source, or include independent
+PWA, SEO, marketing, review UX, mobile and cache overlays.

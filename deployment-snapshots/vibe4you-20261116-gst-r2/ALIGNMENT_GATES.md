@@ -158,9 +158,15 @@ complete live system build/release reproducibility is NOT established.
    code inputs and the original verified release Python builder:
    56/56 R3 release files match their archived output, and its
    54 code files match the pinned R3 Search V2 input.
-   The original R13 COMPILED baseline is not yet reproducible from
-   editable React source; separately deployed overlays remain outside
-   the replay. DO NOT deploy intermediate dist or replay outputs.
+   The original R13 compiled baseline is now REPRODUCIBLE from
+   the preceding V4Y-046 54-file public, already-compiled input:
+   56/56 R13 code/config outputs and the exact generated R13 release
+   SHA manifest match, with 54/54 storefront files equal to the
+   later R13 -> R3 input. This completes the *compiled release
+   transformation chain* from V4Y-046 through live Search V2 R2.
+   The earliest V4Y-046 baseline remains already-compiled;
+   editable React source-to-V4Y-046 is NOT proven and independent
+   production overlays remain outside this chain. DO NOT deploy intermediate dist or replay outputs.
    See SEARCH_V2_EDITABLE_SOURCE_RECOVERY.md and
    search-v2-replay/README.md.
 
@@ -192,10 +198,11 @@ complete live system build/release reproducibility is NOT established.
    historical-order test fixtures (receipt/registry source now aligned).
 3. Validate review-photo browser upload/rendering end-to-end in an isolated
    environment (source and unit-level privacy/migrations now aligned).
-4. Reconstruct the V4Y-056 R13 baseline from editable React source.
-   The compiled R13 -> R3 -> Search V2 -> Search V2 R2 transformations
-   are now independently hash-verified and replayable, but still
-   start from already-compiled R13 code.
+4. Reconstruct the V4Y-046 Category/Social baseline from editable
+   React/TypeScript source. The compiled V4Y-046 -> R13 -> R3 ->
+   Search V2 -> Search V2 R2 release transformations are now
+   independently hash-verified and replayable, but still start
+   from already-compiled V4Y-046 code.
    Then incorporate separately deployed marketing/review/PWA overlays
    through a reviewed source-based build. Independently cover the
    10 unmanifested public CSS/PWA assets in a future guarded

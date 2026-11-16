@@ -210,3 +210,19 @@ This is NOT a full editable React source-to-production build,
 because its earliest R13 baseline is already compiled. The
 independently deployed overlays and payment/Admin browser E2E
 are also not yet integrated. No production deployment is allowed.
+
+
+## Full archived compiled release transformations from V4Y-046
+
+The additional v4y046-to-r13 public archive and offline replay
+now extend the historically verified chain to:
+
+V4Y-046 -> V4Y-056 R13 -> V4Y-055 R3 -> Search V2 -> Search V2 R2.
+
+R13: 56/56 code/config files and exact SHA manifest recreated;
+R3: 56/56 files; Search V2: 54/54 public storefront files;
+Search V2 R2: 54/54 final files match the verified Ubuntu runtime.
+
+The original V4Y-046 code is compiled rather than editable React
+source, and independently released overlays remain separately
+deployed. This branch is NOT an authorized production release.

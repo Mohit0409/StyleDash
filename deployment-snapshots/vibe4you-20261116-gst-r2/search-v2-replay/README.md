@@ -70,3 +70,15 @@ and in scripts/replay_compiled_search_v2_r2.py.
 
 No production mutation, live test payments, customer data, taxes,
 private keys, live credentials or user photos are included.
+
+
+## Earlier V4Y-046 -> V4Y-056 R13 input replay
+
+v4y046-to-r13/ stores the SHA-pinned 54-file public compiled V4Y-046
+baseline, original R13 Python patcher, and exact historical backend
+code candidate. scripts/replay_v4y046_to_r13_offline.py reproduces the
+56-file R13 candidate plus its candidate.sha256 checksum manifest.
+The 54 resulting storefront files equal the later R13 -> R3 input.
+
+This extends compiled release-chain replay backwards; it does not
+recover the original V4Y-046 bundle from editable React source.

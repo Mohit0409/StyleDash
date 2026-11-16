@@ -1,0 +1,286 @@
+{
+  "editable_react_source_to_v4y046_reproduced": false,
+  "production_integrity_manifest_sha256": "ec13b4f28f99b26f3cf468412d77a651b8596decc1cb5afb1012170bac11a126",
+  "r13_backend_sha256": "776207b5903429ef51320ef678147964d762732d72ff8d8aef322bd85b9bf2cc",
+  "r13_builder_sha256": "c9d7e2d4bde394c8611a3726e3b9a3d2d49520c88fde2ed83c9016ecd6263920",
+  "r13_expected_files": {
+    "server/assets/AuthPage-DdPolTCV-v4y056-storefront-hardening-r4.js": "2c05ec0e01f63d3d5d703e26748b26af2525216ae838946ab80823ed3c88f5fb",
+    "server/assets/CartDrawer-C-5Jk24c-v4y056-storefront-hardening-r4.js": "09f03e57313bd971f5d5e7e32d25c24300f83b09627780dbed474764d82d186c",
+    "server/assets/Categories-D3F5K7Iz-v4y056-storefront-hardening-r4.js": "1f60e480acf73806af159596fdb042bad3480f37acc001313e6e651524d48f3b",
+    "server/assets/Checkout-DmmfmeKk-v4y056-storefront-hardening-r4.js": "93bf36c0c5cd78f0d02f9dff60c87abdaf289ee070a7819ff2081809f0770c33",
+    "server/assets/Help-CoUxhEzf-v4y056-storefront-hardening-r4.js": "7474c7a3f772ccd03739b5469618e7de50f20c7bc5447c108beb8c3f7b4ac705",
+    "server/assets/Home-MLk-Vyxe-v4y056-storefront-hardening-r4.js": "840918c04963d0143e8c865fffc88a28f9642a426c3c650c7e12500d48d0cca8",
+    "server/assets/NotFound-CJDcyxdR-v4y056-storefront-hardening-r4.js": "7a6d3cf46d28bb90e2ccb0685f6e08a66f06ac75ac5462f0922f3d718dae981a",
+    "server/assets/Offers-BRa1Xh-o-v4y056-storefront-hardening-r4.js": "0c90e3e5220ab3cdf35603f9e92d15c7e17c5eab501032d5022f7e293e884ead",
+    "server/assets/OrderSuccess-DuVYT0jB-v4y056-storefront-hardening-r4.js": "6f6536e21f3dab969be1f26e57ed49ba9d58a2b17ee0cee9f229cf72152199c0",
+    "server/assets/OrderTracking-D7tSHMZQ-v4y056-storefront-hardening-r4.js": "309f6b89a89f54311969daac28fddedda531a8af739f6f005f1ff8c4cf6b1548",
+    "server/assets/Orders-Cn6lwD6k-v4y056-storefront-hardening-r4.js": "36c01d888bcb998bd3b2575865ee6a0379a57775a152777a4a9e90b9919207b5",
+    "server/assets/OutsideDeliveryRequests-ClStqVLS-v4y056-storefront-hardening-r4.js": "c14a3b6bd42487ff2d36ac79bad7996a876670d142093612206463a2b92dc5d6",
+    "server/assets/PasswordRecovery-XOXlX37H-v4y056-storefront-hardening-r4.js": "5fe9418a2c094ff23d4443209174f4bd8b58475be8434d9486ff36b596f068c2",
+    "server/assets/PaymentTestProduct-CrM0dV54-v4y056-storefront-hardening-r4.js": "7c8facf7db68715fa8eeb7451dee0259dfb82641b1cbc6e15d14166543bebbbe",
+    "server/assets/Privacy-BhC6qJ0h-v4y056-storefront-hardening-r4.js": "4e69bd19d74ec87874a63a2edecc00b121ac971ab1246772d2c6a3f982bbb3ad",
+    "server/assets/ProductCard-qnCHrzMh-v4y056-storefront-hardening-r4.js": "776bf83fc754c95e301cafe729f63f81b5fc40ad31fa675bcadcf516570bd1bf",
+    "server/assets/ProductDetail-CvQ_LhJ--v4y056-storefront-hardening-r4.js": "c044928a6a9f86b772c6d4cf8979a3a0468daaae882fc325b33865ad470ad211",
+    "server/assets/ProductPagination-D112Lo5A-v4y056-storefront-hardening-r4.js": "df470d03f82e96a5f86ea44db18cd2c4f2b761be6dd0f5924e3fd9e58381ad7c",
+    "server/assets/Products-DSTsw2bW-v4y056-storefront-hardening-r4.js": "f73f3fbaf18e35d73447c1ef14d869c562b5bc2be4559a667d132d9074eb3870",
+    "server/assets/Profile-B5Zhrhx3-v4y056-storefront-hardening-r4.js": "98079ee9a0ad9ea50d5f809d5a6ae0d1aa433f21dac777852cb98d4bbb0fc004",
+    "server/assets/Returns-B0TWXGCR-v4y056-storefront-hardening-r4.js": "def1092790207bf62367b920451caa2e8844e01399779e94c63f64b525e29d2d",
+    "server/assets/SEO-DZgr-RBr-v4y056-storefront-hardening-r4.js": "c4e6cf0cbb5d4a8b78811cbebc01b7464e1c9291e153d02f9c129681809bf2a3",
+    "server/assets/StoreDetail-b161Q6hN-v4y056-storefront-hardening-r4.js": "11e84ab4ed618a8cdb510314ed374cf8089019a64bfde4524c62865a9cf87149",
+    "server/assets/StoreImage-DwkkglaO-v4y056-storefront-hardening-r4.js": "2ea0cba997238f1212416fb7193974aa2f2941fb64e35ce34793de34597dbe46",
+    "server/assets/Stores-DEM_OnT8-v4y056-storefront-hardening-r4.js": "ec8451c27d406243d932767f82a181bea34f9e6b387e76128527a8fad9eced79",
+    "server/assets/Terms-B1E-Y1qk-v4y056-storefront-hardening-r4.js": "fe6d3c6a6e9e793000df7df4c5120c3ef9d517a90d4c30370f297706416b48ea",
+    "server/assets/VendorOnboarding-BsmUPytx-v4y056-storefront-hardening-r4.js": "d58adb459d771a49e4a15de15f7b442d9260c34cc8622ec866a01a86a36b4205",
+    "server/assets/Wishlist-DoTTiRsZ-v4y056-storefront-hardening-r4.js": "8fc064d4b35b3411de91241862b0417994522b67fb859ca77fafcf2c121f9556",
+    "server/assets/arrow-right-DhLnpMvV-v4y056-storefront-hardening-r4.js": "f0335dffd202aaea3433233e1fc5f475c42a580e87ef7f449b721aaa53882f1c",
+    "server/assets/categories-C-uMYXyt-v4y056-storefront-hardening-r4.js": "1f4119c9be577af065e0f936d074c28e6aed7be3914552ccc7e90259f2fc9174",
+    "server/assets/chevron-left-Ce9od1i3-v4y056-storefront-hardening-r4.js": "32360f899586e5407532611769539dade702853ab37790c2bbe75188ea58e560",
+    "server/assets/chevron-right-BBZulVyo-v4y056-storefront-hardening-r4.js": "5305b520d477b1820d4aff3c40f8e320a86a9a039ff470aa0ddeafb20b1603f5",
+    "server/assets/circle-check-94cP9Asr-v4y056-storefront-hardening-r4.js": "4fa69bd8db3575f17e1cb5c34fbb58de3debf574bbda07ce915a91f4dba7b230",
+    "server/assets/circle-check-big-YxfPTOvn-v4y056-storefront-hardening-r4.js": "cd860b3c13614addda4271cddebd2f39706caaf7df58f76a13f6571f7f9d5455",
+    "server/assets/circle-x-D-PISaFi-v4y056-storefront-hardening-r4.js": "11dac42077b2195ad9f6e8639feaef2f4fd9f300c5846230988720f84b8aa793",
+    "server/assets/clock-3-DqLyMaZJ-v4y056-storefront-hardening-r4.js": "e9e8dfc0b728b677bcf2ec9244ae6d759c6689dd452b2433c005fb062dd45eee",
+    "server/assets/deliveryRequestApi-CZpm9t97-v4y056-storefront-hardening-r4.js": "7679cbc1903001f651cdfecaf7e059d853c4659b13e57db4a7676058cd4ae662",
+    "server/assets/firebaseClient-B8Q2FPL--v4y056-storefront-hardening-r4.js": "fca013771821dcce3e937d4f36ef398e63e59c26d424070e4ee876e0569ed627",
+    "server/assets/index-MMTPd8z_-v4y056-storefront-hardening-r4.js": "1a4eb2ac4c38ead76c4f7acdb642c99fa131d18d5f0950d4c8be795c000c83df",
+    "server/assets/map-pin-l8Oy_Rp3-v4y056-storefront-hardening-r4.js": "c7560af409969cf8ff15dfc4756fe4d95dbbdd72ef7e23f015cc9b0b24c69912",
+    "server/assets/navigation-CO5d9oN5-v4y056-storefront-hardening-r4.js": "34eeef8fc50f805ba6dc09c905298ad121a7cea092ebb1840b4f9f44389e4a56",
+    "server/assets/package-BUraWBKW-v4y056-storefront-hardening-r4.js": "97abf0cf99028074938f81a47dc7f9b6d20ee40ff9288697d78551a635d65cde",
+    "server/assets/paymentApi-P94e14Sf-v4y056-storefront-hardening-r4.js": "f71e34f8bb5d44a34ae6d1068b27bdd980f78b9c8a860ba936172bfc4ffec15b",
+    "server/assets/plus-Br5X9t6--v4y056-storefront-hardening-r4.js": "5914ef15902930cc6cf2411a7c7af7bcea736be58ba7c5ed8f6460b534de6566",
+    "server/assets/products-DDTJzgQ3-v4y056-storefront-hardening-r4.js": "316fe4aca00aa13cc17ea7767ee32fb56ee08c8dcfc3d97c2ddd52373f56734c",
+    "server/assets/rotate-ccw-DQL9F9zB-v4y056-storefront-hardening-r4.js": "a5a0c3368a91dcabdcd70b9aba5a4dd5ea32ae5e78049d0b73293940fb98e219",
+    "server/assets/save-Bzq3yNjr-v4y056-storefront-hardening-r4.js": "4c7141bd2dbcfc0ff45fc20ddc69db8f3db1678cc4a4ffc92f64e0dd9146dbc4",
+    "server/assets/star-DRsAYDnG-v4y056-storefront-hardening-r4.js": "6140d89449431d9e4d3636370e2b063d83aea92e4bb98ce6fb3a31ad100846f0",
+    "server/assets/tag-DASHTBgF-v4y056-storefront-hardening-r4.js": "16aaecb3fe163c2b292076ddc9a312a2a74f06fd2de638f8a268be19c7293a22",
+    "server/assets/trash-2-Bcyafx5t-v4y056-storefront-hardening-r4.js": "364f9ae8d849ce29fccb9d771aa9a9019f6c5e7a7054dd44c28efac2b7ab41c9",
+    "server/assets/triangle-alert-CyYC8VH9-v4y056-storefront-hardening-r4.js": "5a5c7aa5486073ec32b3bb37d496f60e3fad6f38b5929420f04b82f95087487e",
+    "server/assets/truck-CCwIHnPl-v4y056-storefront-hardening-r4.js": "4612bbb46c50bad929214e5eefe535ca257767f3cfb76f03f8ac4540da49eca5",
+    "server/assets/useProductPagination-DQRotuP9-v4y056-storefront-hardening-r4.js": "a06858e0922eb93a8dcd9f3380784fcf1ade69842c9d422165b87170fca1b191",
+    "server/index.html": "594628d38bace652d3a32cec86f5e2ae2ec779142f8bfe84bdfdde5c353c04cd",
+    "server/serve.py": "776207b5903429ef51320ef678147964d762732d72ff8d8aef322bd85b9bf2cc",
+    "systemd/zz-public-origin.conf": "8bc5ee42ed516a283ff41d8a81eaa731a1f5a1fca5dc592bd3e62ab282d9a099"
+  },
+  "r13_full_candidate_manifest_sha256": "dd97baecb6edb5f44b58704258f8815507f212117b9c044c9a8d0594311f00ac",
+  "schema_version": 1,
+  "scope": "public V4Y-046 already compiled input -> V4Y-056 R13 release",
+  "v4y046_base_files": [
+    {
+      "path": "assets/AuthPage-DdPolTCV-v4y046-category-social-r1.js",
+      "sha256": "4e209f6ceb101776ac10538f25df3afe05f1c8833392d1c77714832815751aa4"
+    },
+    {
+      "path": "assets/CartDrawer-C-5Jk24c-v4y046-category-social-r1.js",
+      "sha256": "7966e15985e418347971829b45dcf02f44e55a1b203274d77be7d61ce2e9cddf"
+    },
+    {
+      "path": "assets/Categories-D3F5K7Iz-v4y046-category-social-r1.js",
+      "sha256": "a5f564d834fb28ec21e17f8fbf5a2fc06761341d84f350eee43a9631d983abb8"
+    },
+    {
+      "path": "assets/Checkout-DmmfmeKk-v4y046-category-social-r1.js",
+      "sha256": "982595a0e70d92eefb66396847ae7cac9b003bff6e08dd1a3ad5da82309a13ac"
+    },
+    {
+      "path": "assets/Help-CoUxhEzf-v4y046-category-social-r1.js",
+      "sha256": "6a0e7eed0292df512fe9f5e6a8aff3a36ce2cffe8f0925e745b0216226a968b7"
+    },
+    {
+      "path": "assets/Home-MLk-Vyxe-v4y046-category-social-r1.js",
+      "sha256": "6f98c108479385a6902d8f74f77449705e2aac0f1509a72a104807b4cd7776fb"
+    },
+    {
+      "path": "assets/NotFound-CJDcyxdR-v4y046-category-social-r1.js",
+      "sha256": "718fd0b4ecd2402cf9a4e6f827caadceb9a5dc020f2b6f97a45a1a9db27b0cfc"
+    },
+    {
+      "path": "assets/Offers-BRa1Xh-o-v4y046-category-social-r1.js",
+      "sha256": "63f227de9e45314fdb6677e8a19350e19cf01cfdd27f43533d2bbe432e887efb"
+    },
+    {
+      "path": "assets/OrderSuccess-DuVYT0jB-v4y046-category-social-r1.js",
+      "sha256": "596b3546f87792525bed48ace1b76af8ab510f218966fc7f0da36a620e7d04b7"
+    },
+    {
+      "path": "assets/OrderTracking-D7tSHMZQ-v4y046-category-social-r1.js",
+      "sha256": "4ff6a04b4d87411ca50222f6e12d370e884b32de6a3929ba03c83f1b5753961c"
+    },
+    {
+      "path": "assets/Orders-Cn6lwD6k-v4y046-category-social-r1.js",
+      "sha256": "25380ee865102c53edd56d011d9fb63ef3a86e4a0b91fe195f900f202952fdb7"
+    },
+    {
+      "path": "assets/OutsideDeliveryRequests-ClStqVLS-v4y046-category-social-r1.js",
+      "sha256": "4a885da219e66b8a03b1037cb7b0c78128fb273a156687bd5048fc38b6d59f8b"
+    },
+    {
+      "path": "assets/PasswordRecovery-XOXlX37H-v4y046-category-social-r1.js",
+      "sha256": "dc62ae37861b0fec3c50f467d4d6135e0605976d76def087b2b4bf9d26a41d40"
+    },
+    {
+      "path": "assets/PaymentTestProduct-CrM0dV54-v4y046-category-social-r1.js",
+      "sha256": "23862709e68bd64cc1c10e484442d673c44566612f1784ddcfb56bf5e02c0265"
+    },
+    {
+      "path": "assets/Privacy-BhC6qJ0h-v4y046-category-social-r1.js",
+      "sha256": "55963383b28eda77fd3bb8bb75785fd3d615edc30873813e667bf7b03d0550e9"
+    },
+    {
+      "path": "assets/ProductCard-qnCHrzMh-v4y046-category-social-r1.js",
+      "sha256": "fede3c0372bb0f85238daae49cadefe9095ec21ef3178c078c6ccc96f89b9564"
+    },
+    {
+      "path": "assets/ProductDetail-CvQ_LhJ--v4y046-category-social-r1.js",
+      "sha256": "b48801b86143c4f317c9a67336adcdb55af5db34fd46b7ad23544f114a8d4144"
+    },
+    {
+      "path": "assets/ProductPagination-D112Lo5A-v4y046-category-social-r1.js",
+      "sha256": "3ebdfc4e4c5b7797177d7fecc9fe356780ec6935f28140f0b895893af79cee1c"
+    },
+    {
+      "path": "assets/Products-DSTsw2bW-v4y046-category-social-r1.js",
+      "sha256": "d7726a76bb8858530f0be369fc388b19d0f4f0b86f465508a5305c0169d1a225"
+    },
+    {
+      "path": "assets/Profile-B5Zhrhx3-v4y046-category-social-r1.js",
+      "sha256": "f8d5dfa5d607bd85fe68523f8c930e953e79e63a5e8c1a82e2156ea5a85b0795"
+    },
+    {
+      "path": "assets/Returns-B0TWXGCR-v4y046-category-social-r1.js",
+      "sha256": "58bfcfc43b84bc9e5629c5755ecf5209d08eec11db0a49b35180bafd0de98418"
+    },
+    {
+      "path": "assets/SEO-DZgr-RBr-v4y046-category-social-r1.js",
+      "sha256": "e7332ea3f38faee80ecda1ab677e24270454aa720f0c9828275c14f14a3428f1"
+    },
+    {
+      "path": "assets/StoreDetail-b161Q6hN-v4y046-category-social-r1.js",
+      "sha256": "26f93577d7f99fc6f075473dc42e61edf265c5eb6db55477c33874bf0fb5ab1d"
+    },
+    {
+      "path": "assets/StoreImage-DwkkglaO-v4y046-category-social-r1.js",
+      "sha256": "95ecd5a21285c46f660f8f5ee7a88740134848c5c18b91f3c37f122ca958a533"
+    },
+    {
+      "path": "assets/Stores-DEM_OnT8-v4y046-category-social-r1.js",
+      "sha256": "bc4f1877a72147eb36feb0a96b4edbcec24fdb62176305a4280b0799ad901e0d"
+    },
+    {
+      "path": "assets/Terms-B1E-Y1qk-v4y046-category-social-r1.js",
+      "sha256": "71ea94dca353ec29741d5eff21f3a019e1c8ae327052524815a20d806fe9fdad"
+    },
+    {
+      "path": "assets/VendorOnboarding-BsmUPytx-v4y046-category-social-r1.js",
+      "sha256": "bbdf6afc7ba5f2dd07f72ff3f1d838a5e9345da56ea3fbb843910f6a1f8d2675"
+    },
+    {
+      "path": "assets/Wishlist-DoTTiRsZ-v4y046-category-social-r1.js",
+      "sha256": "51aa56a989aa82bb636d4787ac13e18c849e13a67c2a35c70e06f61f31d3780e"
+    },
+    {
+      "path": "assets/arrow-right-DhLnpMvV-v4y046-category-social-r1.js",
+      "sha256": "819887080a06298a7668f20ec40dcf496b8664a2fe787ac6a796be63411717d1"
+    },
+    {
+      "path": "assets/categories-C-uMYXyt-v4y046-category-social-r1.js",
+      "sha256": "1f4119c9be577af065e0f936d074c28e6aed7be3914552ccc7e90259f2fc9174"
+    },
+    {
+      "path": "assets/chevron-left-Ce9od1i3-v4y046-category-social-r1.js",
+      "sha256": "ef1f8278680258c122d471015a6e677195ae54e590386a42228aa479a755e82b"
+    },
+    {
+      "path": "assets/chevron-right-BBZulVyo-v4y046-category-social-r1.js",
+      "sha256": "4c386b4e1838a3a1156bde64eae4effb76c6b227dd144f52296d23b6eb73ca98"
+    },
+    {
+      "path": "assets/circle-check-94cP9Asr-v4y046-category-social-r1.js",
+      "sha256": "28a3a4ad57607f3305e05d30f3f08e20481b07d376c750f4a52f3c44b8037eec"
+    },
+    {
+      "path": "assets/circle-check-big-YxfPTOvn-v4y046-category-social-r1.js",
+      "sha256": "830219f6eab5c3e6834a630194cf4b1537cb8699291e9999ef62f788575a653f"
+    },
+    {
+      "path": "assets/circle-x-D-PISaFi-v4y046-category-social-r1.js",
+      "sha256": "25f72c54e277ef8036887a634e6f1b839f48d6f6547762faff6e51b240bf1088"
+    },
+    {
+      "path": "assets/clock-3-DqLyMaZJ-v4y046-category-social-r1.js",
+      "sha256": "72c27ec2fd48da6446ee64594858c65c6470bcb9433a6a84bfe4a3d32122dae6"
+    },
+    {
+      "path": "assets/deliveryRequestApi-CZpm9t97-v4y046-category-social-r1.js",
+      "sha256": "3df583633a40f901023dcda2dbb435349f247e15b3d205501c70444c33225cbe"
+    },
+    {
+      "path": "assets/firebaseClient-B8Q2FPL--v4y046-category-social-r1.js",
+      "sha256": "fca013771821dcce3e937d4f36ef398e63e59c26d424070e4ee876e0569ed627"
+    },
+    {
+      "path": "assets/index-MMTPd8z_-v4y046-category-social-r1.js",
+      "sha256": "ae7a452633379c3dfe982fa30b9ced10863bfb2f6855ece94204777f97f00f9d"
+    },
+    {
+      "path": "assets/map-pin-l8Oy_Rp3-v4y046-category-social-r1.js",
+      "sha256": "a7ca58a822a6d8a24e547b28ae2b451d4cf7d60524265907b8b34afa005279dc"
+    },
+    {
+      "path": "assets/navigation-CO5d9oN5-v4y046-category-social-r1.js",
+      "sha256": "34eeef8fc50f805ba6dc09c905298ad121a7cea092ebb1840b4f9f44389e4a56"
+    },
+    {
+      "path": "assets/package-BUraWBKW-v4y046-category-social-r1.js",
+      "sha256": "236b0c8ba83d81fe508c35bae21c7a44156c3f869ff1405c1404b01f50d7443e"
+    },
+    {
+      "path": "assets/paymentApi-P94e14Sf-v4y046-category-social-r1.js",
+      "sha256": "7bd7b092b63c72b5a33c3210e4874e06c10c95e5dfc132a78bff132dbffad64e"
+    },
+    {
+      "path": "assets/plus-Br5X9t6--v4y046-category-social-r1.js",
+      "sha256": "d2433b9dadada6052a23e41bd51544ce168896bb2784694869152d7dc9da9d1d"
+    },
+    {
+      "path": "assets/products-DDTJzgQ3-v4y046-category-social-r1.js",
+      "sha256": "316fe4aca00aa13cc17ea7767ee32fb56ee08c8dcfc3d97c2ddd52373f56734c"
+    },
+    {
+      "path": "assets/rotate-ccw-DQL9F9zB-v4y046-category-social-r1.js",
+      "sha256": "a16fa6fe4b5ce2ae053e903b14582e469197c8d850545eb8a6e258ff684e7839"
+    },
+    {
+      "path": "assets/save-Bzq3yNjr-v4y046-category-social-r1.js",
+      "sha256": "b02e49f95f68fb2d97d62308ff617059171079954d029d460a9248b6c4e8da45"
+    },
+    {
+      "path": "assets/star-DRsAYDnG-v4y046-category-social-r1.js",
+      "sha256": "c8d5a8cc3af6587b0b1e15fb64acd5335b5655e5ce37a40b71a8bc34c60fc17e"
+    },
+    {
+      "path": "assets/tag-DASHTBgF-v4y046-category-social-r1.js",
+      "sha256": "fac82cb0437c7e043a1896cdca42400163eaee7db624361dc0b1ed79c99e6514"
+    },
+    {
+      "path": "assets/trash-2-Bcyafx5t-v4y046-category-social-r1.js",
+      "sha256": "a0e3038d873dda0ca5b6ae7bacdbe3d10656f6b7c9f384197284535b91f7b028"
+    },
+    {
+      "path": "assets/triangle-alert-CyYC8VH9-v4y046-category-social-r1.js",
+      "sha256": "ee643887176bebf0c94ed176eb727b8429ae6194116012a1c420697bde1e02c0"
+    },
+    {
+      "path": "assets/truck-CCwIHnPl-v4y046-category-social-r1.js",
+      "sha256": "ee9ddfbb6ec93390783babfa80b6861085f04e7a83675179a86fb4bbcc995acc"
+    },
+    {
+      "path": "assets/useProductPagination-DQRotuP9-v4y046-category-social-r1.js",
+      "sha256": "e1d7036e8376fb8f84127d2ccb36046425a22c4f5eaa2bf458eaeba787590836"
+    },
+    {
+      "path": "index.html",
+      "sha256": "e9e904068c4a6e3589862363d082f72efb704cb0e80530ae8c31b0c70d6d58f3"
+    }
+  ],
+  "v4y046_manifest_sha256": "038dec55f34f8fdb1f80be5305fe7ad3488267cd87c3c7ea07a3e39065c3430b"
+}
