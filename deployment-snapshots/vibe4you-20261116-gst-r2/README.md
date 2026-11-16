@@ -75,3 +75,19 @@ isolated Windows sync worktree. However, the generated frontend is NOT the
 same as the deployed Search V2 R2 plus overlays. See BUILD_PARITY.md
 for the exact hash/entrypoint comparison. This branch remains a draft source
 alignment effort, not an authorized production deployment package.
+
+## GST source reconciliation completed in isolated branch
+
+- Authentic 12-identity GST Phase 1 registry (3720 bytes) proven equal to
+  both service-restricted deployed registry SHA-256 values.
+- Exact receipt_pdf.py production source now promoted to scripts/, shared
+  by both Admin and Public deployed copies.
+- Updated tests for deployed Customer Bill/PAYMENT RECEIPT format.
+- 30 focused GST/receipt parity tests passed, including synthetic
+  5% and 18% customer GST figures, fail-closed policy, historical
+  state alias, and unchanged customer totals.
+- 93 backend/Admin/review tests passed with deployed receipt source.
+
+Production payments, orders, GST registry and services were not touched.
+The source snapshot is still NOT an authorized live deployment package;
+other Admin/Public and frontend source alignment gates remain.

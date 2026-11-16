@@ -9,3 +9,5 @@ tax_document_pdf.py -text whitespace=-blank-at-eol,-blank-at-eof,-space-before-t
 order_documents.py -text whitespace=-blank-at-eol,-blank-at-eof,-space-before-tab,cr-at-eol
 order_profit.py -text whitespace=-blank-at-eol,-blank-at-eof,-space-before-tab,cr-at-eol
 styledash_registration_email.py -text whitespace=-blank-at-eol,-blank-at-eof,-space-before-tab,cr-at-eol
+gst_phase1_registry.py -text whitespace=-blank-at-eol,-blank-at-eof,-space-before-tab,cr-at-eol
+receipt_pdf.py -text whitespace=-blank-at-eol,-blank-at-eof,-space-before-tab,cr-at-eol

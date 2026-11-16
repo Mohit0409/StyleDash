@@ -55,6 +55,13 @@ class ProductionSnapshotParity(unittest.TestCase):
                 if other in self.hashes:
                     self.assertEqual(self.hashes[rel], self.hashes[other])
 
+    def test_production_receipt_source_exactly_matches_admin_and_public(self):
+        expected = "eee783b343739237d9bcab2e59e5fe1c0c9d6b35300733bb6edaa64db9f84c3f"
+        source = digest(ROOT / "scripts/receipt_pdf.py")
+        self.assertEqual(source, expected)
+        self.assertEqual(source, self.hashes["admin/receipt_pdf.py"])
+        self.assertEqual(source, self.hashes["server/receipt_pdf.py"])
+
     def test_exact_deployed_static_pages_in_vite_public(self):
         locations = {
             "server/verify-email.html": "public/verify-email.html",
@@ -73,7 +80,12 @@ class ProductionSnapshotParity(unittest.TestCase):
             sorted(self.manifest.get("unreadable_paths", [])),
             ["admin/gst_phase1_registry.py", "server/gst_phase1_registry.py"],
         )
-        self.assertFalse((ROOT / "scripts/gst_phase1_registry.py").exists())
+        # These server files are unreadable nonroot, but their exact checksum
+        # is accessible in the pinned production integrity manifest.
+        self.assertEqual(
+            digest(ROOT / "scripts/gst_phase1_registry.py"),
+            "3244c8adf4d387474462b3ab9a3d1aa6884ad2fdba30ffcbc37c427d7f824c3f",
+        )
 
 
 if __name__ == "__main__":
