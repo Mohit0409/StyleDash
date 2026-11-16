@@ -169,3 +169,14 @@ links, tamper detection and source classification. The Vite build
 does not yet reproduce current production, and no deployer consumes
 this snapshot. These ten out-of-manifest assets should be included
 in a separately reviewed future guarded integrity/backup release.
+
+## Recovered editable Search V2 R2 source
+
+The archived November 14 Search V2 R2 source candidate has been
+incorporated (eleven TS/TSX changes). The isolated Vite build now
+reproduces all 61 files from its normal prepatch dist/, plus five
+already-recovered public static assets. TypeScript and 225 frontend
+unit tests pass. The final versioned production bundle and all overlays
+still require an auditable release transformation and browser E2E.
+Do not deploy this intermediate build. See
+SEARCH_V2_EDITABLE_SOURCE_RECOVERY.md for the evidence and limits.

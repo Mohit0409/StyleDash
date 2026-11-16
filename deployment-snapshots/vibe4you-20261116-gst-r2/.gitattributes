@@ -1,2 +1,3 @@
 deployed/** -text whitespace=-blank-at-eol,-blank-at-eof,-space-before-tab,cr-at-eol
 code-manifest.json -text whitespace=-blank-at-eol,-blank-at-eof,-space-before-tab,cr-at-eol
+search-v2-source-build-proof.json -text whitespace=-blank-at-eol,-blank-at-eof,-space-before-tab,cr-at-eol

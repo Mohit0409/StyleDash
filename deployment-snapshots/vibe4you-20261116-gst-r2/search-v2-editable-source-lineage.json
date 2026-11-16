@@ -1,0 +1,73 @@
+{
+  "scope": "editable TS/TSX source candidate from historical Search V2 R2 Windows release",
+  "release_payload_bytes_match_active_live_homepage_main_and_products": true,
+  "not_yet_proven_reproducible_source_build": true,
+  "source_files": [
+    {
+      "path": "src/components/HomepageMerchandising.tsx",
+      "sha256": "7f143cb961b4fb891e5232b8c2eb4461810b779c6f58a207fbfdae3b550ff14d",
+      "previous_source_sha256": "8eceaec17fc47de8e8c90b2106f82c7a18c08813f31d8a2997328ac289357218",
+      "candidate": "StyleDash-search-v2-relevance-r2-20261114"
+    },
+    {
+      "path": "src/pages/Products.tsx",
+      "sha256": "3be613b86494983edd6c9c516bdf7a481b05922829b13cbfb371e28406e49b08",
+      "previous_source_sha256": "9a1bd44982c59344c947597359933850a1c8eede756b23bc798b6cfe3786b47c",
+      "candidate": "StyleDash-search-v2-relevance-r2-20261114"
+    },
+    {
+      "path": "src/services/paymentApi.ts",
+      "sha256": "082d7130588931248be154c0ce3c2a8886b7c511cc4ef7c930a0824d0dc8526d",
+      "previous_source_sha256": "e4d3a59b902440d56df36ab88059198939ddb5307ae0e132750b62b557a8f186",
+      "candidate": "StyleDash-search-v2-relevance-r2-20261114"
+    },
+    {
+      "path": "src/tests/homepageSectionIcons.test.tsx",
+      "sha256": "170058165a126eca1610a75a3c7d03de3624dc9b291815deccf0f60c2166aacc",
+      "previous_source_sha256": null,
+      "candidate": "StyleDash-search-v2-relevance-r2-20261114"
+    },
+    {
+      "path": "src/tests/paymentApi.test.ts",
+      "sha256": "03442afad7ebc253e43b0ab68909930c4aeddfd3b171b353e2a4e15ec9a43676",
+      "previous_source_sha256": "6ca3f89f520d3a246426ab99c000d0fbcf7bd19f6c2f373dd1069574c6ad9439",
+      "candidate": "StyleDash-search-v2-relevance-r2-20261114"
+    },
+    {
+      "path": "src/tests/searchEngineV2.test.ts",
+      "sha256": "b81404c679b305177f3bb645b72589c85fe441609f22d7fa4598c32fd23ea34c",
+      "previous_source_sha256": null,
+      "candidate": "StyleDash-search-v2-relevance-r2-20261114"
+    },
+    {
+      "path": "src/tests/searchRelevanceR2.test.ts",
+      "sha256": "7ac1708047841ac36f15ec00ee5e18d220f41d45978186107879d166722bd160",
+      "previous_source_sha256": null,
+      "candidate": "StyleDash-search-v2-relevance-r2-20261114"
+    },
+    {
+      "path": "src/utils/catalogFilters.ts",
+      "sha256": "92f8365712b77582fe694ba6ccad133426551fb09aff4f0a53f432ebbbd1be83",
+      "previous_source_sha256": "5a65188fbfed3cfc19f8809e379a55c61180cf54205e02a76bf64171cccc6708",
+      "candidate": "StyleDash-search-v2-relevance-r2-20261114"
+    },
+    {
+      "path": "src/utils/localSearch.ts",
+      "sha256": "68a525862f04e354025ca33c484a0196f3adea8236be7697a11115fd9bdc9806",
+      "previous_source_sha256": null,
+      "candidate": "StyleDash-search-v2-relevance-r2-20261114"
+    },
+    {
+      "path": "src/utils/searchEngine.ts",
+      "sha256": "eda543054a22e4f1cd1d642441a11e80006ba1307c01ad0dea34cb8386f17fbe",
+      "previous_source_sha256": null,
+      "candidate": "StyleDash-search-v2-relevance-r2-20261114"
+    },
+    {
+      "path": "src/utils/searchSuggestions.ts",
+      "sha256": "9ae87ff2e96364893274add3d2578107d92e3286c05890e892a96842350b4b0c",
+      "previous_source_sha256": "337ac94c00cf3889ca6e5d440cd49cdcf31d0c6a8ea2f748596ed36a0882491f",
+      "candidate": "StyleDash-search-v2-relevance-r2-20261114"
+    }
+  ]
+}

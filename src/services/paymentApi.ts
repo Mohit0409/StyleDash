@@ -208,11 +208,22 @@ export class PaymentApiError extends Error {
   }
 }
 
-async function postJson<T>(
+// Replies that never came from the Vibe4You server as JSON: Cloudflare error
+// pages, a dropped connection, or a network blip. Retrying is safe because
+// every checkout endpoint is idempotent on the server: create-order and COD
+// reuse the same Idempotency-Key, and verify-payment finalizes exactly once.
+const TRANSIENT_CODES = new Set(['invalid_response', 'server_unavailable']);
+export const CHECKOUT_RETRY_DELAY_MS = 700;
+
+const wait = (ms: number) => new Promise<void>((resolve) => { setTimeout(resolve, ms); });
+
+const describeStatus = (status: number) => (status ? ` (HTTP ${status})` : '');
+
+async function postJsonOnce<T>(
   endpoint: string,
   body: unknown,
-  idempotencyKey?: string,
-  fetcher: typeof fetch = fetch,
+  idempotencyKey: string | undefined,
+  fetcher: typeof fetch,
 ): Promise<T> {
   try {
     const headers = {
@@ -230,12 +241,36 @@ async function postJson<T>(
   }
 }
 
+async function postJson<T>(
+  endpoint: string,
+  body: unknown,
+  idempotencyKey?: string,
+  fetcher: typeof fetch = fetch,
+): Promise<T> {
+  try {
+    return await postJsonOnce<T>(endpoint, body, idempotencyKey, fetcher);
+  } catch (error) {
+    if (!(error instanceof PaymentApiError) || !TRANSIENT_CODES.has(error.code)) throw error;
+    await wait(CHECKOUT_RETRY_DELAY_MS);
+    return postJsonOnce<T>(endpoint, body, idempotencyKey, fetcher);
+  }
+}
+
+const withMessage = (error: unknown, message: (status: number) => string): never => {
+  if (error instanceof PaymentApiError && TRANSIENT_CODES.has(error.code)) {
+    throw new PaymentApiError(message(error.status), error.code, error.status);
+  }
+  throw error;
+};
+
 export function createPaymentOrder(
   intent: CheckoutIntent,
   idempotencyKey: string,
   fetcher?: typeof fetch,
 ): Promise<CreatePaymentOrderResponse> {
-  return postJson('/api/create-order', intent, idempotencyKey, fetcher);
+  return postJson<CreatePaymentOrderResponse>('/api/create-order', intent, idempotencyKey, fetcher)
+    .catch((error) => withMessage(error, (status) =>
+      `Secure checkout could not start${describeStatus(status)}. Payment was not taken. Please try again.`));
 }
 
 export function placeCodOrder(
@@ -243,7 +278,10 @@ export function placeCodOrder(
   idempotencyKey: string,
   fetcher?: typeof fetch,
 ): Promise<{ success: true; idempotent: boolean; order: ServerOrder }> {
-  return postJson('/api/place-cod-order', intent, idempotencyKey, fetcher);
+  return postJson<{ success: true; idempotent: boolean; order: ServerOrder }>(
+    '/api/place-cod-order', intent, idempotencyKey, fetcher,
+  ).catch((error) => withMessage(error, (status) =>
+    `We could not confirm your order${describeStatus(status)}. Check Your Orders before trying again.`));
 }
 
 export function verifyPayment(
@@ -251,7 +289,11 @@ export function verifyPayment(
   styleDashOrderId: string,
   fetcher?: typeof fetch,
 ): Promise<{ success: true; pending?: boolean; idempotent: boolean; order: ServerOrder }> {
-  return postJson('/api/verify-payment', { ...response, styleDashOrderId }, undefined, fetcher);
+  return postJson<{ success: true; pending?: boolean; idempotent: boolean; order: ServerOrder }>(
+    '/api/verify-payment', { ...response, styleDashOrderId }, undefined, fetcher,
+  ).catch((error) => withMessage(error, (status) =>
+    `Your payment was sent, but we could not confirm it yet${describeStatus(status)}. `
+    + 'Do not pay again. Check Your Orders in a few minutes.'));
 }
 
 export async function openRazorpayCheckout(

@@ -139,6 +139,19 @@ complete live system build/release reproducibility is NOT established.
    The older Vite-generated JS assets are not yet reproducibly mapped. Do not assume
    copying built dist files back into src makes a valid source build.
 
+5a. **Editable Search V2 R2 source (RECOVERED; final postprocessing pending):**
+   The November 14 search release worktree had exact payload hashes
+   for live Search V2 R2 homepage, main JS and Products chunk.
+   Eleven TS/TSX source edits (six modified and five newly added)
+   have been imported to the isolated branch. All 61 of the archived
+   candidate's normal Vite output files match our new Vite output
+   by filename and SHA-256, with five further public static files
+   retained from earlier sync. TypeScript and 225/225 Vitest tests
+   pass. The separately postprocessed versioned final JS and
+   overlay integration still need an auditable build path;
+   DO NOT deploy the intermediate dist. See
+   SEARCH_V2_EDITABLE_SOURCE_RECOVERY.md.
+
 6. **Owner's Windows edits:** the root Windows checkout has 68 existing
    modified tracked files; a separate combined release checkout has two
    modified catalog JSONs. These must be reviewed, not overwritten or

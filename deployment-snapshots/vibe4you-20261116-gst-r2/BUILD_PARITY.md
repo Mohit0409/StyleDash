@@ -74,3 +74,18 @@ or the actual React source/build reproducibility.
 The files remain **deployed artifacts, not editable application source**.
 Do not substitute them for authored Vite src code or deploy this snapshot
 without a separate guarded build and owner-approved release.
+
+## Editable Search V2 R2 source recovery
+
+The source from StyleDash-search-v2-relevance-r2-20261114 has been
+restored (11 TS/TSX changes) and 225/225 Vitest tests pass.
+The isolated Vite build now matches **all 61 files** of that
+archived candidate's *prepatch* dist/ by name and SHA-256, plus
+five extra production public pages/assets.
+
+This does NOT contradict the earlier production mismatch: the
+active live Search V2 R2 bundle has postprocessed filenames and code.
+Those compiled assets, CSS and overlays remain separate from the
+reconstructed editable build. No one should deploy dist/ as-is.
+See SEARCH_V2_EDITABLE_SOURCE_RECOVERY.md and
+search-v2-source-build-proof.json for exact SHA evidence.
