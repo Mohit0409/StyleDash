@@ -53,3 +53,17 @@ Never overwrite production from this branch.
 Deployment verified GST R2 calculations for two orders after release:
 SD-20261107-D5F89A: INR 3.67; SD-20261102-D798E8: INR 346.88.
 The code snapshot does not alter invoices, orders, or tax classifications.
+
+## Source promotion tranche 1 (draft branch only)
+
+Ten previously missing, non-divergent production Python modules have been copied
+byte-for-byte into isolated Git worktree scripts/ tree. A stdlib unittest verifies
+them against the pinned live production snapshot.
+
+Previously existing scripts/receipt_pdf.py and both server entrypoints remain
+unchanged. The protected Phase 1 registry module remains unavailable via
+non-root SSH; never substitute the test-only shim for actual production code.
+
+This is not yet a complete runnable production application. Do not deploy
+from this branch until dependencies, Admin/Public divergences and full tests
+are reconciled.

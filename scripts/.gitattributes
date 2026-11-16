@@ -1,0 +1,11 @@
+# Exact byte-for-byte deployed source mirrors, no Windows newline rewriting.
+billing_audit.py -text whitespace=-blank-at-eol,-blank-at-eof,-space-before-tab,cr-at-eol
+gst_catalog_review.py -text whitespace=-blank-at-eol,-blank-at-eof,-space-before-tab,cr-at-eol
+gst_invoice_draft.py -text whitespace=-blank-at-eol,-blank-at-eof,-space-before-tab,cr-at-eol
+gst_official_suggestions.py -text whitespace=-blank-at-eol,-blank-at-eof,-space-before-tab,cr-at-eol
+invoice_ledger.py -text whitespace=-blank-at-eol,-blank-at-eof,-space-before-tab,cr-at-eol
+invoice_order_adapter.py -text whitespace=-blank-at-eol,-blank-at-eof,-space-before-tab,cr-at-eol
+tax_document_pdf.py -text whitespace=-blank-at-eol,-blank-at-eof,-space-before-tab,cr-at-eol
+order_documents.py -text whitespace=-blank-at-eol,-blank-at-eof,-space-before-tab,cr-at-eol
+order_profit.py -text whitespace=-blank-at-eol,-blank-at-eof,-space-before-tab,cr-at-eol
+styledash_registration_email.py -text whitespace=-blank-at-eol,-blank-at-eof,-space-before-tab,cr-at-eol
