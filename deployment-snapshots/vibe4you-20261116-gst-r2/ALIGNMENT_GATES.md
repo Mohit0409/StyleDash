@@ -26,6 +26,34 @@ ec13b4f28f99b26f3cf468412d77a651b8596decc1cb5afb1012170bac11a126
 
 These numbers describe source-path hash matches, not a production-ready build.
 
+## Target-specific, offline source assembly (completed for captured backend/static code)
+
+- The new deployment-targets/vibe4you-20261116-r2/source-map.json
+  records 60 verified, backend/static Admin/Public target files.
+- 42 captured targets resolve directly to matching existing source files.
+- 16 legacy or missing Admin/Public target-specific code files have
+  distinct, hash-pinned canonical source copies under
+  deployment-targets/vibe4you-20261116-r2/targets/.
+  Admin/Public variants are deliberately kept separate and not flattened
+  to the older Termux installer's shared scripts/ filename.
+- Both protected GST Phase 1 targets resolve to the same genuine,
+  hash-verified scripts/gst_phase1_registry.py source.
+- The generated server/index.html is explicitly excluded because
+  the current Vite build still differs from Search V2 R2 production.
+- scripts/assemble_pinned_server_code.py performs offline, fail-closed
+  hash validation and optional local temporary staging. It is NOT
+  connected to deployment scripts, cannot change live services or
+  accounting data, and may only create a new directory under OS temp.
+- The original, older Termux deployment script is NOT changed.
+  It would still flatten divergent code and must not deploy this branch.
+- 10 isolated assembly tests verify exact source hashes, Admin/Public
+  separation, forbidden paths, no private runtime files, generated
+  homepage omission, source drift denial, and repeatable temp staging.
+
+Selected backend/static source-target assembly is reproducible;
+complete live system build/release reproducibility is NOT established.
+
+
 ## Highest-priority unresolved dependencies
 
 1. **GST Phase 1 registry (RESOLVED):** exact 3720-byte source recovered
@@ -67,12 +95,14 @@ These numbers describe source-path hash matches, not a production-ready build.
    mock cleanup checks passed 28/28, and the combined suite passed
    173/173.
 
-3. **Admin/Public divergent modules:** some deploy targets share a filename
-   but have different SHA-256 digests. Each must keep a separate build
-   mapping or a reviewed common-code extraction, not a blind overwrite.
-   Examples include serve.py, tax_classification_registry.py,
-   invoice_admin_gateway.py, catalog_normalization.py, styledash_security.py,
-   styledash_shops.py, and store_categories.py.
+3. **Admin/Public divergent modules (SOURCE MAP RESOLVED,
+   runtime integration remains pending):** 16 missing/divergent files
+   now have separate, production-hash-pinned source paths and an
+   offline assembly workflow. These include serve.py, tax classification,
+   invoice gateways, catalog normalization, shops, security and categories.
+   Existing Termux/Ubuntu release install scripts do NOT yet use this map.
+   The separate runtime entrypoints/dependency relationships still require
+   integration, security review and guarded deployment design.
 
 4. **Reviews v5 and photo migration source (RESOLVED):** both deployed
    Admin/Public styledash_reviews.py modules have the identical SHA-256
@@ -110,8 +140,10 @@ These numbers describe source-path hash matches, not a production-ready build.
 
 ## Proposed next integration sequence
 
-1. Design a dedicated build mapping for the divergent Public/Admin
-   entrypoints and tax/shops/security modules.
+1. Integrate the new 60-target code source map into a reviewed
+   offline runtime build, verify Admin/Public imports/entrypoints
+   independently, and design a separately approved guarded deployment.
+   Do not execute old Termux deployment installers against Ubuntu.
 2. Extend end-to-end invoice issue/read invariants with safe synthetic
    historical-order test fixtures (receipt/registry source now aligned).
 3. Validate review-photo browser upload/rendering end-to-end in an isolated

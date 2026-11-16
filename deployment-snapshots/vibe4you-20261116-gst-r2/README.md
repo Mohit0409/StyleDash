@@ -132,3 +132,20 @@ A synthetic 2x2 WebP covers photo access before/after moderation and
 malformed-photo denial, not real-world browser upload rendering.
 Focused review 15 tests and combined backend/security/GST 177 tests PASS.
 Live server and user data were not touched.
+
+
+## Distinct Admin/Public source targets
+
+The original captured 59 non-sensitive files remain immutable.
+A new source map under deployment-targets/vibe4you-20261116-r2/
+tracks 60 hash-verified backend/static targets: 58 directly observed
+production-code files plus 2 genuine Phase 1 GST registry targets.
+Sixteen source files with divergent or missing legacy source paths
+are stored separately by their Admin/Public runtime destination.
+The generated server/index.html is excluded.
+
+scripts/assemble_pinned_server_code.py --check performs zero-write
+validation. Its --output option only permits a new OS-temp staging
+directory. Ten targeted safety tests passed. The obsolete Termux
+deployment installer is unchanged and must NOT be used to deploy
+this code. This is not a complete website/source/production match.
