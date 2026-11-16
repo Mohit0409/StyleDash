@@ -66,6 +66,7 @@ class ProductionSnapshotParity(unittest.TestCase):
         for deployed, source in locations.items():
             with self.subTest(deployed=deployed):
                 self.assertEqual(digest(ROOT / source), self.hashes[deployed])
+        self.assertFalse((ROOT / "public/.gitattributes").exists())
 
     def test_unreadable_modules_are_explicitly_excluded(self):
         self.assertEqual(

@@ -67,3 +67,11 @@ non-root SSH; never substitute the test-only shim for actual production code.
 This is not yet a complete runnable production application. Do not deploy
 from this branch until dependencies, Admin/Public divergences and full tests
 are reconciled.
+
+## Frontend build verification
+
+Typecheck, 192/192 frontend unit tests, and Vite build all pass in the
+isolated Windows sync worktree. However, the generated frontend is NOT the
+same as the deployed Search V2 R2 plus overlays. See BUILD_PARITY.md
+for the exact hash/entrypoint comparison. This branch remains a draft source
+alignment effort, not an authorized production deployment package.
