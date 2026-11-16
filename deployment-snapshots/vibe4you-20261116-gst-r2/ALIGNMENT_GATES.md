@@ -10,9 +10,9 @@ ec13b4f28f99b26f3cf468412d77a651b8596decc1cb5afb1012170bac11a126
 ## Measured from the isolated sync worktree
 
 - 59 deployed non-sensitive code files snapshot-verified byte-for-byte.
-- 38 of these have a byte-identical mapped source file in the sync worktree.
-- 14 map to an existing but different source file.
-- 7 lack an existing source path according to the conservative mapper.
+- 40 of these have a byte-identical mapped source file in the sync worktree.
+- 13 map to an existing but different source file.
+- 6 lack an existing source path according to the conservative mapper.
 - Two Phase 1 GST registry modules remain unreadable by nonroot SFTP, but
   an exact-SHA copy of their genuine 3720-byte source was recovered in an
   older Windows worktree and promoted to scripts/gst_phase1_registry.py.
@@ -56,6 +56,16 @@ These numbers describe source-path hash matches, not a production-ready build.
    suites passed 55/55, then the wider backend/receipt/review/security
    suite passed 144/144. The deployed module is still a component
    of the older build and not an authorized production release.
+
+2c. **Public Firebase account-deletion cleanup (RESOLVED):**
+   The exact live server/styledash_firebase.py now matches
+   scripts/styledash_firebase.py, including the separate
+   delete_firebase_user helper. The pre-existing federation/login
+   functions were unchanged in the source delta. All Firebase SDK
+   interactions in new regression tests were mocked, with no real
+   user-deletion or network activity. Existing federated-auth plus
+   mock cleanup checks passed 28/28, and the combined suite passed
+   173/173.
 
 3. **Admin/Public divergent modules:** some deploy targets share a filename
    but have different SHA-256 digests. Each must keep a separate build

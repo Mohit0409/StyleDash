@@ -81,6 +81,12 @@ class ProductionSnapshotParity(unittest.TestCase):
             self.hashes["admin/styledash_admin.py"],
         )
 
+    def test_firebase_account_cleanup_source_matches_production(self):
+        self.assertEqual(
+            digest(ROOT / "scripts/styledash_firebase.py"),
+            self.hashes["server/styledash_firebase.py"],
+        )
+
     def test_production_admin_html_css_js_byte_identical(self):
         files = {
             "admin/admin/index.html": "server/admin/index.html",

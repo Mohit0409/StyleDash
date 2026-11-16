@@ -108,3 +108,13 @@ byte-for-byte to the isolated Windows scripts/styledash_admin.py.
 The source SHA-256 agrees with the pinned deployed-code manifest.
 Admin/security 55 tests and the broader 144-test backend regression
 suite passed. No production access or writes occurred for this promotion.
+
+## Firebase account deletion source alignment
+
+The exact server/styledash_firebase.py production module is now aligned
+with scripts/styledash_firebase.py (same SHA-256 as the pinned live manifest).
+The deployed delta adds best-effort Firebase Auth account cleanup on
+customer deletion. New tests mock every Firebase call, checking valid,
+invalid, already-deleted, and backend-error paths; no real deletion occurs.
+28 Firebase/federated-auth tests and 173 combined backend tests passed.
+This is source synchronization only; production remains untouched.
