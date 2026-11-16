@@ -118,3 +118,17 @@ customer deletion. New tests mock every Firebase call, checking valid,
 invalid, already-deleted, and backend-error paths; no real deletion occurs.
 28 Firebase/federated-auth tests and 173 combined backend tests passed.
 This is source synchronization only; production remains untouched.
+
+## Review v5 moderation source alignment
+
+Both deployed Admin/Public review modules were proven to have the identical
+SHA-256, and the exact production module is restored to
+scripts/styledash_reviews.py in this isolated branch.
+The tests now use the deployed signed-in/unverified review policy, enforce
+private-until-approved publication, reset to pending on edit, retain cross-
+user edit/delete and own-store review restrictions, and exercise v2-v5
+migration fixture consistency.
+A synthetic 2x2 WebP covers photo access before/after moderation and
+malformed-photo denial, not real-world browser upload rendering.
+Focused review 15 tests and combined backend/security/GST 177 tests PASS.
+Live server and user data were not touched.

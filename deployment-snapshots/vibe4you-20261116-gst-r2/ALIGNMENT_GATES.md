@@ -10,8 +10,8 @@ ec13b4f28f99b26f3cf468412d77a651b8596decc1cb5afb1012170bac11a126
 ## Measured from the isolated sync worktree
 
 - 59 deployed non-sensitive code files snapshot-verified byte-for-byte.
-- 40 of these have a byte-identical mapped source file in the sync worktree.
-- 13 map to an existing but different source file.
+- 42 of these have a byte-identical mapped source file in the sync worktree.
+- 11 map to an existing but different source file.
 - 6 lack an existing source path according to the conservative mapper.
 - Two Phase 1 GST registry modules remain unreadable by nonroot SFTP, but
   an exact-SHA copy of their genuine 3720-byte source was recovered in an
@@ -74,14 +74,17 @@ These numbers describe source-path hash matches, not a production-ready build.
    invoice_admin_gateway.py, catalog_normalization.py, styledash_security.py,
    styledash_shops.py, and store_categories.py.
 
-4. **Review policy + schema migrations:** production's common
-   styledash_reviews.py is newer. An isolated trial replacement caused
-   4 older baseline test failures and 2 errors: legacy delivered-purchase
-   expectations no longer match deployed review eligibility; migration
-   fixtures lack the photo_webp column. The attempted replacement was
-   REVERTED in the branch. The original 12 review tests pass again.
-   Correctly update migrations and contractual tests to reflect the
-   desired current policy before moving this module.
+4. **Reviews v5 and photo migration source (RESOLVED):** both deployed
+   Admin/Public styledash_reviews.py modules have the identical SHA-256
+   and now match the isolated scripts/styledash_reviews.py exactly.
+   Updated legacy tests to enforce the deployed signed-in/unverified review
+   policy, private-until-approved status, re-moderation after editing,
+   IDOR protection, own-store review prohibition and safe v2-v5 schema
+   rollback/migration fixtures. Three added tests cover synthetic WebP
+   photo privacy, rejects invalid images, and photo_webp migration columns.
+   15/15 review tests and 177/177 combined backend/security/GST tests pass.
+   This tests source behavior, NOT browser upload success for real customers.
+   Live production/SQLite/customer records remain untouched.
 
 5. **Generated frontend:** the old Vite source and current deployed index
    and generated JS assets are not yet reproducibly mapped. Do not assume
@@ -111,8 +114,9 @@ These numbers describe source-path hash matches, not a production-ready build.
    entrypoints and tax/shops/security modules.
 2. Extend end-to-end invoice issue/read invariants with safe synthetic
    historical-order test fixtures (receipt/registry source now aligned).
-3. Reconcile reviews and photo migrations against current requirements.
-4. Validate frontend assets and build output equivalence.
+3. Validate review-photo browser upload/rendering end-to-end in an isolated
+   environment (source and unit-level privacy/migrations now aligned).
+4. Validate storefront assets and build output equivalence.
 5. Run end-to-end tests, compare the complete production artifact
    manifest and require explicit owner approval before merging main.
 

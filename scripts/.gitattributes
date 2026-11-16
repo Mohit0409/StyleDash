@@ -13,3 +13,4 @@ gst_phase1_registry.py -text whitespace=-blank-at-eol,-blank-at-eof,-space-befor
 receipt_pdf.py -text whitespace=-blank-at-eol,-blank-at-eof,-space-before-tab,cr-at-eol
 styledash_admin.py -text whitespace=-blank-at-eol,-blank-at-eof,-space-before-tab,cr-at-eol
 styledash_firebase.py -text whitespace=-blank-at-eol,-blank-at-eof,-space-before-tab,cr-at-eol
+styledash_reviews.py -text whitespace=-blank-at-eol,-blank-at-eof,-space-before-tab,cr-at-eol
