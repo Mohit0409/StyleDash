@@ -116,8 +116,27 @@ complete live system build/release reproducibility is NOT established.
    This tests source behavior, NOT browser upload success for real customers.
    Live production/SQLite/customer records remain untouched.
 
-5. **Generated frontend:** the old Vite source and current deployed index
-   and generated JS assets are not yet reproducibly mapped. Do not assume
+5. **Generated frontend (CURRENT RUNTIME REFERENCE CAPTURED,
+   editable-source parity still PENDING):** An isolated read-only copy
+   of 133 currently public files has been SHA-256 verified and stored
+   in frontend-runtime/site/. This includes the pinned Search V2 R2
+   main bundle, 21 directly linked homepage resources, potential
+   transitive Vite literal dependency assets, and PWA icons/service
+   worker. 123 bytes are pinned in the original production integrity
+   manifest; 10 currently served files are NOT present in that
+   manifest and were independently checked against live disk and
+   HTTP response SHA. The latter is a release-integrity coverage gap.
+   Potential bundle dependencies are NOT a browser network trace.
+   Windows release artifact search found exact filename/hash matches
+   for 14 of the 21 directly linked assets (some are compiled outputs,
+   not editable JSX/TSX sources). The code snapshot includes
+   test_active_frontend_runtime.py and offline
+   scripts/verify_pinned_frontend_runtime.py with 8 focused tests.
+   The old Vite source still builds different asset hashes:
+   this is an acceptance/reference snapshot, NOT the editable source
+   or an authorized production deployment payload.
+
+   The older Vite-generated JS assets are not yet reproducibly mapped. Do not assume
    copying built dist files back into src makes a valid source build.
 
 6. **Owner's Windows edits:** the root Windows checkout has 68 existing
@@ -148,7 +167,10 @@ complete live system build/release reproducibility is NOT established.
    historical-order test fixtures (receipt/registry source now aligned).
 3. Validate review-photo browser upload/rendering end-to-end in an isolated
    environment (source and unit-level privacy/migrations now aligned).
-4. Validate storefront assets and build output equivalence.
+4. Use frontend-runtime/ as a byte-exact public reference for
+   reproducing the currently deployed Search V2 R2 and overlay bundle
+   from editable source; separately cover the 10 unmanifested
+   public assets in a future guarded production integrity release.
 5. Run end-to-end tests, compare the complete production artifact
    manifest and require explicit owner approval before merging main.
 

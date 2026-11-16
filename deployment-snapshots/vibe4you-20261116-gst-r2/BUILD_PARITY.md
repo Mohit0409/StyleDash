@@ -59,3 +59,18 @@ not changed dependency policy as part of source alignment.
 
 All comparisons here were read-only for Ubuntu; production files,
 billing records, and customer data were not changed.
+
+## November 16 live runtime capture
+
+An additional exact-byte frontend-runtime/ capsule now captures 133 public
+site/PWA artifacts, verified against the live Ubuntu server. This includes
+the active Search V2 R2 entry JS, direct overlay CSS/JS, potential dynamic
+Vite asset dependencies and PWA icons/service worker. 123 assets match
+the deployed integrity manifest; 10 publicly served files do not appear
+in that manifest but matched both nonroot filesystem and HTTP body hashes.
+This fixes our baseline *visibility*, not production's manifest coverage
+or the actual React source/build reproducibility.
+
+The files remain **deployed artifacts, not editable application source**.
+Do not substitute them for authored Vite src code or deploy this snapshot
+without a separate guarded build and owner-approved release.

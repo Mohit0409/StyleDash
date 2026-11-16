@@ -149,3 +149,23 @@ validation. Its --output option only permits a new OS-temp staging
 directory. Ten targeted safety tests passed. The obsolete Termux
 deployment installer is unchanged and must NOT be used to deploy
 this code. This is not a complete website/source/production match.
+
+## Live storefront runtime acceptance baseline
+
+frontend-runtime/ contains a captured, exact-byte, read-only reference of
+133 publicly served current storefront/PWA files, including all 21
+direct homepage links, the Search V2 R2 bundle's conservatively
+discovered potential asset dependencies and PWA manifest icons/SW.
+123 are in the existing server integrity manifest and ten have
+independent current disk/HTTP SHA-256 proof but lack manifest coverage.
+No customer or private server data is included. A secret-pattern screen
+found no flagged files. Source-lineage inventory identified 14 of
+21 direct homepage references in older exact-byte Windows release
+artifacts; a compiled file is not necessarily editable source.
+
+scripts/verify_pinned_frontend_runtime.py is an OFFLINE integrity check;
+server/tests/test_active_frontend_runtime.py tests its paths, PWA
+links, tamper detection and source classification. The Vite build
+does not yet reproduce current production, and no deployer consumes
+this snapshot. These ten out-of-manifest assets should be included
+in a separately reviewed future guarded integrity/backup release.

@@ -1,0 +1,149 @@
+{
+  "scope": "Windows worktree filenames matching exact public production asset bytes; not proof of editable React source",
+  "searched_project_worktree_roots": 223,
+  "direct_index_assets": [
+    {
+      "asset": "server/assets/ga4-ecommerce-overlay-8475166ca3c64edf.js",
+      "sha256": "8475166ca3c64edf8b50a7db0db0f9974334e8d35f1a8253798eca0dae1cb264",
+      "windows_exact_artifact_candidates": [
+        "StyleDash/.release-ga4-20261019/prod-compatible/ga4-ecommerce-overlay-8475166ca3c64edf.js",
+        "StyleDash/release-artifacts/checkout-paise-consistency-20261022-PREPARED-ONLY/browser-staging-public-assets-NOT-DEPLOYED/web/assets/ga4-ecommerce-overlay-8475166ca3c64edf.js"
+      ]
+    },
+    {
+      "asset": "server/assets/google-ads-base-a30d3812928d86c4.js",
+      "sha256": "a30d3812928d86c48301ef8f46f0aa5fc6e11cf632a6c75733e6bb7bdc06eb5e",
+      "windows_exact_artifact_candidates": [
+        "StyleDash/release-artifacts/google-ads-tag-20261026/release-candidate-20261026/server/assets/google-ads-base-a30d3812928d86c4.js"
+      ]
+    },
+    {
+      "asset": "server/assets/index-BITtbtpM.css",
+      "sha256": "04227d23bf3c0272a6541a3e28eb0d6d8616a5eeac2b18302fdb53193a0eb29c",
+      "windows_exact_artifact_candidates": [
+        "StyleDash-home-rail-no-pagination-20261013/dist/assets/index-BITtbtpM.css",
+        "StyleDash-pagination-20261013/dist/assets/index-BITtbtpM.css",
+        "StyleDash-private-admin-pagination-20261013/dist/assets/index-BITtbtpM.css",
+        "StyleDash/.worktrees/fix-restore-ga4-measurement-20261012/dist/assets/index-BITtbtpM.css",
+        "StyleDash/.worktrees/release-ga4-permanent-staging-20261013/dist/assets/index-BITtbtpM.css",
+        "StyleDash/release-artifacts/checkout-paise-consistency-20261022-PREPARED-ONLY/browser-staging-public-assets-NOT-DEPLOYED/web/assets/index-BITtbtpM.css"
+      ]
+    },
+    {
+      "asset": "server/assets/index-MMTPd8z_-v4y-search-v2-r2.js",
+      "sha256": "2d61891edd2ed343de5f75d92955e65c1bab913e5885547ec977e24430150a4e",
+      "windows_exact_artifact_candidates": [
+        "StyleDash-search-v2-relevance-r2-20261114/qa/guarded-search-v2-r2/payload/assets/index-MMTPd8z_-v4y-search-v2-r2.js"
+      ]
+    },
+    {
+      "asset": "server/assets/mobile-product-gallery-clean-v2-20261031.js",
+      "sha256": "5623b3bbf0ea961df61125899d124c02fc0a6d1ab6b1ec30a850721adfad512d",
+      "windows_exact_artifact_candidates": [
+        "StyleDash/release-artifacts/mobile-product-gallery-clean-v2-20261031/mobile-product-gallery-clean-v2-20261031.js"
+      ]
+    },
+    {
+      "asset": "server/assets/pr150-review-r5-utilities.css",
+      "sha256": "2dff9b8ffcae77d4298c02bf3ec0eb17f50a3bd3507f2bc782f1be847f6f6cdb",
+      "windows_exact_artifact_candidates": [
+        "StyleDash/release-artifacts/checkout-paise-consistency-20261022-PREPARED-ONLY/browser-staging-public-assets-NOT-DEPLOYED/web/assets/pr150-review-r5-utilities.css"
+      ]
+    },
+    {
+      "asset": "server/assets/product-assurances-4b20f50e1398c7cf.css",
+      "sha256": "4b20f50e1398c7cfb971cf85f4817cd9990b622fe2fdd4b8ea105695c2f05f3e",
+      "windows_exact_artifact_candidates": [
+        "StyleDash/.release-product-assurances-20261029/product-assurances-4b20f50e1398c7cf.css"
+      ]
+    },
+    {
+      "asset": "server/assets/product-assurances-cfc8756faf11bb03.js",
+      "sha256": "cfc8756faf11bb0394ac107fa8571cb594d01c87f43ea85e10a3104c16f8aa78",
+      "windows_exact_artifact_candidates": [
+        "StyleDash/.release-product-assurances-20261029/product-assurances-cfc8756faf11bb03.js"
+      ]
+    },
+    {
+      "asset": "server/assets/seller-price-labels-20261018.js",
+      "sha256": "358e26d230ff966d69d788bd841683bfe4278a9defcb73ea9d4842565c5df2cc",
+      "windows_exact_artifact_candidates": [
+        "StyleDash/release-artifacts/checkout-paise-consistency-20261022-PREPARED-ONLY/browser-staging-public-assets-NOT-DEPLOYED/web/assets/seller-price-labels-20261018.js",
+        "StyleDash/release-artifacts/shop-owner-price-labels-20261018/prod-candidate/seller-price-labels-20261018.js",
+        "StyleDash/release-artifacts/shop-owner-price-labels-20261018/v4y-seller-price-labels-20261018-guarded1/seller-price-labels-20261018.js"
+      ]
+    },
+    {
+      "asset": "server/assets/v4y-account-privacy-20261104.js",
+      "sha256": "20f16e8f9091eef7826ed81a2f35c4c8ee7f33c8fb465a6848d6d4611ff74a7a",
+      "windows_exact_artifact_candidates": [
+        "StyleDash-play-privacy/release-artifacts/v4y054-account-deletion-20261104/candidate/v4y-account-privacy-20261104.js",
+        "StyleDash-play-privacy/release-artifacts/v4y054-account-deletion-20261104/deploy/payload/v4y-account-privacy-20261104.js"
+      ]
+    },
+    {
+      "asset": "server/assets/v4y-category-cache-refresh-20261020.js",
+      "sha256": "56ea4220f3f5cc39b342b35bd7198e5e79bf0c2c0f90590aa9c571e9203ed99b",
+      "windows_exact_artifact_candidates": [
+        "StyleDash/.release-category-taxonomy-20261020/candidate/server/assets/v4y-category-cache-refresh-20261020.js",
+        "StyleDash/release-artifacts/checkout-paise-consistency-20261022-PREPARED-ONLY/browser-staging-public-assets-NOT-DEPLOYED/web/assets/v4y-category-cache-refresh-20261020.js"
+      ]
+    },
+    {
+      "asset": "server/assets/v4y-customer-cache-repair-20261020-r2.js",
+      "sha256": "7d0e0a6f697e2a1da24ae95388a48d890b8cec3ddbd697e005a183a125cfc2be",
+      "windows_exact_artifact_candidates": [
+        "StyleDash/release-artifacts/checkout-paise-consistency-20261022-PREPARED-ONLY/browser-staging-public-assets-NOT-DEPLOYED/web/assets/v4y-customer-cache-repair-20261020-r2.js"
+      ]
+    },
+    {
+      "asset": "server/assets/v4y-health-nutrition-cache-refresh-20261021.js",
+      "sha256": "e8c91ac438babe78c53de949e450348d02e261a1cb798afb0ce54c2bac99ae30",
+      "windows_exact_artifact_candidates": [
+        "StyleDash/release-artifacts/checkout-paise-consistency-20261022-PREPARED-ONLY/browser-staging-public-assets-NOT-DEPLOYED/web/assets/v4y-health-nutrition-cache-refresh-20261021.js"
+      ]
+    },
+    {
+      "asset": "server/assets/v4y-mobile-ui-fix-20261021.js",
+      "sha256": "143ef316fe790a0fd29b5deea5b2e7c64d1f5b927d0a4c78fd9e402e8564a31e",
+      "windows_exact_artifact_candidates": [
+        "StyleDash/release-artifacts/checkout-paise-consistency-20261022-PREPARED-ONLY/browser-staging-public-assets-NOT-DEPLOYED/web/assets/v4y-mobile-ui-fix-20261021.js"
+      ]
+    },
+    {
+      "asset": "server/assets/v4y-review-experience-20261103-mobile-photo-v2.js",
+      "sha256": "68bb53fceefd9aae5f6c7e45aff986df29b3b9e445329314789eac078369da9a",
+      "windows_exact_artifact_candidates": []
+    },
+    {
+      "asset": "server/assets/v4y-social-buttons-20261024.js",
+      "sha256": "50b6653d25fd2838a874301f998548d72c9e181f3b9052cf6f53b54e7a462bdc",
+      "windows_exact_artifact_candidates": []
+    },
+    {
+      "asset": "server/favicon.svg",
+      "sha256": "748178ec3563bbc574042deb53ea30b6e4d75b3452c80b3e0b00358a536ac602",
+      "windows_exact_artifact_candidates": []
+    },
+    {
+      "asset": "server/vibe4you-app/icons/apple-touch-icon.png",
+      "sha256": "cc75d57e704e1d8748aca181a7d1f57ed7ba346457907df077117afdb135a9d2",
+      "windows_exact_artifact_candidates": []
+    },
+    {
+      "asset": "server/vibe4you-app/manifest.json",
+      "sha256": "b83f48b4557e12eb7c921468ba85daeac6a9b677a8bfc40f8a06c1c591966e8a",
+      "windows_exact_artifact_candidates": []
+    },
+    {
+      "asset": "server/vibe4you-app/pwa-install.css",
+      "sha256": "24fa4e84969779dbd4f6e574db99874adb89c4eb5ccc4ec54a021be6009a7bfd",
+      "windows_exact_artifact_candidates": []
+    },
+    {
+      "asset": "server/vibe4you-app/pwa-install.js",
+      "sha256": "f8db194dda55094b6466bb27475a98a05c9a92d5f0a39cc00df55e5577632acf",
+      "windows_exact_artifact_candidates": []
+    }
+  ]
+}
