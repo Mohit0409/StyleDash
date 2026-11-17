@@ -31,10 +31,14 @@ The archived backend is historical code, not an authorized production
 replacement. Its 378 KB of code were parsed and screened for high-risk
 literal secret formats before inclusion.
 
-**Limitation:** V4Y-046 itself is compiled public output. The original
-editable React source and exact production V4Y-046 build provenance
-still need to be reconstructed. Separately installed marketing,
-review, SEO, PWA and CSS overlays also remain outside this replay.
+**Limitation:** V4Y-046 itself is compiled public output. The closest
+recorded editable predecessor is now pinned and builds offline, but only
+43/53 modules match after narrow graph-local filename and newline
+normalization (0/53 raw). The provenance evidence classifies V4Y-046 as a
+composite of that source build and later compiled transformations; no single
+editable React build reproduces it exactly. See
+`../../V4Y046_EDITABLE_SOURCE_PROVENANCE.md`. Separately installed
+marketing, review, SEO, PWA and CSS overlays also remain outside this replay.
 
 Together with the other stage replays, the current compiled chain is:
 

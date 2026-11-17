@@ -142,3 +142,27 @@ The compiled transformation chain from **V4Y-046 to deployed Search
 V2 R2** is now reproducible and hash-verified. The chain does NOT yet
 rebuild V4Y-046 from editable React source, or include independent
 PWA, SEO, marketing, review UX, mobile and cache overlays.
+
+## V4Y-046 editable-source provenance classification
+
+Commit `748ac8a60e1665bd7dbd4261ef1816423a5ad342` on the retained
+`origin/feature/store-compact-statistics-20261015` branch is the closest
+recorded editable predecessor. A clean export installs and builds fully
+offline, emitting 54 JavaScript chunks. After replacing only graph-local
+JavaScript basenames and normalizing CRLF/LF, 48/53 modules match the PR150
+archive and 43/53 match V4Y-046. Exact raw equality is 0/53.
+
+The ten V4Y-046 differences are `Categories`, `Checkout`, `ProductDetail`,
+`Profile`, `StoreDetail`, `Stores`, `VendorOnboarding`, `categories`, `index`,
+and `paymentApi`; the source build also has a `storeRating` chunk not present
+in the compiled release. Historical manifests and byte deltas establish that
+V4Y-046 is a composite release containing in-place compiled replacements,
+suffix rewrites, a Checkout patch, a social overlay insertion and a
+post-minification Categories insertion. No single editable React build
+reproduces it exactly.
+
+See `V4Y046_EDITABLE_SOURCE_PROVENANCE.md` and
+`v4y046-editable-source-provenance.json`. This classifies the missing source
+boundary; it does not make the compiled release an authorized deployment
+input. Typed equivalents of the ten differences and independent overlays
+still require reconstruction and parity tests.

@@ -1,0 +1,148 @@
+{
+  "schema_version": 1,
+  "investigation_date": "2026-11-17",
+  "classification": "V4Y-046 is a composite compiled release derived from an editable source build plus post-build transformations; no single editable React build reproduces it exactly",
+  "exact_editable_source_to_v4y046_reproduced": false,
+  "source_candidate": {
+    "repository": "Mohit0409/StyleDash",
+    "remote_branch": "origin/feature/store-compact-statistics-20261015",
+    "commit": "748ac8a60e1665bd7dbd4261ef1816423a5ad342",
+    "commit_date": "2026-10-17T00:02:04+05:30",
+    "commit_subject": "Merge remote-tracking branch 'origin/main' into feature/store-compact-statistics-20261015",
+    "tracked_files_exported": 295,
+    "selected_git_blob_inputs": [
+      {
+        "path": "package.json",
+        "bytes": 1836,
+        "sha256": "246c1c5c21d6aacadf9bf9914ad583b0df04f5fbbd70806c2b7276784f59c53a"
+      },
+      {
+        "path": "package-lock.json",
+        "bytes": 204293,
+        "sha256": "113d0f674625d98fed0bf4fd63fcd85a3e936e02d8a6aaab322ec8193ee8d313"
+      },
+      {
+        "path": "vite.config.ts",
+        "bytes": 363,
+        "sha256": "227bb65ab9848b9cec4e2f48ea44ada6729d34df7dc87e60fc139782e79a356f"
+      },
+      {
+        "path": "src/pages/Categories.tsx",
+        "bytes": 4297,
+        "sha256": "6aca3b0716e349db9cadb2dd238e9198877aa5f9969fdde1ece9d87cb4e96c5d"
+      },
+      {
+        "path": "src/pages/Checkout.tsx",
+        "bytes": 17329,
+        "sha256": "fd545544119d40990b774f6b20747d4de8fcd1e5ac8f936654730c1fdd1104b5"
+      },
+      {
+        "path": "src/pages/StoreDetail.tsx",
+        "bytes": 6143,
+        "sha256": "a9eaebd9b89cbec1ae8fc4e411ea059459590efb29ea3ecf722c5a81d2730460"
+      },
+      {
+        "path": "src/pages/Stores.tsx",
+        "bytes": 8119,
+        "sha256": "bbeb614cab93c9aa8e854386d8967228c80b278447449d929e053d04b9649d4e"
+      },
+      {
+        "path": "src/services/paymentApi.ts",
+        "bytes": 9248,
+        "sha256": "30cfb7e5192525923b074c31f6f2b3de98d523dd68ff2a02b45d93b154e89f1e"
+      },
+      {
+        "path": "src/utils/storeRating.ts",
+        "bytes": 594,
+        "sha256": "f427b71ec413ce7331b1578cc81346a5790648e6f3f323bdd8b79b3104e906c5"
+      }
+    ]
+  },
+  "fresh_offline_build": {
+    "python": "3.12.10",
+    "node": "24.18.0",
+    "npm": "12.0.2",
+    "vite": "5.4.21",
+    "npm_ci_packages": 370,
+    "npm_audit_vulnerabilities": 0,
+    "vite_modules_transformed": 1676,
+    "javascript_chunks": 54,
+    "public_provider_values": "derived in memory from the pinned browser-visible Firebase bundle; values were not printed or written",
+    "network_used": false,
+    "production_contacted": false
+  },
+  "comparison_policy": "Replace only each graph's complete local JavaScript basenames with stable module labels and normalize CRLF/LF; preserve all other bytes. This forensic normalization is not exact build parity.",
+  "pr150_comparison": {
+    "archive_sha256": "256b8ad24749e83b2da0b0a6b0c9cd6bd6fb2eaec315c7ea2ccfd57260ca3003",
+    "archived_javascript_chunks": 53,
+    "candidate_javascript_chunks": 54,
+    "common_modules": 53,
+    "candidate_only_modules": [
+      "storeRating"
+    ],
+    "exact_raw_equal_modules": 0,
+    "filename_and_newline_normalized_equal_modules": 48,
+    "different_modules": [
+      "Checkout",
+      "StoreDetail",
+      "Stores",
+      "index",
+      "paymentApi"
+    ]
+  },
+  "v4y046_comparison": {
+    "baseline_javascript_chunks": 53,
+    "candidate_javascript_chunks": 54,
+    "common_modules": 53,
+    "candidate_only_modules": [
+      "storeRating"
+    ],
+    "exact_raw_equal_modules": 0,
+    "filename_only_normalized_equal_modules": 0,
+    "filename_and_newline_normalized_equal_modules": 43,
+    "different_modules": [
+      "Categories",
+      "Checkout",
+      "ProductDetail",
+      "Profile",
+      "StoreDetail",
+      "Stores",
+      "VendorOnboarding",
+      "categories",
+      "index",
+      "paymentApi"
+    ]
+  },
+  "compiled_release_composition": [
+    "PR150 compiled graph associated with source commit 748ac8a",
+    "five PR150 modules that already differ from the fresh source build plus an extra source-build storeRating chunk",
+    "six recorded in-place compiled replacements: index, Profile, ProductDetail, Checkout, categories and VendorOnboarding",
+    "V4Y-045 five-anchor compiled Checkout patch and graph-wide suffix rewrite",
+    "V4Y-046 graph-wide suffix rewrite and deferred social-overlay index insertion",
+    "V4Y-046 Categories post-minification insertion containing V4Y_Pick and V4Y_Thumb"
+  ],
+  "categories_investigation": {
+    "deployed_chunk": "Categories-D3F5K7Iz-v4y046-category-social-r1.js",
+    "sha256": "a5f564d834fb28ec21e17f8fbf5a2fc06761341d84f350eee43a9631d983abb8",
+    "bytes": 5080,
+    "suffix_renamed_predecessor_bytes": 3726,
+    "inserted_characters": 1354,
+    "deleted_characters": 0,
+    "post_minification_identifiers": [
+      "V4Y_PH",
+      "V4Y_Pick",
+      "V4Y_Thumb"
+    ],
+    "git_history_matches_for_identifiers": 0,
+    "checked_out_categories_tsx_matches_for_thumbnail_logic": 0,
+    "original_builder_found": false
+  },
+  "safety": {
+    "production_writes": false,
+    "database_access": false,
+    "customer_data_access": false,
+    "payment_action": false,
+    "original_windows_checkout_modified": false,
+    "github_main_merged": false
+  }
+}

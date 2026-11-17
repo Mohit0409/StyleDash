@@ -164,9 +164,14 @@ complete live system build/release reproducibility is NOT established.
    SHA manifest match, with 54/54 storefront files equal to the
    later R13 -> R3 input. This completes the *compiled release
    transformation chain* from V4Y-046 through live Search V2 R2.
-   The earliest V4Y-046 baseline remains already-compiled;
-   editable React source-to-V4Y-046 is NOT proven and independent
-   production overlays remain outside this chain. DO NOT deploy intermediate dist or replay outputs.
+   The earliest V4Y-046 baseline remains already-compiled. Its closest
+   recorded editable predecessor is now pinned to commit `748ac8a`: an
+   offline build matches 43/53 V4Y-046 modules after narrow local-filename
+   and newline normalization, but 0/53 raw modules. The evidence classifies
+   V4Y-046 as a composite compiled release, not a single reproducible React
+   build. Exact editable source-to-V4Y-046 parity remains NOT achieved, and
+   independent production overlays remain outside this chain. DO NOT deploy
+   intermediate dist or replay outputs.
    See SEARCH_V2_EDITABLE_SOURCE_RECOVERY.md and
    search-v2-replay/README.md.
 
@@ -198,11 +203,12 @@ complete live system build/release reproducibility is NOT established.
    historical-order test fixtures (receipt/registry source now aligned).
 3. Validate review-photo browser upload/rendering end-to-end in an isolated
    environment (source and unit-level privacy/migrations now aligned).
-4. Reconstruct the V4Y-046 Category/Social baseline from editable
-   React/TypeScript source. The compiled V4Y-046 -> R13 -> R3 ->
-   Search V2 -> Search V2 R2 release transformations are now
-   independently hash-verified and replayable, but still start
-   from already-compiled V4Y-046 code.
+4. Reconstruct typed React/TypeScript equivalents for the ten classified
+   V4Y-046 differences and prove their behavior against the pinned compiled
+   baseline. The closest editable predecessor and composite release
+   operations are now documented, while the V4Y-046 -> R13 -> R3 ->
+   Search V2 -> Search V2 R2 transformations remain independently
+   hash-verified and replayable from already-compiled V4Y-046 code.
    Then incorporate separately deployed marketing/review/PWA overlays
    through a reviewed source-based build. Independently cover the
    10 unmanifested public CSS/PWA assets in a future guarded
