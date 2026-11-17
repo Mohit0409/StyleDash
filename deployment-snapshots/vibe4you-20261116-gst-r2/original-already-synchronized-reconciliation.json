@@ -1,0 +1,56 @@
+{
+  "schema_version": 1,
+  "reconciled_at": "2026-11-17",
+  "source_audit": "deployment-snapshots/vibe4you-20261116-gst-r2/original-tracked-audit.json",
+  "source_bundle": "already-synchronized",
+  "original_checkout_head": "2c3e6e7bc400502516467869c370264e27d069aa",
+  "comparison_method": "SHA-256 after normalizing CRLF to LF; raw SHA-256 is also recorded to expose line-ending-only differences",
+  "audited_paths": [
+    "src/context/AuthContext.tsx",
+    "src/context/ToastContext.tsx",
+    "src/services/authApi.ts",
+    "vite.config.ts"
+  ],
+  "comparisons": [
+    {
+      "path": "src/context/AuthContext.tsx",
+      "original_raw_sha256": "140958266cff345bc76e026e267d5770cf8d5dc110f66ae731c6b42e40b2aaa2",
+      "synchronized_raw_sha256": "140958266cff345bc76e026e267d5770cf8d5dc110f66ae731c6b42e40b2aaa2",
+      "normalized_sha256": "a7a176b3412e2321358c955477e76f748d882246df470a80ac8083ef8797683e",
+      "normalized_equal": true,
+      "difference": "none"
+    },
+    {
+      "path": "src/context/ToastContext.tsx",
+      "original_raw_sha256": "cccdea7204c5ae9af609db197b8afbf962580e6fc2afd9e5672cd557b277360e",
+      "synchronized_raw_sha256": "f6533eccbc75577a4b06fa65ba53d4195b0b94b67bee8044f6aaa67825e54cbd",
+      "normalized_sha256": "791eafa45a358c669717c0ae0cb054863bcd838ff7ddda4b50cbb64be7e6240b",
+      "normalized_equal": true,
+      "difference": "line-ending-only"
+    },
+    {
+      "path": "src/services/authApi.ts",
+      "original_raw_sha256": "b6a2c82c69b7d6900a32885b86b164fffba46731c16528e546567e0ac7d0575d",
+      "synchronized_raw_sha256": "b6a2c82c69b7d6900a32885b86b164fffba46731c16528e546567e0ac7d0575d",
+      "normalized_sha256": "5d24a7267c9351194726e91e76e8baf8d71e87f4cac80669b2be2940089e131d",
+      "normalized_equal": true,
+      "difference": "none"
+    },
+    {
+      "path": "vite.config.ts",
+      "original_raw_sha256": "be9dfeb76ff3b97ecdbf16420fbab739e686a149644aa3bb4eaa2e312d976802",
+      "synchronized_raw_sha256": "c1b1ae922f6738752f0ceaa0852c5b4fd1030be75f0b82d2ee14f276edd4b2bf",
+      "normalized_sha256": "227bb65ab9848b9cec4e2f48ea44ada6729d34df7dc87e60fc139782e79a356f",
+      "normalized_equal": true,
+      "difference": "line-ending-only"
+    }
+  ],
+  "source_files_ported": [],
+  "source_files_rejected": [],
+  "supersedes_disposition": {
+    "from": "no-port-required",
+    "to": "reconciled-no-port-required"
+  },
+  "production_claim": "This comparison concerns only the original and isolated synchronization checkouts; it makes no production parity claim.",
+  "result": "PASS"
+}

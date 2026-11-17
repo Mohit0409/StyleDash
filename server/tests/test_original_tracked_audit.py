@@ -40,6 +40,12 @@ UBUNTU_SOURCE_MAP = (
     / "vibe4you-20261116-r2"
     / "source-map.json"
 )
+SYNCHRONIZED_RECONCILIATION = (
+    ROOT
+    / "deployment-snapshots"
+    / "vibe4you-20261116-gst-r2"
+    / "original-already-synchronized-reconciliation.json"
+)
 
 
 class OriginalTrackedAuditTests(unittest.TestCase):
@@ -58,6 +64,9 @@ class OriginalTrackedAuditTests(unittest.TestCase):
         )
         cls.ubuntu_source_map = json.loads(
             UBUNTU_SOURCE_MAP.read_text(encoding="utf-8")
+        )
+        cls.synchronized_reconciliation = json.loads(
+            SYNCHRONIZED_RECONCILIATION.read_text(encoding="utf-8")
         )
 
     def test_inventory_is_complete_and_non_overlapping(self) -> None:
@@ -279,6 +288,42 @@ class OriginalTrackedAuditTests(unittest.TestCase):
             "never source-controlled release payloads",
             self.termux_reconciliation["runtime_state_decision"],
         )
+
+    def test_synchronized_reconciliation_covers_the_whole_audit_bundle(self) -> None:
+        bundle = next(
+            item
+            for item in self.audit["bundles"]
+            if item["id"] == "already-synchronized"
+        )
+        self.assertEqual(
+            set(bundle["paths"]),
+            set(self.synchronized_reconciliation["audited_paths"]),
+        )
+        self.assertEqual(
+            set(self.audit["same_as_synchronized_branch"]),
+            set(self.synchronized_reconciliation["audited_paths"]),
+        )
+
+    def test_synchronized_reconciliation_requires_no_source_port(self) -> None:
+        reconciliation = self.synchronized_reconciliation
+        self.assertEqual([], reconciliation["source_files_ported"])
+        self.assertEqual([], reconciliation["source_files_rejected"])
+        self.assertEqual(4, len(reconciliation["comparisons"]))
+        self.assertTrue(
+            all(item["normalized_equal"] for item in reconciliation["comparisons"])
+        )
+        self.assertEqual(
+            2,
+            sum(
+                item["difference"] == "line-ending-only"
+                for item in reconciliation["comparisons"]
+            ),
+        )
+        self.assertEqual(
+            "reconciled-no-port-required",
+            reconciliation["supersedes_disposition"]["to"],
+        )
+        self.assertEqual("PASS", reconciliation["result"])
 
 
 if __name__ == "__main__":
