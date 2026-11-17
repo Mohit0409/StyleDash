@@ -10,12 +10,19 @@ AUDIT = (
     / "vibe4you-20261116-gst-r2"
     / "original-tracked-audit.json"
 )
+RECONCILIATION = (
+    ROOT
+    / "deployment-snapshots"
+    / "vibe4you-20261116-gst-r2"
+    / "original-local-search-reconciliation.json"
+)
 
 
 class OriginalTrackedAuditTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
         cls.audit = json.loads(AUDIT.read_text(encoding="utf-8"))
+        cls.reconciliation = json.loads(RECONCILIATION.read_text(encoding="utf-8"))
 
     def test_inventory_is_complete_and_non_overlapping(self) -> None:
         paths = [
@@ -91,6 +98,32 @@ class OriginalTrackedAuditTests(unittest.TestCase):
 
     def test_audit_is_not_a_release_approval(self) -> None:
         self.assertEqual("MANUAL ACTION REQUIRED", self.audit["result"])
+
+    def test_local_search_reconciliation_covers_the_whole_audit_bundle(self) -> None:
+        bundle = next(
+            item
+            for item in self.audit["bundles"]
+            if item["id"] == "local-search-aliases"
+        )
+        self.assertEqual(
+            set(bundle["paths"]), set(self.reconciliation["audited_paths"])
+        )
+        self.assertEqual("local-search-aliases", self.reconciliation["source_bundle"])
+
+    def test_local_search_dependency_is_byte_identical(self) -> None:
+        dependency = self.reconciliation["dependency"]
+        self.assertTrue(dependency["byte_identical"])
+        self.assertEqual(dependency["original_sha256"], dependency["synchronized_sha256"])
+        self.assertRegex(dependency["synchronized_sha256"], r"^[0-9a-f]{64}$")
+
+    def test_local_search_reconciliation_ports_tests_not_dirty_source(self) -> None:
+        self.assertEqual([], self.reconciliation["source_files_ported"])
+        self.assertEqual(3, len(self.reconciliation["test_files_updated"]))
+        self.assertEqual(
+            "reconciled-no-source-port-required",
+            self.reconciliation["supersedes_disposition"]["to"],
+        )
+        self.assertEqual("PASS", self.reconciliation["result"])
 
 
 if __name__ == "__main__":

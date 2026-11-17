@@ -49,4 +49,12 @@ describe('search suggestions', () => {
       { text: 'Rose ', match: false }, { text: 'Per', match: true }, { text: 'fume', match: false },
     ]);
   });
+
+  it('returns the same suggestions for NMH and Neemuch-qualified searches', () => {
+    const products = [product()];
+    const stores = [store()];
+    expect(buildSearchSuggestions('perfume in nmh', products, stores).map(item => item.id))
+      .toEqual(buildSearchSuggestions('perfume in Neemuch', products, stores).map(item => item.id));
+    expect(buildSearchSuggestions('nmh rose', products, stores).some(item => item.id === 'product:p1')).toBe(true);
+  });
 });
