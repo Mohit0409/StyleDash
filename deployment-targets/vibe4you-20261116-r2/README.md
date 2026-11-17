@@ -25,6 +25,14 @@ PWA outputs. `scripts/assemble_pinned_frontend_overlays.py` applies the same
 offline/new-temp-directory boundary. It deliberately excludes the generated
 homepage and Search V2 R2 main bundle and is not connected to a deployer.
 
+`ubuntu-release-contract.json` records the read-only observed Ubuntu service
+boundary around the 60 backend/static targets. The offline
+`scripts/build_pinned_ubuntu_release_candidate.py` builder emits a deterministic
+temporary candidate with separate 33-file Admin and 27-file Public payloads,
+exact source-map/contract copies, a manifest and SHA256SUMS. It cannot activate
+the candidate, contact production, restart systemd or include runtime state.
+See `deployment-snapshots/vibe4you-20261116-gst-r2/UBUNTU_BACKEND_RELEASE_ARCHITECTURE.md`.
+
 This snapshot is NOT a claim about the complete Vibe4You production manifest
 or a full deployable source tree. Align runtime entrypoint dependencies and
 current frontend assets; run acceptance/security checks before changes.

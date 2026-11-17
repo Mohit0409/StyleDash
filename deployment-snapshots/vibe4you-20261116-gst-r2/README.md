@@ -150,13 +150,21 @@ directory. Ten targeted safety tests passed. The obsolete Termux
 deployment installer is unchanged and must NOT be used to deploy
 this code. This is not a complete website/source/production match.
 
+The 60-target map now also feeds an offline Ubuntu-layout candidate builder.
+It emits separate 33-file Admin and 27-file Public payloads plus deterministic
+manifest/SHA256SUMS metadata under a new OS-temp directory. The read-only
+observed service contract preserves the current systemd run scripts, loopback
+8080/8081 isolation, venv, frontend assets, credentials and all runtime state.
+Activation is not implemented or authorized. See
+UBUNTU_BACKEND_RELEASE_ARCHITECTURE.md.
+
 ## Live storefront runtime acceptance baseline
 
 frontend-runtime/ contains a captured, exact-byte, read-only reference of
-133 publicly served current storefront/PWA files, including all 21
+134 publicly served current storefront/PWA files, including all 21
 direct homepage links, the Search V2 R2 bundle's conservatively
-discovered potential asset dependencies and PWA manifest icons/SW.
-123 are in the existing server integrity manifest and ten have
+discovered potential asset dependencies and PWA manifest icons/SW/offline fallback.
+123 are in the existing server integrity manifest and eleven have
 independent current disk/HTTP SHA-256 proof but lack manifest coverage.
 No customer or private server data is included. A secret-pattern screen
 found no flagged files. Source-lineage inventory identified 14 of
@@ -167,7 +175,7 @@ scripts/verify_pinned_frontend_runtime.py is an OFFLINE integrity check;
 server/tests/test_active_frontend_runtime.py tests its paths, PWA
 links, tamper detection and source classification. The Vite build
 does not yet reproduce current production, and no deployer consumes
-this snapshot. These ten out-of-manifest assets should be included
+this snapshot. These eleven out-of-manifest assets should be included
 in a separately reviewed future guarded integrity/backup release.
 
 ## Recovered editable Search V2 R2 source

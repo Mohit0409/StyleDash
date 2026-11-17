@@ -53,6 +53,27 @@ These numbers describe source-path hash matches, not a production-ready build.
 Selected backend/static source-target assembly is reproducible;
 complete live system build/release reproducibility is NOT established.
 
+## Ubuntu candidate architecture (offline boundary completed)
+
+- The 60 exact target files now assemble into a deterministic candidate using
+  the current Ubuntu flat `admin/` and `server/` path layout: 33 Admin and 27
+  Public targets remain separate.
+- A hash-pinned release contract records the read-only observed public, Admin
+  and Cloudflare systemd boundaries. Public remains loopback `8080`; Admin
+  remains private loopback `8081`; both keep the current hardened service
+  identity and working directory.
+- Existing Ubuntu run scripts, systemd units, venv, bin tools, private state,
+  frontend assets/homepage and `/etc` credentials are preserved and excluded.
+- The candidate includes deterministic manifest/SHA256SUMS metadata and is
+  restricted to a new OS-temp directory. Twenty focused source/candidate tests
+  pass, including tamper and private-state rejection.
+- Activation is deliberately unimplemented and unauthorized. The old Termux
+  installer remains forbidden for Ubuntu. See
+  `UBUNTU_BACKEND_RELEASE_ARCHITECTURE.md`.
+
+This resolves the offline Ubuntu-compatible candidate boundary, not the human-
+gated production activation/rollback mechanism or release approval.
+
 
 ## Highest-priority unresolved dependencies
 
@@ -95,14 +116,16 @@ complete live system build/release reproducibility is NOT established.
    mock cleanup checks passed 28/28, and the combined suite passed
    173/173.
 
-3. **Admin/Public divergent modules (SOURCE MAP RESOLVED,
-   runtime integration remains pending):** 16 missing/divergent files
+3. **Admin/Public divergent modules (SOURCE MAP AND OFFLINE UBUNTU CANDIDATE
+   RESOLVED; activation remains pending):** 16 missing/divergent files
    now have separate, production-hash-pinned source paths and an
    offline assembly workflow. These include serve.py, tax classification,
    invoice gateways, catalog normalization, shops, security and categories.
-   Existing Termux/Ubuntu release install scripts do NOT yet use this map.
-   The separate runtime entrypoints/dependency relationships still require
-   integration, security review and guarded deployment design.
+   Existing Termux release install scripts do NOT use this map and are
+   explicitly disallowed for Ubuntu. The pinned Ubuntu candidate preserves
+   both entrypoints and current systemd boundaries, but activation still
+   requires independent security review and a separately approved guarded
+   deployment/rollback implementation.
 
 4. **Reviews v5 and photo migration source (RESOLVED):** both deployed
    Admin/Public styledash_reviews.py modules have the identical SHA-256
@@ -201,10 +224,10 @@ complete live system build/release reproducibility is NOT established.
 
 ## Proposed next integration sequence
 
-1. Integrate the new 60-target code source map into a reviewed
-   offline runtime build, verify Admin/Public imports/entrypoints
-   independently, and design a separately approved guarded deployment.
-   Do not execute old Termux deployment installers against Ubuntu.
+1. Submit the completed 60-target offline Ubuntu candidate to independent
+   Tester/Security review, then design a separately approved Ubuntu activation
+   and code-only rollback implementation. Do not execute old Termux deployment
+   installers against Ubuntu and do not replace live database state.
 2. Extend end-to-end invoice issue/read invariants with safe synthetic
    historical-order test fixtures (receipt/registry source now aligned).
 3. Validate review-photo browser upload/rendering end-to-end in an isolated

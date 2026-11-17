@@ -1,0 +1,107 @@
+{
+  "schema_version": 1,
+  "scope": "offline Ubuntu release-candidate architecture for the 60 pinned Admin/Public code targets; not a deployer",
+  "observed_readonly_at": "2026-11-17",
+  "production_root": "/opt/vibe4you-production",
+  "production_integrity_manifest_sha256": "ec13b4f28f99b26f3cf468412d77a651b8596decc1cb5afb1012170bac11a126",
+  "backend_source_map": "deployment-targets/vibe4you-20261116-r2/source-map.json",
+  "backend_source_map_sha256": "4139830b332f68dd137461b7622caa12d812a38c2042ab93c67ea4b5db9966e1",
+  "payload": {
+    "target_count": 60,
+    "admin_target_count": 33,
+    "server_target_count": 27,
+    "allowed_roots": [
+      "admin",
+      "server"
+    ],
+    "generated_exclusions": [
+      "server/index.html"
+    ]
+  },
+  "service_contract": {
+    "public": {
+      "unit": "vibe4you-production-public.service",
+      "exec_start": "/opt/vibe4you-production/run-public.sh",
+      "working_directory": "/opt/vibe4you-production",
+      "user": "vibe4you",
+      "group": "vibe4you",
+      "bind": "127.0.0.1",
+      "port": 8080,
+      "public_ingress": true,
+      "restart": "on-failure",
+      "no_new_privileges": true,
+      "protect_system": "strict",
+      "protect_home": "read-only"
+    },
+    "admin": {
+      "unit": "vibe4you-production-admin.service",
+      "exec_start": "/opt/vibe4you-production/run-admin.sh",
+      "working_directory": "/opt/vibe4you-production",
+      "user": "vibe4you",
+      "group": "vibe4you",
+      "bind": "127.0.0.1",
+      "port": 8081,
+      "public_ingress": false,
+      "restart": "on-failure",
+      "no_new_privileges": true,
+      "protect_system": "strict",
+      "protect_home": "yes"
+    },
+    "tunnel": {
+      "unit": "vibe4you-cloudflared.service",
+      "executable": "/opt/vibe4you-production/bin/cloudflared",
+      "credential_path": "/etc/vibe4you-production/cloudflare-tunnel-token",
+      "credential_contents_in_repository": false,
+      "user": "vibe4you",
+      "group": "vibe4you",
+      "public_ingress_must_target": "127.0.0.1:8080",
+      "admin_ingress_forbidden": true,
+      "restart": "always",
+      "no_new_privileges": true,
+      "protect_system": "strict",
+      "protect_home": "yes"
+    }
+  },
+  "preserve_paths": [
+    "/opt/vibe4you-production/run-public.sh",
+    "/opt/vibe4you-production/run-admin.sh",
+    "/opt/vibe4you-production/bin/**",
+    "/opt/vibe4you-production/venv/**",
+    "/opt/vibe4you-production/private/**",
+    "/opt/vibe4you-production/server/assets/**",
+    "/opt/vibe4you-production/server/index.html",
+    "/etc/vibe4you-production/**"
+  ],
+  "forbidden_payload_patterns": [
+    "**/.env",
+    "**/*.db",
+    "**/*.db-wal",
+    "**/*.db-shm",
+    "**/backups/**",
+    "**/logs/**",
+    "**/private/**",
+    "**/*secret*",
+    "**/*token*",
+    "**/*credential*",
+    "**/__pycache__/**",
+    "**/*.pyc"
+  ],
+  "required_gates_before_any_future_activation": [
+    "rebuild candidate from the pinned source map in an isolated temporary directory",
+    "run complete backend, Admin, GST, security, checkout, review and payment-idempotency tests",
+    "independently review public/Admin separation and secret scan results",
+    "read-only compare all intended target hashes with the live production manifest",
+    "verify SQLite integrity and create a validated online backup without replacing live state",
+    "obtain explicit owner approval for the exact release candidate",
+    "stage outside the live root, then use a reviewed Ubuntu-specific activation mechanism",
+    "verify public health and homepage, public Admin 404 boundaries, private Admin loopback health and tunnel isolation",
+    "roll back code only on failure and preserve all current database/payment/GST history"
+  ],
+  "activation": {
+    "implemented": false,
+    "authorized": false,
+    "reason": "this tranche defines and validates the candidate boundary only; production mutation requires separate review and explicit approval",
+    "old_termux_installer_allowed": false,
+    "database_rollback_allowed": false
+  }
+}
