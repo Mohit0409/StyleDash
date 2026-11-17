@@ -52,6 +52,12 @@ PROTECTED_CONFIG_RECONCILIATION = (
     / "vibe4you-20261116-gst-r2"
     / "original-protected-config-reconciliation.json"
 )
+ANALYTICS_RECONCILIATION = (
+    ROOT
+    / "deployment-snapshots"
+    / "vibe4you-20261116-gst-r2"
+    / "original-analytics-consent-reconciliation.json"
+)
 
 
 class OriginalTrackedAuditTests(unittest.TestCase):
@@ -76,6 +82,9 @@ class OriginalTrackedAuditTests(unittest.TestCase):
         )
         cls.protected_config_reconciliation = json.loads(
             PROTECTED_CONFIG_RECONCILIATION.read_text(encoding="utf-8")
+        )
+        cls.analytics_reconciliation = json.loads(
+            ANALYTICS_RECONCILIATION.read_text(encoding="utf-8")
         )
 
     def test_inventory_is_complete_and_non_overlapping(self) -> None:
@@ -364,6 +373,37 @@ class OriginalTrackedAuditTests(unittest.TestCase):
         self.assertEqual(["gst.principalPlace"], settings["observed_changed_paths"])
         self.assertEqual(
             "reconciled-no-protected-value-port",
+            reconciliation["supersedes_disposition"]["to"],
+        )
+        self.assertEqual("PASS", reconciliation["result"])
+
+    def test_analytics_reconciliation_covers_the_whole_audit_bundle(self) -> None:
+        bundle = next(
+            item
+            for item in self.audit["bundles"]
+            if item["id"] == "analytics-consent-and-attribution"
+        )
+        reconciliation = self.analytics_reconciliation
+        self.assertEqual(set(bundle["paths"]), set(reconciliation["audited_paths"]))
+        self.assertEqual(7, len(reconciliation["file_decisions"]))
+
+    def test_analytics_reconciliation_preserves_privacy_boundary(self) -> None:
+        reconciliation = self.analytics_reconciliation
+        self.assertEqual([], reconciliation["source_files_ported"])
+        self.assertEqual(
+            {
+                "src/services/ecommerceAnalytics.ts",
+                "src/pages/NeemuchShopping.tsx",
+                "src/data/neemuchShopping.ts",
+            },
+            set(reconciliation["untracked_dependencies_not_admitted"]),
+        )
+        invariants = " ".join(reconciliation["privacy_invariants"])
+        self.assertIn("explicit acceptance", invariants)
+        self.assertIn("exclude query strings and fragments", invariants)
+        self.assertIn("standard arguments object", invariants)
+        self.assertEqual(
+            "reconciled-current-consent-implementation-retained",
             reconciliation["supersedes_disposition"]["to"],
         )
         self.assertEqual("PASS", reconciliation["result"])

@@ -1,0 +1,76 @@
+{
+  "schema_version": 1,
+  "reconciled_at": "2026-11-17",
+  "source_audit": "deployment-snapshots/vibe4you-20261116-gst-r2/original-tracked-audit.json",
+  "source_bundle": "analytics-consent-and-attribution",
+  "original_checkout_head": "2c3e6e7bc400502516467869c370264e27d069aa",
+  "audited_paths": [
+    "src/App.tsx",
+    "src/components/Footer.tsx",
+    "src/config/index.ts",
+    "src/context/CartContext.tsx",
+    "src/pages/Home.tsx",
+    "src/pages/Privacy.tsx",
+    "src/services/analytics.ts"
+  ],
+  "file_decisions": [
+    {
+      "path": "src/App.tsx",
+      "decision": "analytics-already-satisfied-unrelated-routes-not-admitted",
+      "evidence": "AnalyticsConsent and AnalyticsRouteTracker are already mounted. The dirty Neemuch routes depend on untracked page/data files and are outside the consent change."
+    },
+    {
+      "path": "src/components/Footer.tsx",
+      "decision": "already-satisfied-retain-current-navigation",
+      "evidence": "The Analytics Preferences control is already present. The current Delivery Requests link is retained."
+    },
+    {
+      "path": "src/config/index.ts",
+      "decision": "superseded-by-validated-fallback",
+      "evidence": "Both analytics identifiers and the updated policy date are present. The current branch also validates the GA identifier and provides the synchronized public fallback instead of silently disabling analytics."
+    },
+    {
+      "path": "src/context/CartContext.tsx",
+      "decision": "equivalent-event-retained-untracked-wrapper-rejected",
+      "evidence": "The current add_to_cart event carries product, variant, price, and quantity fields directly. Replacing it with the dirty wrapper would add an untracked dependency and regress the current atomic multi-variant inventory check."
+    },
+    {
+      "path": "src/pages/Home.tsx",
+      "decision": "do-not-port-unrelated-untracked-neemuch-surface",
+      "evidence": "The dirty homepage change is an SEO/navigation surface requiring untracked Neemuch data and page dependencies, not an analytics-consent implementation. The current synchronized merchandising and promo components are retained."
+    },
+    {
+      "path": "src/pages/Privacy.tsx",
+      "decision": "already-satisfied",
+      "evidence": "The consent-gated Google Analytics and Meta Pixel disclosure, withdrawal path, prohibited data list, and query/fragment exclusion are already present."
+    },
+    {
+      "path": "src/services/analytics.ts",
+      "decision": "current-implementation-supersedes-dirty-version",
+      "evidence": "The current implementation retains consent storage, delayed tracker loading, revocation, cookie expiry, and sensitive-route suppression while using the real arguments object required by Google Consent Mode. Dirty query/referrer forwarding is rejected because the published notice says query strings and fragments are excluded."
+    }
+  ],
+  "untracked_dependencies_not_admitted": [
+    "src/services/ecommerceAnalytics.ts",
+    "src/pages/NeemuchShopping.tsx",
+    "src/data/neemuchShopping.ts"
+  ],
+  "privacy_invariants": [
+    "Google Analytics and Meta Pixel remain off until explicit acceptance.",
+    "Declining or withdrawing consent revokes tracker consent and expires known analytics cookies.",
+    "Order-success, order-tracking, and reset-password routes are not tracked.",
+    "Page locations exclude query strings and fragments.",
+    "The active Google Consent Mode shim queues the standard arguments object."
+  ],
+  "source_files_ported": [],
+  "supersedes_disposition": {
+    "from": "selective-port-with-dependency-and-privacy-review",
+    "to": "reconciled-current-consent-implementation-retained"
+  },
+  "verification": [
+    "src/tests/analyticsConfig.test.ts",
+    "e2e/specs/analytics-consent.spec.ts"
+  ],
+  "production_claim": "No tracker, environment, consent value, deployment, service, or production state was changed.",
+  "result": "PASS"
+}
