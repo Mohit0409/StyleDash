@@ -28,6 +28,18 @@ MAINTENANCE_RECONCILIATION = (
     / "vibe4you-20261116-gst-r2"
     / "original-repository-maintenance-reconciliation.json"
 )
+TERMUX_RECONCILIATION = (
+    ROOT
+    / "deployment-snapshots"
+    / "vibe4you-20261116-gst-r2"
+    / "original-termux-operations-reconciliation.json"
+)
+UBUNTU_SOURCE_MAP = (
+    ROOT
+    / "deployment-targets"
+    / "vibe4you-20261116-r2"
+    / "source-map.json"
+)
 
 
 class OriginalTrackedAuditTests(unittest.TestCase):
@@ -40,6 +52,12 @@ class OriginalTrackedAuditTests(unittest.TestCase):
         )
         cls.maintenance_reconciliation = json.loads(
             MAINTENANCE_RECONCILIATION.read_text(encoding="utf-8")
+        )
+        cls.termux_reconciliation = json.loads(
+            TERMUX_RECONCILIATION.read_text(encoding="utf-8")
+        )
+        cls.ubuntu_source_map = json.loads(
+            UBUNTU_SOURCE_MAP.read_text(encoding="utf-8")
         )
 
     def test_inventory_is_complete_and_non_overlapping(self) -> None:
@@ -197,6 +215,70 @@ class OriginalTrackedAuditTests(unittest.TestCase):
             self.maintenance_reconciliation["supersedes_disposition"]["to"],
         )
         self.assertEqual("PASS", self.maintenance_reconciliation["result"])
+
+    def test_termux_reconciliation_covers_the_whole_audit_bundle(self) -> None:
+        bundle = next(
+            item
+            for item in self.audit["bundles"]
+            if item["id"] == "obsolete-termux-operations"
+        )
+        self.assertEqual(
+            set(bundle["paths"]),
+            set(self.termux_reconciliation["audited_paths"]),
+        )
+        self.assertEqual(
+            "obsolete-termux-operations",
+            self.termux_reconciliation["source_bundle"],
+        )
+
+    def test_termux_reconciliation_ports_no_obsolete_operations(self) -> None:
+        self.assertEqual([], self.termux_reconciliation["source_files_ported"])
+        self.assertEqual(
+            set(self.termux_reconciliation["audited_paths"]),
+            set(self.termux_reconciliation["source_files_rejected"]),
+        )
+        self.assertEqual(
+            "reconciled-no-termux-port",
+            self.termux_reconciliation["supersedes_disposition"]["to"],
+        )
+        contract = self.termux_reconciliation["ubuntu_release_contract"]
+        self.assertFalse(contract["activation_implemented"])
+        self.assertFalse(contract["activation_authorized"])
+        self.assertFalse(contract["old_termux_installer_allowed"])
+        self.assertEqual("PASS", self.termux_reconciliation["result"])
+
+    def test_termux_invoice_modules_are_already_pinned_for_ubuntu(self) -> None:
+        actual_targets = {
+            entry["target"]
+            for entry in self.ubuntu_source_map["verified_targets"]
+        }
+        modules = self.termux_reconciliation[
+            "ubuntu_candidate_modules_already_present"
+        ]
+        self.assertEqual(7, len(modules))
+        self.assertEqual(13, sum(len(item["targets"]) for item in modules))
+        for item in modules:
+            with self.subTest(module=item["module"]):
+                self.assertTrue(set(item["targets"]).issubset(actual_targets))
+
+    def test_termux_backup_principles_are_preserved_as_future_requirements(self) -> None:
+        requirement_ids = {
+            item["id"]
+            for item in self.termux_reconciliation["future_ubuntu_requirements"]
+        }
+        self.assertEqual(
+            {
+                "backup-mutual-exclusion",
+                "complete-runtime-state-coverage",
+                "verified-off-device-copies",
+                "validated-restore-procedure",
+            },
+            requirement_ids,
+        )
+        self.assertIn(
+            "never source-controlled release payloads",
+            self.termux_reconciliation["runtime_state_decision"],
+        )
 
 
 if __name__ == "__main__":
