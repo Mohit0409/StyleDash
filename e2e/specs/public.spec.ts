@@ -357,6 +357,10 @@ test('product detail exposes product social metadata and structured data', async
   expect(jsonLd.name).toBe('Pure Cotton Oversized Graphic Tee');
   expect(jsonLd.offers.priceCurrency).toBe('INR');
   expect(jsonLd.aggregateRating).toBeUndefined();
+  expect(jsonLd.offers.shippingDetails).toBeUndefined();
+  const merchant = JSON.parse(await page.locator('#styledash-merchant-policy-jsonld').textContent() || '{}');
+  expect(merchant['@type']).toBe('Organization');
+  expect(merchant.hasMerchantReturnPolicy.merchantReturnLink).toBe('https://vibe4you.in/returns');
 });
 
 test('robots and sitemap expose only intended public discovery metadata', async ({ request }) => {

@@ -1,0 +1,60 @@
+{
+  "schema_version": 1,
+  "reconciled_at": "2026-11-17",
+  "source_audit": "deployment-snapshots/vibe4you-20261116-gst-r2/original-tracked-audit.json",
+  "source_bundle": "merchant-policy-and-seo-shell",
+  "original_checkout_head": "2c3e6e7bc400502516467869c370264e27d069aa",
+  "audited_paths": [
+    "e2e/specs/public.spec.ts",
+    "index.html",
+    "src/components/SEO.tsx",
+    "src/pages/Returns.tsx",
+    "src/pages/Terms.tsx"
+  ],
+  "file_decisions": [
+    {
+      "path": "e2e/specs/public.spec.ts",
+      "decision": "selective-test-port",
+      "evidence": "The product metadata test now verifies that no unsupported shippingDetails claim is emitted and that the organization policy links to the published returns page. Current responsive and local-search assertions are retained."
+    },
+    {
+      "path": "index.html",
+      "decision": "do-not-port-generic-shell-rewrite",
+      "evidence": "The synchronized branded shell is retained. Page-specific discovery metadata remains the responsibility of route SEO components and the generated public overlay."
+    },
+    {
+      "path": "src/components/SEO.tsx",
+      "decision": "selective-source-port",
+      "evidence": "Product pages now add organization-level MerchantReturnPolicy JSON-LD that links to the real conditional policy without declaring a fabricated universal return window."
+    },
+    {
+      "path": "src/pages/Returns.tsx",
+      "decision": "do-not-port-blocked-payment-model-language",
+      "evidence": "The dirty prose mixes current no-advance COD with historical INR 50 booking-advance behavior. Legal copy must not select a payment model while the payment bundle remains blocked."
+    },
+    {
+      "path": "src/pages/Terms.tsx",
+      "decision": "do-not-port-blocked-payment-model-language",
+      "evidence": "The historical booking-advance refund/forfeiture terms are coupled to the unresolved payment model and are not independently safe to publish."
+    }
+  ],
+  "structured_data_invariants": [
+    "Product JSON-LD does not fabricate aggregate ratings.",
+    "Product JSON-LD does not advertise unsupported shippingDetails.",
+    "Organization policy JSON-LD links to https://vibe4you.in/returns.",
+    "The structured policy does not claim a universal return window or return fee."
+  ],
+  "source_files_ported": ["src/components/SEO.tsx"],
+  "test_files_updated": ["e2e/specs/public.spec.ts"],
+  "source_files_rejected": [
+    "index.html",
+    "src/pages/Returns.tsx",
+    "src/pages/Terms.tsx"
+  ],
+  "supersedes_disposition": {
+    "from": "selective-port-with-legal-and-structured-data-review",
+    "to": "reconciled-selective-merchant-policy-port"
+  },
+  "production_claim": "No legal policy, payment behavior, deployment, service, or production state was changed.",
+  "result": "PASS"
+}

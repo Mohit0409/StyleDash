@@ -58,6 +58,12 @@ ANALYTICS_RECONCILIATION = (
     / "vibe4you-20261116-gst-r2"
     / "original-analytics-consent-reconciliation.json"
 )
+MERCHANT_POLICY_RECONCILIATION = (
+    ROOT
+    / "deployment-snapshots"
+    / "vibe4you-20261116-gst-r2"
+    / "original-merchant-policy-seo-reconciliation.json"
+)
 
 
 class OriginalTrackedAuditTests(unittest.TestCase):
@@ -85,6 +91,9 @@ class OriginalTrackedAuditTests(unittest.TestCase):
         )
         cls.analytics_reconciliation = json.loads(
             ANALYTICS_RECONCILIATION.read_text(encoding="utf-8")
+        )
+        cls.merchant_policy_reconciliation = json.loads(
+            MERCHANT_POLICY_RECONCILIATION.read_text(encoding="utf-8")
         )
 
     def test_inventory_is_complete_and_non_overlapping(self) -> None:
@@ -404,6 +413,34 @@ class OriginalTrackedAuditTests(unittest.TestCase):
         self.assertIn("standard arguments object", invariants)
         self.assertEqual(
             "reconciled-current-consent-implementation-retained",
+            reconciliation["supersedes_disposition"]["to"],
+        )
+        self.assertEqual("PASS", reconciliation["result"])
+
+    def test_merchant_policy_reconciliation_covers_the_whole_audit_bundle(self) -> None:
+        bundle = next(
+            item
+            for item in self.audit["bundles"]
+            if item["id"] == "merchant-policy-and-seo-shell"
+        )
+        reconciliation = self.merchant_policy_reconciliation
+        self.assertEqual(set(bundle["paths"]), set(reconciliation["audited_paths"]))
+        self.assertEqual(5, len(reconciliation["file_decisions"]))
+
+    def test_merchant_policy_reconciliation_is_narrow_and_payment_safe(self) -> None:
+        reconciliation = self.merchant_policy_reconciliation
+        self.assertEqual(["src/components/SEO.tsx"], reconciliation["source_files_ported"])
+        self.assertEqual(["e2e/specs/public.spec.ts"], reconciliation["test_files_updated"])
+        self.assertEqual(
+            {"index.html", "src/pages/Returns.tsx", "src/pages/Terms.tsx"},
+            set(reconciliation["source_files_rejected"]),
+        )
+        invariants = " ".join(reconciliation["structured_data_invariants"])
+        self.assertIn("does not advertise unsupported shippingDetails", invariants)
+        self.assertIn("https://vibe4you.in/returns", invariants)
+        self.assertIn("does not claim a universal return window", invariants)
+        self.assertEqual(
+            "reconciled-selective-merchant-policy-port",
             reconciliation["supersedes_disposition"]["to"],
         )
         self.assertEqual("PASS", reconciliation["result"])
