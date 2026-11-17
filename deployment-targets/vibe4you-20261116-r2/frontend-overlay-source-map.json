@@ -1,0 +1,290 @@
+{
+  "schema_version": 1,
+  "scope": "independent public overlay, compiled CSS reference, and static PWA layer; offline validation/staging only; not a deployer",
+  "frontend_capsule_manifest_sha256": "dcec8a0d3970517f605cddf399bae5382ccde802b6783c846960d35fa7ff5d6f",
+  "production_integrity_manifest_sha256": "ec13b4f28f99b26f3cf468412d77a651b8596decc1cb5afb1012170bac11a126",
+  "live_readonly_verified_at": "2026-11-17",
+  "exact_react_integration": false,
+  "expected_kind_counts": {
+    "authored-standalone-overlay": 14,
+    "compiled-vite-css-reference": 2,
+    "reproducible-static-pwa": 9
+  },
+  "provenance_note": "historical_* fields are workspace evidence labels only; assembly reads repository-local capsule sources exclusively",
+  "files": [
+    {
+      "target": "server/assets/ga4-ecommerce-overlay-8475166ca3c64edf.js",
+      "source": "deployment-snapshots/vibe4you-20261116-gst-r2/frontend-runtime/site/assets/ga4-ecommerce-overlay-8475166ca3c64edf.js",
+      "sha256": "8475166ca3c64edf8b50a7db0db0f9974334e8d35f1a8253798eca0dae1cb264",
+      "size_bytes": 6762,
+      "kind": "authored-standalone-overlay",
+      "production_integrity_manifest": true,
+      "direct_index_link": true,
+      "editable_status": "byte-exact standalone asset; not typed React integration",
+      "historical_exact_candidate": "StyleDash/.release-ga4-20261019/prod-compatible/ga4-ecommerce-overlay-8475166ca3c64edf.js"
+    },
+    {
+      "target": "server/assets/google-ads-base-a30d3812928d86c4.js",
+      "source": "deployment-snapshots/vibe4you-20261116-gst-r2/frontend-runtime/site/assets/google-ads-base-a30d3812928d86c4.js",
+      "sha256": "a30d3812928d86c48301ef8f46f0aa5fc6e11cf632a6c75733e6bb7bdc06eb5e",
+      "size_bytes": 1652,
+      "kind": "authored-standalone-overlay",
+      "production_integrity_manifest": true,
+      "direct_index_link": true,
+      "editable_status": "byte-exact standalone asset; not typed React integration",
+      "historical_exact_candidate": "StyleDash/release-artifacts/google-ads-tag-20261026/google-ads-base-20261026.js"
+    },
+    {
+      "target": "server/assets/Home-bVIr0YEJ.css",
+      "source": "deployment-snapshots/vibe4you-20261116-gst-r2/frontend-runtime/site/assets/Home-bVIr0YEJ.css",
+      "sha256": "4dfee094a1c14a519491b5ab80e3d10578e29cc8dd3307da28de7070339bc434",
+      "size_bytes": 5703,
+      "kind": "compiled-vite-css-reference",
+      "production_integrity_manifest": false,
+      "direct_index_link": false,
+      "editable_status": "compiled reference only; authored CSS source parity not established"
+    },
+    {
+      "target": "server/assets/index-BITtbtpM.css",
+      "source": "deployment-snapshots/vibe4you-20261116-gst-r2/frontend-runtime/site/assets/index-BITtbtpM.css",
+      "sha256": "04227d23bf3c0272a6541a3e28eb0d6d8616a5eeac2b18302fdb53193a0eb29c",
+      "size_bytes": 63237,
+      "kind": "compiled-vite-css-reference",
+      "production_integrity_manifest": false,
+      "direct_index_link": true,
+      "editable_status": "compiled reference only; authored CSS source parity not established",
+      "historical_exact_candidate": "StyleDash-home-rail-no-pagination-20261013/dist/assets/index-BITtbtpM.css"
+    },
+    {
+      "target": "server/assets/mobile-product-gallery-clean-v2-20261031.js",
+      "source": "deployment-snapshots/vibe4you-20261116-gst-r2/frontend-runtime/site/assets/mobile-product-gallery-clean-v2-20261031.js",
+      "sha256": "5623b3bbf0ea961df61125899d124c02fc0a6d1ab6b1ec30a850721adfad512d",
+      "size_bytes": 1420,
+      "kind": "authored-standalone-overlay",
+      "production_integrity_manifest": true,
+      "direct_index_link": true,
+      "editable_status": "byte-exact standalone asset; not typed React integration",
+      "historical_exact_candidate": "StyleDash/release-artifacts/mobile-product-gallery-clean-v2-20261031/mobile-product-gallery-clean-v2-20261031.js"
+    },
+    {
+      "target": "server/assets/pr150-review-r5-utilities.css",
+      "source": "deployment-snapshots/vibe4you-20261116-gst-r2/frontend-runtime/site/assets/pr150-review-r5-utilities.css",
+      "sha256": "2dff9b8ffcae77d4298c02bf3ec0eb17f50a3bd3507f2bc782f1be847f6f6cdb",
+      "size_bytes": 1327,
+      "kind": "authored-standalone-overlay",
+      "production_integrity_manifest": true,
+      "direct_index_link": true,
+      "editable_status": "byte-exact standalone asset; not typed React integration",
+      "historical_exact_candidate": "StyleDash/release-artifacts/checkout-paise-consistency-20261022-PREPARED-ONLY/browser-staging-public-assets-NOT-DEPLOYED/web/assets/pr150-review-r5-utilities.css"
+    },
+    {
+      "target": "server/assets/product-assurances-4b20f50e1398c7cf.css",
+      "source": "deployment-snapshots/vibe4you-20261116-gst-r2/frontend-runtime/site/assets/product-assurances-4b20f50e1398c7cf.css",
+      "sha256": "4b20f50e1398c7cfb971cf85f4817cd9990b622fe2fdd4b8ea105695c2f05f3e",
+      "size_bytes": 1274,
+      "kind": "authored-standalone-overlay",
+      "production_integrity_manifest": true,
+      "direct_index_link": true,
+      "editable_status": "byte-exact standalone asset; not typed React integration",
+      "historical_exact_candidate": "StyleDash/.release-product-assurances-20261029/product-assurances-4b20f50e1398c7cf.css"
+    },
+    {
+      "target": "server/assets/product-assurances-cfc8756faf11bb03.js",
+      "source": "deployment-snapshots/vibe4you-20261116-gst-r2/frontend-runtime/site/assets/product-assurances-cfc8756faf11bb03.js",
+      "sha256": "cfc8756faf11bb0394ac107fa8571cb594d01c87f43ea85e10a3104c16f8aa78",
+      "size_bytes": 10396,
+      "kind": "authored-standalone-overlay",
+      "production_integrity_manifest": true,
+      "direct_index_link": true,
+      "editable_status": "byte-exact standalone asset; not typed React integration",
+      "historical_exact_candidate": "StyleDash/.release-product-assurances-20261029/product-assurances-cfc8756faf11bb03.js"
+    },
+    {
+      "target": "server/assets/seller-price-labels-20261018.js",
+      "source": "deployment-snapshots/vibe4you-20261116-gst-r2/frontend-runtime/site/assets/seller-price-labels-20261018.js",
+      "sha256": "358e26d230ff966d69d788bd841683bfe4278a9defcb73ea9d4842565c5df2cc",
+      "size_bytes": 1517,
+      "kind": "authored-standalone-overlay",
+      "production_integrity_manifest": true,
+      "direct_index_link": true,
+      "editable_status": "byte-exact standalone asset; not typed React integration",
+      "historical_exact_candidate": "StyleDash/release-artifacts/shop-owner-price-labels-20261018/prod-candidate/seller-price-labels-20261018.js"
+    },
+    {
+      "target": "server/assets/v4y-account-privacy-20261104.js",
+      "source": "deployment-snapshots/vibe4you-20261116-gst-r2/frontend-runtime/site/assets/v4y-account-privacy-20261104.js",
+      "sha256": "20f16e8f9091eef7826ed81a2f35c4c8ee7f33c8fb465a6848d6d4611ff74a7a",
+      "size_bytes": 4763,
+      "kind": "authored-standalone-overlay",
+      "production_integrity_manifest": true,
+      "direct_index_link": true,
+      "editable_status": "byte-exact standalone asset; not typed React integration",
+      "historical_exact_candidate": "StyleDash-play-privacy/release-artifacts/v4y054-account-deletion-20261104/candidate/v4y-account-privacy-20261104.js"
+    },
+    {
+      "target": "server/assets/v4y-category-cache-refresh-20261020.js",
+      "source": "deployment-snapshots/vibe4you-20261116-gst-r2/frontend-runtime/site/assets/v4y-category-cache-refresh-20261020.js",
+      "sha256": "56ea4220f3f5cc39b342b35bd7198e5e79bf0c2c0f90590aa9c571e9203ed99b",
+      "size_bytes": 1747,
+      "kind": "authored-standalone-overlay",
+      "production_integrity_manifest": true,
+      "direct_index_link": true,
+      "editable_status": "byte-exact standalone asset; not typed React integration",
+      "historical_exact_candidate": "StyleDash/.release-category-taxonomy-20261020/candidate/server/assets/v4y-category-cache-refresh-20261020.js"
+    },
+    {
+      "target": "server/assets/v4y-customer-cache-repair-20261020-r2.js",
+      "source": "deployment-snapshots/vibe4you-20261116-gst-r2/frontend-runtime/site/assets/v4y-customer-cache-repair-20261020-r2.js",
+      "sha256": "7d0e0a6f697e2a1da24ae95388a48d890b8cec3ddbd697e005a183a125cfc2be",
+      "size_bytes": 2768,
+      "kind": "authored-standalone-overlay",
+      "production_integrity_manifest": true,
+      "direct_index_link": true,
+      "editable_status": "byte-exact standalone asset; not typed React integration",
+      "historical_exact_candidate": "StyleDash/release-artifacts/checkout-paise-consistency-20261022-PREPARED-ONLY/browser-staging-public-assets-NOT-DEPLOYED/web/assets/v4y-customer-cache-repair-20261020-r2.js"
+    },
+    {
+      "target": "server/assets/v4y-health-nutrition-cache-refresh-20261021.js",
+      "source": "deployment-snapshots/vibe4you-20261116-gst-r2/frontend-runtime/site/assets/v4y-health-nutrition-cache-refresh-20261021.js",
+      "sha256": "e8c91ac438babe78c53de949e450348d02e261a1cb798afb0ce54c2bac99ae30",
+      "size_bytes": 1097,
+      "kind": "authored-standalone-overlay",
+      "production_integrity_manifest": true,
+      "direct_index_link": true,
+      "editable_status": "byte-exact standalone asset; not typed React integration",
+      "historical_exact_candidate": "StyleDash/release-artifacts/checkout-paise-consistency-20261022-PREPARED-ONLY/browser-staging-public-assets-NOT-DEPLOYED/web/assets/v4y-health-nutrition-cache-refresh-20261021.js"
+    },
+    {
+      "target": "server/assets/v4y-mobile-ui-fix-20261021.js",
+      "source": "deployment-snapshots/vibe4you-20261116-gst-r2/frontend-runtime/site/assets/v4y-mobile-ui-fix-20261021.js",
+      "sha256": "143ef316fe790a0fd29b5deea5b2e7c64d1f5b927d0a4c78fd9e402e8564a31e",
+      "size_bytes": 4522,
+      "kind": "authored-standalone-overlay",
+      "production_integrity_manifest": true,
+      "direct_index_link": true,
+      "editable_status": "byte-exact standalone asset; not typed React integration",
+      "historical_exact_candidate": "StyleDash/release-artifacts/checkout-paise-consistency-20261022-PREPARED-ONLY/browser-staging-public-assets-NOT-DEPLOYED/web/assets/v4y-mobile-ui-fix-20261021.js"
+    },
+    {
+      "target": "server/assets/v4y-review-experience-20261103-mobile-photo-v2.js",
+      "source": "deployment-snapshots/vibe4you-20261116-gst-r2/frontend-runtime/site/assets/v4y-review-experience-20261103-mobile-photo-v2.js",
+      "sha256": "68bb53fceefd9aae5f6c7e45aff986df29b3b9e445329314789eac078369da9a",
+      "size_bytes": 14590,
+      "kind": "authored-standalone-overlay",
+      "production_integrity_manifest": true,
+      "direct_index_link": true,
+      "editable_status": "byte-exact standalone asset; not typed React integration",
+      "historical_exact_candidate": "Vibe4You-reviews-20261102/photo-fix/v4y-review-experience-20261103-mobile-photo-v2.js"
+    },
+    {
+      "target": "server/assets/v4y-social-buttons-20261024.js",
+      "source": "deployment-snapshots/vibe4you-20261116-gst-r2/frontend-runtime/site/assets/v4y-social-buttons-20261024.js",
+      "sha256": "50b6653d25fd2838a874301f998548d72c9e181f3b9052cf6f53b54e7a462bdc",
+      "size_bytes": 5126,
+      "kind": "authored-standalone-overlay",
+      "production_integrity_manifest": true,
+      "direct_index_link": true,
+      "editable_status": "byte-exact standalone asset; not typed React integration",
+      "historical_exact_candidate": "Vibe4You/tests/fixtures/current-graph/v4y-social-buttons-20261024.js"
+    },
+    {
+      "target": "server/sw.js",
+      "source": "deployment-snapshots/vibe4you-20261116-gst-r2/frontend-runtime/site/sw.js",
+      "sha256": "6ba5fa6429dc541b0fba56247ab3da40bd5f111002a4a5d7b7e4ca3fc9d13415",
+      "size_bytes": 2040,
+      "kind": "reproducible-static-pwa",
+      "production_integrity_manifest": false,
+      "direct_index_link": false,
+      "editable_status": "byte-exact output of the recovered hash-pinned PWA builder",
+      "historical_builder": "Vibe4You commit 5393594e502b7cc79e74aef7be4e8de4d3a37117 scripts/prepare-live-pwa.py"
+    },
+    {
+      "target": "server/vibe4you-app/icons/apple-touch-icon.png",
+      "source": "deployment-snapshots/vibe4you-20261116-gst-r2/frontend-runtime/site/vibe4you-app/icons/apple-touch-icon.png",
+      "sha256": "cc75d57e704e1d8748aca181a7d1f57ed7ba346457907df077117afdb135a9d2",
+      "size_bytes": 7678,
+      "kind": "reproducible-static-pwa",
+      "production_integrity_manifest": false,
+      "direct_index_link": true,
+      "editable_status": "byte-exact output of the recovered hash-pinned PWA builder",
+      "historical_builder": "Vibe4You commit 5393594e502b7cc79e74aef7be4e8de4d3a37117 scripts/prepare-live-pwa.py"
+    },
+    {
+      "target": "server/vibe4you-app/icons/icon-192.png",
+      "source": "deployment-snapshots/vibe4you-20261116-gst-r2/frontend-runtime/site/vibe4you-app/icons/icon-192.png",
+      "sha256": "2ec378d14c187e481fa53ec5141b32b21a3f3492de617b8911ed19de274f24d6",
+      "size_bytes": 8472,
+      "kind": "reproducible-static-pwa",
+      "production_integrity_manifest": false,
+      "direct_index_link": false,
+      "editable_status": "byte-exact output of the recovered hash-pinned PWA builder",
+      "historical_builder": "Vibe4You commit 5393594e502b7cc79e74aef7be4e8de4d3a37117 scripts/prepare-live-pwa.py"
+    },
+    {
+      "target": "server/vibe4you-app/icons/icon-512.png",
+      "source": "deployment-snapshots/vibe4you-20261116-gst-r2/frontend-runtime/site/vibe4you-app/icons/icon-512.png",
+      "sha256": "b40462926adc645aec33977bc4e34573bc8d4c62cdd7a22c052cf6a0dc017851",
+      "size_bytes": 23788,
+      "kind": "reproducible-static-pwa",
+      "production_integrity_manifest": false,
+      "direct_index_link": false,
+      "editable_status": "byte-exact output of the recovered hash-pinned PWA builder",
+      "historical_builder": "Vibe4You commit 5393594e502b7cc79e74aef7be4e8de4d3a37117 scripts/prepare-live-pwa.py"
+    },
+    {
+      "target": "server/vibe4you-app/icons/icon-maskable-512.png",
+      "source": "deployment-snapshots/vibe4you-20261116-gst-r2/frontend-runtime/site/vibe4you-app/icons/icon-maskable-512.png",
+      "sha256": "cb144d04f97f7dcc20e2bb27fc98ee325df59cfa3c0a5f4f989ab089be2976f2",
+      "size_bytes": 17193,
+      "kind": "reproducible-static-pwa",
+      "production_integrity_manifest": false,
+      "direct_index_link": false,
+      "editable_status": "byte-exact output of the recovered hash-pinned PWA builder",
+      "historical_builder": "Vibe4You commit 5393594e502b7cc79e74aef7be4e8de4d3a37117 scripts/prepare-live-pwa.py"
+    },
+    {
+      "target": "server/vibe4you-app/manifest.json",
+      "source": "deployment-snapshots/vibe4you-20261116-gst-r2/frontend-runtime/site/vibe4you-app/manifest.json",
+      "sha256": "b83f48b4557e12eb7c921468ba85daeac6a9b677a8bfc40f8a06c1c591966e8a",
+      "size_bytes": 752,
+      "kind": "reproducible-static-pwa",
+      "production_integrity_manifest": false,
+      "direct_index_link": true,
+      "editable_status": "byte-exact output of the recovered hash-pinned PWA builder",
+      "historical_builder": "Vibe4You commit 5393594e502b7cc79e74aef7be4e8de4d3a37117 scripts/prepare-live-pwa.py"
+    },
+    {
+      "target": "server/vibe4you-app/offline.html",
+      "source": "deployment-snapshots/vibe4you-20261116-gst-r2/frontend-runtime/site/vibe4you-app/offline.html",
+      "sha256": "8a2c83a487d84927107f641e5fe8d164a01c0e45f7ce9f0a3209eab863c82677",
+      "size_bytes": 1697,
+      "kind": "reproducible-static-pwa",
+      "production_integrity_manifest": false,
+      "direct_index_link": false,
+      "editable_status": "byte-exact output of the recovered hash-pinned PWA builder",
+      "historical_builder": "Vibe4You commit 5393594e502b7cc79e74aef7be4e8de4d3a37117 scripts/prepare-live-pwa.py"
+    },
+    {
+      "target": "server/vibe4you-app/pwa-install.css",
+      "source": "deployment-snapshots/vibe4you-20261116-gst-r2/frontend-runtime/site/vibe4you-app/pwa-install.css",
+      "sha256": "24fa4e84969779dbd4f6e574db99874adb89c4eb5ccc4ec54a021be6009a7bfd",
+      "size_bytes": 1162,
+      "kind": "reproducible-static-pwa",
+      "production_integrity_manifest": false,
+      "direct_index_link": true,
+      "editable_status": "byte-exact output of the recovered hash-pinned PWA builder",
+      "historical_builder": "Vibe4You commit 5393594e502b7cc79e74aef7be4e8de4d3a37117 scripts/prepare-live-pwa.py"
+    },
+    {
+      "target": "server/vibe4you-app/pwa-install.js",
+      "source": "deployment-snapshots/vibe4you-20261116-gst-r2/frontend-runtime/site/vibe4you-app/pwa-install.js",
+      "sha256": "f8db194dda55094b6466bb27475a98a05c9a92d5f0a39cc00df55e5577632acf",
+      "size_bytes": 2972,
+      "kind": "reproducible-static-pwa",
+      "production_integrity_manifest": false,
+      "direct_index_link": true,
+      "editable_status": "byte-exact output of the recovered hash-pinned PWA builder",
+      "historical_builder": "Vibe4You commit 5393594e502b7cc79e74aef7be4e8de4d3a37117 scripts/prepare-live-pwa.py"
+    }
+  ]
+}

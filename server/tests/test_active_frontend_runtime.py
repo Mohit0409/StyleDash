@@ -10,12 +10,12 @@ from scripts import verify_pinned_frontend_runtime as frontend
 
 
 class ActiveFrontendRuntimeTests(unittest.TestCase):
-    def test_all_133_public_files_match_pinned_runtime_snapshot(self):
+    def test_all_134_public_files_match_pinned_runtime_snapshot(self):
         result=frontend.verify()
         self.assertEqual(result,{
-            "files":133,
+            "files":134,
             "pinned":123,
-            "unmanifested":10,
+            "unmanifested":11,
             "index_direct_refs":21,
             "potential_vite_assets":123,
         })
@@ -41,6 +41,7 @@ class ActiveFrontendRuntimeTests(unittest.TestCase):
             "server/vibe4you-app/icons/icon-512.png",
             "server/vibe4you-app/icons/icon-maskable-512.png",
             "server/vibe4you-app/manifest.json",
+            "server/vibe4you-app/offline.html",
             "server/vibe4you-app/pwa-install.css",
             "server/vibe4you-app/pwa-install.js",
         }
@@ -79,14 +80,22 @@ class ActiveFrontendRuntimeTests(unittest.TestCase):
                 with self.assertRaisesRegex(frontend.FrontendCapsuleError,"manifest has changed"):
                     frontend.verify()
 
-    def test_pwa_icon_files_have_png_signatures_and_service_worker_exists(self):
+    def test_pwa_icon_files_and_offline_fallback_are_complete(self):
         pwa=json.loads((frontend.SITE/"vibe4you-app/manifest.json").read_text("utf-8"))
         self.assertEqual(len(pwa.get("icons",[])),3)
         for image in pwa["icons"]:
             with self.subTest(name=image["src"]):
                 file=frontend.SITE/image["src"].lstrip("/")
                 self.assertEqual(file.read_bytes()[:8],b"\x89PNG\r\n\x1a\n")
-        self.assertIn("self", (frontend.SITE/"sw.js").read_text("utf-8"))
+        worker=(frontend.SITE/"sw.js").read_text("utf-8")
+        offline=frontend.SITE/"vibe4you-app/offline.html"
+        self.assertIn("self",worker)
+        self.assertIn("/vibe4you-app/offline.html",worker)
+        self.assertEqual(len(offline.read_bytes()),1697)
+        self.assertEqual(
+            hashlib.sha256(offline.read_bytes()).hexdigest(),
+            "8a2c83a487d84927107f641e5fe8d164a01c0e45f7ce9f0a3209eab863c82677",
+        )
 
     def test_index_links_resolve_to_local_public_capsule(self):
         p=frontend.HomeReferences()

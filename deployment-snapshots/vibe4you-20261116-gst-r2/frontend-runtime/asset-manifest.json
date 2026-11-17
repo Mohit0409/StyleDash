@@ -1311,6 +1311,16 @@
       "target": "server/vibe4you-app/manifest.json"
     },
     {
+      "direct_index_link": false,
+      "potential_vite_asset_dependency": false,
+      "production_integrity_manifest": false,
+      "provenance": "live_readonly_sftp_and_http_sha256",
+      "pwa_derived": true,
+      "sha256": "8a2c83a487d84927107f641e5fe8d164a01c0e45f7ce9f0a3209eab863c82677",
+      "size_bytes": 1697,
+      "target": "server/vibe4you-app/offline.html"
+    },
+    {
       "direct_index_link": true,
       "potential_vite_asset_dependency": false,
       "production_integrity_manifest": false,
@@ -1333,6 +1343,6 @@
   ],
   "production_integrity_manifest_sha256": "ec13b4f28f99b26f3cf468412d77a651b8596decc1cb5afb1012170bac11a126",
   "schema_version": 1,
-  "scope": "homepage linked assets plus potential literal-reference Vite deps plus PWA manifest icons/serviceworker; not a network trace",
+  "scope": "homepage linked assets plus potential literal-reference Vite deps plus the public PWA static graph; not a network trace",
   "source": "read_only_public_ubuntu_SFTP_and_HTTP"
 }

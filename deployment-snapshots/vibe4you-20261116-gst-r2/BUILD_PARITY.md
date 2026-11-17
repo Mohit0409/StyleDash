@@ -62,11 +62,11 @@ billing records, and customer data were not changed.
 
 ## November 16 live runtime capture
 
-An additional exact-byte frontend-runtime/ capsule now captures 133 public
+An additional exact-byte frontend-runtime/ capsule now captures 134 public
 site/PWA artifacts, verified against the live Ubuntu server. This includes
 the active Search V2 R2 entry JS, direct overlay CSS/JS, potential dynamic
-Vite asset dependencies and PWA icons/service worker. 123 assets match
-the deployed integrity manifest; 10 publicly served files do not appear
+Vite asset dependencies and PWA icons/service worker/offline fallback. 123 assets match
+the deployed integrity manifest; 11 publicly served files do not appear
 in that manifest but matched both nonroot filesystem and HTTP body hashes.
 This fixes our baseline *visibility*, not production's manifest coverage
 or the actual React source/build reproducibility.
@@ -166,3 +166,16 @@ See `V4Y046_EDITABLE_SOURCE_PROVENANCE.md` and
 boundary; it does not make the compiled release an authorized deployment
 input. Typed equivalents of the ten differences and independent overlays
 still require reconstruction and parity tests.
+
+## Independent overlay/PWA integration tranche
+
+The 14 direct standalone marketing/review/mobile/cache/social overlays, two
+live compiled CSS references and nine static PWA outputs now have an explicit
+25-file source map and offline fail-closed assembler. All inputs resolve to the
+corrected 134-file exact-byte capsule; the PWA set also matches the output of
+the historical hash-pinned builder. Sixteen focused integrity/assembly tests
+pass. This establishes a reproducible artifact-layer boundary, not typed React
+integration: the two CSS files remain compiled-only references and the
+standalone overlays are not yet incorporated into the Vite module graph.
+
+See `FRONTEND_OVERLAY_INTEGRATION.md`. No production release path was added.

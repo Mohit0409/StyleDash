@@ -16,7 +16,7 @@ ROOT = Path(__file__).resolve().parents[1]
 CAPSULE = ROOT / "deployment-snapshots/vibe4you-20261116-gst-r2/frontend-runtime"
 MANIFEST = CAPSULE / "asset-manifest.json"
 SITE = CAPSULE / "site"
-PINNED_MANIFEST_SHA256 = "a32a2fa9130a53abd16709bc6b2018e72011c8c29c01b78a25727d61a86b36aa"
+PINNED_MANIFEST_SHA256 = "dcec8a0d3970517f605cddf399bae5382ccde802b6783c846960d35fa7ff5d6f"
 PINNED_PROD_SHA256 = "ec13b4f28f99b26f3cf468412d77a651b8596decc1cb5afb1012170bac11a126"
 ALLOWED_EXTENSIONS = {".js", ".css", ".json", ".svg", ".png", ".jpg", ".jpeg", ".webp", ".html"}
 PWA_EXTRA = {
@@ -24,6 +24,7 @@ PWA_EXTRA = {
     "server/vibe4you-app/icons/icon-192.png",
     "server/vibe4you-app/icons/icon-512.png",
     "server/vibe4you-app/icons/icon-maskable-512.png",
+    "server/vibe4you-app/offline.html",
 }
 
 
@@ -80,7 +81,7 @@ def verify() -> dict:
     meta=json.loads(raw)
     if (meta.get("schema_version")!=1
         or meta.get("production_integrity_manifest_sha256")!=PINNED_PROD_SHA256
-        or len(meta.get("files",[]))!=133):
+        or len(meta.get("files",[]))!=134):
         raise FrontendCapsuleError("Wrong public runtime baseline")
     paths=set()
     pinned=0
@@ -102,7 +103,7 @@ def verify() -> dict:
         if row["direct_index_link"]:direct.add(path)
         if row["potential_vite_asset_dependency"]:potential.add(path)
         if row["pwa_derived"]:pwa_derived.add(path)
-    if pinned!=123 or len(paths)!=133 or len(potential)!=123 or pwa_derived!=PWA_EXTRA:
+    if pinned!=123 or len(paths)!=134 or len(potential)!=123 or pwa_derived!=PWA_EXTRA:
         raise FrontendCapsuleError("Unexpected file/asset coverage")
     if "server/index.html" not in paths or "server/assets/index-MMTPd8z_-v4y-search-v2-r2.js" not in paths:
         raise FrontendCapsuleError("Missing active Search V2 R2 entrypoint")
@@ -116,12 +117,15 @@ def verify() -> dict:
         raise FrontendCapsuleError("Current homepage links do not match pinned captures")
     pwa=json.loads((SITE/"vibe4you-app/manifest.json").read_text(encoding="utf-8"))
     icon_set={"server/"+str(icon["src"]).lstrip("/") for icon in pwa.get("icons",[])}
-    if icon_set!=PWA_EXTRA-{"server/sw.js"}:
+    if icon_set!=PWA_EXTRA-{"server/sw.js","server/vibe4you-app/offline.html"}:
         raise FrontendCapsuleError("PWA icon references changed")
     installer=(SITE/"vibe4you-app/pwa-install.js").read_text("utf-8")
     if "/sw.js" not in installer:
         raise FrontendCapsuleError("PWA registration path changed")
-    return {"files":133,"pinned":pinned,"unmanifested":133-pinned,
+    worker=(SITE/"sw.js").read_text("utf-8")
+    if "/vibe4you-app/offline.html" not in worker:
+        raise FrontendCapsuleError("PWA offline fallback path changed")
+    return {"files":134,"pinned":pinned,"unmanifested":134-pinned,
             "index_direct_refs":len(direct),"potential_vite_assets":len(potential)}
 
 

@@ -19,6 +19,12 @@ validates source byte hashes and optionally writes a local temporary
 staging directory. It cannot stage private state, customer data, secrets,
 or assets outside this explicit 60-file allowlist.
 
+`frontend-overlay-source-map.json` independently pins 25 public frontend
+files: 14 standalone overlays, two compiled CSS references and nine static
+PWA outputs. `scripts/assemble_pinned_frontend_overlays.py` applies the same
+offline/new-temp-directory boundary. It deliberately excludes the generated
+homepage and Search V2 R2 main bundle and is not connected to a deployer.
+
 This snapshot is NOT a claim about the complete Vibe4You production manifest
 or a full deployable source tree. Align runtime entrypoint dependencies and
 current frontend assets; run acceptance/security checks before changes.

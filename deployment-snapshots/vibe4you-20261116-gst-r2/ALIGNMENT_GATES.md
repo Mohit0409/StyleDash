@@ -118,12 +118,12 @@ complete live system build/release reproducibility is NOT established.
 
 5. **Generated frontend (CURRENT RUNTIME REFERENCE CAPTURED,
    editable-source parity still PENDING):** An isolated read-only copy
-   of 133 currently public files has been SHA-256 verified and stored
+   of 134 currently public files has been SHA-256 verified and stored
    in frontend-runtime/site/. This includes the pinned Search V2 R2
    main bundle, 21 directly linked homepage resources, potential
    transitive Vite literal dependency assets, and PWA icons/service
-   worker. 123 bytes are pinned in the original production integrity
-   manifest; 10 currently served files are NOT present in that
+   worker/offline fallback. 123 bytes are pinned in the original production integrity
+   manifest; 11 currently served files are NOT present in that
    manifest and were independently checked against live disk and
    HTTP response SHA. The latter is a release-integrity coverage gap.
    Potential bundle dependencies are NOT a browser network trace.
@@ -132,6 +132,12 @@ complete live system build/release reproducibility is NOT established.
    not editable JSX/TSX sources). The code snapshot includes
    test_active_frontend_runtime.py and offline
    scripts/verify_pinned_frontend_runtime.py with 8 focused tests.
+   A separate 25-file overlay source map now classifies and pins 14
+   standalone overlays, two compiled CSS references and nine reproducible
+   static PWA outputs. Its offline-only assembler and eight added tests
+   validate exact staging without adding a deployment path. Typed React
+   integration and authored source parity for both compiled CSS files remain
+   pending; see FRONTEND_OVERLAY_INTEGRATION.md.
    The old Vite source still builds different asset hashes:
    this is an acceptance/reference snapshot, NOT the editable source
    or an authorized production deployment payload.
@@ -211,7 +217,7 @@ complete live system build/release reproducibility is NOT established.
    hash-verified and replayable from already-compiled V4Y-046 code.
    Then incorporate separately deployed marketing/review/PWA overlays
    through a reviewed source-based build. Independently cover the
-   10 unmanifested public CSS/PWA assets in a future guarded
+   11 unmanifested public CSS/PWA assets in a future guarded
    production integrity release.
 5. Run end-to-end tests, compare the complete production artifact
    manifest and require explicit owner approval before merging main.
