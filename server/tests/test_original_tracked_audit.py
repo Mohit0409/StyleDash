@@ -22,6 +22,12 @@ FILTER_RECONCILIATION = (
     / "vibe4you-20261116-gst-r2"
     / "original-filter-dismiss-reconciliation.json"
 )
+MAINTENANCE_RECONCILIATION = (
+    ROOT
+    / "deployment-snapshots"
+    / "vibe4you-20261116-gst-r2"
+    / "original-repository-maintenance-reconciliation.json"
+)
 
 
 class OriginalTrackedAuditTests(unittest.TestCase):
@@ -31,6 +37,9 @@ class OriginalTrackedAuditTests(unittest.TestCase):
         cls.reconciliation = json.loads(RECONCILIATION.read_text(encoding="utf-8"))
         cls.filter_reconciliation = json.loads(
             FILTER_RECONCILIATION.read_text(encoding="utf-8")
+        )
+        cls.maintenance_reconciliation = json.loads(
+            MAINTENANCE_RECONCILIATION.read_text(encoding="utf-8")
         )
 
     def test_inventory_is_complete_and_non_overlapping(self) -> None:
@@ -162,6 +171,32 @@ class OriginalTrackedAuditTests(unittest.TestCase):
             self.filter_reconciliation["supersedes_disposition"]["to"],
         )
         self.assertEqual("PASS", self.filter_reconciliation["result"])
+
+    def test_maintenance_reconciliation_covers_the_whole_audit_bundle(self) -> None:
+        bundle = next(
+            item
+            for item in self.audit["bundles"]
+            if item["id"] == "repository-maintenance"
+        )
+        self.assertEqual(
+            set(bundle["paths"]),
+            set(self.maintenance_reconciliation["audited_paths"]),
+        )
+
+    def test_maintenance_reconciliation_keeps_config_not_stale_status(self) -> None:
+        self.assertEqual(
+            [".eslintrc.cjs"],
+            self.maintenance_reconciliation["source_files_ported"],
+        )
+        self.assertEqual(
+            ["docs/DEV_COORDINATION.md"],
+            self.maintenance_reconciliation["source_files_rejected"],
+        )
+        self.assertEqual(
+            "reconciled-selective-config-port",
+            self.maintenance_reconciliation["supersedes_disposition"]["to"],
+        )
+        self.assertEqual("PASS", self.maintenance_reconciliation["result"])
 
 
 if __name__ == "__main__":

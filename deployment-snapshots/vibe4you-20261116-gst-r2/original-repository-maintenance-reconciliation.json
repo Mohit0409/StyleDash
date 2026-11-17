@@ -1,0 +1,40 @@
+{
+  "schema_version": 1,
+  "reconciled_at": "2026-11-17",
+  "source_audit": "deployment-snapshots/vibe4you-20261116-gst-r2/original-tracked-audit.json",
+  "source_bundle": "repository-maintenance",
+  "original_checkout_head": "2c3e6e7bc400502516467869c370264e27d069aa",
+  "audited_paths": [
+    ".eslintrc.cjs",
+    "docs/DEV_COORDINATION.md"
+  ],
+  "findings": [
+    {
+      "path": ".eslintrc.cjs",
+      "decision": "selective-source-port",
+      "evidence": "tmp contains generated and tool-managed trees and is not an authored TypeScript lint target; adding it to ignorePatterns makes lint deterministic without weakening rules for repository source"
+    },
+    {
+      "path": "docs/DEV_COORDINATION.md",
+      "decision": "do-not-port-stale-status",
+      "evidence": "the appended October COD note describes an old Termux release, old live hashes, and a historical rollout status; the current Ubuntu service contract, pinned production manifest, and exact deployed source snapshot supersede those mutable statements"
+    },
+    {
+      "path": "docs/DEV_COORDINATION.md",
+      "decision": "behavior-already-preserved",
+      "evidence": "the authoritative public server source already rejects online COD payment creation with cod_no_online_payment and the current payment tests cover server-authoritative no-advance COD behavior"
+    }
+  ],
+  "source_files_ported": [
+    ".eslintrc.cjs"
+  ],
+  "source_files_rejected": [
+    "docs/DEV_COORDINATION.md"
+  ],
+  "supersedes_disposition": {
+    "from": "review-after-source-reconciliation",
+    "to": "reconciled-selective-config-port"
+  },
+  "production_claim": "No production or deployment status is inferred from the rejected historical coordination prose.",
+  "result": "PASS"
+}
