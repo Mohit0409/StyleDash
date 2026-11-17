@@ -16,6 +16,12 @@ RECONCILIATION = (
     / "vibe4you-20261116-gst-r2"
     / "original-local-search-reconciliation.json"
 )
+FILTER_RECONCILIATION = (
+    ROOT
+    / "deployment-snapshots"
+    / "vibe4you-20261116-gst-r2"
+    / "original-filter-dismiss-reconciliation.json"
+)
 
 
 class OriginalTrackedAuditTests(unittest.TestCase):
@@ -23,6 +29,9 @@ class OriginalTrackedAuditTests(unittest.TestCase):
     def setUpClass(cls) -> None:
         cls.audit = json.loads(AUDIT.read_text(encoding="utf-8"))
         cls.reconciliation = json.loads(RECONCILIATION.read_text(encoding="utf-8"))
+        cls.filter_reconciliation = json.loads(
+            FILTER_RECONCILIATION.read_text(encoding="utf-8")
+        )
 
     def test_inventory_is_complete_and_non_overlapping(self) -> None:
         paths = [
@@ -124,6 +133,35 @@ class OriginalTrackedAuditTests(unittest.TestCase):
             self.reconciliation["supersedes_disposition"]["to"],
         )
         self.assertEqual("PASS", self.reconciliation["result"])
+
+    def test_filter_reconciliation_covers_the_whole_audit_bundle(self) -> None:
+        bundle = next(
+            item
+            for item in self.audit["bundles"]
+            if item["id"] == "filter-dismissal-ui"
+        )
+        self.assertEqual(
+            set(bundle["paths"]),
+            set(self.filter_reconciliation["audited_paths"]),
+        )
+        self.assertEqual(
+            "filter-dismissal-ui", self.filter_reconciliation["source_bundle"]
+        )
+
+    def test_filter_reconciliation_is_a_narrow_source_port(self) -> None:
+        self.assertEqual(
+            ["src/components/FilterSidebar.tsx"],
+            self.filter_reconciliation["source_files_ported"],
+        )
+        self.assertEqual(
+            ["e2e/specs/filter-dismiss.spec.ts"],
+            self.filter_reconciliation["test_files_updated"],
+        )
+        self.assertEqual(
+            "reconciled-selective-source-port",
+            self.filter_reconciliation["supersedes_disposition"]["to"],
+        )
+        self.assertEqual("PASS", self.filter_reconciliation["result"])
 
 
 if __name__ == "__main__":
