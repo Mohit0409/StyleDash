@@ -46,6 +46,12 @@ SYNCHRONIZED_RECONCILIATION = (
     / "vibe4you-20261116-gst-r2"
     / "original-already-synchronized-reconciliation.json"
 )
+PROTECTED_CONFIG_RECONCILIATION = (
+    ROOT
+    / "deployment-snapshots"
+    / "vibe4you-20261116-gst-r2"
+    / "original-protected-config-reconciliation.json"
+)
 
 
 class OriginalTrackedAuditTests(unittest.TestCase):
@@ -67,6 +73,9 @@ class OriginalTrackedAuditTests(unittest.TestCase):
         )
         cls.synchronized_reconciliation = json.loads(
             SYNCHRONIZED_RECONCILIATION.read_text(encoding="utf-8")
+        )
+        cls.protected_config_reconciliation = json.loads(
+            PROTECTED_CONFIG_RECONCILIATION.read_text(encoding="utf-8")
         )
 
     def test_inventory_is_complete_and_non_overlapping(self) -> None:
@@ -321,6 +330,40 @@ class OriginalTrackedAuditTests(unittest.TestCase):
         )
         self.assertEqual(
             "reconciled-no-port-required",
+            reconciliation["supersedes_disposition"]["to"],
+        )
+        self.assertEqual("PASS", reconciliation["result"])
+
+    def test_protected_config_reconciliation_covers_the_whole_audit_bundle(self) -> None:
+        bundle = next(
+            item
+            for item in self.audit["bundles"]
+            if item["id"] == "protected-policy-and-config"
+        )
+        reconciliation = self.protected_config_reconciliation
+        self.assertEqual(set(bundle["paths"]), set(reconciliation["audited_paths"]))
+        self.assertEqual("protected-policy-and-config", reconciliation["source_bundle"])
+
+    def test_protected_config_reconciliation_records_no_values_or_ports(self) -> None:
+        reconciliation = self.protected_config_reconciliation
+        self.assertFalse(reconciliation["protected_values_recorded"])
+        self.assertEqual([], reconciliation["source_files_ported"])
+        self.assertEqual(
+            {".env.e2e", ".env.example"},
+            set(reconciliation["already_satisfied_without_port"]),
+        )
+        self.assertEqual(
+            {"AGENTS.md", "server/payment-data/settings.json"},
+            set(reconciliation["source_files_rejected"]),
+        )
+        settings = next(
+            item
+            for item in reconciliation["file_decisions"]
+            if item["path"] == "server/payment-data/settings.json"
+        )
+        self.assertEqual(["gst.principalPlace"], settings["observed_changed_paths"])
+        self.assertEqual(
+            "reconciled-no-protected-value-port",
             reconciliation["supersedes_disposition"]["to"],
         )
         self.assertEqual("PASS", reconciliation["result"])
