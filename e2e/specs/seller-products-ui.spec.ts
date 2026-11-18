@@ -71,8 +71,8 @@ test('approved shop owner can draft and submit but cannot publish a product', as
   await page.getByRole('button', { name: 'New Product Draft' }).click();
   await page.getByLabel('Product name').fill('Local Product');
   await page.getByLabel('Description').fill('A locally submitted product for private review.');
-  await page.getByLabel('Price (INR)', { exact: true }).fill('500');
-  await page.getByLabel('Original price (INR)').fill('600');
+  await page.getByLabel('Price (Selling Price) (INR)', { exact: true }).fill('500');
+  await page.getByLabel('Original price (MRP) (INR)').fill('600');
   await page.getByPlaceholder('Size, e.g. S or XL').fill('M');
   await page.getByPlaceholder('Stock').fill('2');
   await page.getByRole('button', { name: '+ Add size' }).click();
@@ -195,8 +195,8 @@ test('approved shop owner can draft a multi-colour product and reopen it without
   await page.getByRole('button', { name: 'New Product Draft' }).click();
   await page.getByLabel('Product name').fill('Two Tone Kurta');
   await page.getByLabel('Description').fill('A kurta available in two colours.');
-  await page.getByLabel('Price (INR)', { exact: true }).fill('700');
-  await page.getByLabel('Original price (INR)').fill('800');
+  await page.getByLabel('Price (Selling Price) (INR)', { exact: true }).fill('700');
+  await page.getByLabel('Original price (MRP) (INR)').fill('800');
   await page.getByLabel('Colour name').fill('Blue');
   await page.getByPlaceholder('Size, e.g. S or XL').fill('M');
   await page.getByPlaceholder('Stock').fill('4');

@@ -64,6 +64,12 @@ MERCHANT_POLICY_RECONCILIATION = (
     / "vibe4you-20261116-gst-r2"
     / "original-merchant-policy-seo-reconciliation.json"
 )
+CATALOG_SELLER_RECONCILIATION = (
+    ROOT
+    / "deployment-snapshots"
+    / "vibe4you-20261116-gst-r2"
+    / "original-catalog-seller-reconciliation.json"
+)
 
 
 class OriginalTrackedAuditTests(unittest.TestCase):
@@ -94,6 +100,9 @@ class OriginalTrackedAuditTests(unittest.TestCase):
         )
         cls.merchant_policy_reconciliation = json.loads(
             MERCHANT_POLICY_RECONCILIATION.read_text(encoding="utf-8")
+        )
+        cls.catalog_seller_reconciliation = json.loads(
+            CATALOG_SELLER_RECONCILIATION.read_text(encoding="utf-8")
         )
 
     def test_inventory_is_complete_and_non_overlapping(self) -> None:
@@ -441,6 +450,34 @@ class OriginalTrackedAuditTests(unittest.TestCase):
         self.assertIn("does not claim a universal return window", invariants)
         self.assertEqual(
             "reconciled-selective-merchant-policy-port",
+            reconciliation["supersedes_disposition"]["to"],
+        )
+        self.assertEqual("PASS", reconciliation["result"])
+
+    def test_catalog_seller_reconciliation_covers_the_whole_audit_bundle(self) -> None:
+        bundle = next(
+            item
+            for item in self.audit["bundles"]
+            if item["id"] == "catalog-taxonomy-and-seller"
+        )
+        reconciliation = self.catalog_seller_reconciliation
+        self.assertEqual(set(bundle["paths"]), set(reconciliation["audited_paths"]))
+        self.assertEqual(8, len(reconciliation["file_decisions"]))
+
+    def test_catalog_seller_reconciliation_preserves_backend_contract(self) -> None:
+        reconciliation = self.catalog_seller_reconciliation
+        self.assertEqual(["src/components/SellerProducts.tsx"], reconciliation["source_files_ported"])
+        self.assertEqual(["e2e/specs/seller-products-ui.spec.ts"], reconciliation["test_files_updated"])
+        self.assertEqual(
+            ["src/data/catalogTaxonomy.ts"],
+            reconciliation["untracked_dependencies_not_admitted"],
+        )
+        invariants = " ".join(reconciliation["contract_invariants"])
+        self.assertIn("20 active size/colour combinations", invariants)
+        self.assertIn("backend source of truth", invariants)
+        self.assertIn("administrator review", invariants)
+        self.assertEqual(
+            "reconciled-selective-seller-label-port",
             reconciliation["supersedes_disposition"]["to"],
         )
         self.assertEqual("PASS", reconciliation["result"])
