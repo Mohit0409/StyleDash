@@ -76,6 +76,12 @@ PRODUCT_PRESENTATION_RECONCILIATION = (
     / "vibe4you-20261116-gst-r2"
     / "original-product-presentation-reconciliation.json"
 )
+BACKEND_ADMIN_RECONCILIATION = (
+    ROOT
+    / "deployment-snapshots"
+    / "vibe4you-20261116-gst-r2"
+    / "original-backend-admin-reconciliation.json"
+)
 
 
 class OriginalTrackedAuditTests(unittest.TestCase):
@@ -112,6 +118,9 @@ class OriginalTrackedAuditTests(unittest.TestCase):
         )
         cls.product_presentation_reconciliation = json.loads(
             PRODUCT_PRESENTATION_RECONCILIATION.read_text(encoding="utf-8")
+        )
+        cls.backend_admin_reconciliation = json.loads(
+            BACKEND_ADMIN_RECONCILIATION.read_text(encoding="utf-8")
         )
 
     def test_inventory_is_complete_and_non_overlapping(self) -> None:
@@ -523,6 +532,52 @@ class OriginalTrackedAuditTests(unittest.TestCase):
             "reconciled-selective-product-presentation-port",
             reconciliation["supersedes_disposition"]["to"],
         )
+        self.assertEqual("PASS", reconciliation["result"])
+
+    def test_backend_admin_reconciliation_covers_all_three_coupled_bundles(self) -> None:
+        bundle_ids = {
+            "production-divergent-backend-reference",
+            "production-divergent-admin-ui",
+            "coupled-backend-tests",
+        }
+        expected_paths = {
+            path
+            for bundle in self.audit["bundles"]
+            if bundle["id"] in bundle_ids
+            for path in bundle["paths"]
+        }
+        reconciliation = self.backend_admin_reconciliation
+        self.assertEqual(bundle_ids, set(reconciliation["source_bundles"]))
+        self.assertEqual(expected_paths, set(reconciliation["audited_paths"]))
+        self.assertEqual(15, len(expected_paths))
+
+    def test_backend_admin_reconciliation_requires_independent_implementation(self) -> None:
+        reconciliation = self.backend_admin_reconciliation
+        comparisons = reconciliation["hash_comparisons"]
+        self.assertEqual(9, len(comparisons))
+        self.assertFalse(any(item["dirty_matches_live"] for item in comparisons))
+        self.assertEqual(
+            4,
+            sum(item["synchronized_matches_live"] for item in comparisons),
+        )
+        self.assertEqual([], reconciliation["source_files_ported"])
+        self.assertEqual([], reconciliation["test_files_ported"])
+        self.assertEqual(
+            9, len(reconciliation["source_files_held_for_independent_implementation"])
+        )
+        self.assertEqual(6, len(reconciliation["test_files_held_with_implementation"]))
+        findings = " ".join(reconciliation["contract_findings"])
+        self.assertIn("COD booking-advance", findings)
+        self.assertIn("20 to 100", findings)
+        self.assertIn("static taxonomy", findings)
+        self.assertEqual(
+            {"tests_run": 225, "passed": 223, "failed": 2},
+            {
+                key: reconciliation["current_branch_test_evidence"][key]
+                for key in ("tests_run", "passed", "failed")
+            },
+        )
+        self.assertEqual("MANUAL ACTION REQUIRED", reconciliation["release_status"])
         self.assertEqual("PASS", reconciliation["result"])
 
 
