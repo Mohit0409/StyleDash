@@ -82,6 +82,18 @@ BACKEND_ADMIN_RECONCILIATION = (
     / "vibe4you-20261116-gst-r2"
     / "original-backend-admin-reconciliation.json"
 )
+PAYMENT_RECONCILIATION = (
+    ROOT
+    / "deployment-snapshots"
+    / "vibe4you-20261116-gst-r2"
+    / "original-payment-cod-tax-reconciliation.json"
+)
+RECONCILIATION_CLOSURE = (
+    ROOT
+    / "deployment-snapshots"
+    / "vibe4you-20261116-gst-r2"
+    / "original-tracked-reconciliation-closure.json"
+)
 
 
 class OriginalTrackedAuditTests(unittest.TestCase):
@@ -121,6 +133,12 @@ class OriginalTrackedAuditTests(unittest.TestCase):
         )
         cls.backend_admin_reconciliation = json.loads(
             BACKEND_ADMIN_RECONCILIATION.read_text(encoding="utf-8")
+        )
+        cls.payment_reconciliation = json.loads(
+            PAYMENT_RECONCILIATION.read_text(encoding="utf-8")
+        )
+        cls.reconciliation_closure = json.loads(
+            RECONCILIATION_CLOSURE.read_text(encoding="utf-8")
         )
 
     def test_inventory_is_complete_and_non_overlapping(self) -> None:
@@ -579,6 +597,52 @@ class OriginalTrackedAuditTests(unittest.TestCase):
         )
         self.assertEqual("MANUAL ACTION REQUIRED", reconciliation["release_status"])
         self.assertEqual("PASS", reconciliation["result"])
+
+    def test_payment_reconciliation_covers_the_whole_audit_bundle(self) -> None:
+        bundle = next(
+            item
+            for item in self.audit["bundles"]
+            if item["id"] == "payment-cod-and-tax-invoice"
+        )
+        reconciliation = self.payment_reconciliation
+        self.assertEqual(set(bundle["paths"]), set(reconciliation["audited_paths"]))
+        self.assertEqual(8, len(reconciliation["file_decisions"]))
+
+    def test_payment_reconciliation_retains_no_advance_and_ownership_contract(self) -> None:
+        reconciliation = self.payment_reconciliation
+        self.assertEqual([], reconciliation["source_files_ported"])
+        self.assertEqual(
+            ["src/tests/prelaunchLock.test.ts"], reconciliation["test_files_updated"]
+        )
+        self.assertEqual(
+            ["src/services/ecommerceAnalytics.ts"],
+            reconciliation["untracked_dependencies_not_admitted"],
+        )
+        contract = " ".join(reconciliation["selected_payment_contract"].values())
+        self.assertIn("No online advance", contract)
+        self.assertIn("/api/place-cod-order", contract)
+        self.assertIn("owning account", contract)
+        findings = " ".join(reconciliation["contract_findings"])
+        self.assertIn("₹50 Razorpay COD booking amount", findings)
+        self.assertIn("cross-account 404", findings)
+        self.assertEqual(
+            "reconciled-current-no-advance-cod-contract-retained",
+            reconciliation["supersedes_disposition"]["to"],
+        )
+        self.assertEqual("MANUAL ACTION REQUIRED", reconciliation["release_status"])
+        self.assertEqual("PASS", reconciliation["result"])
+
+    def test_closure_maps_every_audit_bundle_to_an_existing_report(self) -> None:
+        closure = self.reconciliation_closure
+        bundle_ids = {bundle["id"] for bundle in self.audit["bundles"]}
+        self.assertEqual(14, len(bundle_ids))
+        self.assertEqual(bundle_ids, set(closure["bundle_reports"]))
+        for report in closure["bundle_reports"].values():
+            self.assertTrue((ROOT / report).is_file(), report)
+        self.assertEqual(68, closure["tracked_status_paths"])
+        self.assertEqual("COMPLETE", closure["source_reconciliation_status"])
+        self.assertEqual("MANUAL ACTION REQUIRED", closure["release_status"])
+        self.assertEqual("PASS", closure["result"])
 
 
 if __name__ == "__main__":

@@ -1,0 +1,33 @@
+{
+  "schema_version": 1,
+  "closed_at": "2026-11-18",
+  "source_audit": "deployment-snapshots/vibe4you-20261116-gst-r2/original-tracked-audit.json",
+  "original_checkout_head": "2c3e6e7bc400502516467869c370264e27d069aa",
+  "tracked_status_paths": 68,
+  "bundle_count": 14,
+  "bundle_reports": {
+    "already-synchronized": "deployment-snapshots/vibe4you-20261116-gst-r2/original-already-synchronized-reconciliation.json",
+    "protected-policy-and-config": "deployment-snapshots/vibe4you-20261116-gst-r2/original-protected-config-reconciliation.json",
+    "repository-maintenance": "deployment-snapshots/vibe4you-20261116-gst-r2/original-repository-maintenance-reconciliation.json",
+    "obsolete-termux-operations": "deployment-snapshots/vibe4you-20261116-gst-r2/original-termux-operations-reconciliation.json",
+    "production-divergent-backend-reference": "deployment-snapshots/vibe4you-20261116-gst-r2/original-backend-admin-reconciliation.json",
+    "production-divergent-admin-ui": "deployment-snapshots/vibe4you-20261116-gst-r2/original-backend-admin-reconciliation.json",
+    "coupled-backend-tests": "deployment-snapshots/vibe4you-20261116-gst-r2/original-backend-admin-reconciliation.json",
+    "payment-cod-and-tax-invoice": "deployment-snapshots/vibe4you-20261116-gst-r2/original-payment-cod-tax-reconciliation.json",
+    "analytics-consent-and-attribution": "deployment-snapshots/vibe4you-20261116-gst-r2/original-analytics-consent-reconciliation.json",
+    "catalog-taxonomy-and-seller": "deployment-snapshots/vibe4you-20261116-gst-r2/original-catalog-seller-reconciliation.json",
+    "local-search-aliases": "deployment-snapshots/vibe4you-20261116-gst-r2/original-local-search-reconciliation.json",
+    "product-presentation-and-store-detail": "deployment-snapshots/vibe4you-20261116-gst-r2/original-product-presentation-reconciliation.json",
+    "filter-dismissal-ui": "deployment-snapshots/vibe4you-20261116-gst-r2/original-filter-dismiss-reconciliation.json",
+    "merchant-policy-and-seo-shell": "deployment-snapshots/vibe4you-20261116-gst-r2/original-merchant-policy-seo-reconciliation.json"
+  },
+  "source_reconciliation_status": "COMPLETE",
+  "release_blockers": [
+    "The current and pinned-live review workflows report eligible=true before a qualifying delivered order exists; two deterministic backend tests fail.",
+    "Held GST invoice, billing, supplier-bill, commission, and private-contact capabilities require independent Ubuntu-native implementation and security review.",
+    "A human must review and approve the synchronization branch; no merge or deployment has been authorized."
+  ],
+  "release_status": "MANUAL ACTION REQUIRED",
+  "production_claim": "The original dirty checkout was not modified, and no production or runtime state was changed.",
+  "result": "PASS"
+}
