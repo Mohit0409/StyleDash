@@ -118,6 +118,23 @@ def verify_firebase_id_token(id_token: str) -> dict[str, Any]:
     return claims
 
 
+def delete_firebase_user(uid: str) -> None:
+    """Delete a Firebase Auth user after the linked Vibe4You account is deleted.
+
+    An already-missing user counts as success.  Callers treat any other error
+    as a best-effort cleanup failure.
+    """
+    if not isinstance(uid, str) or not 1 <= len(uid) <= 128:
+        return
+    app = _initialize_app()
+    from firebase_admin import auth as firebase_auth
+
+    try:
+        firebase_auth.delete_user(uid, app=app)
+    except firebase_auth.UserNotFoundError:
+        return
+
+
 def reset_app_for_tests() -> None:
     """Test-only hook to force re-initialization between isolated test cases."""
     global _app

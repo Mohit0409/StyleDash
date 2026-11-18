@@ -1,0 +1,22 @@
+# Exact byte-for-byte deployed source mirrors, no Windows newline rewriting.
+billing_audit.py -text whitespace=-blank-at-eol,-blank-at-eof,-space-before-tab,cr-at-eol
+gst_catalog_review.py -text whitespace=-blank-at-eol,-blank-at-eof,-space-before-tab,cr-at-eol
+gst_invoice_draft.py -text whitespace=-blank-at-eol,-blank-at-eof,-space-before-tab,cr-at-eol
+gst_official_suggestions.py -text whitespace=-blank-at-eol,-blank-at-eof,-space-before-tab,cr-at-eol
+invoice_ledger.py -text whitespace=-blank-at-eol,-blank-at-eof,-space-before-tab,cr-at-eol
+invoice_order_adapter.py -text whitespace=-blank-at-eol,-blank-at-eof,-space-before-tab,cr-at-eol
+tax_document_pdf.py -text whitespace=-blank-at-eol,-blank-at-eof,-space-before-tab,cr-at-eol
+order_documents.py -text whitespace=-blank-at-eol,-blank-at-eof,-space-before-tab,cr-at-eol
+order_profit.py -text whitespace=-blank-at-eol,-blank-at-eof,-space-before-tab,cr-at-eol
+styledash_registration_email.py -text whitespace=-blank-at-eol,-blank-at-eof,-space-before-tab,cr-at-eol
+gst_phase1_registry.py -text whitespace=-blank-at-eol,-blank-at-eof,-space-before-tab,cr-at-eol
+receipt_pdf.py -text whitespace=-blank-at-eol,-blank-at-eof,-space-before-tab,cr-at-eol
+styledash_admin.py -text whitespace=-blank-at-eol,-blank-at-eof,-space-before-tab,cr-at-eol
+styledash_firebase.py -text whitespace=-blank-at-eol,-blank-at-eof,-space-before-tab,cr-at-eol
+styledash_reviews.py -text whitespace=-blank-at-eol,-blank-at-eof,-space-before-tab,cr-at-eol
+styledash_delivery_zone.py -text whitespace=-blank-at-eol,-blank-at-eof,-space-before-tab,cr-at-eol
+styledash_delivery_zone_store.py -text whitespace=-blank-at-eol,-blank-at-eof,-space-before-tab,cr-at-eol
+styledash_mail.py -text whitespace=-blank-at-eol,-blank-at-eof,-space-before-tab,cr-at-eol
+styledash_notify.py -text whitespace=-blank-at-eol,-blank-at-eof,-space-before-tab,cr-at-eol
+audit_identity_duplicates.py -text whitespace=-blank-at-eol,-blank-at-eof,-space-before-tab,cr-at-eol
+relevance-r2-runtime-bridge.ts -text whitespace=-blank-at-eol,-blank-at-eof,-space-before-tab,cr-at-eol

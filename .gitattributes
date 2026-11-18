@@ -1,1 +1,26 @@
 scripts/termux/** text eol=lf
+# Production-exact public pages: do not change bytes through CRLF normalization.
+public/verify-email.html -text whitespace=-blank-at-eol,-blank-at-eof,-space-before-tab,cr-at-eol
+public/verify-email.js -text whitespace=-blank-at-eol,-blank-at-eof,-space-before-tab,cr-at-eol
+public/account-deletion.html -text whitespace=-blank-at-eol,-blank-at-eof,-space-before-tab,cr-at-eol
+public/account-deletion.js -text whitespace=-blank-at-eol,-blank-at-eof,-space-before-tab,cr-at-eol
+public/.well-known/assetlinks.json -text whitespace=-blank-at-eol,-blank-at-eof,-space-before-tab,cr-at-eol
+server/admin/index.html -text whitespace=-blank-at-eol,-blank-at-eof,-space-before-tab,cr-at-eol
+server/admin/admin.css -text whitespace=-blank-at-eol,-blank-at-eof,-space-before-tab,cr-at-eol
+server/admin/admin.js -text whitespace=-blank-at-eol,-blank-at-eof,-space-before-tab,cr-at-eol
+server/admin/admin-variants.css -text whitespace=-blank-at-eol,-blank-at-eof,-space-before-tab,cr-at-eol
+server/admin/delivery-zone-map.js -text whitespace=-blank-at-eol,-blank-at-eof,-space-before-tab,cr-at-eol
+server/admin/leaflet.css -text whitespace=-blank-at-eol,-blank-at-eof,-space-before-tab,cr-at-eol
+server/admin/leaflet.js -text whitespace=-blank-at-eol,-blank-at-eof,-space-before-tab,cr-at-eol
+public/manifest.json -text whitespace=-blank-at-eol,-blank-at-eof,-space-before-tab,cr-at-eol
+src/pages/Products.tsx -text whitespace=-blank-at-eol,-blank-at-eof,-space-before-tab,cr-at-eol
+src/services/paymentApi.ts -text whitespace=-blank-at-eol,-blank-at-eof,-space-before-tab,cr-at-eol
+src/tests/homepageSectionIcons.test.tsx -text whitespace=-blank-at-eol,-blank-at-eof,-space-before-tab,cr-at-eol
+src/tests/paymentApi.test.ts -text whitespace=-blank-at-eol,-blank-at-eof,-space-before-tab,cr-at-eol
+src/utils/catalogFilters.ts -text whitespace=-blank-at-eol,-blank-at-eof,-space-before-tab,cr-at-eol
+src/utils/searchEngine.ts -text whitespace=-blank-at-eol,-blank-at-eof,-space-before-tab,cr-at-eol
+src/utils/searchSuggestions.ts -text whitespace=-blank-at-eol,-blank-at-eof,-space-before-tab,cr-at-eol
+index.html -text whitespace=-blank-at-eol,-blank-at-eof,-space-before-tab,cr-at-eol
+public/favicon.svg -text whitespace=-blank-at-eol,-blank-at-eof,-space-before-tab,cr-at-eol
+public/product-placeholder.svg -text whitespace=-blank-at-eol,-blank-at-eof,-space-before-tab,cr-at-eol
+public/robots.txt -text whitespace=-blank-at-eol,-blank-at-eof,-space-before-tab,cr-at-eol

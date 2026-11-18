@@ -46,14 +46,16 @@ class ReceiptPdfTests(unittest.TestCase):
         pdf = build_receipt_pdf(delivered_order())
         self.assertTrue(pdf.startswith(b"%PDF-1.4"))
         self.assertIn(b"Vibe4You", pdf)
-        self.assertIn(b"MARKETPLACE RECEIPT", pdf)
+        self.assertIn(b"CUSTOMER BILL", pdf)
+        self.assertIn(b"PAYMENT RECEIPT", pdf)
         self.assertIn(b"Receipt Ref: V4Y-RCP-V4Y-20260904-ABC123", pdf)
         self.assertIn(b"04 Sep 2026, 03:30 PM IST", pdf)
-        for heading in (b"STORE", b"PRODUCT", b"SIZE", b"COLOR", b"QTY", b"UNIT", b"LINE TOTAL"):
+        for heading in (b"PRODUCT", b"HSN", b"SIZE", b"COLOR", b"QTY", b"UNIT", b"LINE TOTAL"):
             self.assertIn(heading, pdf)
         self.assertNotIn(b"GST included", pdf)
         self.assertIn(b"GSTIN: 23JVZPM8734E1ZT", pdf)
-        self.assertIn(b"Product GST is not calculated or charged", pdf)
+        self.assertIn(b"Pending verified product/tax classification", pdf)
+        self.assertIn(b"No additional tax is charged on this receipt.", pdf)
         self.assertIn(b"Grand Total: INR 940.00", pdf)
 
     def test_problematic_product_punctuation_is_cleaned_without_question_mark_replacement(self):

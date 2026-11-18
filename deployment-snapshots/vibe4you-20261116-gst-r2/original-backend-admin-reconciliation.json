@@ -1,0 +1,165 @@
+{
+  "schema_version": 1,
+  "reconciled_at": "2026-11-18",
+  "source_audit": "deployment-snapshots/vibe4you-20261116-gst-r2/original-tracked-audit.json",
+  "source_bundles": [
+    "production-divergent-backend-reference",
+    "production-divergent-admin-ui",
+    "coupled-backend-tests"
+  ],
+  "original_checkout_head": "2c3e6e7bc400502516467869c370264e27d069aa",
+  "audited_paths": [
+    "scripts/catalog_normalization.py",
+    "scripts/receipt_pdf.py",
+    "scripts/styledash_security.py",
+    "scripts/styledash_shops.py",
+    "scripts/termux-admin-server.py",
+    "scripts/termux-spa-server.py",
+    "server/admin/admin.css",
+    "server/admin/admin.js",
+    "server/admin/index.html",
+    "server/tests/test_admin.py",
+    "server/tests/test_production_reliability.py",
+    "server/tests/test_receipt_pdf.py",
+    "server/tests/test_release_blockers.py",
+    "server/tests/test_shop_workflow.py",
+    "server/tests/test_styledash_server.py"
+  ],
+  "review_method": [
+    "Compared every dirty backend and admin asset hash with its pinned live target and the synchronized branch.",
+    "Reviewed added routes, state transitions, tax and billing behavior, commission behavior, and their coupled tests without executing dirty source.",
+    "Ran the six current synchronized-branch test modules represented by the dirty test bundle."
+  ],
+  "hash_comparisons": [
+    {
+      "path": "scripts/catalog_normalization.py",
+      "live_target": "server/catalog_normalization.py",
+      "dirty_sha256": "0d03897318771cb0b30bad2fa664d9d5739a8384d47a503dc03607c2abb8bcee",
+      "synchronized_sha256": "a656e8a56c9f9d1e91a70508b34e99f48f247e72e3838b9a0af8b4fc68654417",
+      "live_sha256": "de318ae192e0d2c799a4c38695349818734fd69043f8d98f2289bf063744eeb3",
+      "dirty_matches_live": false,
+      "synchronized_matches_live": false
+    },
+    {
+      "path": "scripts/receipt_pdf.py",
+      "live_target": "server/receipt_pdf.py",
+      "dirty_sha256": "28436e6001b854ed4f25b1a0ec9cee907c9c937cd2f2e1e85874f5236ebecf3f",
+      "synchronized_sha256": "eee783b343739237d9bcab2e59e5fe1c0c9d6b35300733bb6edaa64db9f84c3f",
+      "live_sha256": "eee783b343739237d9bcab2e59e5fe1c0c9d6b35300733bb6edaa64db9f84c3f",
+      "dirty_matches_live": false,
+      "synchronized_matches_live": true
+    },
+    {
+      "path": "scripts/styledash_security.py",
+      "live_target": "server/styledash_security.py",
+      "dirty_sha256": "3a0216cabbca84f2010014b56cf47158b6bc61b0100c48be5a388e2ff4632fe2",
+      "synchronized_sha256": "735c2446c3ac80870cb9f8190b162f0f3d278a924262137cb4bf31dc3b52d146",
+      "live_sha256": "e4404801000fcda0829c15c144704407ccd2d3fb4015e1508ee095224ea27538",
+      "dirty_matches_live": false,
+      "synchronized_matches_live": false
+    },
+    {
+      "path": "scripts/styledash_shops.py",
+      "live_target": "server/styledash_shops.py",
+      "dirty_sha256": "b667f57c42f092e2fedca39cfa1ec59dbadbdc1f7e67121bef6977c575acb7b1",
+      "synchronized_sha256": "fd619e8ecc0ad44997c3cb0be793f17cba2e1f8a283e877c5a82a578c15ce647",
+      "live_sha256": "d309a0f0690705f98854c8b8ec295ad0e96993bce0a171225a7215a21339b9e6",
+      "dirty_matches_live": false,
+      "synchronized_matches_live": false
+    },
+    {
+      "path": "scripts/termux-admin-server.py",
+      "live_target": "admin/serve.py",
+      "dirty_sha256": "936a53816964cdaa5105af1b87986f9dfeedbf6e3a930a7e3103eddcea258182",
+      "synchronized_sha256": "66579030eaa3a464d4673db55ba8ac92ab7ca06ac8f132d50c026b94fec987d3",
+      "live_sha256": "067772b76708a1e02d128a7263081ac23cacae4ca9a4b4a1c4a03b267472bee7",
+      "dirty_matches_live": false,
+      "synchronized_matches_live": false
+    },
+    {
+      "path": "scripts/termux-spa-server.py",
+      "live_target": "server/serve.py",
+      "dirty_sha256": "eba89309efb96b29e03924fa2ca2524238b8126e8b951af1e9592adb8765a047",
+      "synchronized_sha256": "1f499535fdf4735600512ad420064b77efa0cd287825f5b09966b201c791595a",
+      "live_sha256": "3870012927ce8cb2c159cd6347d5a416364bc9cec674c8cd280bcc6ec18863bd",
+      "dirty_matches_live": false,
+      "synchronized_matches_live": false
+    },
+    {
+      "path": "server/admin/admin.css",
+      "live_target": "admin/admin/admin.css",
+      "dirty_sha256": "f8f2fcc8fd84f3f24e5ec23427889cdc2398a6d1c56eee50fbe137e132c3a38b",
+      "synchronized_sha256": "5c35389a17af52b8e7e7df637fda8ff665f0294fd76b1877222e922feeb8f65c",
+      "live_sha256": "5c35389a17af52b8e7e7df637fda8ff665f0294fd76b1877222e922feeb8f65c",
+      "dirty_matches_live": false,
+      "synchronized_matches_live": true
+    },
+    {
+      "path": "server/admin/admin.js",
+      "live_target": "admin/admin/admin.js",
+      "dirty_sha256": "018cd7e905ec9401d651380b2a67f5b4a4252decbd1c1d553091c2b1a90dad0e",
+      "synchronized_sha256": "93100f066de969baa6bc5eb0c8c87126cac718bd2e8ddc9b69f1115196cc010c",
+      "live_sha256": "93100f066de969baa6bc5eb0c8c87126cac718bd2e8ddc9b69f1115196cc010c",
+      "dirty_matches_live": false,
+      "synchronized_matches_live": true
+    },
+    {
+      "path": "server/admin/index.html",
+      "live_target": "admin/admin/index.html",
+      "dirty_sha256": "5e501259b3387966c45ef60e98692a4044902cf2616d49496c0321038b9ce1c2",
+      "synchronized_sha256": "11072a05283ec1da131e2a8a617ef674f7c5a9c8693fea2b9f0553b1d75e11d4",
+      "live_sha256": "11072a05283ec1da131e2a8a617ef674f7c5a9c8693fea2b9f0553b1d75e11d4",
+      "dirty_matches_live": false,
+      "synchronized_matches_live": true
+    }
+  ],
+  "contract_findings": [
+    "The dirty public server mixes the retired COD booking-advance implementation with the current no-online-payment COD route; it is not a coherent payment model.",
+    "The dirty shop implementation raises the active size/colour combination limit from the retained backend limit of 20 to 100.",
+    "The dirty category changes recreate a static taxonomy that was rejected in favor of the backend-authoritative store and live-catalogue contract.",
+    "The dirty admin surface couples private WhatsApp links, supplier-bill storage, billing reports, GST classification, invoice issuance, commission mutation, and COD collection controls to new backend routes.",
+    "Receipt and admin assets in the synchronized branch already match four pinned live targets exactly; overwriting them with the dirty versions would discard verified live lineage.",
+    "Tax, invoice, supplier-bill, commission, and customer-contact features require independent Ubuntu-native implementation and security review rather than a Termux-era bulk port."
+  ],
+  "current_branch_test_evidence": {
+    "command": "python -m unittest server.tests.test_admin server.tests.test_production_reliability server.tests.test_receipt_pdf server.tests.test_release_blockers server.tests.test_shop_workflow server.tests.test_styledash_server",
+    "tests_run": 225,
+    "passed": 223,
+    "failed": 2,
+    "isolated_failures_reproduced": true,
+    "failures": [
+      "server.tests.test_styledash_server.HttpApiTests.test_verified_customer_review_http_contract",
+      "server.tests.test_styledash_server.HttpApiTests.test_verified_local_store_review_http_contract"
+    ],
+    "failure_evidence": "The current and pinned-live review workflows report eligible=true before a qualifying delivered order exists. This is a separate baseline release blocker, not evidence that the dirty coupled bundle is safe."
+  },
+  "source_files_ported": [],
+  "test_files_ported": [],
+  "source_files_held_for_independent_implementation": [
+    "scripts/catalog_normalization.py",
+    "scripts/receipt_pdf.py",
+    "scripts/styledash_security.py",
+    "scripts/styledash_shops.py",
+    "scripts/termux-admin-server.py",
+    "scripts/termux-spa-server.py",
+    "server/admin/admin.css",
+    "server/admin/admin.js",
+    "server/admin/index.html"
+  ],
+  "test_files_held_with_implementation": [
+    "server/tests/test_admin.py",
+    "server/tests/test_production_reliability.py",
+    "server/tests/test_receipt_pdf.py",
+    "server/tests/test_release_blockers.py",
+    "server/tests/test_shop_workflow.py",
+    "server/tests/test_styledash_server.py"
+  ],
+  "supersedes_dispositions": {
+    "production-divergent-backend-reference": "reconciled-no-bulk-port-independent-ubuntu-implementation-required",
+    "production-divergent-admin-ui": "reconciled-no-ui-port-without-reviewed-backend-contract",
+    "coupled-backend-tests": "reconciled-hold-tests-with-reviewed-implementation"
+  },
+  "release_status": "MANUAL ACTION REQUIRED",
+  "production_claim": "No database, product, store, order, payment, refund, invoice, service, deployment, or production state was changed.",
+  "result": "PASS"
+}

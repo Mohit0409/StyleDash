@@ -1,0 +1,83 @@
+{
+  "schema_version": 1,
+  "reconciled_at": "2026-11-18",
+  "source_audit": "deployment-snapshots/vibe4you-20261116-gst-r2/original-tracked-audit.json",
+  "source_bundle": "catalog-taxonomy-and-seller",
+  "original_checkout_head": "2c3e6e7bc400502516467869c370264e27d069aa",
+  "audited_paths": [
+    "e2e/specs/seller-products-ui.spec.ts",
+    "src/components/SellerProducts.tsx",
+    "src/components/StoreBranding.tsx",
+    "src/data/categories.ts",
+    "src/pages/Categories.tsx",
+    "src/pages/VendorOnboarding.tsx",
+    "src/tests/sellerProductPricing.test.ts",
+    "src/types/index.ts"
+  ],
+  "file_decisions": [
+    {
+      "path": "e2e/specs/seller-products-ui.spec.ts",
+      "decision": "selective-test-port",
+      "evidence": "Existing seller creation flows now assert the clarified Selling Price and MRP labels without weakening payload or publication-boundary assertions."
+    },
+    {
+      "path": "src/components/SellerProducts.tsx",
+      "decision": "selective-label-port-current-contract-retained",
+      "evidence": "Only price labels are clarified. The current colour-specific form, incremental image previews, HEIC support, and server-compatible 20-combination limit are retained."
+    },
+    {
+      "path": "src/components/StoreBranding.tsx",
+      "decision": "already-satisfied",
+      "evidence": "The current shared PRODUCT_IMAGE_ACCEPT constant and user guidance already include JPEG, PNG, WebP, HEIC, HEIF, and supported iPhone photos."
+    },
+    {
+      "path": "src/data/categories.ts",
+      "decision": "do-not-port-untracked-static-taxonomy",
+      "evidence": "The current seven store categories are synchronized with the backend source of truth. The dirty file depends on an untracked taxonomy that introduces categories the store application backend does not authorize."
+    },
+    {
+      "path": "src/pages/Categories.tsx",
+      "decision": "retain-live-catalogue-taxonomy",
+      "evidence": "The current page derives categories, subcategories, and counts from published products instead of displaying a static list containing unavailable catalogue branches."
+    },
+    {
+      "path": "src/pages/VendorOnboarding.tsx",
+      "decision": "retain-backend-synchronized-store-categories",
+      "evidence": "The current form imports STORE_CATEGORIES from the backend-aligned categories module and also preserves legacy approved values through storeCategoryOptions."
+    },
+    {
+      "path": "src/tests/sellerProductPricing.test.ts",
+      "decision": "reject-100-variant-expectation",
+      "evidence": "The public seller backend enforces at most 20 active size/colour combinations. The current test correctly rejects 21 and must not be weakened to accept 100."
+    },
+    {
+      "path": "src/types/index.ts",
+      "decision": "retain-stronger-current-types",
+      "evidence": "Outside-Neemuch delivery is already typed, while store categories retain the canonical StoreCategory union instead of being weakened to an arbitrary string."
+    }
+  ],
+  "contract_invariants": [
+    "Seller submissions remain capped at 20 active size/colour combinations.",
+    "Store category choices remain synchronized with the backend source of truth.",
+    "Customer category browsing is derived from the live published catalogue.",
+    "HEIC and HEIF support remains centralized in productImage utilities.",
+    "Seller publication still requires administrator review."
+  ],
+  "untracked_dependencies_not_admitted": ["src/data/catalogTaxonomy.ts"],
+  "source_files_ported": ["src/components/SellerProducts.tsx"],
+  "test_files_updated": ["e2e/specs/seller-products-ui.spec.ts"],
+  "already_satisfied_without_port": ["src/components/StoreBranding.tsx"],
+  "source_files_rejected": [
+    "src/data/categories.ts",
+    "src/pages/Categories.tsx",
+    "src/pages/VendorOnboarding.tsx",
+    "src/tests/sellerProductPricing.test.ts",
+    "src/types/index.ts"
+  ],
+  "supersedes_disposition": {
+    "from": "selective-port-with-schema-and-dependency-review",
+    "to": "reconciled-selective-seller-label-port"
+  },
+  "production_claim": "No catalogue data, seller record, inventory, database, deployment, service, or production state was changed.",
+  "result": "PASS"
+}

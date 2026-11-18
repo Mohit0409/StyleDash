@@ -1,0 +1,33 @@
+{
+  "id": "/",
+  "name": "Vibe4You",
+  "short_name": "Vibe4You",
+  "description": "Shop products from local Neemuch stores.",
+  "lang": "en",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "theme_color": "#171717",
+  "background_color": "#f3efe9",
+  "prefer_related_applications": false,
+  "icons": [
+    {
+      "src": "/vibe4you-app/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/vibe4you-app/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/vibe4you-app/icons/icon-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}

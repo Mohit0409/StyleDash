@@ -11,6 +11,21 @@ interface SEOProps {
 
 const PRODUCTION_ORIGIN = 'https://vibe4you.in';
 
+// Link to the published conditional policy without claiming a universal
+// return window for hygiene-sensitive or merchant-specific products.
+const merchantPolicyJsonLd = {
+  '@context': 'https://schema.org',
+  '@type': 'Organization',
+  '@id': `${PRODUCTION_ORIGIN}/#organization`,
+  name: 'Vibe4You',
+  url: PRODUCTION_ORIGIN,
+  hasMerchantReturnPolicy: {
+    '@type': 'MerchantReturnPolicy',
+    '@id': `${PRODUCTION_ORIGIN}/#return-policy`,
+    merchantReturnLink: `${PRODUCTION_ORIGIN}/returns`,
+  },
+};
+
 const ensureMeta = (attribute: 'name' | 'property', key: string, content: string) => {
   let element = document.querySelector<HTMLMetaElement>(`meta[${attribute}="${key}"]`);
   if (!element) {
@@ -74,10 +89,18 @@ export const SEO: React.FC<SEOProps> = ({
       script.type = 'application/ld+json';
       script.text = JSON.stringify(jsonLd);
       document.head.appendChild(script);
+      if (type === 'product') {
+        const policyScript = document.createElement('script');
+        policyScript.id = 'styledash-merchant-policy-jsonld';
+        policyScript.type = 'application/ld+json';
+        policyScript.text = JSON.stringify(merchantPolicyJsonLd);
+        document.head.appendChild(policyScript);
+      }
     }
 
     return () => {
       document.getElementById('styledash-seo-jsonld')?.remove();
+      document.getElementById('styledash-merchant-policy-jsonld')?.remove();
     };
   }, [title, description, image, type, jsonLd, noIndex]);
 

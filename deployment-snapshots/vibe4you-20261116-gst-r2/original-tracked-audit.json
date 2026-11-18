@@ -1,0 +1,242 @@
+{
+  "schema_version": 1,
+  "observed_at": "2026-11-17",
+  "scope": "read-only classification of the original Windows checkout; no files were copied from it",
+  "original_checkout": {
+    "path": "C:/movieXsuggestion/MyProject/StyleDash",
+    "branch": "agent/dev-admin-session-reset-main",
+    "head": "2c3e6e7bc400502516467869c370264e27d069aa",
+    "head_subject": "fix: preserve shop MRP when applying commission",
+    "origin_main": "7ac8267ce8d382bdad2ee8f1b4fc4ae45f5b689d",
+    "merge_base_with_origin_main": "eaff68b16e05858ef2408253a61bf3979324869c",
+    "ahead_of_origin_main": 1,
+    "behind_origin_main": 140
+  },
+  "observed_counts": {
+    "tracked_status_paths": 68,
+    "content_diff_paths": 65,
+    "status_only_paths": 3,
+    "staged_paths": 0,
+    "untracked_paths_minimum": 4239,
+    "untracked_scan_complete": false
+  },
+  "status_only_paths": [
+    "src/context/AuthContext.tsx",
+    "src/services/authApi.ts",
+    "vite.config.ts"
+  ],
+  "same_as_synchronized_branch": [
+    "src/context/AuthContext.tsx",
+    "src/context/ToastContext.tsx",
+    "src/services/authApi.ts",
+    "vite.config.ts"
+  ],
+  "production_hash_comparison": {
+    "manifest": "deployment-snapshots/vibe4you-20261116-gst-r2/source-mapping-audit.json",
+    "method": "SHA-256 of the dirty working file compared with every hash-pinned live backend target",
+    "exact_matches": [],
+    "checked": [
+      {"path": "scripts/catalog_normalization.py", "sha256": "0d03897318771cb0b30bad2fa664d9d5739a8384d47a503dc03607c2abb8bcee"},
+      {"path": "scripts/receipt_pdf.py", "sha256": "28436e6001b854ed4f25b1a0ec9cee907c9c937cd2f2e1e85874f5236ebecf3f"},
+      {"path": "scripts/styledash_security.py", "sha256": "3a0216cabbca84f2010014b56cf47158b6bc61b0100c48be5a388e2ff4632fe2"},
+      {"path": "scripts/styledash_shops.py", "sha256": "b667f57c42f092e2fedca39cfa1ec59dbadbdc1f7e67121bef6977c575acb7b1"},
+      {"path": "scripts/termux-admin-server.py", "sha256": "936a53816964cdaa5105af1b87986f9dfeedbf6e3a930a7e3103eddcea258182"},
+      {"path": "scripts/termux-spa-server.py", "sha256": "eba89309efb96b29e03924fa2ca2524238b8126e8b951af1e9592adb8765a047"},
+      {"path": "server/admin/admin.css", "sha256": "f8f2fcc8fd84f3f24e5ec23427889cdc2398a6d1c56eee50fbe137e132c3a38b"},
+      {"path": "server/admin/admin.js", "sha256": "018cd7e905ec9401d651380b2a67f5b4a4252decbd1c1d553091c2b1a90dad0e"},
+      {"path": "server/admin/index.html", "sha256": "5e501259b3387966c45ef60e98692a4044902cf2616d49496c0321038b9ce1c2"}
+    ]
+  },
+  "guardrails": [
+    "Do not copy environment or runtime settings values into source control.",
+    "Do not accept deletion of AGENTS.md.",
+    "Do not treat a dirty Termux server file as authentic Ubuntu production source.",
+    "Do not bulk-add the untracked archive, release, temporary, or runtime surface.",
+    "Port a bundle only after its untracked dependencies and current synchronized equivalents are reviewed together.",
+    "Payment, tax, authentication, authorization, inventory, and admin changes require independent security review."
+  ],
+  "bundles": [
+    {
+      "id": "already-synchronized",
+      "disposition": "no-port-required",
+      "paths": [
+        "src/context/AuthContext.tsx",
+        "src/context/ToastContext.tsx",
+        "src/services/authApi.ts",
+        "vite.config.ts"
+      ],
+      "notes": ["All four working files are byte-equivalent to the synchronization branch; three are status-only in the original checkout."]
+    },
+    {
+      "id": "protected-policy-and-config",
+      "disposition": "manual-review-do-not-copy-values",
+      "paths": [
+        ".env.e2e",
+        ".env.example",
+        "AGENTS.md",
+        "server/payment-data/settings.json"
+      ],
+      "notes": ["Values were intentionally not recorded.", "The AGENTS.md deletion is rejected; repository safety policy remains authoritative."]
+    },
+    {
+      "id": "repository-maintenance",
+      "disposition": "review-after-source-reconciliation",
+      "paths": [
+        ".eslintrc.cjs",
+        "docs/DEV_COORDINATION.md"
+      ],
+      "notes": ["Tooling and coordination edits are not production-source evidence."]
+    },
+    {
+      "id": "obsolete-termux-operations",
+      "disposition": "do-not-port-to-ubuntu-release",
+      "paths": [
+        "scripts/termux/backup-styledash-data",
+        "scripts/termux/backup-styledash-recovery",
+        "scripts/termux/deploy-payment-release"
+      ],
+      "notes": ["The verified production contract is Ubuntu/systemd; the offline candidate builder deliberately has no Termux deploy path."]
+    },
+    {
+      "id": "production-divergent-backend-reference",
+      "disposition": "evidence-only-independent-port-required",
+      "paths": [
+        "scripts/catalog_normalization.py",
+        "scripts/receipt_pdf.py",
+        "scripts/styledash_security.py",
+        "scripts/styledash_shops.py",
+        "scripts/termux-admin-server.py",
+        "scripts/termux-spa-server.py"
+      ],
+      "notes": ["Contains taxonomy, receipt/GST, commission, billing, COD, invoice, and local-route work.", "None of these working files is an exact hash match for a pinned live backend target."]
+    },
+    {
+      "id": "production-divergent-admin-ui",
+      "disposition": "evidence-only-requires-backend-contract-review",
+      "paths": [
+        "server/admin/admin.css",
+        "server/admin/admin.js",
+        "server/admin/index.html"
+      ],
+      "notes": ["Contains private WhatsApp contact, billing audit, supplier bill, tax invoice, category, commission, and COD controls.", "None is an exact live-production hash match."]
+    },
+    {
+      "id": "coupled-backend-tests",
+      "disposition": "port-only-with-reviewed-implementation",
+      "paths": [
+        "server/tests/test_admin.py",
+        "server/tests/test_production_reliability.py",
+        "server/tests/test_receipt_pdf.py",
+        "server/tests/test_release_blockers.py",
+        "server/tests/test_shop_workflow.py",
+        "server/tests/test_styledash_server.py"
+      ],
+      "notes": ["Tests span admin, payment, GST/receipt, release safety, shops, and public-server contracts; they are not a standalone patch."]
+    },
+    {
+      "id": "payment-cod-and-tax-invoice",
+      "disposition": "blocked-pending-model-reconciliation-and-security-review",
+      "paths": [
+        "e2e/specs/commerce-desktop.spec.ts",
+        "src/pages/Checkout.tsx",
+        "src/pages/OrderSuccess.tsx",
+        "src/pages/OrderTracking.tsx",
+        "src/services/businessApi.ts",
+        "src/services/paymentApi.ts",
+        "src/tests/paymentApi.test.ts",
+        "src/tests/prelaunchLock.test.ts"
+      ],
+      "notes": ["The checkout path says COD needs no online advance while payment API tests still exercise a COD booking advance; the mixed model must not be promoted.", "Requires payment, ownership/IDOR, inventory, and invoice security review."]
+    },
+    {
+      "id": "analytics-consent-and-attribution",
+      "disposition": "selective-port-with-dependency-and-privacy-review",
+      "paths": [
+        "src/App.tsx",
+        "src/components/Footer.tsx",
+        "src/config/index.ts",
+        "src/context/CartContext.tsx",
+        "src/pages/Home.tsx",
+        "src/pages/Privacy.tsx",
+        "src/services/analytics.ts"
+      ],
+      "notes": ["Depends on untracked or separately sourced analytics-consent and ecommerce-analytics modules in the original checkout.", "Consent, sensitive-route filtering, attribution parameters, and policy copy must be reviewed as one unit."]
+    },
+    {
+      "id": "catalog-taxonomy-and-seller",
+      "disposition": "selective-port-with-schema-and-dependency-review",
+      "paths": [
+        "e2e/specs/seller-products-ui.spec.ts",
+        "src/components/SellerProducts.tsx",
+        "src/components/StoreBranding.tsx",
+        "src/data/categories.ts",
+        "src/pages/Categories.tsx",
+        "src/pages/VendorOnboarding.tsx",
+        "src/tests/sellerProductPricing.test.ts",
+        "src/types/index.ts"
+      ],
+      "notes": ["Depends on an untracked catalogTaxonomy module in the original checkout and changes public categories, seller limits, and product metadata."]
+    },
+    {
+      "id": "local-search-aliases",
+      "disposition": "selective-port-with-route-and-source-review",
+      "paths": [
+        "src/pages/Products.tsx",
+        "src/tests/catalogFilters.test.ts",
+        "src/tests/searchSuggestions.test.ts",
+        "src/utils/catalogFilters.ts",
+        "src/utils/searchSuggestions.ts"
+      ],
+      "notes": ["Normalizes NMH and Neemuch search intent through a localSearch dependency that is untracked in the original checkout but separately present in the synchronization branch."]
+    },
+    {
+      "id": "product-presentation-and-store-detail",
+      "disposition": "selective-port-with-accessibility-and-untracked-dependency-review",
+      "paths": [
+        "e2e/specs/product-image-viewer.spec.ts",
+        "src/components/VariantSelector.tsx",
+        "src/pages/ProductDetail.tsx",
+        "src/pages/StoreDetail.tsx",
+        "src/utils/productImage.ts"
+      ],
+      "notes": ["Touches galleries, reviews, assurances, variant semantics, store details, HEIC decoding, and accessibility.", "Several imported presentation/assurance modules are untracked in the original checkout."]
+    },
+    {
+      "id": "filter-dismissal-ui",
+      "disposition": "selective-port-with-browser-verification",
+      "paths": [
+        "e2e/specs/filter-dismiss.spec.ts",
+        "src/components/FilterSidebar.tsx"
+      ],
+      "notes": ["Large FilterSidebar simplification must be reviewed with the actual mobile browser behavior test."]
+    },
+    {
+      "id": "merchant-policy-and-seo-shell",
+      "disposition": "selective-port-with-legal-and-structured-data-review",
+      "paths": [
+        "e2e/specs/public.spec.ts",
+        "index.html",
+        "src/components/SEO.tsx",
+        "src/pages/Returns.tsx",
+        "src/pages/Terms.tsx"
+      ],
+      "notes": ["Changes merchant return-policy structured data and customer-facing legal claims; consistency and factual business approval are required."]
+    }
+  ],
+  "untracked_surface": {
+    "minimum_paths_observed": 4239,
+    "scan_complete": false,
+    "largest_visible_areas": [
+      {"area": "release-artifacts", "count": 1781},
+      {"area": "root", "count": 367},
+      {"area": "scripts", "count": 319},
+      {"area": ".release-mobile-collapsed-nav-5968323-clean", "count": 259},
+      {"area": ".release-http2-package", "count": 236},
+      {"area": ".gst-pending-fix-20261115", "count": 225},
+      {"area": "server", "count": 45},
+      {"area": "src", "count": 12}
+    ],
+    "decision": "quarantine for a separate provenance audit; never mass-add"
+  },
+  "result": "MANUAL ACTION REQUIRED"
+}

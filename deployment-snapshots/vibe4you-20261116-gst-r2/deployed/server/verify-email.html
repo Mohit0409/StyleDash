@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<meta name="referrer" content="no-referrer">
+<title>Verify email | Vibe4You</title>
+<style>
+body{font-family:system-ui,-apple-system,Segoe UI,Arial,sans-serif;margin:0;background:#f6f7f5;color:#141817;min-height:100vh;display:grid;place-items:center}
+main{width:min(90%,430px);background:white;border:1px solid #ddd;border-radius:20px;padding:28px;box-shadow:0 8px 28px #0000000d;text-align:center}
+h1{font-size:1.45rem;margin:0 0 14px}p{line-height:1.5;color:#47534e}button{cursor:pointer;color:white;background:#18803c;border:0;padding:14px 24px;font-weight:700;border-radius:10px;margin-top:12px}
+button:disabled{opacity:.55;cursor:not-allowed}a{color:#18803c}#message{min-height:24px}
+form{text-align:left;margin-top:8px}label{display:block;font-weight:600;margin-bottom:6px}
+input{box-sizing:border-box;width:100%;font-size:1rem;padding:12px;border:1px solid #b9c2be;border-radius:10px}
+form button{width:100%}
+</style>
+<script src="/verify-email.js" defer></script>
+</head>
+<body>
+<main>
+<h1>Vibe4You email verification</h1>
+<p id="message" role="status">Enter the password you chose when registering to verify your email and finish creating your account.</p>
+<form id="verify-form" method="post">
+<label for="password">Password you chose when registering</label>
+<input id="password" type="password" autocomplete="current-password" minlength="8" maxlength="256" required disabled>
+<button id="verify" type="submit" disabled>Verify my email</button>
+</form>
+<p><a href="/register">Back to registration</a></p>
+</main>
+</body>
+</html>

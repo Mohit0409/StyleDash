@@ -1,0 +1,71 @@
+{
+  "schema_version": 1,
+  "reconciled_at": "2026-11-17",
+  "source_audit": "deployment-snapshots/vibe4you-20261116-gst-r2/original-tracked-audit.json",
+  "source_bundle": "local-search-aliases",
+  "original_checkout_head": "2c3e6e7bc400502516467869c370264e27d069aa",
+  "dependency": {
+    "path": "src/utils/localSearch.ts",
+    "original_checkout_status": "untracked",
+    "original_sha256": "68a525862f04e354025ca33c484a0196f3adea8236be7697a11115fd9bdc9806",
+    "synchronized_sha256": "68a525862f04e354025ca33c484a0196f3adea8236be7697a11115fd9bdc9806",
+    "byte_identical": true
+  },
+  "audited_paths": [
+    "src/pages/Products.tsx",
+    "src/tests/catalogFilters.test.ts",
+    "src/tests/searchSuggestions.test.ts",
+    "src/utils/catalogFilters.ts",
+    "src/utils/searchSuggestions.ts"
+  ],
+  "findings": [
+    {
+      "path": "src/utils/catalogFilters.ts",
+      "decision": "no-source-port",
+      "evidence": "matchesCatalogueProduct delegates search to parseSearchQuery, which already calls normalizeLocalShoppingQuery"
+    },
+    {
+      "path": "src/utils/searchSuggestions.ts",
+      "decision": "already-integrated",
+      "evidence": "buildSearchSuggestions already normalizes queryValue with normalizeLocalShoppingQuery before scoring"
+    },
+    {
+      "path": "src/pages/Products.tsx",
+      "decision": "no-source-port",
+      "evidence": "product matching delegates to matchesCatalogueProduct and store matching delegates to scoreStoreSearch; both use the centralized normalized parser"
+    },
+    {
+      "path": "src/pages/Products.tsx",
+      "decision": "exclude-unrelated-hunks",
+      "evidence": "the original dirty patch also changes SEO title, description, and heading copy; those changes belong to the separately blocked merchant-policy/SEO review bundle"
+    },
+    {
+      "path": "src/tests/catalogFilters.test.ts",
+      "decision": "retain-regression-intent",
+      "evidence": "added explicit product catalogue assertions for NMH, Neemuch, and place-only queries"
+    },
+    {
+      "path": "src/tests/searchSuggestions.test.ts",
+      "decision": "retain-regression-intent",
+      "evidence": "added explicit suggestion-equivalence assertions for NMH and Neemuch-qualified queries"
+    }
+  ],
+  "current_implementation_chain": [
+    "normalizeLocalShoppingQuery",
+    "parseSearchQuery",
+    "scoreProductSearch/scoreStoreSearch",
+    "matchesCatalogueProduct/buildSearchSuggestions/Products"
+  ],
+  "source_files_ported": [],
+  "test_files_updated": [
+    "e2e/specs/public.spec.ts",
+    "src/tests/catalogFilters.test.ts",
+    "src/tests/searchSuggestions.test.ts"
+  ],
+  "supersedes_disposition": {
+    "from": "selective-port-with-route-and-source-review",
+    "to": "reconciled-no-source-port-required"
+  },
+  "production_claim": "No claim that this editable source is byte-identical to the deployed compiled frontend; production capsule hashes remain authoritative.",
+  "result": "PASS"
+}

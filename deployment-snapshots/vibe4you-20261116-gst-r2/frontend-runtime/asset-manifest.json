@@ -1,0 +1,1348 @@
+{
+  "files": [
+    {
+      "direct_index_link": false,
+      "potential_vite_asset_dependency": true,
+      "production_integrity_manifest": true,
+      "provenance": "pinned_live_integrity_manifest",
+      "pwa_derived": false,
+      "sha256": "c2f787a7d95c45799d50ed5282e57c66c5b768057c59ca8b85bab8360ca81b15",
+      "size_bytes": 10248,
+      "target": "server/assets/AuthPage-DdPolTCV-v4y-search-v2-r2.js"
+    },
+    {
+      "direct_index_link": false,
+      "potential_vite_asset_dependency": true,
+      "production_integrity_manifest": true,
+      "provenance": "pinned_live_integrity_manifest",
+      "pwa_derived": false,
+      "sha256": "a7a9fdcbff611226a8aefc5306a3ce908f361829d66e7c3df9416069e021acb6",
+      "size_bytes": 10278,
+      "target": "server/assets/AuthPage-DdPolTCV-v4y044-pr150-review-r5.js"
+    },
+    {
+      "direct_index_link": false,
+      "potential_vite_asset_dependency": true,
+      "production_integrity_manifest": true,
+      "provenance": "pinned_live_integrity_manifest",
+      "pwa_derived": false,
+      "sha256": "9eabfd7400a931bc0cb521673135e7f7a0db4ac7e57653a0aaf9f51cbbd874b5",
+      "size_bytes": 6496,
+      "target": "server/assets/CartDrawer-C-5Jk24c-v4y-search-v2-r2.js"
+    },
+    {
+      "direct_index_link": false,
+      "potential_vite_asset_dependency": true,
+      "production_integrity_manifest": true,
+      "provenance": "pinned_live_integrity_manifest",
+      "pwa_derived": false,
+      "sha256": "e9876a931aa2a0c927e14d1dbd26124c4e67f3a578dc2aa05cafa42515706a3a",
+      "size_bytes": 6527,
+      "target": "server/assets/CartDrawer-C-5Jk24c-v4y044-pr150-review-r5.js"
+    },
+    {
+      "direct_index_link": false,
+      "potential_vite_asset_dependency": true,
+      "production_integrity_manifest": true,
+      "provenance": "pinned_live_integrity_manifest",
+      "pwa_derived": false,
+      "sha256": "84be25d419b48db2e924fe1dbd485ec67a4f94cc12534315a5db162712cb92c9",
+      "size_bytes": 5052,
+      "target": "server/assets/Categories-D3F5K7Iz-v4y-search-v2-r2.js"
+    },
+    {
+      "direct_index_link": false,
+      "potential_vite_asset_dependency": true,
+      "production_integrity_manifest": true,
+      "provenance": "pinned_live_integrity_manifest",
+      "pwa_derived": false,
+      "sha256": "d7387708e41941bb1e4e0a5e4b070378c53342944336c52635fd64b571d6384a",
+      "size_bytes": 3717,
+      "target": "server/assets/Categories-D3F5K7Iz-v4y044-pr150-review-r5.js"
+    },
+    {
+      "direct_index_link": false,
+      "potential_vite_asset_dependency": true,
+      "production_integrity_manifest": true,
+      "provenance": "pinned_live_integrity_manifest",
+      "pwa_derived": false,
+      "sha256": "6749f861cc1f68911e5bef01327b7f8d22dfea022b41c00b8f557912b19247f5",
+      "size_bytes": 17984,
+      "target": "server/assets/Checkout-DmmfmeKk-v4y-search-v2-r2.js"
+    },
+    {
+      "direct_index_link": false,
+      "potential_vite_asset_dependency": true,
+      "production_integrity_manifest": true,
+      "provenance": "pinned_live_integrity_manifest",
+      "pwa_derived": false,
+      "sha256": "d07d93321b3ea09838e3d92447d41dcd358095a360fb7031a7ae473e30075e87",
+      "size_bytes": 18184,
+      "target": "server/assets/Checkout-DmmfmeKk-v4y044-pr150-review-r5.js"
+    },
+    {
+      "direct_index_link": false,
+      "potential_vite_asset_dependency": true,
+      "production_integrity_manifest": true,
+      "provenance": "pinned_live_integrity_manifest",
+      "pwa_derived": false,
+      "sha256": "67ae92ecdea31db2d154bf4c79e6502c761c063f2a0c9bcc9974e784c5f0aae2",
+      "size_bytes": 3890,
+      "target": "server/assets/Help-CoUxhEzf-v4y-search-v2-r2.js"
+    },
+    {
+      "direct_index_link": false,
+      "potential_vite_asset_dependency": true,
+      "production_integrity_manifest": true,
+      "provenance": "pinned_live_integrity_manifest",
+      "pwa_derived": false,
+      "sha256": "14130d37a652dea982006bd5853f7918b64155b70a2fbeb4d98c7f9118d469d0",
+      "size_bytes": 3903,
+      "target": "server/assets/Help-CoUxhEzf-v4y044-pr150-review-r5.js"
+    },
+    {
+      "direct_index_link": false,
+      "potential_vite_asset_dependency": true,
+      "production_integrity_manifest": true,
+      "provenance": "pinned_live_integrity_manifest",
+      "pwa_derived": false,
+      "sha256": "76eb6b28290771aed474f48e6f239e5cb222dedd8e594e839c39ae34da3b5df8",
+      "size_bytes": 27536,
+      "target": "server/assets/Home-MLk-Vyxe-v4y-search-v2-r2.js"
+    },
+    {
+      "direct_index_link": false,
+      "potential_vite_asset_dependency": true,
+      "production_integrity_manifest": true,
+      "provenance": "pinned_live_integrity_manifest",
+      "pwa_derived": false,
+      "sha256": "3373cddbeebec23e5797d7481bcda863cff6035a151ec0c7a71848215c47faf2",
+      "size_bytes": 25425,
+      "target": "server/assets/Home-MLk-Vyxe-v4y044-pr150-review-r5.js"
+    },
+    {
+      "direct_index_link": false,
+      "potential_vite_asset_dependency": true,
+      "production_integrity_manifest": false,
+      "provenance": "live_readonly_sftp_and_http_sha256",
+      "pwa_derived": false,
+      "sha256": "4dfee094a1c14a519491b5ab80e3d10578e29cc8dd3307da28de7070339bc434",
+      "size_bytes": 5703,
+      "target": "server/assets/Home-bVIr0YEJ.css"
+    },
+    {
+      "direct_index_link": false,
+      "potential_vite_asset_dependency": true,
+      "production_integrity_manifest": true,
+      "provenance": "pinned_live_integrity_manifest",
+      "pwa_derived": false,
+      "sha256": "c78a37839ed1157a5df4c1e82ee183cde7881330ee94c2e70121f3c417c2a55b",
+      "size_bytes": 816,
+      "target": "server/assets/NotFound-CJDcyxdR-v4y-search-v2-r2.js"
+    },
+    {
+      "direct_index_link": false,
+      "potential_vite_asset_dependency": true,
+      "production_integrity_manifest": true,
+      "provenance": "pinned_live_integrity_manifest",
+      "pwa_derived": false,
+      "sha256": "c45a3a7133aca87be4c1f8175344efa10b4ac07dbdeb54bc3994353ddf2f7ae5",
+      "size_bytes": 829,
+      "target": "server/assets/NotFound-CJDcyxdR-v4y044-pr150-review-r5.js"
+    },
+    {
+      "direct_index_link": false,
+      "potential_vite_asset_dependency": true,
+      "production_integrity_manifest": true,
+      "provenance": "pinned_live_integrity_manifest",
+      "pwa_derived": false,
+      "sha256": "280f13d53c2ad7b7c3786555fd34bb9e6a4f16c141e598960ff7503badede695",
+      "size_bytes": 7956,
+      "target": "server/assets/Offers-BRa1Xh-o-v4y-search-v2-r2.js"
+    },
+    {
+      "direct_index_link": false,
+      "potential_vite_asset_dependency": true,
+      "production_integrity_manifest": true,
+      "provenance": "pinned_live_integrity_manifest",
+      "pwa_derived": false,
+      "sha256": "1fb7ca1c12cd67918a9c71a93ae0e842c73aac65e4319cbfc26acbbf5ab9a887",
+      "size_bytes": 8022,
+      "target": "server/assets/Offers-BRa1Xh-o-v4y044-pr150-review-r5.js"
+    },
+    {
+      "direct_index_link": false,
+      "potential_vite_asset_dependency": true,
+      "production_integrity_manifest": true,
+      "provenance": "pinned_live_integrity_manifest",
+      "pwa_derived": false,
+      "sha256": "90ee9a09e0c5196e57e70d6d04daaad6d97921b5e23a01114d967e8cd0dbb8d1",
+      "size_bytes": 2380,
+      "target": "server/assets/OrderSuccess-DuVYT0jB-v4y-search-v2-r2.js"
+    },
+    {
+      "direct_index_link": false,
+      "potential_vite_asset_dependency": true,
+      "production_integrity_manifest": true,
+      "provenance": "pinned_live_integrity_manifest",
+      "pwa_derived": false,
+      "sha256": "eb0fec9cb8e19353c49494b40c79ccd321028b33903d7df1f97c66ab93e30721",
+      "size_bytes": 2399,
+      "target": "server/assets/OrderSuccess-DuVYT0jB-v4y044-pr150-review-r5.js"
+    },
+    {
+      "direct_index_link": false,
+      "potential_vite_asset_dependency": true,
+      "production_integrity_manifest": true,
+      "provenance": "pinned_live_integrity_manifest",
+      "pwa_derived": false,
+      "sha256": "85c93a57c120c96bf7d66a7dc675c43511862741f7638c37675d78e0f94f8775",
+      "size_bytes": 13484,
+      "target": "server/assets/OrderTracking-D7tSHMZQ-v4y-search-v2-r2.js"
+    },
+    {
+      "direct_index_link": false,
+      "potential_vite_asset_dependency": true,
+      "production_integrity_manifest": true,
+      "provenance": "pinned_live_integrity_manifest",
+      "pwa_derived": false,
+      "sha256": "f1033b97797575bee16a0347cd8bc6769a56ddf0376fb88a768ed9b7ba18d608",
+      "size_bytes": 13538,
+      "target": "server/assets/OrderTracking-D7tSHMZQ-v4y044-pr150-review-r5.js"
+    },
+    {
+      "direct_index_link": false,
+      "potential_vite_asset_dependency": true,
+      "production_integrity_manifest": true,
+      "provenance": "pinned_live_integrity_manifest",
+      "pwa_derived": false,
+      "sha256": "343da140c6220424607d22250858d29aedfc9a41e91b6f2af4595682bc51c4c0",
+      "size_bytes": 7542,
+      "target": "server/assets/Orders-Cn6lwD6k-v4y-search-v2-r2.js"
+    },
+    {
+      "direct_index_link": false,
+      "potential_vite_asset_dependency": true,
+      "production_integrity_manifest": true,
+      "provenance": "pinned_live_integrity_manifest",
+      "pwa_derived": false,
+      "sha256": "68eddff18ce24ac94e81f50e850aa2de86bc5b0347504101fd10472fed3f8093",
+      "size_bytes": 7561,
+      "target": "server/assets/Orders-Cn6lwD6k-v4y044-pr150-review-r5.js"
+    },
+    {
+      "direct_index_link": false,
+      "potential_vite_asset_dependency": true,
+      "production_integrity_manifest": true,
+      "provenance": "pinned_live_integrity_manifest",
+      "pwa_derived": false,
+      "sha256": "3465ec8d639e7eb427da408c53ddc824424413d35bd5287ce8bc837e7463b552",
+      "size_bytes": 9183,
+      "target": "server/assets/OutsideDeliveryRequests-ClStqVLS-v4y-search-v2-r2.js"
+    },
+    {
+      "direct_index_link": false,
+      "potential_vite_asset_dependency": true,
+      "production_integrity_manifest": true,
+      "provenance": "pinned_live_integrity_manifest",
+      "pwa_derived": false,
+      "sha256": "cbdffe7852c306d6089ba9c572e0a7ce94b24974f67e10a248a4efb3e435ae4c",
+      "size_bytes": 9231,
+      "target": "server/assets/OutsideDeliveryRequests-ClStqVLS-v4y044-pr150-review-r5.js"
+    },
+    {
+      "direct_index_link": false,
+      "potential_vite_asset_dependency": true,
+      "production_integrity_manifest": true,
+      "provenance": "pinned_live_integrity_manifest",
+      "pwa_derived": false,
+      "sha256": "22bc1c9c9adc48b7a1aa7055b80e292af3372b36cea8efddb14109f0bb0c1039",
+      "size_bytes": 4624,
+      "target": "server/assets/PasswordRecovery-XOXlX37H-v4y-search-v2-r2.js"
+    },
+    {
+      "direct_index_link": false,
+      "potential_vite_asset_dependency": true,
+      "production_integrity_manifest": true,
+      "provenance": "pinned_live_integrity_manifest",
+      "pwa_derived": false,
+      "sha256": "802784de3239a0f08085254a4eb8af11858d6bf0f58723c7b4e4f092e0cde5fb",
+      "size_bytes": 4637,
+      "target": "server/assets/PasswordRecovery-XOXlX37H-v4y044-pr150-review-r5.js"
+    },
+    {
+      "direct_index_link": false,
+      "potential_vite_asset_dependency": true,
+      "production_integrity_manifest": true,
+      "provenance": "pinned_live_integrity_manifest",
+      "pwa_derived": false,
+      "sha256": "ac85735c68233c3afd42b5df3b29c7d7cb3a5a33c4806c92723695cdba958d13",
+      "size_bytes": 4705,
+      "target": "server/assets/PaymentTestProduct-CrM0dV54-v4y-search-v2-r2.js"
+    },
+    {
+      "direct_index_link": false,
+      "potential_vite_asset_dependency": true,
+      "production_integrity_manifest": true,
+      "provenance": "pinned_live_integrity_manifest",
+      "pwa_derived": false,
+      "sha256": "b9d7c1fc504d1f9d58a3f1554b7dc4eb44b8d065db280d23ded1ebf09646dbd1",
+      "size_bytes": 4741,
+      "target": "server/assets/PaymentTestProduct-CrM0dV54-v4y044-pr150-review-r5.js"
+    },
+    {
+      "direct_index_link": false,
+      "potential_vite_asset_dependency": true,
+      "production_integrity_manifest": true,
+      "provenance": "pinned_live_integrity_manifest",
+      "pwa_derived": false,
+      "sha256": "14790d3b793c0eb5600b7e067e382ca1df4fd8ec5bd8069c83f65365e4bba005",
+      "size_bytes": 5600,
+      "target": "server/assets/Privacy-BhC6qJ0h-v4y-search-v2-r2.js"
+    },
+    {
+      "direct_index_link": false,
+      "potential_vite_asset_dependency": true,
+      "production_integrity_manifest": true,
+      "provenance": "pinned_live_integrity_manifest",
+      "pwa_derived": false,
+      "sha256": "57670086efae092e867e8b976a1e7d321c8ad08545f58568c61f1cd1c4c49a0f",
+      "size_bytes": 5613,
+      "target": "server/assets/Privacy-BhC6qJ0h-v4y044-pr150-review-r5.js"
+    },
+    {
+      "direct_index_link": false,
+      "potential_vite_asset_dependency": true,
+      "production_integrity_manifest": true,
+      "provenance": "pinned_live_integrity_manifest",
+      "pwa_derived": false,
+      "sha256": "6204902b0a7549ae87e0f68907dce23729345395c46ea19f1354ceed963a296d",
+      "size_bytes": 5402,
+      "target": "server/assets/ProductCard-qnCHrzMh-v4y-search-v2-r2.js"
+    },
+    {
+      "direct_index_link": false,
+      "potential_vite_asset_dependency": true,
+      "production_integrity_manifest": true,
+      "provenance": "pinned_live_integrity_manifest",
+      "pwa_derived": false,
+      "sha256": "1a4f3243f17932deeefacffcc034957d28ec052073bb84650a9d1f9c8d183f39",
+      "size_bytes": 5420,
+      "target": "server/assets/ProductCard-qnCHrzMh-v4y044-pr150-review-r5.js"
+    },
+    {
+      "direct_index_link": false,
+      "potential_vite_asset_dependency": true,
+      "production_integrity_manifest": true,
+      "provenance": "pinned_live_integrity_manifest",
+      "pwa_derived": false,
+      "sha256": "410b979f373ba0836a83319bd3c22c5dcd46e4473aa49ba33bf143ccb7156494",
+      "size_bytes": 45213,
+      "target": "server/assets/ProductDetail-CvQ_LhJ--v4y-search-v2-r2.js"
+    },
+    {
+      "direct_index_link": false,
+      "potential_vite_asset_dependency": true,
+      "production_integrity_manifest": true,
+      "provenance": "pinned_live_integrity_manifest",
+      "pwa_derived": false,
+      "sha256": "71f3dc16101355a5ac07c2a5383f99f4c5ce0d075157c1442118246dc1690f23",
+      "size_bytes": 45303,
+      "target": "server/assets/ProductDetail-CvQ_LhJ--v4y044-pr150-review-r5.js"
+    },
+    {
+      "direct_index_link": false,
+      "potential_vite_asset_dependency": true,
+      "production_integrity_manifest": true,
+      "provenance": "pinned_live_integrity_manifest",
+      "pwa_derived": false,
+      "sha256": "35e07d64802342827e91735573b0d572908d018684cfdb7a00df9a42ccf87794",
+      "size_bytes": 2920,
+      "target": "server/assets/ProductPagination-D112Lo5A-v4y-search-v2-r2.js"
+    },
+    {
+      "direct_index_link": false,
+      "potential_vite_asset_dependency": true,
+      "production_integrity_manifest": true,
+      "provenance": "pinned_live_integrity_manifest",
+      "pwa_derived": false,
+      "sha256": "ac565ee300728e18be795e0404c378a73eb64306ab0c5652a097cc1521f85da6",
+      "size_bytes": 2939,
+      "target": "server/assets/ProductPagination-D112Lo5A-v4y044-pr150-review-r5.js"
+    },
+    {
+      "direct_index_link": false,
+      "potential_vite_asset_dependency": true,
+      "production_integrity_manifest": true,
+      "provenance": "pinned_live_integrity_manifest",
+      "pwa_derived": false,
+      "sha256": "f6e313541afd90465be4136158cd4db5f35e72ffe14a665a24eaef27b344f21e",
+      "size_bytes": 17440,
+      "target": "server/assets/Products-DSTsw2bW-v4y-search-v2-r2.js"
+    },
+    {
+      "direct_index_link": false,
+      "potential_vite_asset_dependency": true,
+      "production_integrity_manifest": true,
+      "provenance": "pinned_live_integrity_manifest",
+      "pwa_derived": false,
+      "sha256": "67675b1d33d863d3e4801e60c944815180f208505e96ccec663e6f1e694e6ca9",
+      "size_bytes": 17233,
+      "target": "server/assets/Products-DSTsw2bW-v4y044-pr150-review-r5.js"
+    },
+    {
+      "direct_index_link": false,
+      "potential_vite_asset_dependency": true,
+      "production_integrity_manifest": true,
+      "provenance": "pinned_live_integrity_manifest",
+      "pwa_derived": false,
+      "sha256": "de3052d336eac38f094df63dffa728eb0ee31f790fc809492bbf12f73bef55ae",
+      "size_bytes": 8600,
+      "target": "server/assets/Profile-B5Zhrhx3-v4y-search-v2-r2.js"
+    },
+    {
+      "direct_index_link": false,
+      "potential_vite_asset_dependency": true,
+      "production_integrity_manifest": true,
+      "provenance": "pinned_live_integrity_manifest",
+      "pwa_derived": false,
+      "sha256": "f78fe8cad7c9df4ac2ac9c46d72c25a2257ce1039bd86a63bab7371c126d9ca3",
+      "size_bytes": 8648,
+      "target": "server/assets/Profile-B5Zhrhx3-v4y044-pr150-review-r5.js"
+    },
+    {
+      "direct_index_link": false,
+      "potential_vite_asset_dependency": true,
+      "production_integrity_manifest": true,
+      "provenance": "pinned_live_integrity_manifest",
+      "pwa_derived": false,
+      "sha256": "6b5af02732fa3429e69497872d363868c4c403c77f8a7bee73cdfaf4055e79c4",
+      "size_bytes": 5004,
+      "target": "server/assets/Returns-B0TWXGCR-v4y-search-v2-r2.js"
+    },
+    {
+      "direct_index_link": false,
+      "potential_vite_asset_dependency": true,
+      "production_integrity_manifest": true,
+      "provenance": "pinned_live_integrity_manifest",
+      "pwa_derived": false,
+      "sha256": "2aa86294c0d1474c24adfc03dab047639df8f42116815109145a502f46750c77",
+      "size_bytes": 5017,
+      "target": "server/assets/Returns-B0TWXGCR-v4y044-pr150-review-r5.js"
+    },
+    {
+      "direct_index_link": false,
+      "potential_vite_asset_dependency": true,
+      "production_integrity_manifest": true,
+      "provenance": "pinned_live_integrity_manifest",
+      "pwa_derived": false,
+      "sha256": "e33819964e1ac062219a19c4f56ea30988a004016790f34c7c11d2d1629ccab5",
+      "size_bytes": 1708,
+      "target": "server/assets/SEO-DZgr-RBr-v4y-search-v2-r2.js"
+    },
+    {
+      "direct_index_link": false,
+      "potential_vite_asset_dependency": true,
+      "production_integrity_manifest": true,
+      "provenance": "pinned_live_integrity_manifest",
+      "pwa_derived": false,
+      "sha256": "3b10194fbdf33562dbe7e7445bdffb1a2ed6988acc5ae7d1466f7ea84768107d",
+      "size_bytes": 1715,
+      "target": "server/assets/SEO-DZgr-RBr-v4y044-pr150-review-r5.js"
+    },
+    {
+      "direct_index_link": false,
+      "potential_vite_asset_dependency": true,
+      "production_integrity_manifest": true,
+      "provenance": "pinned_live_integrity_manifest",
+      "pwa_derived": false,
+      "sha256": "f77066c6ffc96c70375b200acbaec8725f76dc40af458f2f4cad018f1ceea13b",
+      "size_bytes": 21488,
+      "target": "server/assets/StoreDetail-b161Q6hN-v4y-search-v2-r2.js"
+    },
+    {
+      "direct_index_link": false,
+      "potential_vite_asset_dependency": true,
+      "production_integrity_manifest": true,
+      "provenance": "pinned_live_integrity_manifest",
+      "pwa_derived": false,
+      "sha256": "72cbfb3964d88964269addf41441d3916c39a8a96abf68da9cda87230679a952",
+      "size_bytes": 21555,
+      "target": "server/assets/StoreDetail-b161Q6hN-v4y044-pr150-review-r5.js"
+    },
+    {
+      "direct_index_link": false,
+      "potential_vite_asset_dependency": true,
+      "production_integrity_manifest": true,
+      "provenance": "pinned_live_integrity_manifest",
+      "pwa_derived": false,
+      "sha256": "9b78c8f24532745711faf109c4772ad68bd933f2643967592c75edd18ab548bd",
+      "size_bytes": 1085,
+      "target": "server/assets/StoreImage-DwkkglaO-v4y-search-v2-r2.js"
+    },
+    {
+      "direct_index_link": false,
+      "potential_vite_asset_dependency": true,
+      "production_integrity_manifest": true,
+      "provenance": "pinned_live_integrity_manifest",
+      "pwa_derived": false,
+      "sha256": "24179818ba3bee3c18f29748de29d91171738f3956f5002ccefa1ab0a5d9af68",
+      "size_bytes": 1092,
+      "target": "server/assets/StoreImage-DwkkglaO-v4y044-pr150-review-r5.js"
+    },
+    {
+      "direct_index_link": false,
+      "potential_vite_asset_dependency": true,
+      "production_integrity_manifest": true,
+      "provenance": "pinned_live_integrity_manifest",
+      "pwa_derived": false,
+      "sha256": "982d27dde39b24e59ca915b49c1d13373a09e77d2fb1ba72e03f711ebd07e827",
+      "size_bytes": 6490,
+      "target": "server/assets/Stores-DEM_OnT8-v4y-search-v2-r2.js"
+    },
+    {
+      "direct_index_link": false,
+      "potential_vite_asset_dependency": true,
+      "production_integrity_manifest": true,
+      "provenance": "pinned_live_integrity_manifest",
+      "pwa_derived": false,
+      "sha256": "b006c525b2f03ba543bb609551eb4ed3454de590aa516c0d87b0d9317b531956",
+      "size_bytes": 6527,
+      "target": "server/assets/Stores-DEM_OnT8-v4y044-pr150-review-r5.js"
+    },
+    {
+      "direct_index_link": false,
+      "potential_vite_asset_dependency": true,
+      "production_integrity_manifest": true,
+      "provenance": "pinned_live_integrity_manifest",
+      "pwa_derived": false,
+      "sha256": "97938931d96d56bb6ada9aa6258e7018faeee7596fea41dbfb6ebac64e4a6891",
+      "size_bytes": 5890,
+      "target": "server/assets/Terms-B1E-Y1qk-v4y-search-v2-r2.js"
+    },
+    {
+      "direct_index_link": false,
+      "potential_vite_asset_dependency": true,
+      "production_integrity_manifest": true,
+      "provenance": "pinned_live_integrity_manifest",
+      "pwa_derived": false,
+      "sha256": "f40cf1168a8cbde58e81b2ad6b2d6cf2dd2b507b52fcf7b81c893a25844f12ca",
+      "size_bytes": 5903,
+      "target": "server/assets/Terms-B1E-Y1qk-v4y044-pr150-review-r5.js"
+    },
+    {
+      "direct_index_link": false,
+      "potential_vite_asset_dependency": true,
+      "production_integrity_manifest": true,
+      "provenance": "pinned_live_integrity_manifest",
+      "pwa_derived": false,
+      "sha256": "4626d26c8626c204be250ce6ea5e7f9c6d126193283f6943ff71e01bd174463b",
+      "size_bytes": 62090,
+      "target": "server/assets/VendorOnboarding-BsmUPytx-v4y-search-v2-r2.js"
+    },
+    {
+      "direct_index_link": false,
+      "potential_vite_asset_dependency": true,
+      "production_integrity_manifest": true,
+      "provenance": "pinned_live_integrity_manifest",
+      "pwa_derived": false,
+      "sha256": "63981eee3cfab3255047509829c28aecf5fd53864919c4c14559cb8bbcaa4a39",
+      "size_bytes": 62168,
+      "target": "server/assets/VendorOnboarding-BsmUPytx-v4y044-pr150-review-r5.js"
+    },
+    {
+      "direct_index_link": false,
+      "potential_vite_asset_dependency": true,
+      "production_integrity_manifest": true,
+      "provenance": "pinned_live_integrity_manifest",
+      "pwa_derived": false,
+      "sha256": "d295b41aa62fc05b2ade4fcf6488c3c21f23f53cfa5379949568c14ecfc36ab7",
+      "size_bytes": 1792,
+      "target": "server/assets/Wishlist-DoTTiRsZ-v4y-search-v2-r2.js"
+    },
+    {
+      "direct_index_link": false,
+      "potential_vite_asset_dependency": true,
+      "production_integrity_manifest": true,
+      "provenance": "pinned_live_integrity_manifest",
+      "pwa_derived": false,
+      "sha256": "fa4a15ec706635524a49b6922f3c366cdabc998025d50e0ae0ce93eca00de800",
+      "size_bytes": 1841,
+      "target": "server/assets/Wishlist-DoTTiRsZ-v4y044-pr150-review-r5.js"
+    },
+    {
+      "direct_index_link": false,
+      "potential_vite_asset_dependency": true,
+      "production_integrity_manifest": true,
+      "provenance": "pinned_live_integrity_manifest",
+      "pwa_derived": false,
+      "sha256": "34d01dea4278a0bbadfb9cfa9f9b05202b317dbf8e7cc4fc2e63061009858f75",
+      "size_bytes": 350,
+      "target": "server/assets/arrow-right-DhLnpMvV-v4y-search-v2-r2.js"
+    },
+    {
+      "direct_index_link": false,
+      "potential_vite_asset_dependency": true,
+      "production_integrity_manifest": true,
+      "provenance": "pinned_live_integrity_manifest",
+      "pwa_derived": false,
+      "sha256": "91298f469491ed7576f124e7d6f8b71bc237d88a68d9b4584d752cb358951658",
+      "size_bytes": 362,
+      "target": "server/assets/arrow-right-DhLnpMvV-v4y044-pr150-review-r5.js"
+    },
+    {
+      "direct_index_link": false,
+      "potential_vite_asset_dependency": true,
+      "production_integrity_manifest": true,
+      "provenance": "pinned_live_integrity_manifest",
+      "pwa_derived": false,
+      "sha256": "1f4119c9be577af065e0f936d074c28e6aed7be3914552ccc7e90259f2fc9174",
+      "size_bytes": 1568,
+      "target": "server/assets/categories-C-uMYXyt-v4y-search-v2-r2.js"
+    },
+    {
+      "direct_index_link": false,
+      "potential_vite_asset_dependency": true,
+      "production_integrity_manifest": true,
+      "provenance": "pinned_live_integrity_manifest",
+      "pwa_derived": false,
+      "sha256": "1f4119c9be577af065e0f936d074c28e6aed7be3914552ccc7e90259f2fc9174",
+      "size_bytes": 1568,
+      "target": "server/assets/categories-C-uMYXyt-v4y044-pr150-review-r5.js"
+    },
+    {
+      "direct_index_link": false,
+      "potential_vite_asset_dependency": true,
+      "production_integrity_manifest": true,
+      "provenance": "pinned_live_integrity_manifest",
+      "pwa_derived": false,
+      "sha256": "55461ee5abbc9aa7ca702c163bd878e8da895852e7269e67e4a1da6a61a1b0bf",
+      "size_bytes": 194443,
+      "target": "server/assets/category-artwork-Bwprl2P_.jpg"
+    },
+    {
+      "direct_index_link": false,
+      "potential_vite_asset_dependency": true,
+      "production_integrity_manifest": true,
+      "provenance": "pinned_live_integrity_manifest",
+      "pwa_derived": false,
+      "sha256": "cdb9ddd33da32f9491a106c0610266086cbb3caad00c3e18bbe2755a070689e2",
+      "size_bytes": 315,
+      "target": "server/assets/chevron-left-Ce9od1i3-v4y-search-v2-r2.js"
+    },
+    {
+      "direct_index_link": false,
+      "potential_vite_asset_dependency": true,
+      "production_integrity_manifest": true,
+      "provenance": "pinned_live_integrity_manifest",
+      "pwa_derived": false,
+      "sha256": "8012897c9b6f17910d530f377b55ef495fd1f85bc9c21e7d1cd08a93d4222734",
+      "size_bytes": 327,
+      "target": "server/assets/chevron-left-Ce9od1i3-v4y044-pr150-review-r5.js"
+    },
+    {
+      "direct_index_link": false,
+      "potential_vite_asset_dependency": true,
+      "production_integrity_manifest": true,
+      "provenance": "pinned_live_integrity_manifest",
+      "pwa_derived": false,
+      "sha256": "61df6531f3d663bf9641171c7666d24053f0bca578e7c44c37f2e619631419e1",
+      "size_bytes": 315,
+      "target": "server/assets/chevron-right-BBZulVyo-v4y-search-v2-r2.js"
+    },
+    {
+      "direct_index_link": false,
+      "potential_vite_asset_dependency": true,
+      "production_integrity_manifest": true,
+      "provenance": "pinned_live_integrity_manifest",
+      "pwa_derived": false,
+      "sha256": "37385e6925a76e76c8fa044a81cdcf9b84d9d641d389192f715c0d876051828d",
+      "size_bytes": 327,
+      "target": "server/assets/chevron-right-BBZulVyo-v4y044-pr150-review-r5.js"
+    },
+    {
+      "direct_index_link": false,
+      "potential_vite_asset_dependency": true,
+      "production_integrity_manifest": true,
+      "provenance": "pinned_live_integrity_manifest",
+      "pwa_derived": false,
+      "sha256": "5d7f8ca8d6ccecea05664b72be0396374b146716e9524b9b2682ffdcd375b0a7",
+      "size_bytes": 358,
+      "target": "server/assets/circle-check-94cP9Asr-v4y-search-v2-r2.js"
+    },
+    {
+      "direct_index_link": false,
+      "potential_vite_asset_dependency": true,
+      "production_integrity_manifest": true,
+      "provenance": "pinned_live_integrity_manifest",
+      "pwa_derived": false,
+      "sha256": "d81367397d08259839b946c35f52f467523dbfd7b00488cfc125949a8a837180",
+      "size_bytes": 370,
+      "target": "server/assets/circle-check-94cP9Asr-v4y044-pr150-review-r5.js"
+    },
+    {
+      "direct_index_link": false,
+      "potential_vite_asset_dependency": true,
+      "production_integrity_manifest": true,
+      "provenance": "pinned_live_integrity_manifest",
+      "pwa_derived": false,
+      "sha256": "c4abd7ccc5372f72d9599f0c24e61ee007ea2dcd9340dd46152e4570805e0405",
+      "size_bytes": 373,
+      "target": "server/assets/circle-check-big-YxfPTOvn-v4y-search-v2-r2.js"
+    },
+    {
+      "direct_index_link": false,
+      "potential_vite_asset_dependency": true,
+      "production_integrity_manifest": true,
+      "provenance": "pinned_live_integrity_manifest",
+      "pwa_derived": false,
+      "sha256": "6ab516a68511262545f4968eddc8641e220154fee123093552a05b93b5a35039",
+      "size_bytes": 385,
+      "target": "server/assets/circle-check-big-YxfPTOvn-v4y044-pr150-review-r5.js"
+    },
+    {
+      "direct_index_link": false,
+      "potential_vite_asset_dependency": true,
+      "production_integrity_manifest": true,
+      "provenance": "pinned_live_integrity_manifest",
+      "pwa_derived": false,
+      "sha256": "298fb2edf28c0c3228334869babbe4584a576a0e288e578e68534c74681d5537",
+      "size_bytes": 387,
+      "target": "server/assets/circle-x-D-PISaFi-v4y-search-v2-r2.js"
+    },
+    {
+      "direct_index_link": false,
+      "potential_vite_asset_dependency": true,
+      "production_integrity_manifest": true,
+      "provenance": "pinned_live_integrity_manifest",
+      "pwa_derived": false,
+      "sha256": "ef820952242a271d66a7b8fd87603ae49b3c06d37aefbd68c8b67fd855241cc1",
+      "size_bytes": 399,
+      "target": "server/assets/circle-x-D-PISaFi-v4y044-pr150-review-r5.js"
+    },
+    {
+      "direct_index_link": false,
+      "potential_vite_asset_dependency": true,
+      "production_integrity_manifest": true,
+      "provenance": "pinned_live_integrity_manifest",
+      "pwa_derived": false,
+      "sha256": "e38a1ce9b73d4240158f3072b310709e22fed52e3aba19c108486f769844af5f",
+      "size_bytes": 367,
+      "target": "server/assets/clock-3-DqLyMaZJ-v4y-search-v2-r2.js"
+    },
+    {
+      "direct_index_link": false,
+      "potential_vite_asset_dependency": true,
+      "production_integrity_manifest": true,
+      "provenance": "pinned_live_integrity_manifest",
+      "pwa_derived": false,
+      "sha256": "1c73c80bbc7999711578b81b4f0c266597a229336fefbf547b6ac14abe76ecdd",
+      "size_bytes": 379,
+      "target": "server/assets/clock-3-DqLyMaZJ-v4y044-pr150-review-r5.js"
+    },
+    {
+      "direct_index_link": false,
+      "potential_vite_asset_dependency": true,
+      "production_integrity_manifest": true,
+      "provenance": "pinned_live_integrity_manifest",
+      "pwa_derived": false,
+      "sha256": "cbecb0aa5b129d4e2dc06d8c94c10a6bb5e4c9582d7244ca876afe577be37ac3",
+      "size_bytes": 582,
+      "target": "server/assets/deliveryRequestApi-CZpm9t97-v4y-search-v2-r2.js"
+    },
+    {
+      "direct_index_link": false,
+      "potential_vite_asset_dependency": true,
+      "production_integrity_manifest": true,
+      "provenance": "pinned_live_integrity_manifest",
+      "pwa_derived": false,
+      "sha256": "005674b82a9b982c598ed45f1d757dd31df1603a400d65fca94a8ac069572e0f",
+      "size_bytes": 589,
+      "target": "server/assets/deliveryRequestApi-CZpm9t97-v4y044-pr150-review-r5.js"
+    },
+    {
+      "direct_index_link": false,
+      "potential_vite_asset_dependency": true,
+      "production_integrity_manifest": true,
+      "provenance": "pinned_live_integrity_manifest",
+      "pwa_derived": false,
+      "sha256": "e9912cda8c8aa7631961f380f2adb4f5aadd99a3a0d8112ee9f0563aef4793ed",
+      "size_bytes": 181743,
+      "target": "server/assets/firebaseClient-B8Q2FPL--v4y-search-v2-r2.js"
+    },
+    {
+      "direct_index_link": false,
+      "potential_vite_asset_dependency": true,
+      "production_integrity_manifest": true,
+      "provenance": "pinned_live_integrity_manifest",
+      "pwa_derived": false,
+      "sha256": "fca013771821dcce3e937d4f36ef398e63e59c26d424070e4ee876e0569ed627",
+      "size_bytes": 183303,
+      "target": "server/assets/firebaseClient-B8Q2FPL--v4y044-pr150-review-r5.js"
+    },
+    {
+      "direct_index_link": true,
+      "potential_vite_asset_dependency": true,
+      "production_integrity_manifest": true,
+      "provenance": "pinned_live_integrity_manifest",
+      "pwa_derived": false,
+      "sha256": "8475166ca3c64edf8b50a7db0db0f9974334e8d35f1a8253798eca0dae1cb264",
+      "size_bytes": 6762,
+      "target": "server/assets/ga4-ecommerce-overlay-8475166ca3c64edf.js"
+    },
+    {
+      "direct_index_link": true,
+      "potential_vite_asset_dependency": true,
+      "production_integrity_manifest": true,
+      "provenance": "pinned_live_integrity_manifest",
+      "pwa_derived": false,
+      "sha256": "a30d3812928d86c48301ef8f46f0aa5fc6e11cf632a6c75733e6bb7bdc06eb5e",
+      "size_bytes": 1652,
+      "target": "server/assets/google-ads-base-a30d3812928d86c4.js"
+    },
+    {
+      "direct_index_link": true,
+      "potential_vite_asset_dependency": true,
+      "production_integrity_manifest": false,
+      "provenance": "live_readonly_sftp_and_http_sha256",
+      "pwa_derived": false,
+      "sha256": "04227d23bf3c0272a6541a3e28eb0d6d8616a5eeac2b18302fdb53193a0eb29c",
+      "size_bytes": 63237,
+      "target": "server/assets/index-BITtbtpM.css"
+    },
+    {
+      "direct_index_link": true,
+      "potential_vite_asset_dependency": true,
+      "production_integrity_manifest": true,
+      "provenance": "pinned_live_integrity_manifest",
+      "pwa_derived": false,
+      "sha256": "2d61891edd2ed343de5f75d92955e65c1bab913e5885547ec977e24430150a4e",
+      "size_bytes": 269668,
+      "target": "server/assets/index-MMTPd8z_-v4y-search-v2-r2.js"
+    },
+    {
+      "direct_index_link": false,
+      "potential_vite_asset_dependency": true,
+      "production_integrity_manifest": true,
+      "provenance": "pinned_live_integrity_manifest",
+      "pwa_derived": false,
+      "sha256": "5b5a69fab3bb8da26565b08e65048613dbf1f832f8950ad7b3943d1741011b91",
+      "size_bytes": 265129,
+      "target": "server/assets/index-MMTPd8z_-v4y044-pr150-review-r5.js"
+    },
+    {
+      "direct_index_link": false,
+      "potential_vite_asset_dependency": true,
+      "production_integrity_manifest": true,
+      "provenance": "pinned_live_integrity_manifest",
+      "pwa_derived": false,
+      "sha256": "577722064593cd3419d0c0b290022fa907c42dff45b9707dfbc98b10a1fac42e",
+      "size_bytes": 439,
+      "target": "server/assets/map-pin-l8Oy_Rp3-v4y-search-v2-r2.js"
+    },
+    {
+      "direct_index_link": false,
+      "potential_vite_asset_dependency": true,
+      "production_integrity_manifest": true,
+      "provenance": "pinned_live_integrity_manifest",
+      "pwa_derived": false,
+      "sha256": "4a1cff29e8ea06c4ee0eff1939d6ca26e29534d2d717b68f0c36ad8bec83137f",
+      "size_bytes": 451,
+      "target": "server/assets/map-pin-l8Oy_Rp3-v4y044-pr150-review-r5.js"
+    },
+    {
+      "direct_index_link": true,
+      "potential_vite_asset_dependency": true,
+      "production_integrity_manifest": true,
+      "provenance": "pinned_live_integrity_manifest",
+      "pwa_derived": false,
+      "sha256": "5623b3bbf0ea961df61125899d124c02fc0a6d1ab6b1ec30a850721adfad512d",
+      "size_bytes": 1420,
+      "target": "server/assets/mobile-product-gallery-clean-v2-20261031.js"
+    },
+    {
+      "direct_index_link": false,
+      "potential_vite_asset_dependency": true,
+      "production_integrity_manifest": true,
+      "provenance": "pinned_live_integrity_manifest",
+      "pwa_derived": false,
+      "sha256": "26d676ee3edd2ad2347f37b39f737908e4a94afb9795503eb644a100275d8a3d",
+      "size_bytes": 105,
+      "target": "server/assets/navigation-CO5d9oN5-v4y-search-v2-r2.js"
+    },
+    {
+      "direct_index_link": false,
+      "potential_vite_asset_dependency": true,
+      "production_integrity_manifest": true,
+      "provenance": "pinned_live_integrity_manifest",
+      "pwa_derived": false,
+      "sha256": "34eeef8fc50f805ba6dc09c905298ad121a7cea092ebb1840b4f9f44389e4a56",
+      "size_bytes": 106,
+      "target": "server/assets/navigation-CO5d9oN5-v4y044-pr150-review-r5.js"
+    },
+    {
+      "direct_index_link": false,
+      "potential_vite_asset_dependency": true,
+      "production_integrity_manifest": true,
+      "provenance": "pinned_live_integrity_manifest",
+      "pwa_derived": false,
+      "sha256": "d6ed6f7b962e2d7facc6123a3f95f30d2ed8aa25dc398cb912fbc2d10d053577",
+      "size_bytes": 545,
+      "target": "server/assets/package-BUraWBKW-v4y-search-v2-r2.js"
+    },
+    {
+      "direct_index_link": false,
+      "potential_vite_asset_dependency": true,
+      "production_integrity_manifest": true,
+      "provenance": "pinned_live_integrity_manifest",
+      "pwa_derived": false,
+      "sha256": "07047f7514f27f3d606ba1514f07a42fe33fb45723f3d72eae00942a27f3f395",
+      "size_bytes": 557,
+      "target": "server/assets/package-BUraWBKW-v4y044-pr150-review-r5.js"
+    },
+    {
+      "direct_index_link": false,
+      "potential_vite_asset_dependency": true,
+      "production_integrity_manifest": true,
+      "provenance": "pinned_live_integrity_manifest",
+      "pwa_derived": false,
+      "sha256": "842506c94e3b6ecb06b3837e4dfed40fe3dfa8a96d48d766a45f384659fe967f",
+      "size_bytes": 2905,
+      "target": "server/assets/paymentApi-P94e14Sf-v4y-search-v2-r2.js"
+    },
+    {
+      "direct_index_link": false,
+      "potential_vite_asset_dependency": true,
+      "production_integrity_manifest": true,
+      "provenance": "pinned_live_integrity_manifest",
+      "pwa_derived": false,
+      "sha256": "9fbb2dea75ecce22ea9bf9b0efe03064c49a1d0c8062e82cf8ac34e436533d73",
+      "size_bytes": 2183,
+      "target": "server/assets/paymentApi-P94e14Sf-v4y044-pr150-review-r5.js"
+    },
+    {
+      "direct_index_link": false,
+      "potential_vite_asset_dependency": true,
+      "production_integrity_manifest": true,
+      "provenance": "pinned_live_integrity_manifest",
+      "pwa_derived": false,
+      "sha256": "972f2f0a8280dce4ccc1bdb230ca1395f15b2a84455d5e6f7e8ee1459ccce93f",
+      "size_bytes": 576,
+      "target": "server/assets/plus-Br5X9t6--v4y-search-v2-r2.js"
+    },
+    {
+      "direct_index_link": false,
+      "potential_vite_asset_dependency": true,
+      "production_integrity_manifest": true,
+      "provenance": "pinned_live_integrity_manifest",
+      "pwa_derived": false,
+      "sha256": "2b9ee54136f15e61a9fc25032e80632429352fe192ce2a808009cc8825ce30ed",
+      "size_bytes": 593,
+      "target": "server/assets/plus-Br5X9t6--v4y044-pr150-review-r5.js"
+    },
+    {
+      "direct_index_link": true,
+      "potential_vite_asset_dependency": true,
+      "production_integrity_manifest": true,
+      "provenance": "pinned_live_integrity_manifest",
+      "pwa_derived": false,
+      "sha256": "2dff9b8ffcae77d4298c02bf3ec0eb17f50a3bd3507f2bc782f1be847f6f6cdb",
+      "size_bytes": 1327,
+      "target": "server/assets/pr150-review-r5-utilities.css"
+    },
+    {
+      "direct_index_link": true,
+      "potential_vite_asset_dependency": true,
+      "production_integrity_manifest": true,
+      "provenance": "pinned_live_integrity_manifest",
+      "pwa_derived": false,
+      "sha256": "4b20f50e1398c7cfb971cf85f4817cd9990b622fe2fdd4b8ea105695c2f05f3e",
+      "size_bytes": 1274,
+      "target": "server/assets/product-assurances-4b20f50e1398c7cf.css"
+    },
+    {
+      "direct_index_link": true,
+      "potential_vite_asset_dependency": true,
+      "production_integrity_manifest": true,
+      "provenance": "pinned_live_integrity_manifest",
+      "pwa_derived": false,
+      "sha256": "cfc8756faf11bb0394ac107fa8571cb594d01c87f43ea85e10a3104c16f8aa78",
+      "size_bytes": 10396,
+      "target": "server/assets/product-assurances-cfc8756faf11bb03.js"
+    },
+    {
+      "direct_index_link": false,
+      "potential_vite_asset_dependency": true,
+      "production_integrity_manifest": true,
+      "provenance": "pinned_live_integrity_manifest",
+      "pwa_derived": false,
+      "sha256": "3dde1684d963cb3c59d3d2f4cc8e7ee8f5624e1db56eaa69d708add47aca5bac",
+      "size_bytes": 346820,
+      "target": "server/assets/products-DDTJzgQ3-v4y-search-v2-r2.js"
+    },
+    {
+      "direct_index_link": false,
+      "potential_vite_asset_dependency": true,
+      "production_integrity_manifest": true,
+      "provenance": "pinned_live_integrity_manifest",
+      "pwa_derived": false,
+      "sha256": "316fe4aca00aa13cc17ea7767ee32fb56ee08c8dcfc3d97c2ddd52373f56734c",
+      "size_bytes": 346821,
+      "target": "server/assets/products-DDTJzgQ3-v4y044-pr150-review-r5.js"
+    },
+    {
+      "direct_index_link": false,
+      "potential_vite_asset_dependency": true,
+      "production_integrity_manifest": true,
+      "provenance": "pinned_live_integrity_manifest",
+      "pwa_derived": false,
+      "sha256": "1ad5407fc60f2cec2777a43374497dfb176f541ea4488590f1c136a07f12e012",
+      "size_bytes": 385,
+      "target": "server/assets/rotate-ccw-DQL9F9zB-v4y-search-v2-r2.js"
+    },
+    {
+      "direct_index_link": false,
+      "potential_vite_asset_dependency": true,
+      "production_integrity_manifest": true,
+      "provenance": "pinned_live_integrity_manifest",
+      "pwa_derived": false,
+      "sha256": "34b55c016ea06891fabf69df8711152a8d3b042c2ba0784961df607dcc9e3b54",
+      "size_bytes": 397,
+      "target": "server/assets/rotate-ccw-DQL9F9zB-v4y044-pr150-review-r5.js"
+    },
+    {
+      "direct_index_link": false,
+      "potential_vite_asset_dependency": true,
+      "production_integrity_manifest": true,
+      "provenance": "pinned_live_integrity_manifest",
+      "pwa_derived": false,
+      "sha256": "5915c05995c6fa85d1396d88673e93151b34de363b9b358857ef8f074e38a7f0",
+      "size_bytes": 513,
+      "target": "server/assets/save-Bzq3yNjr-v4y-search-v2-r2.js"
+    },
+    {
+      "direct_index_link": false,
+      "potential_vite_asset_dependency": true,
+      "production_integrity_manifest": true,
+      "provenance": "pinned_live_integrity_manifest",
+      "pwa_derived": false,
+      "sha256": "cab7d677781f772e41c48dabc5426ba57c5a5c10809e5b905fd9d357cb8103d3",
+      "size_bytes": 525,
+      "target": "server/assets/save-Bzq3yNjr-v4y044-pr150-review-r5.js"
+    },
+    {
+      "direct_index_link": true,
+      "potential_vite_asset_dependency": true,
+      "production_integrity_manifest": true,
+      "provenance": "pinned_live_integrity_manifest",
+      "pwa_derived": false,
+      "sha256": "358e26d230ff966d69d788bd841683bfe4278a9defcb73ea9d4842565c5df2cc",
+      "size_bytes": 1517,
+      "target": "server/assets/seller-price-labels-20261018.js"
+    },
+    {
+      "direct_index_link": false,
+      "potential_vite_asset_dependency": true,
+      "production_integrity_manifest": true,
+      "provenance": "pinned_live_integrity_manifest",
+      "pwa_derived": false,
+      "sha256": "7b046d1fd1b447ce2a60a99881c18ffa92254f66ff50dab59e05040b9c16eddf",
+      "size_bytes": 396,
+      "target": "server/assets/star-DRsAYDnG-v4y-search-v2-r2.js"
+    },
+    {
+      "direct_index_link": false,
+      "potential_vite_asset_dependency": true,
+      "production_integrity_manifest": true,
+      "provenance": "pinned_live_integrity_manifest",
+      "pwa_derived": false,
+      "sha256": "033aa6822017d5793c31eeaccde062d4be7b0911136bb4a0ae2827f0af5ad791",
+      "size_bytes": 408,
+      "target": "server/assets/star-DRsAYDnG-v4y044-pr150-review-r5.js"
+    },
+    {
+      "direct_index_link": false,
+      "potential_vite_asset_dependency": true,
+      "production_integrity_manifest": true,
+      "provenance": "pinned_live_integrity_manifest",
+      "pwa_derived": false,
+      "sha256": "aa8c26d5fb08a1dfef797d40eba81488cfc7e6e318c752f16babe46526b7f1fb",
+      "size_bytes": 512,
+      "target": "server/assets/tag-DASHTBgF-v4y-search-v2-r2.js"
+    },
+    {
+      "direct_index_link": false,
+      "potential_vite_asset_dependency": true,
+      "production_integrity_manifest": true,
+      "provenance": "pinned_live_integrity_manifest",
+      "pwa_derived": false,
+      "sha256": "887caf37e4c918da3ff4ebd5096c76d55d514eb57dac4c5753507f7e5558fef8",
+      "size_bytes": 524,
+      "target": "server/assets/tag-DASHTBgF-v4y044-pr150-review-r5.js"
+    },
+    {
+      "direct_index_link": false,
+      "potential_vite_asset_dependency": true,
+      "production_integrity_manifest": true,
+      "provenance": "pinned_live_integrity_manifest",
+      "pwa_derived": false,
+      "sha256": "bc96d18b7b4b781b39bed16ad8dea2b1a77d256ce6318341c807d9ccdacd4130",
+      "size_bytes": 543,
+      "target": "server/assets/trash-2-Bcyafx5t-v4y-search-v2-r2.js"
+    },
+    {
+      "direct_index_link": false,
+      "potential_vite_asset_dependency": true,
+      "production_integrity_manifest": true,
+      "provenance": "pinned_live_integrity_manifest",
+      "pwa_derived": false,
+      "sha256": "86562996600de2b3cabb83e3e1387ce703274381585954520e652c57bb6f3659",
+      "size_bytes": 555,
+      "target": "server/assets/trash-2-Bcyafx5t-v4y044-pr150-review-r5.js"
+    },
+    {
+      "direct_index_link": false,
+      "potential_vite_asset_dependency": true,
+      "production_integrity_manifest": true,
+      "provenance": "pinned_live_integrity_manifest",
+      "pwa_derived": false,
+      "sha256": "8a39005abb650e2fc54ca56fad72703a95c4ce3561087893bef17c16174c3409",
+      "size_bytes": 450,
+      "target": "server/assets/triangle-alert-CyYC8VH9-v4y-search-v2-r2.js"
+    },
+    {
+      "direct_index_link": false,
+      "potential_vite_asset_dependency": true,
+      "production_integrity_manifest": true,
+      "provenance": "pinned_live_integrity_manifest",
+      "pwa_derived": false,
+      "sha256": "fd2a1463c26097266a89a935faf49d58893d9ae19eb740c86f4cf240af0fc294",
+      "size_bytes": 462,
+      "target": "server/assets/triangle-alert-CyYC8VH9-v4y044-pr150-review-r5.js"
+    },
+    {
+      "direct_index_link": false,
+      "potential_vite_asset_dependency": true,
+      "production_integrity_manifest": true,
+      "provenance": "pinned_live_integrity_manifest",
+      "pwa_derived": false,
+      "sha256": "81ee75731cecbd1a630a3bd1fd114abef251721927551892c585001c5a917913",
+      "size_bytes": 587,
+      "target": "server/assets/truck-CCwIHnPl-v4y-search-v2-r2.js"
+    },
+    {
+      "direct_index_link": false,
+      "potential_vite_asset_dependency": true,
+      "production_integrity_manifest": true,
+      "provenance": "pinned_live_integrity_manifest",
+      "pwa_derived": false,
+      "sha256": "cb9015e88c409e42ef561ade3e50081b411fed6616d1d65eb9493b508ebad6a2",
+      "size_bytes": 599,
+      "target": "server/assets/truck-CCwIHnPl-v4y044-pr150-review-r5.js"
+    },
+    {
+      "direct_index_link": false,
+      "potential_vite_asset_dependency": true,
+      "production_integrity_manifest": true,
+      "provenance": "pinned_live_integrity_manifest",
+      "pwa_derived": false,
+      "sha256": "ed82e51f1ddbdf65d945dff751d296842ca4e21b5736701fbab27783dc5402ba",
+      "size_bytes": 847,
+      "target": "server/assets/useProductPagination-DQRotuP9-v4y-search-v2-r2.js"
+    },
+    {
+      "direct_index_link": false,
+      "potential_vite_asset_dependency": true,
+      "production_integrity_manifest": true,
+      "provenance": "pinned_live_integrity_manifest",
+      "pwa_derived": false,
+      "sha256": "cd9200240f0a603ebf0d1512050d9fa23827fba6661153da1506a57e7232caee",
+      "size_bytes": 860,
+      "target": "server/assets/useProductPagination-DQRotuP9-v4y044-pr150-review-r5.js"
+    },
+    {
+      "direct_index_link": true,
+      "potential_vite_asset_dependency": true,
+      "production_integrity_manifest": true,
+      "provenance": "pinned_live_integrity_manifest",
+      "pwa_derived": false,
+      "sha256": "20f16e8f9091eef7826ed81a2f35c4c8ee7f33c8fb465a6848d6d4611ff74a7a",
+      "size_bytes": 4763,
+      "target": "server/assets/v4y-account-privacy-20261104.js"
+    },
+    {
+      "direct_index_link": true,
+      "potential_vite_asset_dependency": true,
+      "production_integrity_manifest": true,
+      "provenance": "pinned_live_integrity_manifest",
+      "pwa_derived": false,
+      "sha256": "56ea4220f3f5cc39b342b35bd7198e5e79bf0c2c0f90590aa9c571e9203ed99b",
+      "size_bytes": 1747,
+      "target": "server/assets/v4y-category-cache-refresh-20261020.js"
+    },
+    {
+      "direct_index_link": true,
+      "potential_vite_asset_dependency": true,
+      "production_integrity_manifest": true,
+      "provenance": "pinned_live_integrity_manifest",
+      "pwa_derived": false,
+      "sha256": "7d0e0a6f697e2a1da24ae95388a48d890b8cec3ddbd697e005a183a125cfc2be",
+      "size_bytes": 2768,
+      "target": "server/assets/v4y-customer-cache-repair-20261020-r2.js"
+    },
+    {
+      "direct_index_link": true,
+      "potential_vite_asset_dependency": true,
+      "production_integrity_manifest": true,
+      "provenance": "pinned_live_integrity_manifest",
+      "pwa_derived": false,
+      "sha256": "e8c91ac438babe78c53de949e450348d02e261a1cb798afb0ce54c2bac99ae30",
+      "size_bytes": 1097,
+      "target": "server/assets/v4y-health-nutrition-cache-refresh-20261021.js"
+    },
+    {
+      "direct_index_link": true,
+      "potential_vite_asset_dependency": true,
+      "production_integrity_manifest": true,
+      "provenance": "pinned_live_integrity_manifest",
+      "pwa_derived": false,
+      "sha256": "143ef316fe790a0fd29b5deea5b2e7c64d1f5b927d0a4c78fd9e402e8564a31e",
+      "size_bytes": 4522,
+      "target": "server/assets/v4y-mobile-ui-fix-20261021.js"
+    },
+    {
+      "direct_index_link": true,
+      "potential_vite_asset_dependency": true,
+      "production_integrity_manifest": true,
+      "provenance": "pinned_live_integrity_manifest",
+      "pwa_derived": false,
+      "sha256": "68bb53fceefd9aae5f6c7e45aff986df29b3b9e445329314789eac078369da9a",
+      "size_bytes": 14590,
+      "target": "server/assets/v4y-review-experience-20261103-mobile-photo-v2.js"
+    },
+    {
+      "direct_index_link": true,
+      "potential_vite_asset_dependency": true,
+      "production_integrity_manifest": true,
+      "provenance": "pinned_live_integrity_manifest",
+      "pwa_derived": false,
+      "sha256": "50b6653d25fd2838a874301f998548d72c9e181f3b9052cf6f53b54e7a462bdc",
+      "size_bytes": 5126,
+      "target": "server/assets/v4y-social-buttons-20261024.js"
+    },
+    {
+      "direct_index_link": true,
+      "potential_vite_asset_dependency": false,
+      "production_integrity_manifest": true,
+      "provenance": "pinned_live_integrity_manifest",
+      "pwa_derived": false,
+      "sha256": "748178ec3563bbc574042deb53ea30b6e4d75b3452c80b3e0b00358a536ac602",
+      "size_bytes": 542,
+      "target": "server/favicon.svg"
+    },
+    {
+      "direct_index_link": false,
+      "potential_vite_asset_dependency": false,
+      "production_integrity_manifest": true,
+      "provenance": "pinned_live_integrity_manifest",
+      "pwa_derived": false,
+      "sha256": "31499f2378058c320158b98d6be88940a54e87799545b96d78a7d65004557080",
+      "size_bytes": 2809,
+      "target": "server/index.html"
+    },
+    {
+      "direct_index_link": false,
+      "potential_vite_asset_dependency": false,
+      "production_integrity_manifest": false,
+      "provenance": "live_readonly_sftp_and_http_sha256",
+      "pwa_derived": true,
+      "sha256": "6ba5fa6429dc541b0fba56247ab3da40bd5f111002a4a5d7b7e4ca3fc9d13415",
+      "size_bytes": 2040,
+      "target": "server/sw.js"
+    },
+    {
+      "direct_index_link": true,
+      "potential_vite_asset_dependency": false,
+      "production_integrity_manifest": false,
+      "provenance": "live_readonly_sftp_and_http_sha256",
+      "pwa_derived": false,
+      "sha256": "cc75d57e704e1d8748aca181a7d1f57ed7ba346457907df077117afdb135a9d2",
+      "size_bytes": 7678,
+      "target": "server/vibe4you-app/icons/apple-touch-icon.png"
+    },
+    {
+      "direct_index_link": false,
+      "potential_vite_asset_dependency": false,
+      "production_integrity_manifest": false,
+      "provenance": "live_readonly_sftp_and_http_sha256",
+      "pwa_derived": true,
+      "sha256": "2ec378d14c187e481fa53ec5141b32b21a3f3492de617b8911ed19de274f24d6",
+      "size_bytes": 8472,
+      "target": "server/vibe4you-app/icons/icon-192.png"
+    },
+    {
+      "direct_index_link": false,
+      "potential_vite_asset_dependency": false,
+      "production_integrity_manifest": false,
+      "provenance": "live_readonly_sftp_and_http_sha256",
+      "pwa_derived": true,
+      "sha256": "b40462926adc645aec33977bc4e34573bc8d4c62cdd7a22c052cf6a0dc017851",
+      "size_bytes": 23788,
+      "target": "server/vibe4you-app/icons/icon-512.png"
+    },
+    {
+      "direct_index_link": false,
+      "potential_vite_asset_dependency": false,
+      "production_integrity_manifest": false,
+      "provenance": "live_readonly_sftp_and_http_sha256",
+      "pwa_derived": true,
+      "sha256": "cb144d04f97f7dcc20e2bb27fc98ee325df59cfa3c0a5f4f989ab089be2976f2",
+      "size_bytes": 17193,
+      "target": "server/vibe4you-app/icons/icon-maskable-512.png"
+    },
+    {
+      "direct_index_link": true,
+      "potential_vite_asset_dependency": false,
+      "production_integrity_manifest": false,
+      "provenance": "live_readonly_sftp_and_http_sha256",
+      "pwa_derived": false,
+      "sha256": "b83f48b4557e12eb7c921468ba85daeac6a9b677a8bfc40f8a06c1c591966e8a",
+      "size_bytes": 752,
+      "target": "server/vibe4you-app/manifest.json"
+    },
+    {
+      "direct_index_link": false,
+      "potential_vite_asset_dependency": false,
+      "production_integrity_manifest": false,
+      "provenance": "live_readonly_sftp_and_http_sha256",
+      "pwa_derived": true,
+      "sha256": "8a2c83a487d84927107f641e5fe8d164a01c0e45f7ce9f0a3209eab863c82677",
+      "size_bytes": 1697,
+      "target": "server/vibe4you-app/offline.html"
+    },
+    {
+      "direct_index_link": true,
+      "potential_vite_asset_dependency": false,
+      "production_integrity_manifest": false,
+      "provenance": "live_readonly_sftp_and_http_sha256",
+      "pwa_derived": false,
+      "sha256": "24fa4e84969779dbd4f6e574db99874adb89c4eb5ccc4ec54a021be6009a7bfd",
+      "size_bytes": 1162,
+      "target": "server/vibe4you-app/pwa-install.css"
+    },
+    {
+      "direct_index_link": true,
+      "potential_vite_asset_dependency": false,
+      "production_integrity_manifest": false,
+      "provenance": "live_readonly_sftp_and_http_sha256",
+      "pwa_derived": false,
+      "sha256": "f8db194dda55094b6466bb27475a98a05c9a92d5f0a39cc00df55e5577632acf",
+      "size_bytes": 2972,
+      "target": "server/vibe4you-app/pwa-install.js"
+    }
+  ],
+  "production_integrity_manifest_sha256": "ec13b4f28f99b26f3cf468412d77a651b8596decc1cb5afb1012170bac11a126",
+  "schema_version": 1,
+  "scope": "homepage linked assets plus potential literal-reference Vite deps plus the public PWA static graph; not a network trace",
+  "source": "read_only_public_ubuntu_SFTP_and_HTTP"
+}

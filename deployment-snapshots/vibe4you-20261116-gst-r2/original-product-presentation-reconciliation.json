@@ -1,0 +1,72 @@
+{
+  "schema_version": 1,
+  "reconciled_at": "2026-11-18",
+  "source_audit": "deployment-snapshots/vibe4you-20261116-gst-r2/original-tracked-audit.json",
+  "source_bundle": "product-presentation-and-store-detail",
+  "original_checkout_head": "2c3e6e7bc400502516467869c370264e27d069aa",
+  "audited_paths": [
+    "e2e/specs/product-image-viewer.spec.ts",
+    "src/components/VariantSelector.tsx",
+    "src/pages/ProductDetail.tsx",
+    "src/pages/StoreDetail.tsx",
+    "src/utils/productImage.ts"
+  ],
+  "file_decisions": [
+    {
+      "path": "e2e/specs/product-image-viewer.spec.ts",
+      "decision": "selective-test-port",
+      "evidence": "The existing accessible lightbox test now also verifies a square mobile hero, hidden mobile thumbnail rail, and restored desktop thumbnails."
+    },
+    {
+      "path": "src/components/VariantSelector.tsx",
+      "decision": "selective-source-port-with-reviewed-helper",
+      "evidence": "Generic single choices such as Default are hidden, non-apparel choices use Option or Pack / Volume, and size guides appear only for genuinely sized apparel or footwear."
+    },
+    {
+      "path": "src/pages/ProductDetail.tsx",
+      "decision": "selective-source-port",
+      "evidence": "The page gains mobile gallery behavior, reviewed variant/size-guide rules, safe seller/URL offer metadata, and meaningful product information without placeholder material or care values."
+    },
+    {
+      "path": "src/pages/StoreDetail.tsx",
+      "decision": "do-not-port-public-contact-structured-data",
+      "evidence": "The dirty Store JSON-LD publishes phone and street-address fields without a separate public-contact verification gate. Current store presentation and pagination remain authoritative."
+    },
+    {
+      "path": "src/utils/productImage.ts",
+      "decision": "already-satisfied-by-stronger-current-implementation",
+      "evidence": "The current utility already supports HEIC/HEIF, extension fallback, createImageBitmap and native-image decoding, explicit WebP verification, 20 MB inputs, and focused regression tests."
+    }
+  ],
+  "reviewed_untracked_dependencies_admitted": [
+    "src/utils/productPresentation.ts",
+    "src/tests/productPresentation.test.ts"
+  ],
+  "untracked_dependencies_not_admitted": [
+    "src/components/ProductAssurances.tsx",
+    "src/services/ecommerceAnalytics.ts"
+  ],
+  "presentation_invariants": [
+    "A single generic variant remains purchasable without a fake customer choice.",
+    "Size guides are limited to sized clothing and footwear.",
+    "Placeholder material and care values are not rendered as specifications.",
+    "The product image lightbox retains keyboard, swipe, focus-return, and scroll-lock behavior.",
+    "No public store contact field is added to structured data without verification."
+  ],
+  "source_files_ported": [
+    "src/components/VariantSelector.tsx",
+    "src/pages/ProductDetail.tsx"
+  ],
+  "test_files_updated": [
+    "e2e/specs/product-image-viewer.spec.ts",
+    "src/tests/productPresentation.test.ts"
+  ],
+  "already_satisfied_without_port": ["src/utils/productImage.ts"],
+  "source_files_rejected": ["src/pages/StoreDetail.tsx"],
+  "supersedes_disposition": {
+    "from": "selective-port-with-accessibility-and-untracked-dependency-review",
+    "to": "reconciled-selective-product-presentation-port"
+  },
+  "production_claim": "No product, store, inventory, order, payment, database, deployment, service, or production state was changed.",
+  "result": "PASS"
+}

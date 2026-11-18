@@ -1,0 +1,106 @@
+{
+  "schema_version": 1,
+  "reconciled_at": "2026-11-18",
+  "source_audit": "deployment-snapshots/vibe4you-20261116-gst-r2/original-tracked-audit.json",
+  "source_bundle": "payment-cod-and-tax-invoice",
+  "original_checkout_head": "2c3e6e7bc400502516467869c370264e27d069aa",
+  "audited_paths": [
+    "e2e/specs/commerce-desktop.spec.ts",
+    "src/pages/Checkout.tsx",
+    "src/pages/OrderSuccess.tsx",
+    "src/pages/OrderTracking.tsx",
+    "src/services/businessApi.ts",
+    "src/services/paymentApi.ts",
+    "src/tests/paymentApi.test.ts",
+    "src/tests/prelaunchLock.test.ts"
+  ],
+  "file_decisions": [
+    {
+      "path": "e2e/specs/commerce-desktop.spec.ts",
+      "decision": "retain-current-ownership-and-end-to-end-order-test",
+      "evidence": "The dirty change replaces actual COD placement, tracking, and cross-account 404 verification with copy-only assertions. The retained browser test passed against the current candidate."
+    },
+    {
+      "path": "src/pages/Checkout.tsx",
+      "decision": "retain-current-direct-cod-flow",
+      "evidence": "The current page already uses the server-authoritative /api/place-cod-order path with no online advance. The dirty page also imports the previously rejected untracked ecommerce analytics dependency."
+    },
+    {
+      "path": "src/pages/OrderSuccess.tsx",
+      "decision": "do-not-port-legacy-cod-advance-presentation",
+      "evidence": "The added booking-amount and balance presentation belongs only to legacy in-flight orders and is not part of the selected new-order COD model."
+    },
+    {
+      "path": "src/pages/OrderTracking.tsx",
+      "decision": "hold-tax-invoice-ui-with-backend-contract",
+      "evidence": "The added invoice status and download calls depend on backend routes held for independent Ubuntu-native implementation and ownership review."
+    },
+    {
+      "path": "src/services/businessApi.ts",
+      "decision": "hold-tax-invoice-client-with-backend-contract",
+      "evidence": "The new endpoints cannot be admitted independently of the held invoice ledger, issuance, authentication, and IDOR contract."
+    },
+    {
+      "path": "src/services/paymentApi.ts",
+      "decision": "do-not-port-retired-cod-advance-types",
+      "evidence": "The dirty types and Razorpay all-method option support the retired COD booking-advance flow, while the selected contract creates COD orders directly without Razorpay."
+    },
+    {
+      "path": "src/tests/paymentApi.test.ts",
+      "decision": "reject-contradictory-booking-advance-test",
+      "evidence": "The dirty test explicitly expects /api/create-order and a ₹50 Razorpay COD booking amount, contradicting the dirty checkout, browser test, and selected server contract."
+    },
+    {
+      "path": "src/tests/prelaunchLock.test.ts",
+      "decision": "selective-test-port",
+      "evidence": "A narrow negative assertion prevents obsolete Pay ₹50 checkout copy without changing payment behavior."
+    }
+  ],
+  "selected_payment_contract": {
+    "new_cod_orders": "No online advance; POST /api/place-cod-order; full amount collected on delivery.",
+    "online_orders": "UPI or card through Razorpay with server-side signature and captured-payment verification.",
+    "legacy_cod_advance_orders": "Must remain server-side backward compatibility only until independently reviewed; the customer checkout must not create new advance orders.",
+    "ownership": "Order detail, tracking, receipt, and any future invoice endpoint must authenticate the owning account before returning existence or content."
+  },
+  "contract_findings": [
+    "The dirty checkout says no advance and calls placeCodOrder, but the dirty payment unit test requires createPaymentOrder and a ₹50 Razorpay COD booking amount.",
+    "The dirty browser test removes the successful placement, tracking, receipt-state, logout/login, and cross-account 404 assertions.",
+    "Tax-invoice UI and client methods depend on the held dirty backend invoice routes and therefore cannot be promoted independently.",
+    "The current checkout already implements the selected no-advance COD contract without the rejected untracked ecommerce analytics module."
+  ],
+  "untracked_dependencies_not_admitted": [
+    "src/services/ecommerceAnalytics.ts"
+  ],
+  "verification": {
+    "focused_unit_command": "npm test -- --run src/tests/paymentApi.test.ts src/tests/prelaunchLock.test.ts",
+    "focused_unit_tests": 18,
+    "focused_unit_result": "PASS",
+    "browser_command": "npx playwright test e2e/specs/commerce-desktop.spec.ts --project=desktop-chromium -g isolated COD order succeeds and another account cannot read it",
+    "browser_tests": 1,
+    "browser_result": "PASS"
+  },
+  "source_files_ported": [],
+  "test_files_updated": [
+    "src/tests/prelaunchLock.test.ts"
+  ],
+  "source_files_held_with_independent_backend_contract": [
+    "src/pages/OrderTracking.tsx",
+    "src/services/businessApi.ts"
+  ],
+  "source_files_rejected": [
+    "src/pages/Checkout.tsx",
+    "src/pages/OrderSuccess.tsx",
+    "src/services/paymentApi.ts"
+  ],
+  "test_files_rejected": [
+    "e2e/specs/commerce-desktop.spec.ts",
+    "src/tests/paymentApi.test.ts"
+  ],
+  "supersedes_disposition": {
+    "from": "blocked-pending-model-reconciliation-and-security-review",
+    "to": "reconciled-current-no-advance-cod-contract-retained"
+  },
+  "release_status": "MANUAL ACTION REQUIRED",
+  "production_claim": "No order, payment, refund, invoice, inventory, database, service, deployment, or production state was changed.",
+  "result": "PASS"
+}

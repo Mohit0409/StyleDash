@@ -17,6 +17,7 @@ import { useWishlist } from '../context/WishlistContext';
 import { useToast } from '../context/ToastContext';
 import { CONFIG } from '../config';
 import { productGalleryImages } from '../utils/productGallery';
+import { hasMeaningfulProductText, meaningfulCareInstructions, shouldShowSizeGuide } from '../utils/productPresentation';
 
 export const ProductDetail: React.FC = () => {
   const { slug } = useParams<{ slug: string }>();
@@ -86,11 +87,11 @@ export const ProductDetail: React.FC = () => {
   if (!product) {
     return (
       <div className="max-w-7xl mx-auto p-12 text-center space-y-4">
-        <SEO title="Product not found - Vibe4You" description="The requested fashion item could not be found." noIndex />
+        <SEO title="Product not found - Vibe4You" description="The requested product could not be found." noIndex />
         <h1 className="text-2xl font-black">Product Not Found</h1>
-        <p className="text-xs text-neutral-500">The fashion item you are looking for is no longer available.</p>
+        <p className="text-xs text-neutral-500">The product you are looking for is no longer available.</p>
         <Link to="/products" className="inline-block px-6 py-2.5 bg-neutral-950 text-white text-xs font-bold rounded-xl">
-          Browse Fashion Catalogue
+          Browse All Products
         </Link>
       </div>
     );
@@ -109,6 +110,10 @@ export const ProductDetail: React.FC = () => {
   );
   const tryAtHomeEligible = product.tryAtHomeAvailable === true
     && new Set(tryAtHomeVariants.map(variant => variant.size)).size >= 2;
+  const careInstructions = meaningfulCareInstructions(product);
+  const hasMaterial = hasMeaningfulProductText(product.material);
+  const hasDescription = hasMeaningfulProductText(product.description)
+    && product.description.trim() !== product.shortDescription.trim();
 
   const isWishlisted = isInWishlist(product.id);
 
@@ -194,6 +199,8 @@ export const ProductDetail: React.FC = () => {
             '@type': 'Offer',
             priceCurrency: 'INR',
             price: product.price,
+            url: `https://vibe4you.in/product/${product.slug}`,
+            seller: { '@type': 'Organization', name: product.storeName || 'Vibe4You local seller' },
             availability: availabilityResolved
               ? (product.variants.some(variant => variant.available === true)
                 ? 'https://schema.org/InStock'
@@ -226,7 +233,7 @@ export const ProductDetail: React.FC = () => {
             type="button"
             onClick={() => setImageViewerOpen(true)}
             aria-label={`Open full screen image of ${product.name}`}
-            className="relative block aspect-[3/4] w-full overflow-hidden rounded-3xl border border-neutral-200 bg-neutral-100 text-left focus:outline-none focus:ring-2 focus:ring-lime-500 focus:ring-offset-2 dark:border-neutral-800 dark:bg-neutral-800 dark:focus:ring-offset-neutral-950"
+            className="relative block aspect-square w-full overflow-hidden rounded-3xl border border-neutral-200 bg-neutral-100 text-left focus:outline-none focus:ring-2 focus:ring-lime-500 focus:ring-offset-2 sm:aspect-[3/4] dark:border-neutral-800 dark:bg-neutral-800 dark:focus:ring-offset-neutral-950"
           >
             <img
               src={selectedImage}
@@ -240,7 +247,7 @@ export const ProductDetail: React.FC = () => {
             )}
           </button>
 
-          <div className="flex gap-3 overflow-x-auto no-scrollbar">
+          <div data-testid="desktop-gallery-thumbnails" className="hidden gap-3 overflow-x-auto no-scrollbar sm:flex">
             {galleryImages.map((img, idx) => (
               <button
                 key={idx}
@@ -306,7 +313,7 @@ export const ProductDetail: React.FC = () => {
                 || product.variants.find(variant => variant.colourName === c);
               setSelectedSize(firstSize?.size || null);
             }}
-            onOpenSizeGuide={() => setSizeGuideOpen(true)}
+            onOpenSizeGuide={shouldShowSizeGuide(product) ? () => setSizeGuideOpen(true) : undefined}
           />
 
           {tryAtHomeEligible && (
@@ -394,22 +401,35 @@ export const ProductDetail: React.FC = () => {
             <p>Same Day Delivery is available to pincode 458441. Weekend Express is available at checkout on Saturday and Sunday.</p>
           </div>
 
-          {/* Specifications */}
-          <div className="pt-6 border-t border-neutral-200 dark:border-neutral-800 space-y-2 text-xs text-neutral-600 dark:text-neutral-400">
-            <p><strong>Material:</strong> {product.material}</p>
+          <section aria-labelledby="product-information" className="pt-6 border-t border-neutral-200 dark:border-neutral-800 space-y-2 text-xs text-neutral-600 dark:text-neutral-400">
+            <h2 id="product-information" className="text-sm font-black text-neutral-900 dark:text-white">Product information</h2>
+            <p><strong>Category:</strong> {product.category}{product.subcategory ? ` / ${product.subcategory}` : ''}</p>
+            {product.brand && <p><strong>Brand:</strong> {product.brand}</p>}
+            {product.storeName && <p><strong>Seller:</strong> {product.storeName}</p>}
+            {hasMaterial && <p><strong>Material:</strong> {product.material}</p>}
             {product.fit && <p><strong>Fit:</strong> {product.fit}</p>}
-            <p><strong>Care Instructions:</strong> {product.careInstructions.join(', ')}</p>
+            {careInstructions.length > 0 && <p><strong>Care Instructions:</strong> {careInstructions.join(', ')}</p>}
             <p><strong>Exchange:</strong> {product.exchangeAvailable ? `Eligible for size exchange within ${product.returnWindowDays} days for ₹50; replacement stock and conditions apply.` : 'Not available for this product.'}</p>
-          </div>
+            {!hasMaterial && careInstructions.length === 0 && (
+              <p className="text-amber-700 dark:text-amber-300">Additional specifications are being verified with the seller.</p>
+            )}
+          </section>
+
+          {hasDescription && (
+            <section aria-labelledby="about-product" className="pt-6 border-t border-neutral-200 dark:border-neutral-800">
+              <h2 id="about-product" className="text-sm font-black text-neutral-900 dark:text-white">About this product</h2>
+              <p className="mt-2 whitespace-pre-line text-xs leading-5 text-neutral-600 dark:text-neutral-400">{product.description}</p>
+            </section>
+          )}
         </div>
       </div>
 
       {/* Size Guide Modal */}
-      <SizeGuideModal
+      {shouldShowSizeGuide(product) && <SizeGuideModal
         isOpen={sizeGuideOpen}
         onClose={() => setSizeGuideOpen(false)}
         department={product.department}
-      />
+      />}
 
       <ProductImageLightbox
         imageUrls={galleryImages}

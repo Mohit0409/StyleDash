@@ -1,0 +1,107 @@
+{
+  "schema_version": 1,
+  "reconciled_at": "2026-11-17",
+  "source_audit": "deployment-snapshots/vibe4you-20261116-gst-r2/original-tracked-audit.json",
+  "source_bundle": "obsolete-termux-operations",
+  "original_checkout_head": "2c3e6e7bc400502516467869c370264e27d069aa",
+  "ubuntu_release_contract": {
+    "path": "deployment-targets/vibe4you-20261116-r2/ubuntu-release-contract.json",
+    "sha256": "d7b78dd49e6f06250bb3401f8702723fd8bd50581099b81f6c52d88e885b3909",
+    "activation_implemented": false,
+    "activation_authorized": false,
+    "old_termux_installer_allowed": false
+  },
+  "ubuntu_source_map": {
+    "path": "deployment-targets/vibe4you-20261116-r2/source-map.json",
+    "sha256": "4139830b332f68dd137461b7622caa12d812a38c2042ab93c67ea4b5db9966e1"
+  },
+  "audited_paths": [
+    "scripts/termux/backup-styledash-data",
+    "scripts/termux/backup-styledash-recovery",
+    "scripts/termux/deploy-payment-release"
+  ],
+  "file_decisions": [
+    {
+      "path": "scripts/termux/backup-styledash-data",
+      "original_dirty_sha256": "ba02aec4c7e56773c2d2fb304a8ec69ccfda6c2b5d9e7610e687498d4e032908",
+      "synchronized_baseline_sha256": "326a879a9d6c328bebbbf7948760fd881e96f184b38a850cc8bdc4f055b10459",
+      "decision": "do-not-port-termux-script",
+      "evidence": "The script is bound to Termux paths, shell location, service layout, and rclone configuration. Its reusable safety requirements are recorded separately for a future reviewed Ubuntu backup mechanism."
+    },
+    {
+      "path": "scripts/termux/backup-styledash-recovery",
+      "original_dirty_sha256": "83cd206aefcb762550a09c46ce46d06cfb0f3b63dbaa4e62f7caee37e6c5b169",
+      "synchronized_baseline_sha256": "598aee44c7f16c8df8f69f092d6a081b4f57bea0ac34b0578bc14d9814a1b080",
+      "decision": "do-not-port-termux-script",
+      "evidence": "The recovery sequence restores a phone/Termux installation and cannot define Ubuntu recovery. Supplier-bill and product-image coverage remains a requirement for a future Ubuntu recovery plan."
+    },
+    {
+      "path": "scripts/termux/deploy-payment-release",
+      "original_dirty_sha256": "3419abcbd2c7d22439fc331f3be604cf91eae00a056315d85e56269bdb7bacc0",
+      "synchronized_baseline_sha256": "f2c2eb021f7ad84460fedd82afb31bdf665e89920fb6e560d5b407672e866bdd",
+      "decision": "do-not-port-termux-script-modules-already-pinned",
+      "evidence": "The Ubuntu source map already pins the billing and invoice modules required by the dirty script. Activation remains deliberately unimplemented and unauthorized."
+    }
+  ],
+  "ubuntu_candidate_modules_already_present": [
+    {
+      "module": "billing_audit.py",
+      "targets": ["admin/billing_audit.py"]
+    },
+    {
+      "module": "gst_invoice_draft.py",
+      "targets": ["admin/gst_invoice_draft.py", "server/gst_invoice_draft.py"]
+    },
+    {
+      "module": "invoice_order_adapter.py",
+      "targets": ["admin/invoice_order_adapter.py", "server/invoice_order_adapter.py"]
+    },
+    {
+      "module": "invoice_ledger.py",
+      "targets": ["admin/invoice_ledger.py", "server/invoice_ledger.py"]
+    },
+    {
+      "module": "invoice_admin_gateway.py",
+      "targets": ["admin/invoice_admin_gateway.py", "server/invoice_admin_gateway.py"]
+    },
+    {
+      "module": "tax_document_pdf.py",
+      "targets": ["admin/tax_document_pdf.py", "server/tax_document_pdf.py"]
+    },
+    {
+      "module": "tax_classification_registry.py",
+      "targets": ["admin/tax_classification_registry.py", "server/tax_classification_registry.py"]
+    }
+  ],
+  "future_ubuntu_requirements": [
+    {
+      "id": "backup-mutual-exclusion",
+      "requirement": "A reviewed Ubuntu backup mechanism must refuse overlapping scheduled or operator runs and release its lock on normal exit or interruption."
+    },
+    {
+      "id": "complete-runtime-state-coverage",
+      "requirement": "The backup and recovery design must inventory and preserve the live database, order state, supplier-bill artifacts, product images, and required private configuration without committing any of them to a release payload."
+    },
+    {
+      "id": "verified-off-device-copies",
+      "requirement": "Each off-device backup must use bounded retries and timeouts and must pass an independent content verification before its success marker is written."
+    },
+    {
+      "id": "validated-restore-procedure",
+      "requirement": "The Ubuntu recovery procedure must be independently reviewed and restore-tested before any future activation is approved."
+    }
+  ],
+  "runtime_state_decision": "Supplier bills and all other runtime state are backup inputs, never source-controlled release payloads.",
+  "source_files_ported": [],
+  "source_files_rejected": [
+    "scripts/termux/backup-styledash-data",
+    "scripts/termux/backup-styledash-recovery",
+    "scripts/termux/deploy-payment-release"
+  ],
+  "supersedes_disposition": {
+    "from": "do-not-port-to-ubuntu-release",
+    "to": "reconciled-no-termux-port"
+  },
+  "production_claim": "No backup, restore, deployment, activation, service, database, payment, or production mutation was performed.",
+  "result": "PASS"
+}

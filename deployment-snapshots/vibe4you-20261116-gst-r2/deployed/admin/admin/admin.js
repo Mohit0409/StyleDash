@@ -1,0 +1,1622 @@
+let csrfToken = '';
+let activeTab = 'orders';
+let currentOrders = [];
+let outsideDeliveryPage = 1;
+let outsideFollowupOnly = false;
+let billingMonth = (()=>{const parts=Object.fromEntries(new Intl.DateTimeFormat('en',{timeZone:'Asia/Kolkata',year:'numeric',month:'2-digit'}).formatToParts(new Date()).map(part=>[part.type,part.value]));return `${parts.year}-${parts.month}`;})();
+let externalPaymentMonth = billingMonth;
+let currentExternalPaymentReport = null;
+let customerPage = 1;
+let customerPageSize = 50;
+let gstInvoiceReady = false;
+let orderFilters = {status:'all', payment:'all', fulfillment:'all'};
+let currentShopProducts = [];
+let shopProductStores = [];
+let shopProductFilter = 'all';
+let shopProductPagination = {page:1,pageSize:25,total:0,totalPages:1,globalTotal:0,filters:{shops:[],statuses:[],categories:[]}};
+let currentVendors = [];
+let inventoryShops = [];
+const bulkSelection = new Set();
+let adminFilters = {
+  vendors:{status:'all',category:'all'},
+  'shop-products':{status:'all',category:'all'},
+  'shop-product-requests':{status:'all',action:'all'},
+  'outside-delivery':{status:'all'},
+  inventory:{stock:'all',category:'all',department:'all',shop:'all',brand:'all'},
+  customers:{status:'all'},
+  'payment-alerts':{status:'all',type:'all'},
+  audit:{result:'all',target:'all',action:'all'},
+};
+
+const byId = id => document.getElementById(id);
+const escapeText = value => String(value ?? '').replace(/[&<>"']/g, character => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[character]));
+const inventoryImageUrl = value => {
+  if (typeof value !== 'string' || !value.trim()) return null;
+  try {
+    const url = new URL(value, location.origin);
+    if (url.protocol === 'https:' && !/\.html?$/i.test(url.pathname)) return url.href;
+    if (url.origin === location.origin && url.pathname.startsWith('/media/product-images/')) return url.href;
+    return null;
+  } catch { return null; }
+};
+const inventoryThumbnail = item => {
+  const candidates = [...new Set([...(Array.isArray(item.imageUrls)?item.imageUrls:[]), item.imageUrl].map(inventoryImageUrl).filter(Boolean))];
+  const source = candidates[0];
+  const name = escapeText(item.productName || item.name || 'Product');
+  const encodedSources = escapeText(encodeURIComponent(JSON.stringify(candidates)));
+  return source
+    ? `<img class="inventory-thumbnail" data-sources="${encodedSources}" data-index="0" src="${escapeText(source)}" alt="${name}" width="48" height="48" loading="lazy" referrerpolicy="no-referrer">`
+    : '<span class="inventory-thumbnail-fallback" role="img" aria-label="Product image unavailable">No image</span>';
+};
+
+// Private-admin click-to-chat only. No automatic messaging or third-party SDK.
+function normalizeWhatsAppPhone(value) {
+  if (typeof value !== 'string' && typeof value !== 'number') return null;
+  const input = String(value).trim();
+  if (!input || input.length > 40 || !/^[+\d\s().-]+$/.test(input)) return null;
+  let phone = input.replace(/[\s().-]/g, '');
+  const international = phone.startsWith('+') || phone.startsWith('00');
+  if (phone.startsWith('+')) phone = phone.slice(1);
+  else if (phone.startsWith('00')) phone = phone.slice(2);
+  if (!/^\d+$/.test(phone)) return null;
+  if (!international) {
+    if (/^0[6-9]\d{9}$/.test(phone)) phone = phone.slice(1);
+    if (/^[6-9]\d{9}$/.test(phone)) phone = '91' + phone;
+    else if (!/^91[6-9]\d{9}$/.test(phone)) return null;
+  }
+  if (!/^[1-9]\d{7,14}$/.test(phone)) return null;
+  if (phone.startsWith('91') && !/^91[6-9]\d{9}$/.test(phone)) return null;
+  return phone;
+}
+
+function whatsAppContact(phone, label = 'WhatsApp Customer') {
+  const number = normalizeWhatsAppPhone(phone);
+  if (!number) return '<span class="whatsapp-unavailable muted" title="A valid mobile number is required to open WhatsApp">WhatsApp unavailable</span>';
+  const safeLabel = escapeText(label);
+  // Deliberately omit message text: addresses, order/payment details and admin
+  // session data must not be embedded in an external link.
+  return `<a class="whatsapp-contact" href="https://wa.me/${number}" target="_blank" rel="noopener noreferrer" referrerpolicy="no-referrer" aria-label="${safeLabel} (opens in a new tab)"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M21 11.5a8.5 8.5 0 0 1-12.7 7.4L3 21l1.8-5.3A8.5 8.5 0 1 1 21 11.5Z"/><path d="M8 7.5c0 4 3 7 7 7l1-2-2-1-1 1c-1.5-.5-2.5-1.5-3-3l1-1-1-2Z"/></svg>${safeLabel}</a>`;
+}
+
+async function api(path, options = {}) {
+  const headers = new Headers(options.headers || {});
+  if (options.body) headers.set('Content-Type', 'application/json');
+  if (!['GET', 'HEAD'].includes((options.method || 'GET').toUpperCase()) && csrfToken) headers.set('X-CSRF-Token', csrfToken);
+  const response = await fetch(path, {...options, headers, credentials:'include'});
+  const payload = await response.json().catch(() => ({error:'Invalid local service response.'}));
+  if (!response.ok) throw new Error(payload.error || 'Administrator request failed.');
+  return payload;
+}
+
+function showLogin() { byId('login-view').hidden = false; byId('app-view').hidden = true; csrfToken = ''; }
+function showApp(admin) { byId('login-view').hidden = true; byId('app-view').hidden = false; byId('admin-name').textContent = admin.username; loadTab(activeTab); }
+function error(message, target='app-error') { byId(target).textContent = message || ''; }
+
+byId('password-form').addEventListener('submit', async event => {
+  event.preventDefault(); error('', 'auth-error');
+  try {
+    await api('/api/admin/login', {method:'POST', body:JSON.stringify({username:byId('username').value,password:byId('password').value})});
+    byId('password-form').hidden = true; byId('totp-form').hidden = false; byId('totp').focus();
+  } catch (cause) { error(cause.message, 'auth-error'); }
+});
+
+byId('totp-form').addEventListener('submit', async event => {
+  event.preventDefault(); error('', 'auth-error');
+  try { const result=await api('/api/admin/totp',{method:'POST',body:JSON.stringify({code:byId('totp').value})}); csrfToken=result.csrfToken; showApp(result.admin); }
+  catch (cause) { error(cause.message, 'auth-error'); }
+});
+
+byId('logout').addEventListener('click', async () => { try { await api('/api/admin/logout',{method:'POST',body:'{}'}); } finally { location.reload(); } });
+byId('tabs').addEventListener('click', event => { const button=event.target.closest('[data-tab]'); if(!button)return; activeTab=button.dataset.tab; document.querySelectorAll('[data-tab]').forEach(item=>item.classList.toggle('active',item===button)); loadTab(activeTab); });
+byId('search-form').addEventListener('submit', event => {
+  event.preventDefault();if(activeTab==='shop-products')shopProductPagination.page=1;if(activeTab==='customers')customerPage=1;loadTab(activeTab);
+});
+byId('content').addEventListener('error', event => { const image=event.target.closest?.('.inventory-thumbnail'); if(!image)return; let sources=[]; try{sources=JSON.parse(decodeURIComponent(image.dataset.sources||''));}catch{} const next=Number(image.dataset.index||0)+1; if(next<sources.length){image.dataset.index=String(next);image.src=sources[next];return;} const fallback=document.createElement('span'); fallback.className='inventory-thumbnail-fallback'; fallback.setAttribute('role','img'); fallback.setAttribute('aria-label','Product image unavailable'); fallback.textContent='No image'; image.replaceWith(fallback); }, true);
+byId('content').addEventListener('change', event => {
+  const billingControl=event.target.closest('[data-billing-month]');
+  if(billingControl){billingMonth=billingControl.value;loadTab('billing-audit');return;}
+  const externalMonth=event.target.closest('[data-external-payment-month]');
+  if(externalMonth){externalPaymentMonth=externalMonth.value;loadTab('orders');return;}
+  const orderControl=event.target.closest('[data-order-filter]');
+  if(orderControl){orderFilters[orderControl.dataset.orderFilter]=orderControl.value;renderOrdersView();return;}
+  const shopControl=event.target.closest('[data-shop-product-filter]');
+  if(shopControl){shopProductFilter=shopControl.value;shopProductPagination.page=1;loadTab(activeTab);return;}
+  const customerSizeControl=event.target.closest('[data-customer-page-size]');
+  if(customerSizeControl){customerPageSize=Number(customerSizeControl.value);customerPage=1;loadTab('customers');return;}
+  const adminControl=event.target.closest('[data-admin-filter]');
+  if(adminControl){adminFilters[activeTab][adminControl.dataset.adminFilter]=adminControl.value;if(activeTab==='shop-products')shopProductPagination.page=1;if(activeTab==='customers')customerPage=1;loadTab(activeTab);return;}
+  const pageSizeControl=event.target.closest('[data-shop-products-page-size]');
+  if(pageSizeControl){shopProductPagination.pageSize=Number(pageSizeControl.value);shopProductPagination.page=1;loadTab('shop-products');return;}
+  const bulkAll=event.target.closest('[data-bulk-select-all]');
+  if(bulkAll){
+    const resource=bulkAll.dataset.bulkSelectAll;
+    byId('content').querySelectorAll(`[data-bulk-select="${resource}"]`).forEach(box=>{box.checked=bulkAll.checked;const key=`${resource}:${box.value}`;box.checked?bulkSelection.add(key):bulkSelection.delete(key);});
+    syncBulkSelectionUi(resource);return;
+  }
+  const bulk=event.target.closest('[data-bulk-select]');
+  if(bulk){const key=`${bulk.dataset.bulkSelect}:${bulk.value}`;bulk.checked?bulkSelection.add(key):bulkSelection.delete(key);syncBulkSelectionUi(bulk.dataset.bulkSelect);}
+});
+
+function status(message) { byId('app-status').textContent = message || ''; }
+const DEFAULT_VARIANT_SIZE='One Size';
+const DEFAULT_VARIANT_COLOUR='Default';
+const STORE_CATEGORIES=["Clothing & Fashion","Footwear","Accessories","Beauty & Personal Care","Electronics","Gifts","Groceries","Home & Living","Health & Pharmacy","Health & Nutrition","Baby Care","Pet Supplies","Mobile Accessories","Automotive Accessories","Toys & Games","Stationery & Books","Sports & Fitness","Hardware & Tools","General Store"];
+const PRODUCT_OPTION_MODE_VALUES=new Set(['single','size','colour','both']);
+function defaultProductOptionMode(category){return ['Clothing & Fashion','Footwear'].includes(category)?'both':'single';}
+function inferProductOptionMode(item){
+  const explicit=String(item?.attributes?.optionMode||''); if(PRODUCT_OPTION_MODE_VALUES.has(explicit))return explicit;
+  const variants=Array.isArray(item?.variants)?item.variants:[];
+  const sizes=new Set(variants.map(row=>String(row.size||'').trim()).filter(Boolean));
+  const colours=new Set(variants.map(row=>String(row.colourName||item?.colourName||'').trim()).filter(Boolean));
+  const meaningfulSize=Array.from(sizes).some(value=>value!==DEFAULT_VARIANT_SIZE);
+  const meaningfulColour=Array.from(colours).some(value=>value!==DEFAULT_VARIANT_COLOUR&&value!=='Multi');
+  if(meaningfulSize&&meaningfulColour)return 'both'; if(meaningfulSize)return 'size'; if(meaningfulColour)return 'colour'; return 'single';
+}
+function productOptionModeLabel(mode){return ({single:'Single stock (no size/colour)',size:'Size / volume only',colour:'Colour / shade only',both:'Colour + size'})[mode]||mode;}
+function newColourCard(source={}) {
+  const key=typeof crypto?.randomUUID==='function'?crypto.randomUUID():`colour-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+  return {cardKey:key,colourName:source.colourName||'',colourHex:source.colourHex||'',imageUrls:Array.isArray(source.imageUrls)?source.imageUrls.filter(value=>typeof value==='string'):[],pendingFiles:[],httpsDraft:'',sizes:Array.isArray(source.sizes)&&source.sizes.length?source.sizes.map(size=>({id:typeof size.id==='string'?size.id:undefined,size:size.size||'',inventory:Number.isInteger(size.inventory)?size.inventory:0})):[{size:'',inventory:0}]};
+}
+function filePreview(file){return new Promise((resolve,reject)=>{const reader=new FileReader();reader.onerror=()=>reject(new Error('The selected image could not be read.'));reader.onload=()=>resolve(String(reader.result||''));reader.readAsDataURL(file);});}
+async function queueColourFiles(colour,files){
+  const selected=Array.from(files||[]); if(!selected.length)return;
+  if(colour.imageUrls.length+colour.pendingFiles.length+selected.length>8)throw new Error('Each colour can have at most 8 images.');
+  for(const file of selected){validateAdminImageFile(file);colour.pendingFiles.push({file,preview:await filePreview(file)});}
+}
+async function uploadColourVariantImages(colours){
+  for(const colour of colours){const httpsUrls=String(colour.httpsDraft||'').split(/\r?\n/).map(value=>value.trim()).filter(Boolean);const count=colour.imageUrls.length+httpsUrls.length+colour.pendingFiles.length;if(count<1||count>8)throw new Error('Each colour needs between 1 and 8 images.');}
+  const total=colours.reduce((sum,colour)=>sum+colour.pendingFiles.length,0); let offset=0;
+  const result=[];
+  for(const colour of colours){const files=colour.pendingFiles.map(entry=>entry.file);const uploaded=files.length?await uploadAdminProductImages(files,offset,total):[];offset+=files.length;const httpsUrls=String(colour.httpsDraft||'').split(/\r?\n/).map(value=>value.trim()).filter(Boolean);result.push({colourName:colour.colourName,colourHex:colour.colourHex||undefined,imageUrls:[...colour.imageUrls,...httpsUrls,...uploaded],sizes:colour.sizes.map(size=>({...size,inventory:Number(size.inventory)}))});}
+  return result;
+}
+function formDialog(title, fields, submitLabel='Continue') {
+  return new Promise(resolve => {
+    const dialog=byId('admin-dialog');
+    const form=byId('admin-dialog-form');
+    const fieldsRoot=byId('admin-dialog-fields');
+    byId('admin-dialog-title').textContent=title;
+    byId('admin-dialog-submit').textContent=submitLabel;
+    byId('admin-dialog-error').textContent='';
+    fieldsRoot.replaceChildren();
+    let colourVariantsGetter=null;
+    const controlsByName=new Map();
+    for(const field of fields){
+      if(field.type==='colourVariants'){
+        const section=document.createElement('section');section.className='variant-editor';
+        const heading=document.createElement('h3');heading.textContent=field.label;section.appendChild(heading);
+        const hint=document.createElement('p');hint.className='muted';section.appendChild(hint);
+        const cards=document.createElement('div');cards.className='variant-cards';section.appendChild(cards);
+        const addColour=document.createElement('button');addColour.type='button';addColour.className='secondary';addColour.textContent='+ Add another colour / shade';section.appendChild(addColour);
+        const modeControl=controlsByName.get('optionMode');
+        const currentMode=()=>PRODUCT_OPTION_MODE_VALUES.has(modeControl?.value)?modeControl.value:'both';
+        const colours=Array.isArray(field.value)&&field.value.length?field.value.map(newColourCard):[newColourCard()];
+        const makeInput=(text,value,type='text')=>{const label=document.createElement('label');label.textContent=text;const control=document.createElement(type==='textarea'?'textarea':'input');control.value=value??'';if(type!=='textarea')control.type=type;label.appendChild(control);return [label,control];};
+        const tile=(source,labelText,onRemove,isLocal=true)=>{const node=document.createElement('div');node.className='image-tile';if(isLocal){const image=document.createElement('img');image.src=source;image.alt=labelText;image.loading='lazy';node.appendChild(image);}else{const text=document.createElement('span');text.textContent=labelText;text.title=source;node.appendChild(text);}const remove=document.createElement('button');remove.type='button';remove.className='danger';remove.textContent='Remove';remove.onclick=onRemove;node.appendChild(remove);return node;};
+        const render=()=>{
+          const mode=currentMode(),usesColour=mode==='colour'||mode==='both',usesSize=mode==='size'||mode==='both';
+          hint.textContent=mode==='single'?'Add product images and one stock quantity. Size and colour are not required.':mode==='size'?'Add sizes or volumes (for example 50 ml / 100 ml) with stock. Colour is not required.':mode==='colour'?'Add colours or shades with stock. Size is not required.':'Each colour has its own images, sizes and stock. Local files upload only when you save.';
+          addColour.hidden=!usesColour; cards.replaceChildren();
+          const visibleColours=usesColour?colours:colours.slice(0,1);
+          visibleColours.forEach((colour,index)=>{
+          if(!colour.sizes.length)colour.sizes.push({size:'',inventory:0});
+          const card=document.createElement('article');card.className='variant-card';card.dataset.cardKey=colour.cardKey;const title=document.createElement('h4');title.textContent=usesColour?`Colour / shade ${index+1}`:'Product images & stock';card.appendChild(title);
+          if(usesColour){const grid=document.createElement('div');grid.className='dialog-fields';const [nameLabel,name]=makeInput('Colour / shade name',colour.colourName);const [hexLabel,hex]=makeInput('Colour hex (optional)',colour.colourHex);name.oninput=()=>colour.colourName=name.value;hex.oninput=()=>colour.colourHex=hex.value;grid.append(nameLabel,hexLabel);card.appendChild(grid);}
+          const sizesTitle=document.createElement('strong');sizesTitle.textContent=usesSize?'Sizes / volumes & stock':'Stock';card.appendChild(sizesTitle);const sizes=document.createElement('div');sizes.className='variant-sizes';
+          const visibleSizes=usesSize?colour.sizes:colour.sizes.slice(0,1);
+          visibleSizes.forEach((size,sizeIndex)=>{const row=document.createElement('div');row.className='variant-size-row';const [stockLabel,stockInput]=makeInput('Stock',String(size.inventory),'number');stockInput.min='0';stockInput.step='1';stockInput.oninput=()=>size.inventory=Number(stockInput.value);if(usesSize){const [sizeLabel,sizeInput]=makeInput(mode==='size'?'Size / volume':'Size',size.size);sizeInput.oninput=()=>size.size=sizeInput.value;row.append(sizeLabel,stockLabel);}else row.append(stockLabel);if(usesSize&&colour.sizes.length>1){const remove=document.createElement('button');remove.type='button';remove.className='danger';remove.textContent='Remove size';remove.onclick=()=>{colour.sizes.splice(sizeIndex,1);render();};row.appendChild(remove);}sizes.appendChild(row);});card.appendChild(sizes);
+          if(usesSize){const addSize=document.createElement('button');addSize.type='button';addSize.className='secondary';addSize.textContent='+ Add size / volume';addSize.onclick=()=>{colour.sizes.push({size:'',inventory:0});render();};card.appendChild(addSize);}
+          const images=document.createElement('div');images.className='image-tiles';colour.imageUrls.forEach((url,imageIndex)=>images.appendChild(tile(url,`Existing image ${imageIndex+1}`,()=>{colour.imageUrls.splice(imageIndex,1);render();},url.startsWith('/media/product-images/'))));colour.pendingFiles.forEach((entry,imageIndex)=>images.appendChild(tile(entry.preview,`Pending image ${imageIndex+1}`,()=>{colour.pendingFiles.splice(imageIndex,1);render();},true)));card.appendChild(images);
+          const uploadLabel=document.createElement('label');uploadLabel.textContent='Choose product images from this PC';const upload=document.createElement('input');upload.type='file';upload.accept=ADMIN_IMAGE_ACCEPT;upload.multiple=true;upload.onchange=async()=>{try{await queueColourFiles(colour,upload.files);render();}catch(cause){byId('admin-dialog-error').textContent=cause.message;}finally{upload.value='';}};uploadLabel.appendChild(upload);card.appendChild(uploadLabel);
+          const [urlsLabel,urls]=makeInput('HTTPS image URLs (optional fallback)',colour.httpsDraft,'textarea');urls.oninput=()=>colour.httpsDraft=urls.value;card.appendChild(urlsLabel);
+          if(usesColour&&colours.length>1){const removeColour=document.createElement('button');removeColour.type='button';removeColour.className='danger';removeColour.textContent='Remove colour / shade';removeColour.onclick=()=>{colours.splice(index,1);render();};card.appendChild(removeColour);}cards.appendChild(card);
+        });};
+        addColour.onclick=()=>{colours.push(newColourCard());render();};
+        if(modeControl){modeControl.addEventListener('change',render);modeControl.addEventListener('option-mode-sync',render);}
+        colourVariantsGetter=()=>{const mode=currentMode(),usesColour=mode==='colour'||mode==='both',usesSize=mode==='size'||mode==='both';const source=usesColour?colours:colours.slice(0,1);const normalized=source.map(colour=>({cardKey:colour.cardKey,colourName:usesColour?String(colour.colourName||'').trim():DEFAULT_VARIANT_COLOUR,colourHex:usesColour?(String(colour.colourHex||'').trim()||undefined):undefined,imageUrls:colour.imageUrls.map(value=>String(value).trim()).filter(Boolean),httpsDraft:colour.httpsDraft,pendingFiles:[...colour.pendingFiles],sizes:(usesSize?colour.sizes:colour.sizes.slice(0,1)).map(size=>({...(size.id?{id:size.id}:{}),size:usesSize?String(size.size||'').trim():DEFAULT_VARIANT_SIZE,inventory:Number(size.inventory)}))}));if(!normalized.length||normalized.some(colour=>!colour.colourName||!colour.sizes.length||colour.sizes.some(size=>!size.size||!Number.isInteger(size.inventory)||size.inventory<0)))throw new Error(usesColour||usesSize?'Complete the selected product options and enter valid stock.':'Enter a valid stock quantity.');return normalized;};
+        render();fieldsRoot.appendChild(section);continue;
+      }
+      const label=document.createElement('label'); label.className='dialog-field'; label.textContent=field.label;
+      if(field.required===true){const required=document.createElement('span');required.className='field-required';required.textContent='Required';label.appendChild(required);}
+      if(field.type==='textarea'||field.type==='file'||field.fullWidth===true)label.classList.add('dialog-field-wide');
+      const control=field.type==='textarea'?document.createElement('textarea'):field.type==='select'?document.createElement('select'):document.createElement('input');
+      control.name=field.name; control.required=field.required===true; controlsByName.set(field.name,control);
+      if(field.type==='select'){for(const option of field.options||[]){const node=document.createElement('option');node.value=option.value;node.textContent=option.label;control.appendChild(node);}}
+      else if(field.type&&field.type!=='textarea')control.type=field.type;
+      if(field.accept)control.accept=field.accept; if(field.multiple)control.multiple=true;
+      control.value=field.value??'';
+      if(field.placeholder)control.placeholder=field.placeholder;
+      if(field.minLength)control.minLength=field.minLength;
+      if(field.maxLength)control.maxLength=field.maxLength;
+      if(field.min!==undefined)control.min=String(field.min);
+      if(field.max!==undefined)control.max=String(field.max);
+      if(field.step!==undefined)control.step=String(field.step);
+      label.appendChild(control);
+      if(field.help){const help=document.createElement('small');help.className='field-help';help.textContent=field.help;label.appendChild(help);}
+      if(field.type==='file'&&field.previewImages){const preview=document.createElement('div');preview.className='image-preview-grid';label.appendChild(preview);attachImagePreview(control,preview);}
+      fieldsRoot.appendChild(label);
+    }
+    const categoryControl=controlsByName.get('category'),optionModeControl=controlsByName.get('optionMode');
+    const v4ySubcategory=controlsByName.get('subcategory');
+    if(categoryControl&&v4ySubcategory&&v4ySubcategory.tagName==='INPUT'){
+      const suggestions=document.createElement('datalist');
+      suggestions.id='v4y-catalog-subcats-20261020';
+      v4ySubcategory.setAttribute('list',suggestions.id);
+      v4ySubcategory.parentElement.appendChild(suggestions);
+      const update=()=>{
+        suggestions.replaceChildren();
+        for(const label of (V4Y_PRODUCT_SUBCATS_20261020[categoryControl.value]||[])){
+          const option=document.createElement('option');option.value=label;suggestions.appendChild(option);
+        }
+      };
+      categoryControl.addEventListener('change',()=>{v4ySubcategory.value='';update();});
+      update();
+    }
+
+    const optionModeField=fields.find(field=>field.name==='optionMode');
+    if(categoryControl&&optionModeControl&&optionModeField?.autoCategoryDefault){let touched=false;optionModeControl.addEventListener('change',event=>{if(event.isTrusted)touched=true;});categoryControl.addEventListener('change',()=>{if(touched)return;optionModeControl.value=defaultProductOptionMode(categoryControl.value);optionModeControl.dispatchEvent(new Event('option-mode-sync'));});}
+    let settled=false;
+    const finish=value=>{if(settled)return;settled=true;form.onsubmit=null;byId('admin-dialog-cancel').onclick=null;dialog.oncancel=null;if(dialog.open)dialog.close();resolve(value);};
+    form.onsubmit=event=>{event.preventDefault();if(!form.reportValidity())return;try{const values=Object.fromEntries(new FormData(form).entries());for(const field of fields){if(field.type==='file'&&field.multiple)values[field.name]=Array.from(form.elements[field.name]?.files||[]);}if(colourVariantsGetter)values.colourVariants=colourVariantsGetter();finish(values);}catch(cause){byId('admin-dialog-error').textContent=cause.message;}};
+    byId('admin-dialog-cancel').onclick=()=>finish(null);
+    dialog.oncancel=event=>{event.preventDefault();finish(null);};
+    dialog.showModal();
+    fieldsRoot.querySelector('input,textarea,select')?.focus();
+  });
+}
+
+const ADMIN_IMAGE_TYPES=new Set(['image/jpeg','image/png','image/webp','image/heic','image/heif']);
+const ADMIN_IMAGE_ACCEPT='image/jpeg,image/png,image/webp,image/heic,image/heif,.heic,.heif';
+const ADMIN_IMAGE_TARGET_BYTES=450*1024;
+const ADMIN_IMAGE_MAX_BYTES=500*1024;
+function adminImageType(file){
+  const direct=String(file?.type||'').trim().toLowerCase();
+  if(direct)return direct;
+  const extension=String(file?.name||'').split('.').pop()?.toLowerCase()||'';
+  return ({jpg:'image/jpeg',jpeg:'image/jpeg',png:'image/png',webp:'image/webp',heic:'image/heic',heif:'image/heif'})[extension]||'';
+}
+function validateAdminImageFile(file,prefix=''){
+  if(!(file instanceof File)||file.size<=0)throw new Error(`${prefix}Invalid image file.`);
+  if(!ADMIN_IMAGE_TYPES.has(adminImageType(file)))throw new Error(`${prefix}Unsupported image type. Choose JPG, PNG, WebP, HEIC or HEIF.`);
+  if(file.size>12*1024*1024)throw new Error(`${prefix}Image exceeds maximum allowed size of 12 MB before optimization.`);
+}
+function attachImagePreview(control,root){
+  const render=()=>{root.replaceChildren();for(const [index,file] of Array.from(control.files||[]).entries()){
+    const card=document.createElement('div');card.className='image-preview-card';const image=document.createElement('img');image.alt=`Preview ${file.name}`;const reader=new FileReader();reader.onload=()=>{if(typeof reader.result==='string')image.src=reader.result;};reader.readAsDataURL(file);
+    const meta=document.createElement('span');meta.className='image-preview-meta';meta.textContent=`${file.name} - ${Math.max(1,Math.round(file.size/1024))} KB`;const remove=document.createElement('button');remove.type='button';remove.className='image-preview-remove';remove.textContent='Remove';remove.onclick=event=>{event.preventDefault();event.stopPropagation();const transfer=new DataTransfer();Array.from(control.files||[]).forEach((candidate,candidateIndex)=>{if(candidateIndex!==index)transfer.items.add(candidate);});control.files=transfer.files;render();};card.append(image,meta,remove);root.appendChild(card);
+  }};control.addEventListener('change',render);render();
+}
+async function decodeAdminImage(file){
+  if(typeof createImageBitmap==='function'){
+    try{
+      const bitmap=await createImageBitmap(file,{imageOrientation:'from-image'});
+      return {source:bitmap,width:bitmap.width,height:bitmap.height,close:()=>bitmap.close?.()};
+    }catch{}
+  }
+  const dataUrl=await new Promise((resolve,reject)=>{
+    const reader=new FileReader();
+    reader.onload=()=>typeof reader.result==='string'?resolve(reader.result):reject(new Error('Image decode failed.'));
+    reader.onerror=()=>reject(new Error('Image decode failed.'));
+    reader.readAsDataURL(file);
+  });
+  const image=await new Promise((resolve,reject)=>{
+    const candidate=new Image();
+    candidate.onload=()=>resolve(candidate);
+    candidate.onerror=()=>reject(new Error('Image decode failed.'));
+    candidate.src=dataUrl;
+  });
+  const width=image.naturalWidth||image.width;
+  const height=image.naturalHeight||image.height;
+  if(!width||!height)throw new Error('Image decode failed.');
+  return {source:image,width,height,close:()=>{}};
+}
+async function prepareAdminProductImage(file){
+  validateAdminImageFile(file);
+  let decoded;
+  try{decoded=await decodeAdminImage(file);}catch{throw new Error(`Image ${file.name} could not be decoded. On iPhone, choose it from Photos or export it as JPEG.`);}
+  try{
+    const fit=max=>{const scale=Math.min(1,max/Math.max(decoded.width,decoded.height));return {width:Math.max(1,Math.round(decoded.width*scale)),height:Math.max(1,Math.round(decoded.height*scale))};};
+    const render=max=>{const size=fit(max);const canvas=document.createElement('canvas');canvas.width=size.width;canvas.height=size.height;const context=canvas.getContext('2d');if(!context)throw new Error('Image compression failed.');context.drawImage(decoded.source,0,0,size.width,size.height);return canvas;};
+    const make=(canvas,quality)=>new Promise((resolve,reject)=>canvas.toBlob(blob=>blob?resolve(blob):reject(new Error('Image compression failed.')),'image/webp',quality));
+    const profiles=[
+      [1600,[.82,.72,.62,.52]],
+      [1400,[.62,.52,.44]],
+      [1200,[.56,.48,.40]],
+      [1000,[.50,.42,.34]],
+      [800,[.46,.38,.30]],
+      [640,[.42,.34,.28]],
+    ];
+    let smallest=null;
+    for(const [max,qualities] of profiles){
+      const canvas=render(max);
+      for(const quality of qualities){
+        const blob=await make(canvas,quality);
+        if(!smallest||blob.size<smallest.size)smallest=blob;
+        if(blob.size<=ADMIN_IMAGE_TARGET_BYTES)return blob;
+      }
+    }
+    if(smallest&&smallest.size<=ADMIN_IMAGE_MAX_BYTES)return smallest;
+    throw new Error('Image is still too large after compression.');
+  }finally{decoded?.close?.();}
+}
+async function adminEncodedImageType(blob){
+  const bytes=new Uint8Array(await blob.slice(0,16).arrayBuffer());
+  if(bytes.length>=12&&bytes[0]===0x52&&bytes[1]===0x49&&bytes[2]===0x46&&bytes[3]===0x46&&bytes[8]===0x57&&bytes[9]===0x45&&bytes[10]===0x42&&bytes[11]===0x50)return {contentType:'image/webp',extension:'webp'};
+  if(bytes.length>=3&&bytes[0]===0xff&&bytes[1]===0xd8&&bytes[2]===0xff)return {contentType:'image/jpeg',extension:'jpg'};
+  if(bytes.length>=8&&bytes[0]===0x89&&bytes[1]===0x50&&bytes[2]===0x4e&&bytes[3]===0x47&&bytes[4]===0x0d&&bytes[5]===0x0a&&bytes[6]===0x1a&&bytes[7]===0x0a)return {contentType:'image/png',extension:'png'};
+  throw new Error('Optimized image format could not be verified.');
+}
+async function blobBase64(blob){const bytes=new Uint8Array(await blob.arrayBuffer());let binary='';for(let i=0;i<bytes.length;i+=0x8000)binary+=String.fromCharCode(...bytes.subarray(i,i+0x8000));return btoa(binary);}
+async function adminImageUploadPayload(file,blob){
+  const encoded=await adminEncodedImageType(blob);
+  return {fileName:`${file.name.replace(/\.[^.]+$/,'').slice(0,80)||'product'}.${encoded.extension}`,contentType:encoded.contentType,dataBase64:await blobBase64(blob)};
+}
+async function uploadAdminProductImages(files,progressOffset=0,progressTotal=null){const urls=[];const total=progressTotal??files.length;for(const [index,file] of (files||[]).entries()){validateAdminImageFile(file);status(`Uploading ${file.name} (${progressOffset+index+1} of ${total})...`);const blob=await prepareAdminProductImage(file);const result=await api('/api/admin/product-images',{method:'POST',body:JSON.stringify(await adminImageUploadPayload(file,blob))});urls.push(result.image.url);}return urls;}
+
+function parseVariants(raw) {
+  const rows=String(raw||'').split(',').map(value=>value.trim()).filter(Boolean).map(value=>{
+    const split=value.lastIndexOf(':');
+    if(split<=0)throw new Error('Use size:stock format, for example S:5, M:8, L:2.');
+    const size=value.slice(0,split).trim(); const inventory=Number(value.slice(split+1).trim());
+    if(!size||!Number.isInteger(inventory)||inventory<0||inventory>100000)throw new Error('Each size needs a valid whole-number stock.');
+    return {size,inventory};
+  });
+  if(!rows.length)throw new Error('Add at least one size and stock row.');
+  return rows;
+}
+async function createOwnerAccount(){
+  const values=await formDialog('Create store owner account',[
+    {name:'name',label:'Store owner full name',required:true,maxLength:80},
+    {name:'phone',label:'Mobile number (required; used for OTP login)',required:true,maxLength:20},
+    {name:'email',label:'Store owner email (optional)',type:'email',maxLength:254},
+    {name:'password',label:'Temporary password (8+ characters; email login if provided)',type:'password',required:true,minLength:8,maxLength:256},
+  ],'Create owner account'); if(!values)return;
+  await api('/api/admin/customers',{method:'POST',body:JSON.stringify({name:values.name,email:values.email||undefined,phone:values.phone,password:values.password})});
+  status(`Owner account created for ${values.phone}. Mobile OTP login is ready${values.email?'; email/password login is also available.':'.'}`);
+}
+async function resetCustomerPassword(userId){
+  const values=await formDialog('Reset customer password',[{name:'password',label:'New temporary password (8+ characters)',type:'password',required:true,minLength:8,maxLength:256}],'Reset password'); if(!values)return;
+  await api(`/api/admin/customers/${encodeURIComponent(userId)}/password`,{method:'PATCH',body:JSON.stringify({password:values.password})});
+  status('Temporary password updated. Existing sessions were signed out.');
+}
+async function createLocalStore(){
+  const values=await formDialog('Create local store',[
+    {name:'ownerUserId',label:'Owner customer ID',required:true,maxLength:128},
+    {name:'shopName',label:'Store name',required:true,maxLength:100},
+    {name:'ownerName',label:'Owner name',required:true,maxLength:80},
+    {name:'category',label:'Category',type:'select',required:true,value:STORE_CATEGORIES[0],options:STORE_CATEGORIES.map(value=>({value,label:value}))},
+    {name:'description',label:'Store description',type:'textarea',required:true,maxLength:1000},
+    {name:'address',label:'Store address',type:'textarea',required:true,maxLength:250},
+    {name:'city',label:'City',required:true,value:'Neemuch',maxLength:80},
+    {name:'state',label:'State',required:true,value:'Madhya Pradesh',maxLength:80},
+    {name:'pincode',label:'Pincode',required:true,value:'458441',maxLength:6},
+    {name:'businessInformation',label:'Business information (optional)',type:'textarea',maxLength:1000},
+    {name:'bannerUpload',label:'Store cover image (optional)',type:'file',accept:ADMIN_IMAGE_ACCEPT},
+    {name:'logoUpload',label:'Store logo (optional)',type:'file',accept:ADMIN_IMAGE_ACCEPT},
+  ],'Create and activate store'); if(!values)return;
+  const payload={ownerUserId:values.ownerUserId,shopName:values.shopName,ownerName:values.ownerName,category:values.category,description:values.description,address:values.address,city:values.city,state:values.state,pincode:values.pincode,businessInformation:values.businessInformation||undefined};
+  if(values.bannerUpload instanceof File&&values.bannerUpload.size){payload.bannerImage=(await uploadAdminProductImages([values.bannerUpload]))[0];}
+  if(values.logoUpload instanceof File&&values.logoUpload.size){payload.logoImage=(await uploadAdminProductImages([values.logoUpload]))[0];}
+  const result=await api('/api/admin/vendors',{method:'POST',body:JSON.stringify(payload)});
+  const created=result?.application;
+  if(!created?.id||created.status!=='ACTIVE'||created.submittedByUserId!==values.ownerUserId){
+    throw new Error('The store response could not be verified. Refresh Shop Applications before trying again.');
+  }
+  const persisted=(await api('/api/admin/vendors')).applications.find(item=>item.id===created.id&&item.submittedByUserId===values.ownerUserId&&item.status==='ACTIVE');
+  if(!persisted){
+    throw new Error(`Store ${created.id} was created but could not be verified in Shop Applications. Refresh before retrying.`);
+  }
+  status(`${persisted.shopName} created and verified ACTIVE ? ${persisted.id}`);
+}
+async function editStore(button){
+  const item=currentVendors.find(store=>store.id===button.dataset.id); if(!item)throw new Error('Store details are no longer available. Refresh and try again.');
+  const values=await formDialog(`Edit ${item.shopName}`,[
+    {name:'shopName',label:'Store name',required:true,value:item.shopName||'',maxLength:100},
+    {name:'ownerName',label:'Owner / contact name',required:true,value:item.ownerName||'',maxLength:80},
+    {name:'category',label:'Category',type:'select',required:true,value:STORE_CATEGORIES.includes(item.category)?item.category:'',options:[{value:'',label:'Choose a current category'},...STORE_CATEGORIES.map(value=>({value,label:value}))]},
+    {name:'description',label:'Store description',type:'textarea',required:true,value:item.description||'',maxLength:1000},
+    {name:'address',label:'Store address',type:'textarea',required:true,value:item.address||'',maxLength:250},
+    {name:'city',label:'City',required:true,value:item.city||'Neemuch',maxLength:80},
+    {name:'state',label:'State',required:true,value:item.state||'Madhya Pradesh',maxLength:80},
+    {name:'pincode',label:'Pincode',required:true,value:item.pincode||'458441',maxLength:6},
+    {name:'businessInformation',label:'Business information (optional)',type:'textarea',value:item.businessInformation||'',maxLength:1000},
+    {name:'bannerUpload',label:'Replace store cover (optional)',type:'file',accept:ADMIN_IMAGE_ACCEPT},
+    {name:'logoUpload',label:'Replace store logo (optional)',type:'file',accept:ADMIN_IMAGE_ACCEPT},
+  ],'Save Store Changes'); if(!values)return;
+  const payload={shopName:values.shopName,ownerName:values.ownerName,category:values.category,description:values.description,address:values.address,city:values.city,state:values.state,pincode:values.pincode,businessInformation:values.businessInformation||undefined};
+  if(values.bannerUpload instanceof File&&values.bannerUpload.size){payload.bannerImage=(await uploadAdminProductImages([values.bannerUpload]))[0];}
+  if(values.logoUpload instanceof File&&values.logoUpload.size){payload.logoImage=(await uploadAdminProductImages([values.logoUpload]))[0];}
+  await api(`/api/admin/vendors/${encodeURIComponent(item.id)}/details`,{method:'PATCH',body:JSON.stringify(payload)});
+  status(`${values.shopName} store details updated.`);
+}
+
+const PRODUCT_DEPARTMENTS=['men','women','kids','unisex'];
+const PRODUCT_CATEGORIES=STORE_CATEGORIES;
+const V4Y_PRODUCT_SUBCATS_20261020={"Clothing & Fashion":["T-Shirts","Shirts","Jeans","Trousers","Kurta Sets","Anarkali Sets","Sports Bra","Kids Nightwear & Co-ord Sets","Kurtas & Kurtis","Sarees","Blouses","Petticoats","Dresses","Tops","Co-ord Sets","Innerwear","Activewear","Kids Clothing"],"Footwear":["Sports Shoes","Running Shoes","Sneakers","Women's Footwear","Flats","Loafers","Walkers","Casual Shoes","Formal Shoes","Sandals","Slippers & Flip-Flops","Sliders","Clogs & Crocs","Heels","School Shoes"],"Accessories":["Watches","Analog Watches","Digital Watches","Handkerchiefs","Bracelets","Clutch Bags","Decorative Lace","Smart Watches","Fashion Jewellery","Earrings","Necklaces","Bangles","Rings","Handbags","Tote Bags","Backpacks","Wallets","Belts","Hair Accessories","Sunglasses"],"Beauty & Personal Care":["Skin Care","Face Wash","Face Cream","Hair Shampoos","Hair Conditioner","Soaps & Body washes","Creams & Moisturizers","Body Lotion","Body Spray","Body Wash","Hair Oil","Hair Care","Shampoo","Conditioner","Perfume","Deodorant","Makeup","Feminine Care","Oral Care","Bath & Body","Grooming"],"Electronics":["Mobile Phones","Mobile Accessories","Power Tools & Accessories","Personal Care Appliances","Chargers","Power Banks","Audio Accessories","Smart Devices","Electrical Accessories","Home Electronics"],"Gifts":["Gift Hampers","Gift Sets","Gift Box","Decorative Roses","Greeting Cards","Personalised Gifts","Decorative Gifts","Soft Toys"],"Groceries":["Rice & Grains","Flour & Atta","Pulses & Dals","Oil & Ghee","Sugar & Salt","Spices","Tea & Coffee","Breakfast Cereals","Jams & Honey","Snacks","Beverages","Detergents & Cleaning"],"Home & Living":["Bedsheets & Covers","Bath Linens","Bathroom Fittings","Electrical Lighting","Plumbing Supplies","Towels","Kitchenware","Cookware","Home Appliances","Juicers & Mixers","Home Decor","Storage & Organisers","Household Essentials"],"Health & Pharmacy":["Health & Personal Care","First Aid","OTC Medicines","Medical Devices","Wellness Essentials","Hygiene","Pharmacy Products"],"Health & Nutrition":["Protein Powder","Whey Protein","Plant Protein","Creatine","Pre-Workout","Mass Gainers","Amino Acids & BCAA","Vitamins & Minerals","Health Supplements","Sports Nutrition","Protein Bars","Healthy Snacks","Electrolytes & Hydration"],"Baby Care":["Baby Food","Infant Formula","Baby Skin Care","Diapers & Wipes","Feeding Accessories","Baby Clothing","Baby Bath"],"Pet Supplies":["Dog Food","Cat Food","Pet Treats","Pet Grooming","Pet Accessories","Pet Toys","Pet Health"],"Mobile Accessories":["Phone Back Covers","Transparent Back Covers","Tempered Glass","Camera Lens Protectors","Phone Chargers","Wireless Chargers","Cables","Phone Stands","Earphones"],"Automotive Accessories":["Car Dashboard Accessories","Car Chargers","Car Phone Holders","Car Cleaning","Car Fragrances","Two-Wheeler Accessories"],"Toys & Games":["Remote Control Toys","Board Games","Outdoor Toys","Educational Toys","Soft Toys","Action Figures"],"Stationery & Books":["Notebooks","Pens & Pencils","Office Supplies","School Supplies","Books","Art & Craft"],"Sports & Fitness":["Fitness Accessories","Massage & Recovery","Sports Equipment","Yoga Accessories","Gym Accessories","Outdoor Gear"],"Hardware & Tools":["Plumbing & Fittings","Bathroom Fittings","Electrical Supplies","Hand Tools","Power Tools","Fasteners & Adhesives","Tapes & Sealants","Utility Hardware"],"General Store":["Daily Essentials","Household Supplies","Assorted Products","Utility Items"]};
+const PRODUCT_OPTION_MODES=[
+  {value:'single',label:'Single stock - no size or colour'},
+  {value:'size',label:'Size / volume only'},
+  {value:'colour',label:'Colour / shade only'},
+  {value:'both',label:'Colour + size'},
+];
+const DELIVERY_OPTIONS=[{value:'normal',label:'Site-wide: Normal Mon-Fri; Normal + Express Sat-Sun'}];
+
+function downloadProductCsvTemplate(){
+  const header=['name','description','brand','department','category','subcategory','deliveryType','price','originalPrice','variants','colourName','colourHex','commissionPercent','imageFile','imageUrls'];
+  const sample=['Campus Sports Shoes','Sports shoes','Campus','unisex','Footwear','','normal','1720','1720','6:5, 7:5, 8:5, 9:5, 10:5','Multi Color (White/Blue/Green)','','','product1_main.jpg|product1_side.jpg|product1_back.jpg',''];
+  const quote=value=>`"${String(value).replaceAll('"','""')}"`;const blob=new Blob([[header,sample].map(row=>row.map(quote).join(',')).join('\r\n')],{type:'text/csv;charset=utf-8'});const link=document.createElement('a');link.href=URL.createObjectURL(blob);link.download='vibe4you-product-import-template.csv';link.click();URL.revokeObjectURL(link.href);
+}
+function downloadColourProductCsvTemplate(){
+  const header=['name','description','brand','department','category','subcategory','deliveryType','price','originalPrice','variants','colourName','colourHex','commissionPercent','imageFile','imageUrls','productGroup'];
+  const common=['Laive Everyday Handbag','Stylish everyday handbag for women','Laive','women','Accessories','Handbags','normal','950','1299'];
+  const black=[...common,'One Size:2','Black','#000000','','black-front.jpg|black-side.jpg','','LAIVE-BAG-001'];
+  const brown=[...common,'One Size:3','Brown','#8B4513','','brown-front.jpg|brown-side.jpg','','LAIVE-BAG-001'];
+  const quote=value=>String.fromCharCode(34)+String(value).replaceAll(String.fromCharCode(34),'""')+String.fromCharCode(34);
+  const blob=new Blob([[header,black,brown].map(row=>row.map(quote).join(',')).join('\r\n')],{type:'text/csv;charset=utf-8'});
+  const link=document.createElement('a');link.href=URL.createObjectURL(blob);link.download='vibe4you-multicolour-product-import-template.csv';link.click();URL.revokeObjectURL(link.href);
+}
+function parseCsv(text){
+  const rows=[];let row=[];let field='';let quoted=false;for(let i=0;i<text.length;i++){const ch=text[i];if(quoted){if(ch==='"'&&text[i+1]==='"'){field+='"';i++;}else if(ch==='"')quoted=false;else field+=ch;continue;}if(ch==='"'){quoted=true;continue;}if(ch===','){row.push(field);field='';continue;}if(ch==='\n'){row.push(field.replace(/\r$/,''));rows.push(row);row=[];field='';continue;}field+=ch;}if(quoted)throw new Error('CSV has an unterminated quoted field.');if(field||row.length){row.push(field.replace(/\r$/,''));rows.push(row);}return rows.filter(candidate=>candidate.some(value=>value.trim()));
+}
+function csvImageRequirements(text){
+  const rows=parseCsv(text);if(rows.length<2)throw new Error('CSV needs a header row and at least one product.');const headers=rows[0].map((value,index)=>(index===0?value.replace(/^\uFEFF/,''):value).trim());if(new Set(headers).size!==headers.length)throw new Error('CSV headers must be unique.');
+  const required=['name','description','department','category','price','variants','colourName'];for(const key of required)if(!headers.includes(key))throw new Error(`CSV is missing required column: ${key}`);if(!headers.includes('imageFile')&&!headers.includes('imageUrls'))throw new Error('CSV requires imageFile or imageUrls.');const requirements=[],groups=new Map();let productRows=0,ungrouped=0;
+  for(const row of rows.slice(1)){
+    if(!row.some(value=>value.trim()))continue;
+    productRows+=1;
+    const values=Object.fromEntries(headers.map((key,index)=>[key,(row[index]??'').trim()]));
+    const commission=(values.commissionPercent||'').trim();
+    if(commission&&!/^(?:100(?:\.0{1,2})?|\d{1,2}(?:\.\d{1,2})?)$/.test(commission))
+      throw new Error('Row '+productRows+': Commission must be a percentage between 0 and 100, with up to two decimals.');
+    const local=values.imageFile?values.imageFile.split('|').map(value=>value.trim()):[];
+    const direct=(values.imageUrls||'').split('|').map(value=>value.trim()).filter(Boolean);
+    if(local.some(fileName=>!fileName))throw new Error('Row '+productRows+': Image filenames must not be empty.');
+    if(new Set(local).size!==local.length)throw new Error('Row '+productRows+': The same local image is listed more than once.');
+    if(!local.length&&!direct.length)throw new Error('Row '+productRows+': At least one product image is required.');
+    if(local.length+direct.length>8)throw new Error('Row '+productRows+': A product can have at most 8 images (local files and image URLs combined).');
+    for(const fileName of local){
+      if(fileName.length>120||fileName.includes('/')||fileName.includes('\\')||/[\x00-\x1f]/.test(fileName))throw new Error('Row '+productRows+': Image file "'+fileName+'" is invalid.');
+      requirements.push({row:productRows,fileName});
+    }
+    const group=(values.productGroup||'').trim();
+    if(!group){ungrouped+=1;continue;}
+    if(group.length>100||/[\x00-\x1f]/.test(group))throw new Error('Row '+productRows+': Invalid productGroup.');
+    const colour=(values.colourName||'').trim();
+    if(!colour)throw new Error('Row '+productRows+': Grouped products need a colourName.');
+    const keys=['name','description','brand','department','category','subcategory','deliveryType','price','originalPrice','commissionPercent'];
+    const signature=JSON.stringify(keys.map(key=>values[key]||''));
+    const groupKey=group.toLocaleLowerCase();
+    const prior=groups.get(groupKey);
+    if(prior){
+      if(prior.signature!==signature)throw new Error('Row '+productRows+': productGroup "'+group+'" has inconsistent product details, prices or commission.');
+      if(prior.colours.has(colour.toLocaleLowerCase()))throw new Error('Row '+productRows+': productGroup "'+group+'" repeats colour "'+colour+'".');
+      prior.colours.add(colour.toLocaleLowerCase());
+    }else groups.set(groupKey,{signature,colours:new Set([colour.toLocaleLowerCase()])});
+  }
+  if(!productRows)throw new Error('CSV needs at least one product row.');
+  if(productRows>100)throw new Error('Upload a maximum of 100 products at a time.');
+  return {productRows:ungrouped+groups.size,csvRows:productRows,requirements};
+}
+function selectedImageMap(files){const map=new Map();for(const file of files||[]){if(map.has(file.name))throw new Error(`More than one selected image is named "${file.name}".`);map.set(file.name,file);}return map;}
+async function bulkUploadStoreProducts(){
+  const applications=(await api('/api/admin/vendors')).applications.filter(item=>item.status==='ACTIVE');if(!applications.length)throw new Error('There are no active shops available for product import.');
+  const values=await formDialog('Bulk upload products',[
+    {name:'applicationId',label:'Publish products for',type:'select',required:true,options:applications.map(item=>({value:item.id,label:`${item.shopName} - ${item.ownerName}`}))},
+    {name:'csv',label:'Product CSV',type:'file',accept:'.csv,text/csv',required:true,help:'Optional commissionPercent CSV column sets the per-product commission at creation (for example 3). Use imageFile as main.jpg|side.jpg|back.jpg (up to 8 images per colour). Use productGroup to combine multiple colours under one product. The first file is the main image. Keep deliveryType as normal; the site automatically offers Normal Mon-Fri and Normal + Express Sat-Sun for every product.'},
+    {name:'imageFiles',label:'Select the local product images referenced by the CSV',type:'file',accept:ADMIN_IMAGE_ACCEPT,multiple:true,previewImages:true,help:'Select ALL local files named in imageFile, including gallery images. Use | to separate filenames in the CSV. Extract ZIP archives before selecting files; images upload before publishing.'},
+  ],'Review import');if(!values)return;
+  const csvFile=values.csv;if(!(csvFile instanceof File)||!csvFile.size)throw new Error('Choose a CSV file.');if(csvFile.size>1024*1024)throw new Error('CSV must be 1 MB or smaller.');const csvText=await csvFile.text();const plan=csvImageRequirements(csvText);const selected=selectedImageMap(values.imageFiles||[]);const requiredFiles=new Map();
+  for(const requirement of plan.requirements){const file=selected.get(requirement.fileName);if(!file)throw new Error(`Row ${requirement.row}: Image file "${requirement.fileName}" was not selected.`);validateAdminImageFile(file,`Row ${requirement.row}: `);requiredFiles.set(requirement.fileName,file);}
+  const selectedShop=applications.find(item=>item.id===values.applicationId);const approval=await formDialog(`Publish ${plan.productRows} products to ${selectedShop?.shopName||'selected shop'}?`,[],`Upload images & publish ${plan.productRows}`);if(!approval)return;
+  const images={};let uploaded=0;for(const [fileName,file] of requiredFiles){status(`Uploading ${fileName} (${uploaded+1} of ${requiredFiles.size})...`);images[fileName]=(await uploadAdminProductImages([file],uploaded,requiredFiles.size))[0];uploaded+=1;}
+  const result=await api('/api/admin/shop-products/bulk',{method:'POST',body:JSON.stringify({applicationId:values.applicationId,csvText,images})});status(`${result.created} products published successfully with ${requiredFiles.size} local image${requiredFiles.size===1?'':'s'}.`);
+}
+async function createStoreProduct(){
+  const applications=(await api('/api/admin/vendors')).applications.filter(item=>item.status==='ACTIVE');if(!applications.length)throw new Error('There are no active shops available for product creation.');
+  const values=await formDialog('Add product for local store',[
+    {name:'applicationId',label:'Store',type:'select',required:true,options:applications.map(item=>({value:item.id,label:item.shopName}))},
+    {name:'name',label:'Product name',required:true,maxLength:140},{name:'description',label:'Product description',type:'textarea',required:true,maxLength:2000},{name:'brand',label:'Brand (optional)',maxLength:100},
+    {name:'department',label:'Department',type:'select',required:true,value:'unisex',options:PRODUCT_DEPARTMENTS.map(value=>({value,label:value}))},{name:'category',label:'Category',type:'select',required:true,value:'Clothing & Fashion',options:PRODUCT_CATEGORIES.map(value=>({value,label:value}))},{name:'subcategory',label:'Subcategory (optional; inferred when clear)',maxLength:100},{name:'deliveryType',label:'Delivery schedule',type:'select',required:true,value:'normal',options:DELIVERY_OPTIONS},
+    {name:'optionMode',label:'Product options',type:'select',required:true,value:'both',options:PRODUCT_OPTION_MODES,autoCategoryDefault:true,help:'Choose only the options customers actually need. Beauty, electronics, gifts and home products default to single stock; clothing and footwear default to colour + size.'},
+    {name:'price',label:'Selling price in rupees',type:'number',required:true,min:1,step:'0.01'},{name:'originalPrice',label:'Original/MRP price in rupees',type:'number',min:1,step:'0.01'},
+    {name:'tryAtHomeEnabled',label:'Try at Home offer',type:'select',required:true,value:'false',options:[{value:'false',label:'No'},{value:'true',label:'Yes - customer may try two sizes for Rs 50'}],help:'Enable only when this product has at least two real sizes of the same colour.'},
+    {name:'exchangeAvailable',label:'Size exchange',type:'select',required:true,value:'false',options:[{value:'false',label:'No exchange'},{value:'true',label:'Yes - eligible size exchange for Rs 50'}],help:'Enable only when customers can select a replacement size.'},
+    {name:'outsideNeemuchDeliveryEnabled',label:'Outside Neemuch delivery requests',type:'select',required:true,value:'false',options:[{value:'false',label:'Disabled - normal Neemuch delivery only'},{value:'true',label:'Enabled - customer requests a delivery quote before payment'}],help:'When enabled, customers outside pincode 458441 cannot buy this product directly. Vibe4You must quote the delivery charge before payment.'},
+    {name:'colourVariants',label:'Images, options & stock',type:'colourVariants'},
+  ],'Upload images & publish');if(!values)return;
+  const price=Number(values.price),originalPrice=Number(values.originalPrice||values.price);if(!Number.isFinite(price)||price<1||!Number.isFinite(originalPrice)||originalPrice<price)throw new Error('Enter valid selling and original prices.');
+  const colourVariants=await uploadColourVariantImages(values.colourVariants);
+  const payload={applicationId:values.applicationId,name:values.name,description:values.description,brand:values.brand||undefined,department:values.department,category:values.category,subcategory:values.subcategory||undefined,deliveryType:values.deliveryType,pricePaise:Math.round(price*100),originalPricePaise:Math.round(originalPrice*100),colourVariants,attributes:{optionMode:values.optionMode},tryAtHomeEnabled:values.tryAtHomeEnabled==='true',exchangeAvailable:values.exchangeAvailable==='true',outsideNeemuchDeliveryEnabled:values.outsideNeemuchDeliveryEnabled==='true'};
+  await api('/api/admin/shop-products',{method:'POST',body:JSON.stringify(payload)});status(`${values.name} published successfully (${productOptionModeLabel(values.optionMode)}).`);
+}
+ async function editProductCommission(button){
+  const item=currentShopProducts.find(product=>product.id===button.dataset.id);
+  if(!item)throw new Error('Product not found. Refresh and try again.');
+  const isCustom=item.commissionOverrideBasisPoints!==null&&item.commissionOverrideBasisPoints!==undefined;
+  const currentBasis=Number(item.commissionBasisPoints??500);
+  const values=await formDialog('Product commission — private admin only',[
+    {name:'mode',label:'Commission',type:'select',required:true,value:isCustom?'custom':'default',options:[{value:'default',label:'Default (5%)'},{value:'custom',label:'Custom rate for this product'}]},
+    {name:'rate',label:'Custom commission (%)',type:'number',required:true,value:(currentBasis/100).toFixed(2),min:0,max:100,step:'0.01',help:'Applies only to this product. Reset to Default (5%) at any time.'},
+  ],'Save commission');if(!values)return;
+  if(!['default','custom'].includes(values.mode))throw new Error('Choose default or custom commission.');
+  const value=Number(values.rate);
+  if(values.mode==='custom'&&(!Number.isFinite(value)||value<0||value>100||Math.round(value*100)!==value*100))throw new Error('Enter a commission between 0 and 100 with at most two decimal places.');
+  const override=values.mode==='default'?null:Math.round(value*100);
+  const effective=override===null?500:override;
+  const preview=item.pricePaise+Math.floor((item.pricePaise*effective+5000)/10000);
+  if(preview>item.originalPricePaise)throw new Error('Commission would take the customer price above this product’s recorded MRP. Reduce the rate or review the genuine MRP first.');
+  await api(`/api/admin/shop-products/${encodeURIComponent(item.id)}/commission`,{method:'PATCH',body:JSON.stringify({commissionBasisPoints:override})});
+  status(`Commission saved for ${item.name}: ${(effective/100).toFixed(2)}% (${override===null?'default':'custom'}).`);
+ }
+async function editStoreProduct(button){
+  const item=currentShopProducts.find(product=>product.id===button.dataset.id);if(!item)throw new Error('Product details are no longer available. Refresh and try again.');
+  const live=(await api(`/api/admin/inventory?low=0&q=${encodeURIComponent(item.id)}`)).inventory||[];const liveById=new Map(live.map(row=>[row.variantId,Number(row.stock)]));
+  const colourSource=(Array.isArray(item.colourVariants)&&item.colourVariants.length?item.colourVariants:[{colourName:item.colourName||'Multi',colourHex:item.colourHex||'',imageUrls:item.imageUrls||[],sizes:item.variants||[]}]).map(colour=>({...colour,sizes:(colour.sizes||[]).map(size=>({...size,inventory:liveById.has(size.id)?liveById.get(size.id):size.inventory}))}));
+  const values=await formDialog('Edit product details',[
+    {name:'name',label:'Product name',required:true,value:item.name||'',maxLength:140},{name:'description',label:'Description',type:'textarea',required:true,value:item.description||'',maxLength:2000},{name:'brand',label:'Brand (optional)',value:item.brand||'',maxLength:100},
+    {name:'department',label:'Department',type:'select',required:true,value:PRODUCT_DEPARTMENTS.includes(item.department)?item.department:'unisex',options:PRODUCT_DEPARTMENTS.map(value=>({value,label:value}))},{name:'category',label:'Category',type:'select',required:true,value:PRODUCT_CATEGORIES.includes(item.category)?item.category:'',options:[{value:'',label:'Choose a current category'},...PRODUCT_CATEGORIES.map(value=>({value,label:value}))]},{name:'subcategory',label:'Subcategory (optional; inferred when clear)',value:item.subcategory||item.attributes?.subcategory||'',maxLength:100},{name:'deliveryType',label:'Delivery schedule',type:'select',required:true,value:'normal',options:DELIVERY_OPTIONS},
+    {name:'optionMode',label:'Product options',type:'select',required:true,value:inferProductOptionMode(item),options:PRODUCT_OPTION_MODES,help:'Use Single stock when size/colour do not apply; Size / volume for perfume volumes; Colour / shade for cosmetics such as foundation.'},
+    {name:'price',label:'Selling price in rupees',type:'number',required:true,value:(item.pricePaise/100).toFixed(2),min:1,step:'0.01'},{name:'original',label:'Original/MRP price in rupees',type:'number',required:true,value:(item.originalPricePaise/100).toFixed(2),min:1,step:'0.01'},
+    {name:'tryAtHomeEnabled',label:'Try at Home offer',type:'select',required:true,value:item.tryAtHomeEnabled===true?'true':'false',options:[{value:'false',label:'No'},{value:'true',label:'Yes - customer may try two sizes for Rs 50'}],help:'Requires at least two different sizes for the same colour.'},
+    {name:'exchangeAvailable',label:'Size exchange',type:'select',required:true,value:item.exchangeAvailable===true?'true':'false',options:[{value:'false',label:'No exchange'},{value:'true',label:'Yes - eligible size exchange for Rs 50'}],help:'The customer chooses another available size after delivery.'},
+    {name:'outsideNeemuchDeliveryEnabled',label:'Outside Neemuch delivery requests',type:'select',required:true,value:item.outsideNeemuchDeliveryEnabled===true?'true':'false',options:[{value:'false',label:'Disabled - normal Neemuch delivery only'},{value:'true',label:'Enabled - customer requests a delivery quote before payment'}],help:'Admin changes take effect immediately after save. Customers outside 458441 must request delivery and wait for Vibe4You to quote the delivery charge.'},
+    {name:'colourVariants',label:'Images, options & stock',type:'colourVariants',value:colourSource},
+  ],'Save all changes');if(!values)return;
+  const price=Number(values.price),original=Number(values.original);if(!Number.isFinite(price)||price<1||!Number.isFinite(original)||original<price)throw new Error('Enter valid selling and original prices.');
+  const colourVariants=await uploadColourVariantImages(values.colourVariants);
+  const payload={name:values.name,description:values.description,brand:values.brand||undefined,department:values.department,category:values.category,subcategory:values.subcategory||undefined,deliveryType:values.deliveryType,pricePaise:Math.round(price*100),originalPricePaise:Math.round(original*100),colourVariants,attributes:{...(item.attributes||{}),optionMode:values.optionMode},tryAtHomeEnabled:values.tryAtHomeEnabled==='true',exchangeAvailable:values.exchangeAvailable==='true',outsideNeemuchDeliveryEnabled:values.outsideNeemuchDeliveryEnabled==='true'};
+  const wasPublished=item.status==='PUBLISHED';let unpublished=false,updatedProduct=null;
+  try{if(wasPublished){await api(`/api/admin/shop-products/${encodeURIComponent(item.id)}`,{method:'PATCH',body:JSON.stringify({status:'APPROVED'})});unpublished=true;}const result=await api(`/api/admin/shop-products/${encodeURIComponent(item.id)}/details`,{method:'PATCH',body:JSON.stringify(payload)});updatedProduct=result.product;if(wasPublished){await api(`/api/admin/shop-products/${encodeURIComponent(item.id)}`,{method:'PATCH',body:JSON.stringify({status:'PUBLISHED'})});unpublished=false;}}catch(cause){if(unpublished){try{await api(`/api/admin/shop-products/${encodeURIComponent(item.id)}`,{method:'PATCH',body:JSON.stringify({status:'PUBLISHED'})});}catch{}}throw cause;}
+  if(wasPublished&&updatedProduct){const current=(await api(`/api/admin/inventory?low=0&q=${encodeURIComponent(item.id)}`)).inventory||[];for(const variant of updatedProduct.variants||[]){const row=current.find(record=>record.variantId===variant.id);if(!row)throw new Error(`Inventory row ${variant.id} is unavailable after product update.`);const delta=Number(variant.inventory)-Number(row.stock);if(delta)await api(`/api/admin/inventory/${encodeURIComponent(variant.id)}`,{method:'PATCH',body:JSON.stringify({delta})});}}
+  status(`Product details, images, options and stock updated (${productOptionModeLabel(values.optionMode)}).`);
+}
+async function toggleOutsideNeemuchDelivery(button){
+  const item=currentShopProducts.find(product=>product.id===button.dataset.id);if(!item)throw new Error('Product details are no longer available. Refresh and try again.');
+  const enable=item.outsideNeemuchDeliveryEnabled!==true;
+  const values=await formDialog(enable?'Enable outside Neemuch delivery':'Disable outside Neemuch delivery',[
+    {name:'confirmation',label:'Confirm action',type:'select',required:true,value:'',options:[{value:'',label:'Choose confirmation'},{value:'confirm',label:enable?'Yes - enable delivery requests outside 458441':'Yes - disable new outside-Neemuch delivery requests'}],help:enable?'Customers outside 458441 will request a quote first. Vibe4You admin will set the delivery charge before payment.':'Existing paid orders remain unchanged. New outside-Neemuch delivery requests will be blocked for this product.'},
+  ],enable?'Enable Outside Delivery':'Disable Outside Delivery');
+  if(!values||values.confirmation!=='confirm')return;
+  await api(`/api/admin/shop-products/${encodeURIComponent(item.id)}/details`,{method:'PATCH',body:JSON.stringify({outsideNeemuchDeliveryEnabled:enable})});
+  status(enable?'Outside Neemuch delivery requests enabled for this product.':'Outside Neemuch delivery requests disabled for this product.');
+}
+async function reasonFor(title){const values=await formDialog(title,[{name:'reason',label:'Reason',type:'textarea',required:true,maxLength:1000}],'Continue');return values?.reason||null;}
+async function codCollectionMethodFor(){
+  const values=await formDialog('Mark COD balance as paid',[{name:'collectionMethod',label:'Remaining money was actually collected via',type:'select',required:true,options:[{value:'cash',label:'Cash'},{value:'upi_at_delivery',label:'UPI at delivery'}]}],'Mark as Paid');
+  return values?.collectionMethod||null;
+}
+async function lateFeeCollectionMethodFor(){
+  const values=await formDialog('Collect Try at Home late fee',[{name:'collectionMethod',label:'Rs 50 was actually collected via',type:'select',required:true,options:[{value:'cash',label:'Cash'},{value:'upi_at_delivery',label:'UPI at delivery'}]}],'Mark Late Fee Paid');
+  return values?.collectionMethod||null;
+}
+async function feeCollectionMethodFor(title){
+  const values=await formDialog(title,[{name:'collectionMethod',label:'Rs 50 was actually collected via',type:'select',required:true,options:[{value:'cash',label:'Cash'},{value:'upi_at_delivery',label:'UPI at delivery'}]}],'Mark Fee Paid');
+  return values?.collectionMethod||null;
+}
+async function cancellationReasonFor(){
+  const options=['Product unavailable','Size/color unavailable','Store unable to fulfil','Customer requested cancellation','Duplicate order','Delivery not serviceable','Other'].map(value=>({value,label:value}));
+  const values=await formDialog('Cancel order',[{name:'reasonType',label:'Cancellation reason',type:'select',required:true,options},{name:'details',label:'Additional details (required for Other)',type:'textarea',maxLength:500}],'Cancel Order');
+  if(!values)return null;
+  const type=String(values.reasonType||'').trim(),details=String(values.details||'').trim();
+  if(type==='Other'&&!details)throw new Error('Enter the cancellation reason in Additional details.');
+  return details&&type!=='Other'?`${type}: ${details}`:(details||type);
+}
+async function refundCancellationReasonFor(order){
+  const options=['Product unavailable','Size/color unavailable','Store unable to fulfil','Customer requested cancellation','Duplicate order','Delivery not serviceable','Other'].map(value=>({value,label:value}));
+  const codAdvance=order?.paymentMethod==='cod'&&order?.codAdvancePaid===true;
+  const amount=Number(codAdvance?order?.codAdvanceAmount:order?.grandTotal||0);
+  const paymentMethod=codAdvance?'COD booking':String(order?.paymentMethod||'online').toUpperCase();
+  const amountText=Number.isFinite(amount)?amount.toFixed(0):String(codAdvance?order?.codAdvanceAmount:order?.grandTotal||'');
+  const values=await formDialog(`Refund ₹${amountText} and cancel order`,[
+    {name:'reasonType',label:'Cancellation reason',type:'select',required:true,options},
+    {name:'details',label:'Additional details (required for Other)',type:'textarea',maxLength:500},
+    {name:'refundConfirmation',label:`Confirm full refund of ₹${amountText} to the original ${paymentMethod} payment`,type:'select',required:true,value:'',options:[
+      {value:'',label:'Choose confirmation'},
+      {value:'confirm',label:`Yes - initiate full ₹${amountText} Razorpay refund`},
+    ],help:'This sends a real refund request to Razorpay. Fulfillment stays blocked until the signed refund.processed webhook confirms the refund.'},
+  ],`Refund ₹${amountText} & Cancel`);
+  if(!values)return null;
+  const type=String(values.reasonType||'').trim(),details=String(values.details||'').trim();
+  if(type==='Other'&&!details)throw new Error('Enter the cancellation reason in Additional details.');
+  if(values.refundConfirmation!=='confirm')throw new Error('Confirm the full refund before continuing.');
+  return details&&type!=='Other'?`${type}: ${details}`:(details||type);
+}
+async function inventoryAdjustment(){const values=await formDialog('Adjust inventory',[{name:'delta',label:'Stock adjustment (for example 5 or -2)',type:'number',required:true,step:'1'}],'Apply adjustment');if(!values)return null;const delta=Number(values.delta);if(!Number.isSafeInteger(delta))throw new Error('Enter a whole-number stock adjustment.');return delta;}
+async function quoteOutsideDelivery(request){
+  const current=request.quote||{};
+  const values=await formDialog('Send outside-Neemuch delivery quote',[
+    {name:'deliveryFee',label:'Delivery charge (Rs)',type:'number',required:true,min:1,max:10000,step:'1',value:current.deliveryFee??''},
+    {name:'estimatedDelivery',label:'Estimated delivery time',maxLength:120,value:current.estimatedDelivery||'',placeholder:'Example: 2 or 3-5 business days',help:'You can enter just a number of days (for example 2), or a range such as 3-5 business days.'},
+    {name:'note',label:'Message to customer (optional)',type:'textarea',maxLength:500,value:current.note||''},
+  ],'Send Payment Request');
+  if(!values)return false;
+  const fee=Number(values.deliveryFee);if(!Number.isFinite(fee)||fee<1||fee>10000)throw new Error('Enter a delivery charge between Rs 1 and Rs 10,000.');
+  await api(`/api/admin/outside-delivery-requests/${encodeURIComponent(request.id)}/quote`,{method:'PATCH',body:JSON.stringify({deliveryFee:fee,estimatedDelivery:String(values.estimatedDelivery||'').trim(),note:String(values.note||'').trim()})});
+  status('Delivery charge confirmed. The customer can now pay securely from Delivery Requests.');
+  return true;
+}
+async function rejectOutsideDelivery(request){
+  const reason=await reasonFor('Why can this outside-Neemuch delivery request not be fulfilled?');if(!reason)return false;
+  await api(`/api/admin/outside-delivery-requests/${encodeURIComponent(request.id)}/reject`,{method:'PATCH',body:JSON.stringify({reason})});
+  status('Outside delivery request rejected and the reason is visible to the customer.');
+  return true;
+}
+async function confirmOutsideDeliveryPayment(request){
+  const amount=Number(request.quote?.grandTotal);
+  if(!Number.isSafeInteger(amount)||amount<=0)throw new Error('Confirm a delivery quote before recording payment.');
+  const dateParts=Object.fromEntries(new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Kolkata',year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(new Date()).map(part=>[part.type,part.value]));
+  const values=await formDialog(`Verify external payment for ${request.id}`,[
+    {name:'method',label:'Payment method',type:'select',required:true,options:[{value:'upi',label:'UPI / direct QR'},{value:'bank_transfer',label:'Bank transfer'},{value:'cash',label:'Cash'}]},
+    {name:'amount',label:'Exact amount received (Rs)',type:'number',required:true,min:amount,max:amount,step:'1',value:amount,help:'Must match the confirmed product and delivery total.'},
+    {name:'paymentDate',label:'Actual payment date',type:'date',required:true,value:`${dateParts.year}-${dateParts.month}-${dateParts.day}`},
+    {name:'reference',label:'UPI UTR / bank transaction ID / unique cash receipt ID',required:true,minLength:6,maxLength:50,help:'The same reference cannot be used for another order.'},
+    {name:'verification',label:'I checked the actual bank credit or cash received',type:'select',required:true,options:[{value:'',label:'Choose verification'},{value:'verified',label:'Yes, credit or cash is verified'}],help:'A customer screenshot or UTR alone is not proof of payment.'},
+  ],'Verify & Confirm Paid Order');
+  if(!values)return false;
+  if(values.verification!=='verified')throw new Error('Check the actual credit before confirming payment.');
+  const received=Number(values.amount);
+  if(!Number.isSafeInteger(received)||received!==amount)throw new Error('Received amount must match the confirmed quote.');
+  const result=await api(`/api/admin/outside-delivery-requests/${encodeURIComponent(request.id)}/external-payment`,{method:'PATCH',body:JSON.stringify({method:values.method,amount:received,paymentDate:values.paymentDate,reference:String(values.reference||'').trim(),bankCreditVerified:true})});
+  status(`${result.idempotent?'Already recorded':'External payment recorded'} on order ${result.order.id}. ${result.order.status==='payment_review_required'?'Stock needs manual review.':''}`);
+  return true;
+}
+async function createManualOrder(){
+  const snapshot=await api('/api/admin/inventory');
+  const options=(snapshot.inventory||[]).filter(item=>item.stock>0).map(item=>({
+    value:`${item.productId}|${item.variantId}`,
+    label:`${item.productName} · ${item.colour||''} ${item.size||''} · ${item.stock} in stock`,
+  }));
+  if(!options.length)throw new Error('No products with stock are available.');
+  const values=await formDialog('Create manual order',[
+    {name:'source',label:'Order received through',type:'select',required:true,options:[{value:'whatsapp',label:'WhatsApp'},{value:'phone',label:'Phone'},{value:'instagram',label:'Instagram'},{value:'in_person',label:'In person'}]},
+    {name:'product',label:'Product and option',type:'select',required:true,options},
+    {name:'quantity',label:'Quantity',type:'number',required:true,min:1,max:10,step:1,value:1},
+    {name:'customerId',label:'Registered customer ID (optional)',help:'Leave blank for a guest sale. A registered customer ID must match the phone below.'},
+    {name:'name',label:'Customer name',required:true,maxLength:80},
+    {name:'phone',label:'Customer phone',required:true,maxLength:16},
+    {name:'street',label:'Street address',required:true,maxLength:200},
+    {name:'city',label:'City',required:true,value:'Neemuch',maxLength:80},
+    {name:'pincode',label:'Delivery PIN',required:true,minLength:6,maxLength:6},
+    {name:'latitude',label:'Latitude (if delivery zone requires a map pin)',type:'number',step:'any'},
+    {name:'longitude',label:'Longitude (if delivery zone requires a map pin)',type:'number',step:'any'},
+  ],'Create Unpaid Order');
+  if(!values)return false;
+  const [productId,variantId]=String(values.product||'').split('|');
+  const quantity=Number(values.quantity);
+  if(!productId||!variantId||!Number.isSafeInteger(quantity)||quantity<1||quantity>10)throw new Error('Choose a valid product and quantity.');
+  const address={name:String(values.name||'').trim(),phone:String(values.phone||'').trim(),street:String(values.street||'').trim(),city:String(values.city||'').trim(),state:'Madhya Pradesh',pincode:String(values.pincode||'').trim()};
+  if(values.latitude!==''||values.longitude!==''){
+    if(values.latitude===''||values.longitude==='')throw new Error('Enter both map coordinates.');
+    address.latitude=Number(values.latitude);address.longitude=Number(values.longitude);
+  }
+  const body={items:[{productId,variantId,quantity}],address,deliveryMethod:'standard',source:values.source,clientKey:crypto.randomUUID()};
+  if(String(values.customerId||'').trim())body.customerId=String(values.customerId).trim();
+  const result=await api('/api/admin/manual-orders',{method:'POST',body:JSON.stringify(body)});
+  status(`Unpaid manual order ${result.order.id} created for Rs ${result.order.grandTotal}. Verify the actual payment before marking it paid.`);
+  return true;
+}
+async function confirmExistingOrderPayment(order){
+  const amount=Number(order.grandTotal);
+  const dateParts=Object.fromEntries(new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Kolkata',year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(new Date()).map(part=>[part.type,part.value]));
+  const values=await formDialog(`Verify payment for ${order.id}`,[
+    {name:'method',label:'Payment method',type:'select',required:true,options:[{value:'upi',label:'UPI / direct QR'},{value:'bank_transfer',label:'Bank transfer'},{value:'cash',label:'Cash'}]},
+    {name:'amount',label:'Exact amount received (Rs)',type:'number',required:true,min:amount,max:amount,step:1,value:amount},
+    {name:'paymentDate',label:'Actual payment date',type:'date',required:true,value:`${dateParts.year}-${dateParts.month}-${dateParts.day}`},
+    {name:'reference',label:'UTR / bank transaction ID / unique cash receipt ID',required:true,minLength:6,maxLength:50},
+    {name:'verification',label:'I checked the actual bank credit or cash received',type:'select',required:true,options:[{value:'',label:'Choose verification'},{value:'verified',label:'Yes, credit or cash is verified'}],help:'A customer screenshot or UTR alone is not proof of payment.'},
+  ],'Verify & Confirm Paid Order');
+  if(!values)return false;
+  if(values.verification!=='verified'||Number(values.amount)!==amount)throw new Error('Verify the exact received amount before confirming.');
+  const result=await api(`/api/admin/orders/${encodeURIComponent(order.id)}/external-payment`,{method:'PATCH',body:JSON.stringify({method:values.method,amount,paymentDate:values.paymentDate,reference:String(values.reference||'').trim(),bankCreditVerified:true})});
+  status(`${result.idempotent?'Already recorded':'External payment recorded'} on order ${result.order.id}. ${result.order.status==='payment_review_required'?'Stock needs manual review.':''}`);
+  return true;
+}
+const BULK_PRODUCT_FEATURE_ACTIONS={
+  'outside-delivery-enable':{feature:'outsideNeemuchDeliveryEnabled',enabled:true,label:'Enable Outside Delivery'},
+  'outside-delivery-disable':{feature:'outsideNeemuchDeliveryEnabled',enabled:false,label:'Disable Outside Delivery'},
+  'exchange-enable':{feature:'exchangeAvailable',enabled:true,label:'Enable Exchange'},
+  'exchange-disable':{feature:'exchangeAvailable',enabled:false,label:'Disable Exchange'},
+  'try-at-home-enable':{feature:'tryAtHomeEnabled',enabled:true,label:'Enable Try at Home'},
+  'try-at-home-disable':{feature:'tryAtHomeEnabled',enabled:false,label:'Disable Try at Home'},
+};
+function bulkToolbar(resource,statuses){return `<div class="actions bulk-toolbar"><label class="bulk-select bulk-select-all"><input type="checkbox" id="bulk-select-all-${resource}" data-bulk-select-all="${resource}"> ${resource==='products'?'Select all on this page':'Select all'}</label><span><strong id="bulk-count-${resource}">0</strong> selected</span><select data-bulk-target="${resource}"><option value="">Bulk action...</option>${statuses.map(value=>`<option value="${value}">${escapeText(resource==='products'&&value==='UNPUBLISH'?'Unpublish selected':resource==='products'&&value==='REMOVE'?'Remove selected (archive)':value==='SET_COMMISSION'?'Set commission':value.replaceAll('_',' '))}</option>`).join('')}${resource==='products'?Object.entries(BULK_PRODUCT_FEATURE_ACTIONS).map(([value,setting])=>`<option value="${value}">${escapeText(setting.label)}</option>`).join(''):''}</select><button data-action="bulk-transition" data-resource="${resource}">Apply once</button></div>`;}
+function syncBulkSelectionUi(resource){const boxes=[...byId('content').querySelectorAll(`[data-bulk-select="${resource}"]`)];const selected=boxes.filter(box=>box.checked).length;const count=byId(`bulk-count-${resource}`);if(count)count.textContent=String(selected);const selectAll=byId(`bulk-select-all-${resource}`);if(selectAll){selectAll.checked=boxes.length>0&&selected===boxes.length;selectAll.indeterminate=selected>0&&selected<boxes.length;selectAll.disabled=boxes.length===0;}}
+function addBulkControls(resource,statuses,selector){for(const key of [...bulkSelection])if(key.startsWith(`${resource}:`))bulkSelection.delete(key);const root=byId('content');root.querySelector('h2')?.insertAdjacentHTML('afterend',bulkToolbar(resource,statuses));const seen=new Set();root.querySelectorAll(selector).forEach(container=>{const id=resource==='orders'?container.querySelector('h3')?.textContent:container.querySelector('[data-id]')?.dataset.id;if(!id||seen.has(id))return;seen.add(id);container.insertAdjacentHTML('afterbegin',`<label class="bulk-select"><input type="checkbox" data-bulk-select="${resource}" value="${escapeText(id)}"> Select</label>`);});syncBulkSelectionUi(resource);}
+async function bulkSetProductCommission(ids){
+  const items=ids.map(id=>currentShopProducts.find(product=>product.id===id));
+  if(items.some(item=>!item))throw new Error('Selected products changed. Refresh and select them again.');
+  const values=await formDialog(`Set commission for ${items.length} selected product(s)`,[
+    {name:'mode',label:'Commission mode',type:'select',required:true,value:'custom',
+      options:[{value:'custom',label:'Custom rate for selected products'},{value:'default',label:'Reset selected products to default (5%)'}],
+      help:`Applies only to these ${items.length} selected products. Every customer price must remain within its recorded MRP.`},
+    {name:'rate',label:'Custom commission (%)',type:'number',required:true,value:'5.00',min:0,max:100,step:'0.01',
+      help:'Enter 0 to 100, with up to two decimal places. Ignored when resetting to default.'},
+  ],'Apply commission to selection');
+  if(!values)return;
+  if(!['custom','default'].includes(values.mode))throw new Error('Choose a valid commission mode.');
+  const entered=String(values.rate).trim();
+  if(values.mode==='custom'&&!/^(?:100(?:\.0{1,2})?|\d{1,2}(?:\.\d{1,2})?)$/.test(entered))
+    throw new Error('Enter a rate between 0% and 100% with at most two decimal places.');
+  const override=values.mode==='default'?null:Math.round(Number(entered)*100);
+  const basis=override??500;
+  const overMrp=items.filter(item=>(
+    item.pricePaise+Math.floor((item.pricePaise*basis+5000)/10000)>item.originalPricePaise
+  ));
+  if(overMrp.length)throw new Error(`This commission would exceed the recorded MRP for ${overMrp.length} selected product(s), including ${overMrp.slice(0,2).map(item=>item.name).join(', ')}. Nothing was changed. Lower the rate.`);
+  const result=await api('/api/admin/shop-products/bulk-commission',{
+    method:'PATCH',body:JSON.stringify({ids,commissionBasisPoints:override}),
+  });
+  for(const id of ids)bulkSelection.delete(`products:${id}`);
+  status(`Bulk commission saved: ${result.updatedCount} of ${result.selectedCount} selected product(s) changed to ${(basis/100).toFixed(2)}% (${override===null?'default':'custom'}).${result.unchangedCount?' '+result.unchangedCount+' already matched.':''}`);
+}
+async function bulkTransition(resource){
+  const ids=[...bulkSelection].filter(value=>value.startsWith(`${resource}:`)).map(value=>value.slice(resource.length+1));
+  const target=document.querySelector(`[data-bulk-target="${resource}"]`)?.value;
+  if(!ids.length)throw new Error('Select one or more records first.');if(!target)throw new Error('Choose a bulk action.');
+     if(resource==='products'&&(target==='UNPUBLISH'||target==='REMOVE')){
+    if(ids.length>100)throw new Error('Select at most 100 products per operation.');
+    const products=ids.map(id=>currentShopProducts.find(item=>item.id===id));
+    if(products.some(item=>!item))throw new Error('Selected products changed. Refresh and select again.');
+    if(target==='UNPUBLISH'&&products.some(item=>item.status!=='PUBLISHED'))
+      throw new Error('Select published products only for bulk unpublish.');
+    const expected=target+' '+ids.length;
+    const values=await formDialog((target==='REMOVE'?'Archive ':'Unpublish ')+ids.length+' products',[
+      {name:'confirmation',label:(target==='REMOVE'?'Remove products from the admin and customer catalogue while preserving their records. ':'Hide products from customers while keeping them editable. ')+'Type '+expected,required:true}
+    ],target==='REMOVE'?'Archive products':'Unpublish products');
+    if(!values)return false;
+    if(values.confirmation!==expected)throw new Error('Confirmation did not match. Nothing changed.');
+    const result=await api('/api/admin/shop-products/manage',{
+      method:'PATCH',body:JSON.stringify({ids,action:target})
+    });
+    ids.forEach(id=>bulkSelection.delete('products:'+id));
+    status(result.count+' product(s) '+(target==='REMOVE'?'archived and removed from view.':'unpublished.'));
+    return true;
+  }
+  if(resource==='products'&&target==='SET_COMMISSION'){
+     await bulkSetProductCommission(ids);
+     return;
+   }
+  if(resource==='products'&&Object.prototype.hasOwnProperty.call(BULK_PRODUCT_FEATURE_ACTIONS,target)){
+    if(ids.length>100)throw new Error('Select no more than 100 products at a time.');
+    const setting=BULK_PRODUCT_FEATURE_ACTIONS[target];
+    const confirmation=await formDialog(`${setting.label} for ${ids.length} selected product(s)`,[
+      {name:'confirmation',label:`Confirm ${setting.label.toLowerCase()} for all ${ids.length} selected product(s)`,type:'select',required:true,value:'',options:[
+        {value:'',label:'Choose confirmation'},{value:'confirm',label:'Yes, apply this setting to the selected products'}
+      ],help:'Other product settings, commission, MRP and inventory will not change. Exchange and Try at Home require at least two active sizes of the same colour.'}
+    ],'Apply to selected products');
+    if(!confirmation||confirmation.confirmation!=='confirm')return false;
+    const result=await api('/api/admin/shop-products/bulk-features',{method:'PATCH',body:JSON.stringify({ids,feature:setting.feature,enabled:setting.enabled})});
+    ids.forEach(id=>bulkSelection.delete(`products:${id}`));
+    status(`${setting.label}: ${result.changed} of ${result.updated} product(s) changed; ${result.unchanged} already had that setting.`);
+    return;
+  }
+if(resource==='orders'&&target==='cancelled'){
+    const refundRequired=ids.map(id=>currentOrders.find(order=>order.id===id)).filter(order=>isPaidOnlineOrder(order)||isRefundableCodAdvance(order));
+    if(refundRequired.length)throw new Error('Captured payments must be refunded and cancelled individually so each real Razorpay refund is explicitly confirmed.');
+  }
+  let reason=null;if(target==='cancelled')reason=await cancellationReasonFor();else if(target==='REJECTED'||target==='SUSPENDED')reason=await reasonFor(`Enter the ${target.toLowerCase()} reason`);if((target==='cancelled'||target==='REJECTED'||target==='SUSPENDED')&&!reason)return;
+  const route={orders:id=>`/api/admin/orders/${encodeURIComponent(id)}/status`,vendors:id=>`/api/admin/vendors/${encodeURIComponent(id)}`,products:id=>`/api/admin/shop-products/${encodeURIComponent(id)}`,requests:id=>`/api/admin/shop-product-requests/${encodeURIComponent(id)}`,customers:id=>`/api/admin/customers/${encodeURIComponent(id)}`,inventory:id=>`/api/admin/inventory/${encodeURIComponent(id)}`}[resource];
+  if(!route)throw new Error('Unsupported bulk action.');let succeeded=0;const failures=[];
+  if(resource==='requests'){
+    const result=await api('/api/admin/shop-product-requests/bulk',{method:'PATCH',body:JSON.stringify({ids,status:target,...(reason?{reason}:{})})});
+    const updated=Array.isArray(result.updated)?result.updated:[];
+    const unchanged=Array.isArray(result.failures)?result.failures:[];
+    updated.forEach(item=>bulkSelection.delete(`requests:${item.id}`));
+    succeeded=updated.length;
+    unchanged.forEach(item=>failures.push(`${item.productName||item.id}: ${item.error||'Not updated.'}`));
+  }else{
+    for(const id of ids){try{const payload=resource==='customers'?{active:target==='enable'}:resource==='inventory'?{delta:Number(target)}:{status:target,...(reason?{reason}:{})};await api(route(id),{method:'PATCH',body:JSON.stringify(payload)});succeeded+=1;bulkSelection.delete(`${resource}:${id}`);}catch(cause){failures.push(`${id}: ${cause.message}`);}}
+  }
+  status(`${succeeded} of ${ids.length} selected record(s) updated.`);if(failures.length)error(`Some records were unchanged: ${failures.slice(0,3).join(' | ')}`);
+}
+const DELIVERY_ZONE_ID_PATTERN=/^[a-z0-9][a-z0-9_-]{0,79}$/;
+let deliveryZoneConfiguration=null;
+
+function deliveryZoneFeature(configuration){
+  return (configuration?.features||[]).find(feature=>feature?.properties?.active===true&&feature?.geometry?.type==='Polygon')||null;
+}
+function deliveryZoneBoundaryText(configuration){
+  const ring=deliveryZoneFeature(configuration)?.geometry?.coordinates?.[0];
+  if(!Array.isArray(ring))return '';
+  const points=ring.length>1?ring.slice(0,-1):ring;
+  return points.map(point=>Array.isArray(point)?`${point[1]}, ${point[0]}`:'').filter(Boolean).join('\n');
+}
+function parseDeliveryZoneBoundary(text){
+  const lines=String(text||'').split(/\r?\n/).map(line=>line.trim()).filter(Boolean);
+  if(!lines.length)throw new Error('Enter at least three boundary points.');
+  const points=lines.map((line,index)=>{
+    const match=/^([^,]+),([^,]+)$/.exec(line);
+    if(!match)throw new Error(`Boundary line ${index+1} must be latitude, longitude.`);
+    const latitude=Number(match[1].trim()),longitude=Number(match[2].trim());
+    if(!Number.isFinite(latitude)||latitude < -90||latitude > 90)throw new Error(`Boundary line ${index+1} has an invalid latitude.`);
+    if(!Number.isFinite(longitude)||longitude < -180||longitude > 180)throw new Error(`Boundary line ${index+1} has an invalid longitude.`);
+    return [longitude,latitude];
+  });
+  const unique=new Set(points.map(([longitude,latitude])=>`${longitude},${latitude}`));
+  if(unique.size!==points.length)throw new Error('Boundary points must be distinct; do not repeat the first point.');
+  if(points.length<3)throw new Error('A delivery boundary needs at least three distinct points.');
+  return [...points,[...points[0]]];
+}
+function deliveryZonePayload(mode){
+  const id=String(byId('delivery-zone-id')?.value||'').trim();
+  const name=String(byId('delivery-zone-name')?.value||'').trim();
+  if(!DELIVERY_ZONE_ID_PATTERN.test(id))throw new Error('Zone ID must use lowercase letters, numbers, hyphens, or underscores.');
+  if(name.length<2||name.length>100)throw new Error('Zone name must be between 2 and 100 characters.');
+  return {type:'FeatureCollection',enforcementMode:mode,features:[{type:'Feature',properties:{id,name,active:true},geometry:{type:'Polygon',coordinates:[parseDeliveryZoneBoundary(byId('delivery-zone-boundary')?.value)]}}]};
+}
+async function saveDeliveryZoneDraft(){
+  const result=await api('/api/admin/delivery-zone',{method:'PATCH',body:JSON.stringify(deliveryZonePayload('pincode'))});
+  renderDeliveryZone(result.configuration);status('Boundary draft saved. Customer delivery remains pincode-only.');
+}
+async function activateDeliveryZone(){
+  const feature=deliveryZoneFeature(deliveryZoneConfiguration);
+  if(!feature)throw new Error('Save a valid boundary draft before activating polygon delivery.');
+  const confirmation=await formDialog('Activate polygon delivery',[{name:'confirmation',label:'Type ACTIVATE to block customers outside this approved boundary',required:true,maxLength:8,help:'This changes checkout requirements immediately. Customers must confirm a location inside the polygon.'}],'Activate Polygon Delivery');
+  if(!confirmation)return;
+  if(confirmation.confirmation!=='ACTIVATE')throw new Error('Type ACTIVATE exactly to enable polygon delivery.');
+  const result=await api('/api/admin/delivery-zone',{method:'PATCH',body:JSON.stringify({...deliveryZoneConfiguration,enforcementMode:'polygon'})});
+  renderDeliveryZone(result.configuration);status('Polygon delivery is active. Customers outside the approved boundary are blocked.');
+}
+async function usePincodeOnly(){
+  const confirmation=await formDialog('Use pincode-only delivery',[{name:'confirmation',label:'Type PINCODE to disable polygon enforcement',required:true,maxLength:7,help:'The saved boundary draft will be retained for future activation.'}],'Use Pincode Only');
+  if(!confirmation)return;
+  if(confirmation.confirmation!=='PINCODE')throw new Error('Type PINCODE exactly to switch delivery mode.');
+  const result=await api('/api/admin/delivery-zone',{method:'PATCH',body:JSON.stringify({...deliveryZoneConfiguration,enforcementMode:'pincode'})});
+  renderDeliveryZone(result.configuration);status('Pincode-only delivery is active. The boundary draft was retained.');
+}
+function renderDeliveryZone(configuration){
+  deliveryZoneConfiguration=configuration&&typeof configuration==='object'?configuration:{type:'FeatureCollection',enforcementMode:'pincode',features:[]};
+  const feature=deliveryZoneFeature(deliveryZoneConfiguration),properties=feature?.properties||{},ring=feature?.geometry?.coordinates?.[0];
+  const mode=deliveryZoneConfiguration.enforcementMode==='polygon'?'polygon':'pincode';
+  const points=Array.isArray(ring)?Math.max(0,ring.length-1):0;
+  const warning=mode==='polygon'
+    ? '<p class="delivery-zone-warning delivery-zone-warning-active"><strong>Polygon delivery is active.</strong> Customers must confirm a location inside this saved boundary.</p>'
+    : '<p class="delivery-zone-warning"><strong>Pincode-only delivery is active.</strong> Saving a boundary draft does not change customer delivery until you explicitly activate it.</p>';
+  byId('content').innerHTML=`<section class="panel delivery-zone-panel"><h2>Delivery Zones</h2>${warning}<div class="facts"><div class="fact"><small>Enforcement mode</small><strong>${mode==='polygon'?'Polygon':'Pincode only'}</strong></div><div class="fact"><small>Zone name</small><strong>${escapeText(properties.name||'No saved boundary')}</strong></div><div class="fact"><small>Zone ID</small><strong>${escapeText(properties.id||'—')}</strong></div><div class="fact"><small>Active state</small><strong>${feature?'Saved draft':'No boundary'}</strong></div><div class="fact"><small>Boundary points</small><strong>${points}</strong></div></div><div class="delivery-zone-editor"><label>Zone ID<input id="delivery-zone-id" maxlength="80" value="${escapeText(properties.id||'neemuch-delivery-zone')}"><small class="field-help">Lowercase identifier for this boundary. It is shown only to private administration.</small></label><label>Zone name<input id="delivery-zone-name" maxlength="100" value="${escapeText(properties.name||'Neemuch delivery zone')}"></label><label class="delivery-zone-boundary">Boundary coordinates<textarea id="delivery-zone-boundary" rows="9" placeholder="24.123456, 74.123456">${escapeText(deliveryZoneBoundaryText(deliveryZoneConfiguration))}</textarea><small class="field-help">One point per line in latitude, longitude order. At least three distinct points are required. The app closes the GeoJSON ring automatically when saving.</small></label></div><div class="actions"><button data-action="save-delivery-zone-draft">Save Boundary Draft</button><button class="success" data-action="activate-delivery-zone"${feature?'':' disabled'}>Activate Polygon Delivery</button><button class="secondary" data-action="use-pincode-only">Use Pincode Only</button></div></section>`;
+}
+
+async function downloadGstReviewCsv() {
+  const response=await fetch('/api/admin/tax-classifications/review.csv',{
+    credentials:'include',headers:{'Accept':'text/csv'}
+  });
+  if(!response.ok)throw new Error('Unable to download the private GST review sheet.');
+  const url=URL.createObjectURL(await response.blob());
+  const link=document.createElement('a');
+  link.href=url;link.download='Vibe4You_GST_CA_Review.csv';
+  document.body.appendChild(link);
+  try{link.click();}finally{link.remove();setTimeout(()=>URL.revokeObjectURL(url),30000);}
+}
+async function uploadVerifiedGstCsv() {
+  const picker=document.createElement('input');
+  picker.type='file';picker.accept='.csv,text/csv';
+  picker.style.display='none';
+  document.body.appendChild(picker);
+  picker.addEventListener('change',async()=>{
+    try {
+      const file=picker.files?.[0];if(!file)return;
+      if(file.size>1000000)throw new Error('GST approval CSV must be smaller than 1 MB.');
+      const csvText=await file.text();
+      const approval=await formDialog('Approve source-verified GST rates',[
+        {name:'confirmation',label:'Type APPROVE after verifying the uploaded rows and official evidence',required:true}
+      ],'Import verified GST rows');
+      if(!approval)return;
+      if(approval.confirmation!=='APPROVE')throw new Error('Type APPROVE to import verified GST classifications.');
+      const result=await api('/api/admin/tax-classifications/bulk',{
+        method:'POST',body:JSON.stringify({confirmation:'APPROVE VERIFIED GST RATES',csvText})
+      });
+      status('Approved '+result.approved+' verified GST product classifications. Checkout prices and invoice issuance are unchanged.');
+      await loadTab('shop-products');
+    }catch(cause){error(cause.message);}finally{picker.remove();}
+  },{once:true});
+  picker.click();
+}
+
+async function downloadTaxInvoice(orderId) {
+  const path='/api/admin/orders/'+encodeURIComponent(orderId)+'/tax-invoice';
+  const response=await fetch(path,{method:'GET',credentials:'include',headers:{Accept:'application/pdf'}});
+  if(!response.ok){
+    const data=await response.json().catch(()=>({}));
+    throw new Error(data.error||'GST tax invoice is not yet issued.');
+  }
+  if(!(response.headers.get('Content-Type')||'').toLowerCase().startsWith('application/pdf')){
+    throw new Error('Invalid tax invoice download.');
+  }
+  const blobUrl=URL.createObjectURL(await response.blob());
+  const safeId=String(orderId).replace(/[^A-Za-z0-9_-]+/g,'-').slice(0,80)||'order';
+  const link=document.createElement('a');
+  link.href=blobUrl;
+  link.download='vibe4you-tax-invoice-'+safeId+'.pdf';
+  document.body.appendChild(link);
+  try {link.click();} finally {
+    link.remove();
+    window.setTimeout(()=>URL.revokeObjectURL(blobUrl),30000);
+  }
+}
+
+async function downloadOrderReceipt(orderId) {
+  const path='/api/admin/orders/'+encodeURIComponent(orderId)+'/receipt';
+  const response=await fetch(path,{method:'GET',credentials:'include',headers:{Accept:'application/pdf'}});
+  if(!response.ok){
+    const payload=await response.json().catch(()=>({}));
+    throw new Error(payload.error||'Invoice download failed.');
+  }
+  if(!(response.headers.get('Content-Type')||'').toLowerCase().startsWith('application/pdf')){
+    throw new Error('The admin service did not return an invoice PDF.');
+  }
+  const blob=await response.blob();
+  const blobUrl=URL.createObjectURL(blob);
+  const safeId=String(orderId).replace(/[^A-Za-z0-9_-]+/g,'-').slice(0,80)||'order';
+  const link=document.createElement('a');
+  link.href=blobUrl;
+  link.download='vibe4you-receipt-'+safeId+'.pdf';
+  document.body.appendChild(link);
+  try { link.click(); } finally {
+    link.remove();
+    window.setTimeout(()=>URL.revokeObjectURL(blobUrl),30000);
+  }
+}
+
+byId('content').addEventListener('click', async event => {
+  const button=event.target.closest('[data-action]'); if(!button)return;
+  button.disabled=true; error(''); status('');
+  try {
+    const action=button.dataset.action;
+    if(action==='customer-page'){customerPage=Math.max(1,Number(button.dataset.page)||1);await loadTab('customers');return;}
+    if(action==='shop-products-page'){
+      shopProductPagination.page=Math.max(1,Number(button.dataset.page)||1);
+      await loadTab('shop-products');return;
+    }
+    if(action==='approve-official-watch-rates'){
+      const response=await formDialog('Government GST schedule: conventional Casio watches',[
+        {name:'confirmation',label:'Type APPLY VERIFIED WATCH RATES to confirm 18% for listed Casio F-91W/A158WA watches',required:true}
+      ],'Approve documented watch rates');
+      if(!response)return;
+      if(response.confirmation!=='APPLY VERIFIED WATCH RATES')throw new Error('Confirmation text does not match.');
+      const result=await api('/api/admin/tax-classifications/apply-verified-watches',{
+        method:'POST',body:JSON.stringify({confirmation:response.confirmation})
+      });
+      status('Applied source-backed watch GST to '+result.approved+' products. Customer prices unchanged.');
+      await loadTab('shop-products');
+      return;
+    }
+    if(action==='download-gst-review'){await downloadGstReviewCsv();status('GST review CSV downloaded. Research suggestions use documented government rates.');return;}
+    if(action==='upload-gst-review'){await uploadVerifiedGstCsv();return;}
+    if(action==='download-order-receipt'){await downloadOrderReceipt(button.dataset.id);status('Payment receipt download started.');return;}
+    if(action==='set-gst-classification'){
+      const productId=button.dataset.id;
+      const result=await formDialog('Approve Vibe4You tax classification',[
+        {name:'hsnCode',label:'HSN (optional for eligible B2C invoices)'},
+        {name:'gstRate',label:'Verified GST rate (%)',required:true},
+        {name:'supplyType',label:'Supply type: taxable / exempt / nil_rated / zero_rated',value:'taxable',required:true},
+        {name:'evidence',label:'Official rule, notification or tax-advisor evidence',required:true},
+        {name:'effectiveFrom',label:'Effective from (YYYY-MM-DD)',required:true},
+        {name:'confirmation',label:'Type APPROVE to confirm tax classification',required:true},
+      ],'Save approved GST classification');
+      if(!result)return;
+      if(result.confirmation!=='APPROVE')throw new Error('Type APPROVE to save the GST classification.');
+      const input={
+        productId,hsnCode:result.hsnCode,gstRate:result.gstRate,
+        supplyType:result.supplyType,evidence:result.evidence,
+        effectiveFrom:result.effectiveFrom
+      };
+      await api('/api/admin/tax-classifications',{method:'POST',body:JSON.stringify(input)});
+      status('Approved HSN/GST classification for '+productId+'. This does not change customer prices or activate invoicing.');
+      return;
+    }
+    if(action==='issue-gst-invoice'){
+      const issued=await api('/api/admin/orders/'+encodeURIComponent(button.dataset.id)+'/tax-invoice',{method:'POST',body:'{}'});
+      status('Issued GST tax invoice '+issued.invoiceNumber+'. Prices remain GST-inclusive.');
+      return;
+    }
+    if(action==='download-gst-invoice'){await downloadTaxInvoice(button.dataset.id);status('GST tax invoice download started.');return;}
+    if(action==='clear-order-filters'){orderFilters={status:'all',payment:'all',fulfillment:'all'};renderOrdersView();return;}
+    if(action==='create-owner') await createOwnerAccount();
+    if(action==='save-delivery-zone-draft') await saveDeliveryZoneDraft();
+    if(action==='activate-delivery-zone') await activateDeliveryZone();
+    if(action==='use-pincode-only') await usePincodeOnly();
+    if(action==='reset-customer-password') await resetCustomerPassword(button.dataset.id);
+    if(action==='create-store') await createLocalStore();
+    if(action==='edit-store') await editStore(button);
+    if(action==='create-shop-product') await createStoreProduct();
+    if(action==='bulk-shop-products') await bulkUploadStoreProducts();
+    if(action==='download-product-template') downloadProductCsvTemplate();
+    if(action==='download-colour-product-template') downloadColourProductCsvTemplate();
+    if(action==='edit-shop-product') await editStoreProduct(button);
+    if(action==='edit-product-commission') await editProductCommission(button);
+    if(action==='toggle-outside-delivery') await toggleOutsideNeemuchDelivery(button);
+    if(action==='outside-delivery-quote'){const request=(window.__outsideDeliveryRequests||[]).find(item=>item.id===button.dataset.id);if(!request)throw new Error('Delivery request not found.');if(!await quoteOutsideDelivery(request))return;}
+    if(action==='outside-delivery-reject'){const request=(window.__outsideDeliveryRequests||[]).find(item=>item.id===button.dataset.id);if(!request)throw new Error('Delivery request not found.');if(!await rejectOutsideDelivery(request))return;}
+    if(action==='outside-delivery-external-payment'){const request=(window.__outsideDeliveryRequests||[]).find(item=>item.id===button.dataset.id);if(!request)throw new Error('Delivery request not found.');if(!await confirmOutsideDeliveryPayment(request))return;}
+    if(action==='outside-delivery-linked-order'){byId('search').value=button.dataset.id;byId('tabs').querySelector('[data-tab="orders"]').click();return;}
+    if(action==='outside-delivery-followup'){outsideFollowupOnly=!outsideFollowupOnly;outsideDeliveryPage=1;renderOutsideDeliveryRequests(window.__outsideDeliveryRequests||[]);return;}
+    if(action==='outside-delivery-page'){outsideDeliveryPage=Number(button.dataset.page);renderOutsideDeliveryRequests(window.__outsideDeliveryRequests||[]);return;}
+    if(action==='create-manual-order'){if(!await createManualOrder())return;}
+    if(action==='manual-order-payment'){const order=currentOrders.find(item=>item.id===button.dataset.id);if(!order)throw new Error('Order not found.');if(!await confirmExistingOrderPayment(order))return;}
+    if(action==='mark-cod-paid') { const collectionMethod=await codCollectionMethodFor(); if(!collectionMethod)return; await api(`/api/admin/orders/${encodeURIComponent(button.dataset.id)}/payment`,{method:'PATCH',body:JSON.stringify({collectionMethod})}); status('COD balance marked paid after collection. Order confirmation remains separate.'); }
+    if(action==='mark-try-home-late-fee-paid') { const collectionMethod=await lateFeeCollectionMethodFor(); if(!collectionMethod)return; await api(`/api/admin/orders/${encodeURIComponent(button.dataset.id)}/try-at-home-late-fee`,{method:'PATCH',body:JSON.stringify({collectionMethod})}); status('Try at Home late fee marked paid after collection.'); }
+    if(action==='mark-cancellation-fee-paid') { const collectionMethod=await feeCollectionMethodFor('Collect cancellation fee'); if(!collectionMethod)return; await api(`/api/admin/orders/${encodeURIComponent(button.dataset.id)}/cancellation-fee`,{method:'PATCH',body:JSON.stringify({collectionMethod})}); status('Cancellation fee marked paid after collection.'); }
+    if(action==='mark-exchange-fee-paid') { const collectionMethod=await feeCollectionMethodFor('Collect exchange fee'); if(!collectionMethod)return; await api(`/api/admin/orders/${encodeURIComponent(button.dataset.orderId)}/exchanges/${encodeURIComponent(button.dataset.id)}/fee`,{method:'PATCH',body:JSON.stringify({collectionMethod})}); status('Exchange fee marked paid after collection.'); }
+    if(action==='exchange-status') { await api(`/api/admin/orders/${encodeURIComponent(button.dataset.orderId)}/exchanges/${encodeURIComponent(button.dataset.id)}/status`,{method:'PATCH',body:JSON.stringify({status:button.dataset.value})}); status(`Exchange ${button.dataset.value}.`); }
+    if(action==='bulk-transition'){const completed=await bulkTransition(button.dataset.resource);if(completed===false)return;}
+    if(action==='refund-cancel') {
+      const order=currentOrders.find(item=>item.id===button.dataset.id);if(!order)throw new Error('Order details are no longer available. Refresh and try again.');
+      const reason=await refundCancellationReasonFor(order);if(!reason)return;
+      const result=await api(`/api/admin/orders/${encodeURIComponent(order.id)}/refund-cancel`,{method:'PATCH',body:JSON.stringify({reason})});
+      status(result.pending?'Full refund submitted to Razorpay. Fulfillment is on hold until the signed refund confirmation arrives.':'Payment is already refunded; cancellation reconciliation is ready.');
+    }
+    if(action==='save-tracking-id') {
+      const order=currentOrders.find(item=>item.id===button.dataset.id);
+      if(!order)throw new Error('Order details are no longer available. Refresh the page.');
+      const values=await formDialog(order.trackingId?'Edit courier tracking ID':'Add courier tracking ID',[
+        {name:'trackingId',label:'Tracking ID / AWB number',required:true,maxLength:80,
+         value:String(order.trackingId||''),
+         help:'Enter the courier tracking number. Saving publishes it to this customer on Track Order.'}
+      ],'Save tracking ID');
+      if(!values)return;
+      const trackingId=String(values.trackingId||'').trim();
+      if(!/^[A-Za-z0-9][A-Za-z0-9._/-]{3,79}$/.test(trackingId))
+        throw new Error('Tracking ID must be 4-80 characters (letters, numbers, -, _, . or /).');
+      await api('/api/admin/orders/'+encodeURIComponent(order.id)+'/tracking',{
+        method:'PATCH',body:JSON.stringify({trackingId})
+      });
+      status('Tracking ID saved. The customer can see it in Track Order > Status history.');
+    }
+    if(action==='order-status') { const nextStatus=button.dataset.value; let reason=null; if(nextStatus==='cancelled'){reason=await cancellationReasonFor();if(!reason)return;} await api(`/api/admin/orders/${encodeURIComponent(button.dataset.id)}/status`,{method:'PATCH',body:JSON.stringify({status:nextStatus,reason})}); status(nextStatus==='cancelled'?'Order cancelled and the reason is visible to the customer.':'Order status updated.'); }
+    if(action==='vendor') { const nextStatus=button.dataset.value; let reason=null; if(['REJECTED','SUSPENDED'].includes(nextStatus)){reason=await reasonFor(`Enter the ${nextStatus.toLowerCase()} reason`);if(!reason)return;} await api(`/api/admin/vendors/${encodeURIComponent(button.dataset.id)}`,{method:'PATCH',body:JSON.stringify({status:nextStatus,reason})}); status('Shop application status updated.'); }
+    if(action==='remove-shop-product'){
+      const values=await formDialog('Archive '+(button.dataset.name||'this product'),[
+        {name:'confirmation',label:'Remove product from both catalogues and keep its history. Type REMOVE',required:true}
+      ],'Archive product');
+      if(!values)return;
+      if(values.confirmation!=='REMOVE')throw new Error('Confirmation did not match. Product unchanged.');
+      await api('/api/admin/shop-products/manage',{
+        method:'PATCH',body:JSON.stringify({ids:[button.dataset.id],action:'REMOVE'})
+      });
+      status('Product archived and removed from the catalogue.');
+    }
+    if(action==='shop-product') { const nextStatus=button.dataset.value; let reason=null; if(nextStatus==='REJECTED'){reason=await reasonFor('Enter the product rejection reason');if(!reason)return;} await api(`/api/admin/shop-products/${encodeURIComponent(button.dataset.id)}`,{method:'PATCH',body:JSON.stringify({status:nextStatus,reason})}); status('Shop product status updated.'); }
+    if(action==='shop-product-request') { const nextStatus=button.dataset.value; let reason=null; if(nextStatus==='REJECTED'){reason=await reasonFor('Enter the product-request rejection reason');if(!reason)return;} await api(`/api/admin/shop-product-requests/${encodeURIComponent(button.dataset.id)}`,{method:'PATCH',body:JSON.stringify({status:nextStatus,reason})}); status('Product request status updated.'); }
+    if(action==='product-review') {
+      const nextStatus=button.dataset.value;
+      await api("/api/admin/product-reviews/"+encodeURIComponent(button.dataset.id),
+        {method:'PATCH',body:JSON.stringify({status:nextStatus})});
+      status("Product review "+nextStatus+".");
+    }
+    if(action==='store-review') { const nextStatus=button.dataset.value; await api(`/api/admin/store-reviews/${encodeURIComponent(button.dataset.id)}`,{method:'PATCH',body:JSON.stringify({status:nextStatus})}); status(`Store review ${nextStatus}.`); }
+    if(action==='inventory') { const delta=await inventoryAdjustment(); if(delta===null)return; await api(`/api/admin/inventory/${encodeURIComponent(button.dataset.id)}`,{method:'PATCH',body:JSON.stringify({delta})}); status('Inventory adjustment saved.'); }
+    if(action==='customer') await api(`/api/admin/customers/${encodeURIComponent(button.dataset.id)}`,{method:'PATCH',body:JSON.stringify({active:button.dataset.value==='true'})});
+    await loadTab(activeTab);
+  } catch(cause){error(cause.message);} finally{button.disabled=false;}
+});
+
+async function loadTab(tab) {
+  error(''); byId('content').innerHTML='<p>Loading…</p>';
+  try {
+    const query=encodeURIComponent(byId('search').value.trim());
+    const searchLabels={orders:'orders, customers or products','outside-delivery':'requests, products, stores or destinations',vendors:'shops, owners or contact details','shop-products':'products, brands or shops','shop-product-requests':'products, shops or requests',inventory:'products, variants or sizes','product-reviews':'products, customers or review text','store-reviews':'stores, customers or review text',customers:'customers, email or mobile','payment-alerts':'alerts, orders or payment references',audit:'audit actions, targets or results'};
+    if(searchLabels[tab])byId('search').placeholder=`Search ${searchLabels[tab]}`;
+    byId('search-form').hidden=!['orders','outside-delivery','vendors','shop-products','shop-product-requests','inventory','product-reviews','store-reviews','customers','payment-alerts','audit'].includes(tab);
+    if(tab==='orders'){const [orders,invoiceSetup,external]=await Promise.all([api(`/api/admin/orders?q=${query}`),api('/api/admin/invoicing/status'),api(`/api/admin/external-payments?month=${encodeURIComponent(externalPaymentMonth)}`)]);gstInvoiceReady=invoiceSetup.enabled===true;currentExternalPaymentReport=external.report;renderOrders(orders.orders);return;}
+    if(tab==='outside-delivery'){renderOutsideDeliveryRequests((await api('/api/admin/outside-delivery-requests')).requests);return;}
+    if(tab==='vendors'){renderVendors((await api('/api/admin/vendors')).applications);addBulkControls('vendors',['UNDER_REVIEW','APPROVED','REJECTED','ACTIVE','SUSPENDED'],'.card');return;}
+    if(tab==='shop-products'){
+      const params=new URLSearchParams({
+        page:String(shopProductPagination.page),pageSize:String(shopProductPagination.pageSize),
+        q:byId('search').value.trim(),shop:shopProductFilter,
+        status:adminFilters['shop-products'].status,category:adminFilters['shop-products'].category,
+      });
+      const [productResult,vendorResult]=await Promise.all([
+        api('/api/admin/shop-products?'+params.toString()),api('/api/admin/vendors')
+      ]);
+      shopProductPagination=productResult.pagination;
+      currentShopProducts=productResult.products; shopProductStores=vendorResult.applications;
+      renderShopProducts(currentShopProducts,shopProductStores);
+      const gstCoverage=await api('/api/admin/tax-classifications/coverage');
+      const info=document.createElement('p');info.className='muted';
+      info.textContent='GST classification: '+gstCoverage.approved+' approved of '+gstCoverage.published+' published; '+gstCoverage.pending+' pending. Source research: '+(gstCoverage.sourceBackedWatchMatches||0)+' watch matches, '+(gstCoverage.priceSensitiveRateSuggestions||0)+' price-dependent proposals, '+(gstCoverage.needsFurtherClassification||0)+' require more details. Customer prices unchanged.';
+      byId('content').insertBefore(info,byId('content').firstChild?.nextSibling||null);
+      addBulkControls('products',['UNDER_REVIEW','APPROVED','REJECTED','PUBLISHED','UNPUBLISH','REMOVE','SET_COMMISSION'],'.card');return;
+    }
+    if(tab==='shop-product-requests'){renderShopProductRequests((await api('/api/admin/shop-product-requests')).requests);addBulkControls('requests',['UNDER_REVIEW','APPROVED','REJECTED'],'.card');return;}
+    if(tab==='inventory'){const snapshot=await api(`/api/admin/inventory?low=0&q=${query}`);inventoryShops=Array.isArray(snapshot.shops)?snapshot.shops:[];renderInventory(snapshot.inventory,inventoryShops);addBulkControls('inventory',['1','5','-1','-5'],'tbody tr');return;}
+    if(tab==='product-reviews'){renderProductReviews((await api('/api/admin/product-reviews')).reviews);return;}
+    if(tab==='store-reviews'){renderStoreReviews((await api('/api/admin/store-reviews')).reviews);return;}
+    if(tab==='month-end'){await renderMonthEnd();return;}
+    if(tab==='billing-audit'){renderBillingAudit((await api(`/api/admin/billing-audit?month=${encodeURIComponent(billingMonth)}`)).report);return;}
+    if(tab==='customers'){const result=await api(`/api/admin/customers?q=${query}&page=${customerPage}&page_size=${customerPageSize}&status=${encodeURIComponent(adminFilters.customers.status)}`);customerPage=result.pagination.page;renderCustomers(result.customers,result.pagination);addBulkControls('customers',['enable','disable'],'tbody tr');return;}
+    if(tab==='payment-alerts') return renderPaymentAlerts((await api('/api/admin/payment-alerts')).alerts);
+    if(tab==='delivery-zone') return renderDeliveryZone((await api('/api/admin/delivery-zone')).configuration);
+    if(tab==='system') return renderSystem((await api('/api/admin/system')).system);
+    if(tab==='audit') return renderAudit((await api('/api/admin/audit')).audit);
+  } catch(cause) { byId('content').innerHTML=''; error(cause.message); if(cause.message.includes('authentication')) showLogin(); }
+}
+
+function orderActionLabel(value){return ({placed:'Confirm Stock',confirmed:'Confirm Order',preparing:'Mark Preparing',packed:'Mark Packed',out_for_delivery:'Out for Delivery',delivered:'Mark Delivered',cancelled:'Cancel Order'})[value]||value.replaceAll('_',' ');}
+function isPaidOnlineOrder(order){return ['upi','card'].includes(String(order?.paymentMethod||'').toLowerCase())&&order?.paymentStatus==='paid';}
+function isRefundableCodAdvance(order){return order?.paymentMethod==='cod'&&order?.codAdvancePaid===true&&!['packed','out_for_delivery'].includes(order?.status)&&order?.paymentStatus!=='refunded';}
+function activeRefundRequest(order){return ['submitting','submitted','processing','uncertain'].includes(String(order?.refundRequest?.status||''));}
+function orderActions(order){
+  const transitions={payment_pending:['cancelled'],payment_review_required:['placed','cancelled'],placed:['confirmed','cancelled'],confirmed:['preparing','packed','cancelled'],preparing:['out_for_delivery','cancelled'],packed:['out_for_delivery','cancelled'],out_for_delivery:['delivered','cancelled']};
+  const actions=transitions[order.status]||[];
+  if(order.externalPayment)return actions.filter(status=>status!=='cancelled');
+  if(order.cancellationRequest?.status==='requested')return actions.filter(status=>status==='cancelled');
+  if(['submitting','submitted','processing','uncertain','failed'].includes(String(order.refundRequest?.status||'')))return actions.filter(status=>status==='cancelled');
+  if(order.status==='payment_pending'&&order.paymentStatus!=='refunded') return [];
+  return order.paymentStatus==='refunded'
+    ? actions.filter(status=>status==='cancelled')
+    : actions;
+}
+function orderActionButton(order,next){
+  if(next==='cancelled'&&(isPaidOnlineOrder(order)||isRefundableCodAdvance(order))){
+    const refund=order.refundRequest||{};
+    const amount=Number(isRefundableCodAdvance(order)?order.codAdvanceAmount:order.grandTotal||0);
+    const amountText=Number.isFinite(amount)?amount.toFixed(0):String(isRefundableCodAdvance(order)?order.codAdvanceAmount:order.grandTotal||'');
+    if(refund.status==='uncertain')return '<button class="secondary" disabled>Refund needs Razorpay review</button>';
+    if(['submitting','submitted','processing'].includes(refund.status))return '<button class="secondary" disabled>Refund pending</button>';
+    const retry=refund.status==='failed';
+    return `<button class="danger" data-action="refund-cancel" data-id="${escapeText(order.id)}">${retry?'Retry ':''}Refund ₹${escapeText(amountText)} &amp; Cancel</button>`;
+  }
+  return `<button class="${next==='cancelled'?'danger':'success'}" data-action="order-status" data-id="${escapeText(order.id)}" data-value="${next}">${escapeText(orderActionLabel(next))}</button>`;
+}
+
+function statusTone(value){return ({payment_pending:'amber',payment_review_required:'rose',placed:'sky',confirmed:'blue',preparing:'violet',packed:'indigo',out_for_delivery:'teal',delivered:'green',cancelled:'red',payment_test_completed:'slate',pending:'yellow',approved:'green',rejected:'red',hidden:'slate',paid:'lime',failed:'crimson',refunded:'purple',refund_pending:'orange',partially_refunded:'fuchsia',review_required:'pink'})[String(value||'').toLowerCase()]||'slate';}
+function statusBadge(value){const text=String(value||'unknown');return `<span class="status-badge tone-${statusTone(text)}">${escapeText(text.replaceAll('_',' '))}</span>`;}
+function filterOptions(values,selected){return ['all',...Array.from(new Set(values.filter(Boolean))).sort()].map(value=>`<option value="${escapeText(value)}"${value===selected?' selected':''}>${value==='all'?'All':escapeText(value.replaceAll('_',' '))}</option>`).join('');}
+function adminSearch(){return byId('search').value.trim().toLowerCase();}
+function matchesAdminSearch(item,fields){const q=adminSearch();return !q||fields.some(field=>String(item?.[field]??'').toLowerCase().includes(q));}
+function adminFilterBar(label,controls,shown,total){return `<section class="order-filters" aria-label="${escapeText(label)}">${controls.join('')}<div class="order-filter-summary"><span><strong>${shown}</strong> of ${total}</span></div></section>`;}
+function adminSelect(label,key,values,selected){return `<label>${escapeText(label)}<select data-admin-filter="${escapeText(key)}">${filterOptions(values,selected)}</select></label>`;}
+function renderOrders(orders){currentOrders=Array.isArray(orders)?orders:[];renderOrdersView();}
+function orderItemMarkup(item){
+  const store=item.storeName||item.storeId||'Vibe4You';
+  const product=item.productName||item.name||item.productId||'Product';
+  const variant=[item.size?`Size ${item.size}`:'',item.colourName||item.colour?`Color ${item.colourName||item.colour}`:''].filter(Boolean).join(' · ');
+  return `<div class="order-item"><div><small>Store</small><strong>${escapeText(store)}</strong></div><div><small>Product</small><strong>${escapeText(product)}</strong><span>${escapeText(variant||'Variant not recorded')}</span></div><div><small>Quantity</small><strong>${escapeText(item.quantity||0)}</strong></div><div><small>Line total</small><strong>₹${escapeText(item.lineTotal??'-')}</strong></div></div>`;
+}
+function cancellationRequestMarkup(order){const request=order.cancellationRequest;if(!request)return '';const fee=Number(request.feeDue||0);return `<div class="order-cancellation"><strong>Customer cancellation requested</strong><span>Status: ${escapeText(request.status)} | Fee: Rs ${escapeText(fee)} (${request.feePaid===true?'paid':'due'})</span>${fee>0&&request.feePaid!==true&&request.status==='requested'?`<div class="actions"><button class="success" data-action="mark-cancellation-fee-paid" data-id="${escapeText(order.id)}">Collect Rs ${escapeText(fee)} fee</button></div>`:''}</div>`;}
+function refundRequestMarkup(order){
+  const request=order.refundRequest;if(!request)return '';
+  const amount=Number(request.amount||0)/100;
+  const amountText=Number.isFinite(amount)?amount.toFixed(0):'-';
+  const provider=request.razorpayRefundId?` | Razorpay: ${escapeText(request.razorpayRefundId)}`:'';
+  const messages={
+    submitting:'Submitting full refund to Razorpay. Do not retry.',
+    submitted:'Full refund submitted. Fulfillment is on hold until Razorpay confirms it.',
+    processing:'Refund is processing. Fulfillment remains on hold.',
+    uncertain:'Refund outcome is uncertain. Verify Razorpay before any retry.',
+    failed:'Refund failed. Resolve the Razorpay issue, then use Retry Refund & Cancel.',
+    processed:'Full refund confirmed by Razorpay.',
+  };
+  const message=messages[request.status]||'Refund status requires review.';
+  return `<div class="order-cancellation"><strong>Refund ₹${escapeText(amountText)} — ${escapeText(String(request.status||'review').replaceAll('_',' '))}</strong><span>${escapeText(message)}${provider}</span></div>`;
+}
+function exchangeRequestsMarkup(order){return (order.exchangeRequests||[]).map(request=>{const actions=[];if(request.status==='requested')actions.push(`<button class="success" data-action="exchange-status" data-order-id="${escapeText(order.id)}" data-id="${escapeText(request.id)}" data-value="approved">Approve & reserve ${escapeText(request.targetSize)}</button>`,`<button class="danger" data-action="exchange-status" data-order-id="${escapeText(order.id)}" data-id="${escapeText(request.id)}" data-value="rejected">Reject</button>`);if(request.status==='approved'&&request.feePaid!==true)actions.push(`<button class="success" data-action="mark-exchange-fee-paid" data-order-id="${escapeText(order.id)}" data-id="${escapeText(request.id)}">Collect Rs ${escapeText(request.feeDue)} fee</button>`);if(request.status==='approved')actions.push(`<button class="success" data-action="exchange-status" data-order-id="${escapeText(order.id)}" data-id="${escapeText(request.id)}" data-value="completed">Complete exchange</button>`,`<button class="danger" data-action="exchange-status" data-order-id="${escapeText(order.id)}" data-id="${escapeText(request.id)}" data-value="rejected">Reject & release stock</button>`);return `<div class="order-cancellation"><strong>Exchange: ${escapeText(request.sourceSize)} to ${escapeText(request.targetSize)}</strong><span>Status: ${escapeText(request.status)} | Fee: Rs ${escapeText(request.feeDue)} (${request.feePaid===true?'paid':'due'})</span>${actions.length?`<div class="actions">${actions.join('')}</div>`:''}</div>`;}).join('');}
+function renderOrdersView(){
+  const filtered=currentOrders.filter(order=>{
+    const paymentTest=order.isPaymentTestOrder===true||order.fulfillmentRequired===false;
+    if(orderFilters.status!=='all'&&order.status!==orderFilters.status)return false;
+    if(orderFilters.payment!=='all'&&order.paymentStatus!==orderFilters.payment)return false;
+    if(orderFilters.fulfillment==='required'&&paymentTest)return false;
+    if(orderFilters.fulfillment==='test'&&!paymentTest)return false;
+    return true;
+  });
+  const orderStatuses=currentOrders.map(order=>order.status);
+  const paymentStatuses=currentOrders.map(order=>order.paymentStatus);
+  const filters=`<section class="order-filters" aria-label="Order filters"><label>Order status<select data-order-filter="status">${filterOptions(orderStatuses,orderFilters.status)}</select></label><label>Payment status<select data-order-filter="payment">${filterOptions(paymentStatuses,orderFilters.payment)}</select></label><label>Fulfillment<select data-order-filter="fulfillment"><option value="all"${orderFilters.fulfillment==='all'?' selected':''}>All</option><option value="required"${orderFilters.fulfillment==='required'?' selected':''}>Customer orders</option><option value="test"${orderFilters.fulfillment==='test'?' selected':''}>Payment tests</option></select></label><div class="order-filter-summary"><span><strong>${filtered.length}</strong> of ${currentOrders.length} orders</span><button class="secondary" data-action="clear-order-filters">Clear filters</button></div></section>`;
+  const cards=filtered.map(order=>{
+    const paymentTest=order.isPaymentTestOrder===true||order.fulfillmentRequired===false;
+    const tone=statusTone(order.status);
+    const address=order.address||{};
+    const cancellation=order.cancellationReason?`<div class="order-cancellation"><strong>Cancellation reason</strong><span>${escapeText(order.cancellationReason)}</span></div>`:'';
+    const codDue=Number(order.codAmountDue||order.grandTotal||0);
+    const collectButton=!paymentTest&&order.paymentMethod==='cod'&&order.paymentStatus==='pending'&&order.status!=='cancelled'?`<button class="success" data-action="mark-cod-paid" data-id="${escapeText(order.id)}">Collect Rs ${escapeText(codDue)} COD Balance</button>`:'';
+    const lateFeeButton=!paymentTest&&Number(order.tryAtHomeLateFeeDue||0)>0&&order.tryAtHomeLateFeePaid!==true?`<button class="success" data-action="mark-try-home-late-fee-paid" data-id="${escapeText(order.id)}">Collect Rs ${escapeText(order.tryAtHomeLateFeeDue)} Late Fee</button>`:'';
+    const tryHomeSummary=Number(order.tryAtHomeFee||0)>0?`<div class="order-cancellation"><strong>Try at Home</strong><span>Initial fee: Rs ${escapeText(order.tryAtHomeFee)}${Number(order.tryAtHomeLateFeeDue||0)>0?` | Late fee: Rs ${escapeText(order.tryAtHomeLateFeeDue)} (${order.tryAtHomeLateFeePaid===true?'paid':'due'})`:''}</span></div>`:'';
+    const trackingAllowed=!paymentTest&&['confirmed','preparing','packed','out_for_delivery','delivered'].includes(order.status);
+    const trackingButton=trackingAllowed?'<button class="secondary" data-action="save-tracking-id" data-id="'+escapeText(order.id)+'">'+(order.trackingId?'Edit Tracking ID':'Add Tracking ID')+'</button>':'';
+    const trackingSummary=trackingAllowed&&order.trackingId?'<div class="order-cancellation"><strong>Courier tracking ID</strong><span>'+escapeText(order.trackingId)+'</span><small>Visible to the customer under Track Order &gt; Status history.</small></div>':'';
+    const receiptButton=order.status==='delivered'&&!paymentTest?'<button class="secondary" data-action="download-order-receipt" data-id="'+escapeText(order.id)+'">Payment Receipt (PDF)</button>':'';
+    const taxButtons=gstInvoiceReady&&!paymentTest&&['packed','out_for_delivery','delivered'].includes(order.status)?'<button class="secondary" data-action="issue-gst-invoice" data-id="'+escapeText(order.id)+'">Issue GST Invoice</button><button class="secondary" data-action="download-gst-invoice" data-id="'+escapeText(order.id)+'">Download GST Invoice</button>':'';
+    const actions=paymentTest?'<p class="payment-test-note">Payment validation record only. Do not pack, dispatch, deliver, or adjust fashion inventory.</p>':`<div class="actions">${receiptButton}${taxButtons}${trackingButton}${collectButton}${lateFeeButton}${orderActions(order).map(next=>orderActionButton(order,next)).join('')}</div>`;
+    const codAdvance=order.paymentMethod==='cod'&&Number(order.codAdvanceAmount||0)>0?`<div class="order-cancellation"><strong>COD advance</strong><span>Rs ${escapeText(order.codAdvanceAmount)} online ${order.codAdvancePaid===true?'paid':'pending'} | Rs ${escapeText(codDue)} due at delivery</span></div>`:'';
+    return `<article class="card order-card order-tone-${tone}">${paymentTest?'<div class="payment-test-banner"><strong>TEST</strong><strong>NO FULFILLMENT REQUIRED</strong></div>':''}<div class="order-heading"><div><small>Order reference</small><h3>${escapeText(order.id)}</h3><span class="muted">${escapeText(order.createdAt||'')}</span></div><div class="order-heading-status">${statusBadge(order.status)}<strong>₹${escapeText(order.grandTotal)}</strong></div></div><div class="order-customer"><div><small>Customer</small><strong>${escapeText(address.name||'-')}</strong><span>${escapeText(address.phone||'-')}</span>${whatsAppContact(address.phone)}</div><div><small>Delivery address</small><strong>${escapeText(address.street||'-')}</strong><span>${escapeText([address.city,address.state,address.pincode].filter(Boolean).join(', '))}</span></div><div><small>Payment</small>${statusBadge(order.paymentStatus)}<span>${escapeText(String(order.paymentMethod||'').toUpperCase())}</span>${order.paymentCollectionMethod?`<span>${escapeText(order.paymentCollectionMethod==='upi_at_delivery'?'UPI at delivery':'Cash')} · ${escapeText(order.paymentCollectedAt||'')}</span>`:''}</div></div><div class="order-items"><h4>Products</h4>${(order.items||[]).map(orderItemMarkup).join('')||'<p class="muted">No item details recorded.</p>'}</div>${codAdvance}${tryHomeSummary}${cancellation}${trackingSummary}${actions}</article>`;
+  }).join('');
+  byId('content').innerHTML=`<h2>Recent orders</h2>${filters}<div class="grid">${cards||'<p>No orders match the selected filters.</p>'}</div>`;
+  const createButton=document.createElement('button');createButton.className='success';createButton.dataset.action='create-manual-order';createButton.textContent='Create Manual Order';
+  byId('content').querySelector('h2').after(createButton);
+  byId('content').querySelectorAll('.order-card').forEach(card=>{
+    const order=filtered.find(item=>item.id===card.querySelector('h3')?.textContent);
+    if(!order)return;
+    if(order.paymentStatus==='pending'&&order.status==='payment_pending'&&['external_pending','upi','card'].includes(order.paymentMethod)){
+      const button=document.createElement('button');button.className='success';button.dataset.action='manual-order-payment';button.dataset.id=order.id;button.textContent='Verify Direct QR / Bank Payment';
+      card.querySelector(':scope > .actions')?.appendChild(button);
+    }
+    if(order.externalPayment){
+      const detail=document.createElement('p');detail.className='muted';
+      detail.textContent=`External ${order.externalPayment.method} · Paid ${order.externalPayment.paymentDate} · Ref ${order.externalPayment.reference}`;
+      card.appendChild(detail);
+    }
+  });
+  byId('content').querySelectorAll('.order-card').forEach(card=>{const order=filtered.find(item=>item.id===card.querySelector('h3')?.textContent);if(!order)return;const marker=card.querySelector('.actions')||card.lastElementChild;marker?.insertAdjacentHTML('beforebegin',cancellationRequestMarkup(order)+refundRequestMarkup(order)+exchangeRequestsMarkup(order));});
+  addBulkControls('orders',['confirmed','preparing','packed','out_for_delivery','delivered','cancelled'],'.order-card');
+  if(currentExternalPaymentReport)renderExternalPaymentReport(currentExternalPaymentReport);
+}
+function renderExternalPaymentReport(report){
+  const section=document.createElement('section');section.className='order-filters';section.setAttribute('aria-label','External payment reconciliation');
+  const count=Number(report?.count||0),amount=Number(report?.amountPaise||0)/100;
+  const rows=Array.isArray(report?.payments)?report.payments:[];
+  section.innerHTML=`<label>External payment month<input type="month" data-external-payment-month value="${escapeText(externalPaymentMonth)}"></label><div class="order-filter-summary"><strong>${escapeText(count)} verified payments · Rs ${escapeText(amount.toFixed(2))}</strong><small>${escapeText(report?.notice||'Operational reconciliation only.')}</small></div><details><summary>View payment references</summary><table><thead><tr><th>Payment date</th><th>Order</th><th>Customer</th><th>Method</th><th>Amount</th><th>Reference</th></tr></thead><tbody>${rows.map(item=>`<tr><td>${escapeText(item.paymentDate)}</td><td>${escapeText(item.orderId)}</td><td>${escapeText(item.customer||'-')}</td><td>${escapeText(item.method)}</td><td>Rs ${escapeText((Number(item.amountPaise||0)/100).toFixed(2))}</td><td>${escapeText(item.reference)}</td></tr>`).join('')}</tbody></table>${rows.length?'':'<p>No external payments recorded for this month.</p>'}</details>`;
+  byId('content').querySelector('[data-action="create-manual-order"]').after(section);
+}
+function auditMoney(value){const amount=Number(value||0);return `Rs ${Number.isFinite(amount)?amount.toLocaleString('en-IN',{minimumFractionDigits:2,maximumFractionDigits:2}):'0.00'}`;}
+function renderBillingAudit(report){
+  if(report?.mode!=='read_only_preview'||report?.financialReportApproved!==false)throw new Error('Unexpected billing release mode; preview not available.');
+  const summary=report?.summary||{};
+  const metrics=[
+    ['Delivered orders',summary.deliveredOrders||0],
+    ['Items sold',summary.itemsSold||0],
+    ['Estimated delivered-order value',auditMoney(summary.deliveredOrderValueEstimate)]
+  ];
+  byId('content').innerHTML=`<section class="audit-hero"><div><p class="audit-eyebrow">Admin-only operational preview</p><h2>Delivered Order Activity</h2><p>Operational estimates only. Not a financial statement, tax report, verified purchase record, or GST credit calculation.</p></div><label>Month<input type="month" data-billing-month value="${escapeText(report?.month||billingMonth)}"></label></section><p class="audit-warning"><strong>Read-only preview.</strong> Supplier-bill uploads, downloads, financial reporting and PDF exports are disabled until the full audit passes verification.</p><section class="audit-kpis">${metrics.map(([label,value])=>`<article><span>${escapeText(label)}</span><strong>${escapeText(value)}</strong></article>`).join('')}</section><p class="muted audit-note">${escapeText(report?.notice||'Operational information only, not an accounting or tax report.')}</p>`;
+}
+function applicationTransitions(status){return {SUBMITTED:['UNDER_REVIEW'],UNDER_REVIEW:['APPROVED','REJECTED'],APPROVED:['ACTIVE'],ACTIVE:['SUSPENDED'],SUSPENDED:['ACTIVE'],REJECTED:['UNDER_REVIEW']}[status]||[];}
+function productTransitions(status){return {SUBMITTED:['UNDER_REVIEW'],UNDER_REVIEW:['APPROVED','REJECTED'],APPROVED:['PUBLISHED'],PUBLISHED:['APPROVED']}[status]||[];}
+function productRequestTransitions(status){return {SUBMITTED:['UNDER_REVIEW'],UNDER_REVIEW:['APPROVED','REJECTED']}[status]||[];}
+function renderVendors(items){
+  currentVendors=Array.isArray(items)?items:[]; const f=adminFilters.vendors;
+  const filtered=currentVendors.filter(item=>matchesAdminSearch(item,['shopName','ownerName','registeredEmail','registeredMobile','address','city','pincode','description','category','id'])&&(f.status==='all'||item.status===f.status)&&(f.category==='all'||item.category===f.category));
+  const controls=[adminSelect('Status','status',currentVendors.map(item=>item.status),f.status),adminSelect('Category','category',currentVendors.map(item=>item.category),f.category)];
+  byId('content').innerHTML=`<h2>Shop applications</h2><div class="actions"><button class="success" data-action="create-store">Create Local Store</button></div>${adminFilterBar('Shop application filters',controls,filtered.length,currentVendors.length)}<div class="grid">${filtered.map(item=>`<article class="card"><h3>${escapeText(item.shopName)}</h3><small>${escapeText(item.id)}</small><p>${escapeText(item.ownerName)} / ${escapeText(item.registeredEmail)} / ${escapeText(item.registeredMobile)}</p><p class="muted">${escapeText(item.address)}, ${escapeText(item.city)} ${escapeText(item.pincode)} - ${escapeText(item.description)}</p>${item.rejectionReason?`<p class="error">${escapeText(item.rejectionReason)}</p>`:''}<strong>${escapeText(item.status)}</strong><div class="actions">${whatsAppContact(item.registeredMobile, 'WhatsApp Shop Owner')}<button data-action="edit-store" data-id="${escapeText(item.id)}">Edit Store</button>${applicationTransitions(item.status).map(status=>`<button class="${['REJECTED','SUSPENDED'].includes(status)?'danger':'success'}" data-action="vendor" data-id="${escapeText(item.id)}" data-value="${status}">${escapeText(status.replaceAll('_',' '))}</button>`).join('')}</div></article>`).join('')||'<p>No shop applications match the current search and filters.</p>'}</div>`;
+}
+function renderShopProducts(items,applications=shopProductStores){
+  const stores=shopProductPagination.filters.shops||[];
+  const storeMap=new Map([...applications.map(item=>[item.id,item.shopName||item.id]),...stores.map(item=>[item.id,item.name])]);
+  const f=adminFilters['shop-products'];
+  const filtered=items;
+  const page=shopProductPagination.page;
+  const totalPages=shopProductPagination.totalPages;
+  const startItem=shopProductPagination.total?(page-1)*shopProductPagination.pageSize+1:0;
+  const endItem=Math.min(page*shopProductPagination.pageSize,shopProductPagination.total);
+  const sizeOptions=[10,25,50,100].map(size=>'<option value="'+size+'"'+(shopProductPagination.pageSize===size?' selected':'')+'>'+size+'</option>').join('');
+  const paginationNav='<nav class="actions product-pagination" aria-label="Product pages">'
+    +'<button class="secondary" data-action="shop-products-page" data-page="1"'+(page<=1?' disabled':'')+'>First</button>'
+    +'<button class="secondary" data-action="shop-products-page" data-page="'+Math.max(1,page-1)+'"'+(page<=1?' disabled':'')+'>Previous</button>'
+    +'<span>Page <strong>'+page+'</strong> of <strong>'+totalPages+'</strong></span>'
+    +'<button class="secondary" data-action="shop-products-page" data-page="'+Math.min(totalPages,page+1)+'"'+(page>=totalPages?' disabled':'')+'>Next</button>'
+    +'<button class="secondary" data-action="shop-products-page" data-page="'+totalPages+'"'+(page>=totalPages?' disabled':'')+'>Last</button>'
+    +'<label>Products per page <select data-shop-products-page-size>'+sizeOptions+'</select></label></nav>';
+  const options=['<option value="all"'+(shopProductFilter==='all'?' selected':'')+'>All Shops</option>',...stores.map(store=>`<option value="${escapeText(store.id)}"${shopProductFilter===store.id?' selected':''}>${escapeText(store.name)}</option>`)].join('');
+  const extra=[adminSelect('Status','status',shopProductPagination.filters.statuses||[],f.status),adminSelect('Category','category',shopProductPagination.filters.categories||[],f.category)].join('');
+  byId('content').innerHTML=`<h2>Shop product submissions</h2><div class="actions"><button class="success" data-action="create-shop-product">Add Product for Local Store</button><button class="success" data-action="bulk-shop-products">Bulk Upload CSV</button><button class="secondary" data-action="download-product-template">Download CSV Template</button><button class="secondary" data-action="download-colour-product-template">Download Colour CSV Template</button><button class="secondary" data-action="download-gst-review">Download GST Research CSV</button><button class="secondary" data-action="approve-official-watch-rates">Approve source-backed Casio rates</button><button class="secondary" data-action="upload-gst-review">Upload Approved GST CSV</button></div><section class="order-filters" aria-label="Shop product filters"><label>Shop<select data-shop-product-filter>${options}</select></label>${extra}<div class="order-filter-summary"><span><strong>${startItem}–${endItem}</strong> of ${shopProductPagination.total} matching products (${shopProductPagination.globalTotal} in catalogue)</span></div></section>${paginationNav}<div class="grid">${filtered.map(item=>`<article class="card"><div class="inventory-product-heading">${inventoryThumbnail(item)}<div><h3>${escapeText(item.name)}</h3><small>${escapeText(storeMap.get(item.applicationId)||item.applicationId)} · ${escapeText(item.id)}</small></div></div><p>${escapeText(item.category)} | Store price Rs ${escapeText((item.pricePaise/100).toFixed(2))} | Customer price Rs ${escapeText(((item.customerPricePaise??item.pricePaise)/100).toFixed(2))} | Commission ${escapeText(((item.commissionBasisPoints??500)/100).toFixed(2))}% ${item.commissionOverrideBasisPoints==null?'(default)':'(custom)'} (Rs ${escapeText(((item.commissionPaise??0)/100).toFixed(2))}) | total stock ${escapeText(item.inventory)}</p>${item.tryAtHomeEnabled===true?'<p><strong>Try at Home enabled</strong> | two sizes | Rs 50 initial fee | 15-minute decision window</p>':''}<p>${(item.variants||[]).map(variant=>`${escapeText(variant.size)}: <strong>${escapeText(variant.inventory)}</strong>`).join(' · ')}</p><p class="muted">${escapeText(item.description)}</p>${item.rejectionReason?`<p class="error">${escapeText(item.rejectionReason)}</p>`:''}<strong>${escapeText(item.status)}</strong><div class="actions"><button data-action="edit-shop-product" data-id="${escapeText(item.id)}" data-name="${escapeText(item.name)}" data-description="${escapeText(item.description)}" data-price="${escapeText((item.pricePaise/100).toFixed(2))}" data-original="${escapeText((item.originalPricePaise/100).toFixed(2))}">Edit Details</button><button data-action="edit-product-commission" data-id="${escapeText(item.id)}">Set commission</button><button class="secondary" data-action="set-gst-classification" data-id="${escapeText(item.id)}">Set GST / HSN</button><button class="${item.outsideNeemuchDeliveryEnabled===true?'secondary':'success'}" data-action="toggle-outside-delivery" data-id="${escapeText(item.id)}">${item.outsideNeemuchDeliveryEnabled===true?'Disable Outside Delivery':'Enable Outside Delivery'}</button><button class="danger" data-action="remove-shop-product" data-id="${escapeText(item.id)}" data-name="${escapeText(item.name)}">Remove</button>${productTransitions(item.status).map(status=>`<button class="${status==='REJECTED'?'danger':'success'}" data-action="shop-product" data-id="${escapeText(item.id)}" data-value="${status}">${escapeText(status==='APPROVED'&&item.status==='PUBLISHED'?'UNPUBLISH':status.replaceAll('_',' '))}</button>`).join('')}</div></article>`).join('')||'<p>No products match the current search and filters.</p>'}</div>${paginationNav}`;
+  byId('content').querySelectorAll('.card').forEach(card=>{const id=card.querySelector('[data-action="edit-shop-product"]')?.dataset.id;const item=filtered.find(product=>product.id===id);const heading=card.querySelector('h3');if(item?.exchangeAvailable===true)heading?.insertAdjacentHTML('afterend','<p><strong>Size exchange enabled</strong> | Rs 50 fee</p>');if(item?.outsideNeemuchDeliveryEnabled===true)heading?.insertAdjacentHTML('afterend','<p><strong>Outside Neemuch delivery requests enabled</strong></p>');});
+}
+function renderShopProductRequests(items){
+  const all=Array.isArray(items)?items:[]; const f=adminFilters['shop-product-requests'];
+  const filtered=all.filter(item=>matchesAdminSearch(item,['productName','productId','shopName','applicationId','action','status'])&&(f.status==='all'||item.status===f.status)&&(f.action==='all'||item.action===f.action));
+  const controls=[adminSelect('Status','status',all.map(item=>item.status),f.status),adminSelect('Request type','action',all.map(item=>item.action),f.action)];
+  byId('content').innerHTML=`<h2>Product change requests</h2>${adminFilterBar('Product change request filters',controls,filtered.length,all.length)}<div class="grid">${filtered.map(item=>{const changes=Array.isArray(item.changeSummary)?item.changeSummary:[];const summary=changes.length?`<table class="change-summary"><thead><tr><th>Changed field</th><th>Current value</th><th>Requested value</th></tr></thead><tbody>${changes.map(change=>`<tr><td><strong>${escapeText(change.field)}</strong></td><td>${escapeText(change.before)}</td><td>${escapeText(change.after)}</td></tr>`).join('')}</tbody></table>`:'<p class="muted">Seller requested this product be unpublished, or this legacy request has no saved field-by-field summary.</p>';return `<article class="card"><h3>${escapeText(item.productName||item.productId)}</h3><p>${escapeText(item.shopName||item.applicationId)} / ${escapeText(item.action)}</p>${summary}${item.rejectionReason?`<p class="error">${escapeText(item.rejectionReason)}</p>`:''}<strong>${escapeText(item.status)}</strong><div class="actions">${productRequestTransitions(item.status).map(status=>`<button class="${status==='REJECTED'?'danger':'success'}" data-action="shop-product-request" data-id="${escapeText(item.id)}" data-value="${status}">${escapeText(status.replaceAll('_',' '))}</button>`).join('')}</div></article>`;}).join('')||'<p>No product change requests match the current search and filters.</p>'}</div>`;
+}
+function storeReviewActions(item){
+  const actions={pending:[['approved','Approve','success'],['rejected','Reject','danger']],approved:[['hidden','Hide','secondary']],rejected:[['approved','Approve','success']],hidden:[['approved','Approve','success']]}[item.status]||[];
+  return actions.map(([value,label,style])=>`<button class="${style}" data-action="store-review" data-id="${escapeText(item.id)}" data-value="${value}">${label}</button>`).join('');
+}
+function renderProductReviews(items){
+  const all=Array.isArray(items)?items:[];
+  const filtered=all.filter(item=>matchesAdminSearch(item,
+    ['productId','customerName','customerEmail','title','comment','status','id']));
+  byId('content').innerHTML="<h2>Product reviews</h2><p class='muted'>Submissions and photos remain private until approved. Unverified reviews are clearly labeled.</p><div class='grid'>"+
+    (filtered.map(item=>`<article class="card">
+      <div class="order-heading"><div><h3>Product: ${escapeText(item.productId)}</h3>
+        <small>${escapeText(item.id)}</small></div>${statusBadge(item.status)}</div>
+      <p><strong>${escapeText(item.rating)} / 5 stars</strong> ${item.title?escapeText(item.title):''}</p>
+      <p>${escapeText(item.comment)}</p>
+      ${item.hasPhoto?`<img src="/api/admin/review-photo/${encodeURIComponent(item.id)}" alt="Submitted review photo" loading="lazy" style="width:160px;height:160px;object-fit:contain;border-radius:12px">`:''}
+      <p class="muted">Customer: ${escapeText(item.customerName)} — ${escapeText(item.customerEmail)}</p>
+      <p class="muted">${item.verifiedPurchase?'Verified purchase':'No purchase verified'} · ${escapeText(item.updatedAt||item.createdAt||'')}</p>
+      <div class="actions">${storeReviewActions(item).replaceAll('data-action="store-review"','data-action="product-review"')}</div>
+    </article>`).join('')||'<p>No matching product reviews.</p>')+'</div>';
+}
+function renderStoreReviews(items){
+  const all=Array.isArray(items)?items:[];
+  const filtered=all.filter(item=>matchesAdminSearch(item,['storeName','customerName','customerEmail','title','comment','status','id']));
+  byId('content').innerHTML=`<h2>Store reviews</h2><p class="muted">All new reviews stay private until approved. Customer details are shown only in this private administrator view.</p><div class="grid">${filtered.map(item=>`<article class="card"><div class="order-heading"><div><h3>${escapeText(item.storeName||item.storeId)}</h3><small>${escapeText(item.id)}</small></div>${statusBadge(item.status)}</div><p><strong>${escapeText(item.rating)} / 5 stars</strong>${item.title?` — ${escapeText(item.title)}`:''}</p><p>${escapeText(item.comment)}</p>${item.hasPhoto?`<img src="/api/admin/review-photo/${encodeURIComponent(item.id)}" alt="Review photo" loading="lazy" style="width:160px;height:160px;object-fit:contain;border-radius:12px">`:""}<p class="muted">Customer: ${escapeText(item.customerName)} · ${escapeText(item.customerEmail)}</p><p class="muted">Updated: ${escapeText(item.updatedAt||item.createdAt||'')}</p><div class="actions">${storeReviewActions(item)}</div></article>`).join('')||'<p>No store reviews match the current search.</p>'}</div>`;
+}
+function renderInventory(items,shops=inventoryShops){
+  const all=Array.isArray(items)?items:[]; const f=adminFilters.inventory;
+  const stockMatch=item=>{const stock=Number(item.stock);return f.stock==='all'||(f.stock==='attention'&&stock<=5)||(f.stock==='out'&&stock===0)||(f.stock==='low'&&stock>0&&stock<=5)||(f.stock==='healthy'&&stock>5);};
+  const knownShops=Array.isArray(shops)?shops:[];
+  if(f.shop!=='all'&&!knownShops.some(shop=>shop.id===f.shop))f.shop='all';
+  const shopOptions=['<option value="all"'+(f.shop==='all'?' selected':'')+'>All Shops</option>',...knownShops.map(shop=>`<option value="${escapeText(shop.id)}"${f.shop===shop.id?' selected':''}>${escapeText(shop.name)}${shop.status==='ACTIVE'?'':` (${escapeText(shop.status)})`}</option>`)].join('');
+  const filtered=all.filter(item=>matchesAdminSearch(item,['productName','size','colour','variantId','productId','brand','category','department','storeName'])&&stockMatch(item)&&(f.category==='all'||item.category===f.category)&&(f.department==='all'||item.department===f.department)&&(f.shop==='all'||item.storeId===f.shop)&&(f.brand==='all'||item.brand===f.brand));
+  const controls=[
+    `<label>Stock<select data-admin-filter="stock"><option value="attention"${f.stock==='attention'?' selected':''}>Needs attention (5 or fewer)</option><option value="out"${f.stock==='out'?' selected':''}>Out of stock</option><option value="low"${f.stock==='low'?' selected':''}>Low stock (1-5)</option><option value="healthy"${f.stock==='healthy'?' selected':''}>Healthy stock (6+)</option><option value="all"${f.stock==='all'?' selected':''}>All stock</option></select></label>`,
+    adminSelect('Category','category',all.map(item=>item.category),f.category),adminSelect('Department','department',all.map(item=>item.department),f.department),`<label>Shop<select data-admin-filter="shop">${shopOptions}</select></label>`,adminSelect('Brand','brand',all.map(item=>item.brand),f.brand),
+  ];
+  byId('content').innerHTML=`<h2>Inventory</h2>${adminFilterBar('Inventory filters',controls,filtered.length,all.length)}<table><thead><tr><th>Product</th><th>Shop / category</th><th>Variant</th><th>Stock</th><th>Action</th></tr></thead><tbody>${filtered.map(item=>{const variant=[item.size&&item.size!==DEFAULT_VARIANT_SIZE?item.size:'',item.colour&&item.colour!==DEFAULT_VARIANT_COLOUR?item.colour:''].filter(Boolean).join(' / ')||'Single stock';return `<tr><td><div class="inventory-product-cell">${inventoryThumbnail(item)}<span><strong>${escapeText(item.productName)}</strong><br><small>${escapeText(item.brand||'-')}</small></span></div></td><td>${escapeText(item.storeName||'-')}<br><small>${escapeText([item.category,item.department].filter(Boolean).join(' / '))}</small></td><td>${escapeText(variant)}<br><small>${escapeText(item.variantId)}</small></td><td><strong>${escapeText(item.stock)}</strong></td><td><button data-action="inventory" data-id="${escapeText(item.variantId)}">Adjust</button></td></tr>`;}).join('')}</tbody></table>${filtered.length?'':'<p>No inventory matches the current search and filters.</p>'}`;
+}
+function renderCustomers(items,pagination={}){
+  const all=Array.isArray(items)?items:[];
+  const f=adminFilters.customers;
+  const total=Number(pagination.total||0);
+  const page=Math.max(1,Number(pagination.page||1));
+  const pageSize=Number(pagination.pageSize||50);
+  const totalPages=Math.max(1,Number(pagination.totalPages||1));
+  const first=total?(page-1)*pageSize+1:0;
+  const last=total?first+all.length-1:0;
+  const controls=[
+    `<label>Status<select data-admin-filter="status"><option value="all"${f.status==='all'?' selected':''}>All</option><option value="active"${f.status==='active'?' selected':''}>Active</option><option value="disabled"${f.status==='disabled'?' selected':''}>Disabled</option></select></label>`,
+    `<label>Per page<select data-customer-page-size><option value="25"${pageSize===25?' selected':''}>25</option><option value="50"${pageSize===50?' selected':''}>50</option><option value="100"${pageSize===100?' selected':''}>100</option></select></label>`
+  ];
+  const navigation=`<nav class="actions" aria-label="Customer pages"><span>Showing ${first}–${last} of ${total} customers · Page ${page} of ${totalPages}</span><button class="secondary" data-action="customer-page" data-page="${page-1}"${page<=1?' disabled':''}>Previous</button><button class="secondary" data-action="customer-page" data-page="${page+1}"${page>=totalPages?' disabled':''}>Next</button></nav>`;
+  byId('content').innerHTML=`<h2>Customers</h2><div class="actions"><button class="success" data-action="create-owner">Create Store Owner Account</button></div><section class="order-filters" aria-label="Customer filters">${controls.join('')}<div class="order-filter-summary"><span><strong>${total}</strong> matching customers</span></div></section>${navigation}<table><thead><tr><th>Customer</th><th>Contact</th><th>Status</th><th>Action</th></tr></thead><tbody>${all.map(item=>`<tr><td>${escapeText(item.name)}<br><small>${escapeText(item.id)}</small></td><td>${escapeText(item.email||'')}<br>${escapeText(item.phone||'')}</td><td>${item.is_active?'Active':'Disabled'}</td><td><div class="actions">${whatsAppContact(item.phone)}<button data-action="reset-customer-password" data-id="${escapeText(item.id)}">Reset Password</button><button class="${item.is_active?'danger':'success'}" data-action="customer" data-id="${escapeText(item.id)}" data-value="${item.is_active?'false':'true'}">${item.is_active?'Disable':'Enable'}</button></div></td></tr>`).join('')}</tbody></table>${all.length?'':'<p>No customers match the current search and filters.</p>'}${navigation}`;
+}
+
+function renderOutsideDeliveryRequests(items){
+  const all=Array.isArray(items)?items:[];window.__outsideDeliveryRequests=all;const f=adminFilters['outside-delivery'];
+  const needsFollowup=item=>['requested','quoted','payment_pending'].includes(item.status);
+  const overdue=item=>needsFollowup(item)&&Number.isFinite(new Date(item.createdAt).getTime())&&Date.now()-new Date(item.createdAt).getTime()>7*24*60*60*1000;
+  const filtered=all.filter(item=>{const address=item.address||{};const enriched={...item,destination:[address.name,address.phone,address.street,address.city,address.state,address.pincode].filter(Boolean).join(' ')};return matchesAdminSearch(enriched,['id','productName','storeName','status','destination','orderId'])&&(f.status==='all'||item.status===f.status)&&(!outsideFollowupOnly||overdue(item));});
+  const pageSize=25,totalPages=Math.max(1,Math.ceil(filtered.length/pageSize));outsideDeliveryPage=Math.min(Math.max(1,outsideDeliveryPage),totalPages);
+  const visible=filtered.slice((outsideDeliveryPage-1)*pageSize,outsideDeliveryPage*pageSize);
+  const controls=[adminSelect('Status','status',all.map(item=>item.status),f.status)];
+  const cards=visible.map(item=>{const address=item.address||{},quote=item.quote||{};const canQuote=['requested','quoted'].includes(item.status);const canReject=['requested','quoted'].includes(item.status);const quoteBlock=item.quote?`<div class="facts"><div class="fact"><small>Product subtotal</small><strong>Rs ${escapeText(quote.productSubtotal)}</strong></div><div class="fact"><small>Delivery charge</small><strong>Rs ${escapeText(quote.deliveryFee)}</strong></div><div class="fact"><small>Payment request</small><strong>Rs ${escapeText(quote.grandTotal)}</strong></div><div class="fact"><small>Delivery estimate</small><strong>${escapeText(quote.estimatedDelivery||'Not specified')}</strong></div></div>${quote.note?`<p class="muted"><strong>Customer message:</strong> ${escapeText(quote.note)}</p>`:''}`:`<p class="muted">Product subtotal: Rs ${escapeText(item.productSubtotal)}. Enter the courier/delivery charge before the customer can pay.</p>`;const actions=[canQuote?`<button class="success" data-action="outside-delivery-quote" data-id="${escapeText(item.id)}">${item.status==='quoted'?'Update Quote':'Quote Delivery & Send Payment Request'}</button>`:'',canReject?`<button class="danger" data-action="outside-delivery-reject" data-id="${escapeText(item.id)}">Reject</button>`:''].join('');return `<article class="card"><div class="order-heading"><div><small>Delivery request</small><h3>${escapeText(item.id)}</h3><span class="muted">${escapeText(item.createdAt||'')}</span></div><div class="order-heading-status">${statusBadge(item.status)}${item.quote?`<strong>Rs ${escapeText(item.quote.grandTotal)}</strong>`:''}</div></div><p><strong>${escapeText(item.productName)}</strong> · ${escapeText(item.size||'')} ${item.colourName?`· ${escapeText(item.colourName)}`:''} · Qty ${escapeText(item.quantity)}</p><p class="muted">Store: ${escapeText(item.storeName||item.storeId||'-')}</p><div class="order-customer"><div><small>Customer</small><strong>${escapeText(address.name||'-')}</strong><span>${escapeText(address.phone||'-')}</span>${whatsAppContact(address.phone)}</div><div><small>Outside delivery address</small><strong>${escapeText(address.street||'-')}</strong><span>${escapeText([address.city,address.state,address.pincode].filter(Boolean).join(', '))}</span></div><div><small>Linked order</small><strong>${escapeText(item.orderId||'Not paid yet')}</strong><span>${item.paidAt?`Paid ${escapeText(item.paidAt)}`:'Waiting for payment / quote'}</span></div></div>${quoteBlock}${item.rejectionReason?`<p class="error"><strong>Rejected:</strong> ${escapeText(item.rejectionReason)}</p>`:''}${actions?`<div class="actions">${actions}</div>`:''}</article>`;}).join('');
+  byId('content').innerHTML=`<h2>Outside Neemuch delivery requests</h2><p class="muted">Only products whose shop owner opted in appear here. Confirm the actual delivery charge, then the customer receives a secure payment action for product + delivery.</p>${adminFilterBar('Outside delivery request filters',controls,filtered.length,all.length)}<div class="grid">${cards||'<p>No outside-Neemuch delivery requests match the current search and filters.</p>'}</div>`;
+  const overview=document.createElement('p');overview.className='muted';
+  overview.textContent=`${all.filter(needsFollowup).length} requests need action · ${all.filter(overdue).length} older than 7 days`;
+  const followup=document.createElement('button');followup.className='secondary';followup.dataset.action='outside-delivery-followup';followup.textContent=outsideFollowupOnly?'Show All Requests':'Show Overdue Follow-ups';
+  byId('content').querySelector('h2').after(overview,followup);
+  const nav=document.createElement('nav');nav.className='actions';nav.setAttribute('aria-label','Outside delivery pages');
+  const pageLabel=document.createElement('span');pageLabel.textContent=`Showing ${visible.length?((outsideDeliveryPage-1)*pageSize+1):0}–${(outsideDeliveryPage-1)*pageSize+visible.length} of ${filtered.length} · Page ${outsideDeliveryPage} of ${totalPages}`;
+  nav.appendChild(pageLabel);
+  for(const [label,page] of [['Previous',outsideDeliveryPage-1],['Next',outsideDeliveryPage+1]]){const button=document.createElement('button');button.className='secondary';button.dataset.action='outside-delivery-page';button.dataset.page=String(page);button.textContent=label;button.disabled=page<1||page>totalPages;nav.appendChild(button);}
+  byId('content').querySelector('.grid').before(nav);
+  byId('content').querySelectorAll('.grid > .card').forEach((card,index)=>{
+    const request=visible[index];
+    if(!request)return;
+    let actions=card.querySelector('.actions');
+    if(!actions){actions=document.createElement('div');actions.className='actions';card.appendChild(actions);}
+    if(['quoted','payment_pending'].includes(request.status)&&request.quote){
+      const button=document.createElement('button');button.className='success';button.dataset.action='outside-delivery-external-payment';button.dataset.id=request.id;button.textContent='Verify Direct QR / Bank Payment';actions.appendChild(button);
+    }
+    if(request.orderId){
+      const button=document.createElement('button');button.className='secondary';button.dataset.action='outside-delivery-linked-order';button.dataset.id=request.orderId;button.textContent='Open Linked Order';actions.appendChild(button);
+    }
+  });
+}
+function renderPaymentAlerts(items){
+  const all=Array.isArray(items)?items:[]; const f=adminFilters['payment-alerts'];
+  const filtered=all.filter(item=>matchesAdminSearch(item,['type','entityId','styleDashOrderId','razorpayPaymentId','status','recordedAt'])&&(f.status==='all'||item.status===f.status)&&(f.type==='all'||item.type===f.type));
+  const controls=[adminSelect('Status','status',all.map(item=>item.status),f.status),adminSelect('Event','type',all.map(item=>item.type),f.type)];
+  byId('content').innerHTML=`<h2>Payment alerts requiring attention</h2>${adminFilterBar('Payment alert filters',controls,filtered.length,all.length)}<table><thead><tr><th>Time</th><th>Event</th><th>Vibe4You order</th><th>Payment reference</th><th>Status</th></tr></thead><tbody>${filtered.map(item=>`<tr><td>${escapeText(item.recordedAt)}</td><td><strong>${escapeText(item.type)}</strong><br><small>${escapeText(item.entityId)}</small></td><td>${escapeText(item.styleDashOrderId||'Unmatched')}</td><td>${escapeText(item.razorpayPaymentId)}</td><td>${escapeText(item.status)}</td></tr>`).join('')}</tbody></table>${filtered.length?'':'<p>No payment alerts match the current search and filters.</p>'}`;
+}
+function renderSystem(system){byId('content').innerHTML=`<h2>System</h2><div class="facts"><div class="fact"><small>Admin service</small><strong>${escapeText(system.adminService)}</strong></div><div class="fact"><small>Database</small><strong>${escapeText(system.database.database)}</strong><small>Migration ${escapeText(system.database.migrationVersion)}</small></div><div class="fact"><small>Public service</small><strong>${escapeText(system.publicService.status)}</strong></div><div class="fact"><small>Payment mode</small><strong>${escapeText(system.paymentMode)}</strong></div><div class="fact"><small>Latest backup</small><strong>${escapeText(system.latestBackup||'None')}</strong></div></div>`;}
+function renderAudit(items){
+  const all=Array.isArray(items)?items:[]; const f=adminFilters.audit;
+  const filtered=all.filter(item=>matchesAdminSearch(item,['created_at','action','target_type','target_id','result'])&&(f.result==='all'||item.result===f.result)&&(f.target==='all'||item.target_type===f.target)&&(f.action==='all'||item.action===f.action));
+  const controls=[adminSelect('Result','result',all.map(item=>item.result),f.result),adminSelect('Target','target',all.map(item=>item.target_type),f.target),adminSelect('Action','action',all.map(item=>item.action),f.action)];
+  byId('content').innerHTML=`<h2>Administrator audit</h2>${adminFilterBar('Audit filters',controls,filtered.length,all.length)}<table><thead><tr><th>Time</th><th>Action</th><th>Target</th><th>Result</th></tr></thead><tbody>${filtered.map(item=>`<tr><td>${escapeText(item.created_at)}</td><td>${escapeText(item.action)}</td><td>${escapeText(item.target_type)} ${escapeText(item.target_id)}</td><td>${escapeText(item.result)}</td></tr>`).join('')}</tbody></table>${filtered.length?'':'<p>No audit entries match the current search and filters.</p>'}`;
+}
+
+/* Month-end bills: attach the seller's bill to a delivered order and download the month's document pack.
+   Self-contained: reacts only to data-md-* attributes, never to the existing data-action handlers. */
+let monthEndMonth = '';
+const MONTH_END_MAX_BYTES = 5 * 1024 * 1024;
+const MONTH_END_TYPES = {pdf:'application/pdf', jpg:'image/jpeg', jpeg:'image/jpeg', png:'image/png'};
+function monthEndSize(bytes){const n=Number(bytes)||0;return n>=1048576?(n/1048576).toFixed(1)+' MB':Math.max(1,Math.round(n/1024))+' KB';}
+function monthEndNotice(message){const target=byId('app-status');if(target)target.textContent=message||'';}
+function monthEndType(file){
+  const extension=String(file.name||'').split('.').pop().toLowerCase();
+  const byName=MONTH_END_TYPES[extension];
+  return Object.values(MONTH_END_TYPES).includes(file.type)?file.type:byName||'';
+}
+function monthEndBase64(file){
+  return new Promise((resolve,reject)=>{
+    const reader=new FileReader();
+    reader.onload=()=>resolve(String(reader.result).split(',')[1]||'');
+    reader.onerror=()=>reject(new Error('The file could not be read.'));
+    reader.readAsDataURL(file);
+  });
+}
+async function monthEndDownload(path,filename,expectedPrefix){
+  const response=await fetch(path,{method:'GET',credentials:'include'});
+  if(!response.ok){
+    const payload=await response.json().catch(()=>({}));
+    throw new Error(payload.error||'Download failed.');
+  }
+  if(expectedPrefix&&!(response.headers.get('Content-Type')||'').toLowerCase().startsWith(expectedPrefix)){
+    throw new Error('The admin service did not return the expected file.');
+  }
+  const blobUrl=URL.createObjectURL(await response.blob());
+  const link=document.createElement('a');
+  link.href=blobUrl;link.download=filename;
+  document.body.appendChild(link);
+  try{link.click();}finally{link.remove();window.setTimeout(()=>URL.revokeObjectURL(blobUrl),30000);}
+}
+function monthEndBillRow(order,bill){
+  return `<li><button type="button" class="secondary" data-md-action="download-bill" data-order-id="${escapeText(order.orderId)}" data-bill-id="${escapeText(bill.id)}" data-file-name="${escapeText(bill.fileName)}">${escapeText(bill.fileName)}</button> <small>${escapeText(monthEndSize(bill.sizeBytes))}${bill.billNumber?' · bill '+escapeText(bill.billNumber):''}${bill.storeName?' · '+escapeText(bill.storeName):''}</small> <button type="button" class="secondary" data-md-action="void-bill" data-order-id="${escapeText(order.orderId)}" data-bill-id="${escapeText(bill.id)}">Remove</button></li>`;
+}
+function monthEndOrderRow(order,limits){
+  const stores=Array.isArray(order.stores)?order.stores:[];
+  const bills=Array.isArray(order.bills)?order.bills:[];
+  const storeChoice=stores.length>1?`<label>Store <select name="storeId" required><option value="">Choose store</option>${stores.map(store=>`<option value="${escapeText(store.storeId)}">${escapeText(store.storeName)}</option>`).join('')}</select></label> `:'';
+  const canAdd=bills.length<(limits.maxBillsPerOrder||5);
+  const form=canAdd?`<details><summary>Add seller bill</summary><form data-md-upload data-order-id="${escapeText(order.orderId)}"><label>File (PDF, JPG or PNG, up to 5 MB) <input type="file" name="file" accept="application/pdf,image/jpeg,image/png" required></label> ${storeChoice}<label>Bill number <input name="billNumber" maxlength="40" placeholder="optional"></label> <label>Note <input name="note" maxlength="200" placeholder="optional"></label> <button type="submit">Upload</button></form></details>`:'<small>Limit reached</small>';
+  return `<tr><td><strong>${escapeText(order.orderId)}</strong></td><td>${escapeText(order.deliveredDate)}</td><td>${escapeText(order.customerName||'-')}</td><td>${escapeText(stores.map(store=>store.storeName).join(', '))}</td><td>Rs ${escapeText(order.orderTotal)}</td><td><button type="button" class="secondary" data-md-action="download-receipt" data-order-id="${escapeText(order.orderId)}">Receipt</button></td><td>${bills.length?`<ul>${bills.map(bill=>monthEndBillRow(order,bill)).join('')}</ul>`:'<strong>Missing</strong>'}${form}</td></tr>`;
+}
+async function renderMonthEnd(){
+  if(!monthEndMonth)monthEndMonth=billingMonth;
+  const data=await api('/api/admin/month-end?month='+encodeURIComponent(monthEndMonth));
+  const summary=data.summary||{};const limits=data.limits||{};
+  const orders=Array.isArray(data.orders)?data.orders:[];
+  byId('content').innerHTML=`<h2>Month-end bills</h2><p>Attach the seller's bill to each delivered order, then download the whole month as one ZIP: order list, customer invoices and seller bills. This is a document archive, not a tax or accounting report.</p><label>Month <input type="month" data-md-month value="${escapeText(data.month||monthEndMonth)}"></label> <button type="button" data-md-action="export"${orders.length?'':' disabled'}>Download month-end ZIP</button><div class="facts"><div class="fact"><small>Delivered orders</small><strong>${escapeText(summary.orders||0)}</strong></div><div class="fact"><small>With seller bill</small><strong>${escapeText(summary.ordersWithSellerBill||0)}</strong></div><div class="fact"><small>Missing seller bill</small><strong>${escapeText(summary.ordersMissingSellerBill||0)}</strong></div><div class="fact"><small>Order value</small><strong>Rs ${escapeText(summary.orderTotal||'0.00')}</strong></div></div>${orders.length?`<table><thead><tr><th>Order</th><th>Delivered</th><th>Customer</th><th>Store</th><th>Total</th><th>Customer invoice</th><th>Seller bills</th></tr></thead><tbody>${orders.map(order=>monthEndOrderRow(order,limits)).join('')}</tbody></table>`:'<p>No delivered orders in this month.</p>'}`;
+}
+byId('content').addEventListener('change', event => {
+  const control=event.target.closest?.('[data-md-month]');
+  if(!control)return;
+  if(!/^\d{4}-(0[1-9]|1[0-2])$/.test(control.value))return;
+  monthEndMonth=control.value;
+  loadTab('month-end');
+});
+byId('content').addEventListener('submit', async event => {
+  const form=event.target.closest?.('[data-md-upload]');
+  if(!form)return;
+  event.preventDefault();
+  error('');monthEndNotice('');
+  const button=form.querySelector('button[type="submit"]');
+  try{
+    const file=form.elements.file.files[0];
+    if(!file)throw new Error('Choose a file to upload.');
+    if(file.size<=0||file.size>MONTH_END_MAX_BYTES)throw new Error('The file must be between 1 byte and 5 MB.');
+    const contentType=monthEndType(file);
+    if(!contentType)throw new Error('Upload a PDF, JPG or PNG file.');
+    if(button)button.disabled=true;
+    monthEndNotice('Uploading…');
+    await api('/api/admin/orders/'+encodeURIComponent(form.dataset.orderId)+'/seller-bills',{method:'POST',body:JSON.stringify({
+      fileName:file.name,contentType,contentBase64:await monthEndBase64(file),
+      storeId:form.elements.storeId?form.elements.storeId.value:'',
+      billNumber:form.elements.billNumber.value,note:form.elements.note.value
+    })});
+    monthEndNotice('Seller bill uploaded.');
+    await renderMonthEnd();
+  }catch(failure){
+    error(failure.message);monthEndNotice('');
+    if(button)button.disabled=false;
+  }
+});
+byId('content').addEventListener('click', async event => {
+  const control=event.target.closest?.('[data-md-action]');
+  if(!control)return;
+  const action=control.dataset.mdAction;
+  error('');
+  try{
+    if(action==='export'){
+      control.disabled=true;monthEndNotice('Preparing the month-end ZIP… this can take a minute.');
+      try{await monthEndDownload('/api/admin/month-end/export?month='+encodeURIComponent(monthEndMonth),'vibe4you-month-end-'+monthEndMonth+'.zip','application/zip');}
+      finally{control.disabled=false;}
+      monthEndNotice('Month-end ZIP downloaded.');return;
+    }
+    if(action==='download-bill'){
+      await monthEndDownload('/api/admin/orders/'+encodeURIComponent(control.dataset.orderId)+'/seller-bills/'+encodeURIComponent(control.dataset.billId),control.dataset.fileName||'seller-bill','');
+      return;
+    }
+    if(action==='download-receipt'){await downloadOrderReceipt(control.dataset.orderId);return;}
+    if(action==='void-bill'){
+      const values=await formDialog('Remove seller bill',[
+        {name:'reason',label:'Reason for removal',required:true,minLength:3,maxLength:500},
+      ],'Remove Bill');
+      if(!values)return;
+      const reason=String(values.reason||'').trim();
+      if(reason.length<3)throw new Error('Enter a reason of at least 3 characters.');
+      await api('/api/admin/orders/'+encodeURIComponent(control.dataset.orderId)+'/seller-bills/'+encodeURIComponent(control.dataset.billId)+'/void',{method:'POST',body:JSON.stringify({reason})});
+      monthEndNotice('Seller bill removed (kept in the audit trail).');
+      await renderMonthEnd();
+    }
+  }catch(failure){error(failure.message);monthEndNotice('');}
+});
+
+/* R-OD2: seller totals and GST, kept separate from seller-bill documents. */
+function monthEndMoney(value) {
+  return value === null || value === undefined ? 'Pending' : 'Rs ' + escapeText(value);
+}
+function monthEndProfitRow(order, limits, index) {
+  const original = monthEndOrderRow(order, limits);
+  const totalCell = `<td>Rs ${escapeText(order.orderTotal)}</td>`;
+  const formId = 'md-profit-' + index;
+  const gstLabels = {
+    issued_tax_invoice: 'Issued invoice',
+    checkout_snapshot: 'Checkout snapshot',
+    verified_receipt_breakdown: 'Verified receipt',
+    legacy_order_field: 'Legacy order value',
+    unverified_legacy_zero: 'GST not verified',
+    issued_invoice_integrity_error: 'Invoice integrity issue',
+    issued_invoice_inconsistent: 'Invoice total mismatch',
+    invoice_ledger_unreadable: 'Invoice ledger unavailable',
+    invalid_checkout_snapshot: 'Invalid tax snapshot',
+    inconsistent: 'GST exceeds order total',
+    unknown: 'GST not available'
+  };
+  const label = gstLabels[order.customerGstSource] || 'GST not verified';
+  const legacy = ' <small>(' + escapeText(label) + ')</small>';
+  const financialCells =
+    `<td>Rs ${escapeText(order.orderTotal)}</td>` +
+    `<td>${monthEndMoney(order.customerGst)}${legacy}</td>` +
+    `<td>${monthEndMoney(order.customerDeliveryCharge)}</td>` +
+    `<td><form id="${formId}" data-md-profit data-order-id="${escapeText(order.orderId)}"><input type="number" name="sellerTotal" min="0" max="99999999.99" step="0.01" inputmode="decimal" value="${escapeText(order.sellerTotal ?? '')}" placeholder="Seller total" aria-label="Seller total incl. GST for ${escapeText(order.orderId)}" required></form></td>` +
+    `<td><input type="number" form="${formId}" name="sellerGst" min="0" max="99999999.99" step="0.01" inputmode="decimal" value="${escapeText(order.sellerGst ?? '')}" placeholder="Seller GST" aria-label="Seller GST for ${escapeText(order.orderId)}" required></td>` +
+    `<td><input type="number" form="${formId}" name="deliveryCost" min="0" max="99999999.99" step="0.01" inputmode="decimal" value="${escapeText(order.deliveryCost ?? '')}" placeholder="Delivery cost" aria-label="Delivery charge paid by us for ${escapeText(order.orderId)}"><button form="${formId}" type="submit" class="secondary">Save</button></td>` +
+    `<td title="Customer total minus seller total minus delivery cost">${monthEndMoney(order.profitWithGst)}</td>`;
+  return original.replace(totalCell, financialCells);
+}
+function monthEndProfitSummary(value, complete, count, total) {
+  if (value === null || value === undefined) return `Pending (0/${total} orders)`;
+  return `${monthEndMoney(value)}${complete ? '' : ' (partial ' + count + '/' + total + ' orders)'}`;
+}
+renderMonthEnd = async function() {
+  if (!monthEndMonth) monthEndMonth = billingMonth;
+  const data = await api('/api/admin/month-end?month=' + encodeURIComponent(monthEndMonth));
+  const summary = data.summary || {};
+  const limits = data.limits || {};
+  const orders = Array.isArray(data.orders) ? data.orders : [];
+  const total = Number(summary.profitOrdersTotal || orders.length);
+  byId('content').innerHTML =
+    '<h2>Month-end bills &amp; profit</h2>' +
+    '<p>Seller totals and seller GST must be entered from actual supplier bills; both totals include GST. Customer delivery charge comes from a verified issued invoice when available, otherwise the recorded payment receipt amount. It is already included in Customer Total. Enter the delivery charge paid by Vibe4You, including zero when none. Profit = customer total minus seller total minus our delivery cost. Other fees and expenses are excluded; after-GST profit is estimated. Not a GST return.</p>' +
+    `<label>Month <input type="month" data-md-month value="${escapeText(data.month || monthEndMonth)}"></label> ` +
+    `<button type="button" data-md-action="export"${orders.length ? '' : ' disabled'}>Download month-end ZIP</button> ` +
+    `<button type="button" data-md-action="profit-csv"${orders.length ? '' : ' disabled'}>Download profit CSV</button>` +
+    '<div class="facts">' +
+    `<div class="fact"><small>Delivered orders</small><strong>${escapeText(summary.orders || 0)}</strong></div>` +
+    `<div class="fact"><small>With seller bill</small><strong>${escapeText(summary.ordersWithSellerBill || 0)}</strong></div>` +
+    `<div class="fact"><small>Missing seller bill</small><strong>${escapeText(summary.ordersMissingSellerBill || 0)}</strong></div>` +
+    `<div class="fact"><small>Customer total</small><strong>${monthEndMoney(summary.orderTotal || '0.00')}</strong></div>` +
+    `<div class="fact"><small>Month profit with GST</small><strong>${monthEndProfitSummary(summary.monthProfitWithGst, summary.profitWithGstComplete, summary.profitRowsComplete || 0, total)}</strong></div>` +
+    `<div class="fact"><small>Month profit after GST</small><strong>${monthEndProfitSummary(summary.monthProfitAfterGst, summary.profitAfterGstComplete, summary.afterGstOrdersComplete || 0, total)}</strong></div>` +
+    '</div>' +
+    (orders.length ?
+      '<div class="month-end-scroll"><table><thead><tr><th>Order</th><th>Delivered</th><th>Customer</th><th>Store</th><th>Customer Total</th><th>Customer GST</th><th>Delivery charged to customer</th><th>Seller Total (enter)</th><th>Seller GST (enter)</th><th>Delivery charged to us (enter)</th><th>Profit (incl. GST)</th><th>Customer invoice</th><th>Seller bills</th></tr></thead><tbody>' +
+      orders.map((order, index) => monthEndProfitRow(order, limits, index)).join('') +
+      '</tbody></table></div>' :
+      '<p>No delivered orders in this month.</p>');
+};
+byId('content').addEventListener('submit', async event => {
+  const form = event.target.closest?.('[data-md-profit]');
+  if (!form) return;
+  event.preventDefault();
+  error(''); monthEndNotice('');
+  const button = form.querySelector('button[type="submit"]') ||
+    byId('content').querySelector(`button[form="${form.id}"][type="submit"]`);
+  try {
+    const sellerTotal = String(form.elements.sellerTotal.value).trim();
+    const sellerGst = String(form.elements.sellerGst.value).trim();
+    const deliveryCost = String(form.elements.deliveryCost.value).trim();
+    const amount = /^(?:0|[1-9][0-9]{0,7})(?:\.[0-9]{1,2})?$/;
+    if (!amount.test(sellerTotal) || !amount.test(sellerGst)) throw new Error('Enter both seller amounts with up to two decimals.');
+    if (deliveryCost && !amount.test(deliveryCost)) throw new Error('Enter a delivery cost with up to two decimals.');
+    if (Math.round(Number(sellerGst) * 100) > Math.round(Number(sellerTotal) * 100)) throw new Error('Seller GST cannot exceed the seller total.');
+    if (button) button.disabled = true;
+    await api('/api/admin/orders/' + encodeURIComponent(form.dataset.orderId) + '/profit', {
+      method: 'POST', body: JSON.stringify({ sellerTotal, sellerGst, deliveryCost })
+    });
+    await renderMonthEnd();
+    monthEndNotice('Seller amounts saved.');
+  } catch (failure) {
+    error(failure.message); monthEndNotice('');
+    if (button) button.disabled = false;
+  }
+});
+byId('content').addEventListener('click', async event => {
+  const control = event.target.closest?.('[data-md-action="profit-csv"]');
+  if (!control) return;
+  error(''); control.disabled = true;
+  try {
+    await monthEndDownload('/api/admin/month-end/profit-export?month=' + encodeURIComponent(monthEndMonth),
+      'vibe4you-month-profit-' + monthEndMonth + '.csv', 'text/csv');
+    monthEndNotice('Profit CSV downloaded.');
+  } catch (failure) {
+    error(failure.message);
+  } finally {
+    control.disabled = false;
+  }
+});
+
+api('/api/admin/me').then(result=>{csrfToken=result.csrfToken;showApp(result.admin);}).catch(showLogin);

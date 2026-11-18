@@ -1,4 +1,6 @@
-import type { Product, VendorStore } from '../types';
+﻿import type { Product, VendorStore } from '../types';
+import { normalizeLocalShoppingQuery } from './localSearch';
+import { parseSearchQuery, scoreProductSearch, scoreStoreSearch, scoreSearchLabel } from './searchEngine';
 
 export type SearchSuggestionType = 'product' | 'store' | 'category' | 'brand';
 
@@ -62,12 +64,13 @@ export const buildSearchSuggestions = (
   stores: VendorStore[],
   limit = 10,
 ): SearchSuggestion[] => {
-  const query = normalize(queryValue);
+  const query = normalizeLocalShoppingQuery(queryValue);
   if (query.length < 2) return [];
 
   const activeProducts = products.filter(product => product.active === true);
   const activeStores = stores.filter(store => store.active === true && store.approved === true);
   const suggestions: SearchSuggestion[] = [];
+  const parsedQuery = parseSearchQuery(query);
 
   for (const product of activeProducts) {
     const score = bestScore(product.name, [
@@ -77,33 +80,37 @@ export const buildSearchSuggestions = (
       product.storeName,
       ...product.tags,
     ], query);
-    if (score === null) continue;
+    const semanticScore = score === null ? scoreProductSearch(product, parsedQuery) : null;
+    if (score === null && semanticScore === null) continue;
     suggestions.push({
       id: `product:${product.id}`,
       type: 'product',
       label: product.name,
       secondary: [product.brand, product.storeName].filter(Boolean).join(' | '),
       href: `/product/${encodeURIComponent(product.slug || product.id)}`,
-      score,
+      score: score === null ? 10 - Math.min(4, (semanticScore || 0) / 50) : score,
     });
   }
 
   for (const store of activeStores) {
     const score = bestScore(store.storeName, [store.category, store.description, store.address, store.city], query);
-    if (score === null) continue;
+    const semanticScore = score === null ? scoreStoreSearch(store, parsedQuery) : null;
+    if (score === null && semanticScore === null) continue;
     suggestions.push({
       id: `store:${store.id}`,
       type: 'store',
       label: store.storeName,
       secondary: [store.category, store.city].filter(Boolean).join(' | '),
       href: `/store/${encodeURIComponent(store.slug || store.id)}`,
-      score,
+      score: score === null ? 10 - Math.min(4, (semanticScore || 0) / 50) : score,
     });
   }
 
   for (const category of uniqueByLabel(activeProducts.map(product => product.category))) {
-    const score = labelScore(category, query);
-    if (score === null) continue;
+    const direct = labelScore(category, query);
+    const match = direct === null ? scoreSearchLabel(category, parsedQuery) : null;
+    if (direct === null && match === null) continue;
+    const score = direct === null ? 10 - Math.min(3, (match || 0) / 50) : direct;
     suggestions.push({
       id: `category:${normalize(category)}`,
       type: 'category',
@@ -115,8 +122,10 @@ export const buildSearchSuggestions = (
   }
 
   for (const brand of uniqueByLabel(activeProducts.map(product => product.brand))) {
-    const score = labelScore(brand, query);
-    if (score === null) continue;
+    const direct = labelScore(brand, query);
+    const match = direct === null ? scoreSearchLabel(brand, parsedQuery) : null;
+    if (direct === null && match === null) continue;
+    const score = direct === null ? 10 - Math.min(3, (match || 0) / 50) : direct;
     suggestions.push({
       id: `brand:${normalize(brand)}`,
       type: 'brand',

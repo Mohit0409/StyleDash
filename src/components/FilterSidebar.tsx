@@ -212,10 +212,10 @@ export const FilterSidebar: React.FC<FilterSidebarProps> = ({
             role="dialog"
             aria-modal="true"
             aria-labelledby="mobile-filter-heading"
-            className="w-80 bg-white dark:bg-neutral-900 h-full p-6 overflow-y-auto shadow-2xl flex flex-col justify-between"
+            className="w-80 max-w-[calc(100vw-2rem)] bg-white dark:bg-neutral-900 h-full shadow-2xl flex flex-col overflow-hidden"
             onClick={(event) => event.stopPropagation()}
           >
-            <div>
+            <div className="min-h-0 flex-1 overflow-y-auto p-6 pb-4">
               <div className="flex items-center justify-between mb-6">
                 <span id="mobile-filter-heading" className="font-extrabold text-lg text-neutral-900 dark:text-white">Filter & Sort</span>
                 <button aria-label="Close filters" onClick={onCloseMobile} className="p-2 rounded-full hover:bg-neutral-100 dark:hover:bg-neutral-800">
@@ -224,12 +224,14 @@ export const FilterSidebar: React.FC<FilterSidebarProps> = ({
               </div>
               {content}
             </div>
-            <button
-              onClick={onCloseMobile}
-              className="mt-6 w-full py-3 bg-neutral-950 dark:bg-lime-400 text-white dark:text-neutral-950 font-bold text-sm rounded-xl"
-            >
-              Apply Filters
-            </button>
+            <div className="shrink-0 border-t border-neutral-200 bg-white p-4 pb-[max(1rem,env(safe-area-inset-bottom))] dark:border-neutral-800 dark:bg-neutral-900">
+              <button
+                onClick={onCloseMobile}
+                className="w-full py-3 bg-neutral-950 dark:bg-lime-400 text-white dark:text-neutral-950 font-bold text-sm rounded-xl"
+              >
+                Apply Filters
+              </button>
+            </div>
           </div>
         </div>
       )}

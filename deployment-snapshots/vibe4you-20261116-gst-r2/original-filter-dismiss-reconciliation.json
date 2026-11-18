@@ -1,0 +1,52 @@
+{
+  "schema_version": 1,
+  "reconciled_at": "2026-11-17",
+  "source_audit": "deployment-snapshots/vibe4you-20261116-gst-r2/original-tracked-audit.json",
+  "source_bundle": "filter-dismissal-ui",
+  "original_checkout_head": "2c3e6e7bc400502516467869c370264e27d069aa",
+  "audited_paths": [
+    "e2e/specs/filter-dismiss.spec.ts",
+    "src/components/FilterSidebar.tsx"
+  ],
+  "pre_reconciliation_hashes": [
+    {
+      "path": "src/components/FilterSidebar.tsx",
+      "original_dirty_sha256": "1d408851f62195c60f1371e76dab41db5b741094167a5b953a66e8ab4fc9c18e",
+      "synchronized_sha256": "1853d8d1cd6535a7ace924bc0d258ab2a4c087887d41738f8c36a7d796c8cc50"
+    },
+    {
+      "path": "e2e/specs/filter-dismiss.spec.ts",
+      "original_dirty_sha256": "231510fb57f28645e111f03d1f8517d26faed1598acb79bf3b26e24d0187aeca",
+      "synchronized_sha256": "461e41e194ffae99c7c097bebb211881b00c6350c3d5d239013948ff88c32dbe"
+    }
+  ],
+  "findings": [
+    {
+      "path": "src/components/FilterSidebar.tsx",
+      "decision": "selective-source-port",
+      "evidence": "the synchronized mobile drawer scrolls the whole panel, allowing Apply Filters to move outside a short viewport; the reviewed hunk separates a scrollable filter body from a fixed safe-area footer"
+    },
+    {
+      "path": "src/components/FilterSidebar.tsx",
+      "decision": "exclude-format-only-hunks",
+      "evidence": "the remainder of the original dirty diff only collapses JSX formatting and removes comments"
+    },
+    {
+      "path": "e2e/specs/filter-dismiss.spec.ts",
+      "decision": "port-regression-assertion",
+      "evidence": "the test now proves the Apply Filters control remains entirely inside both 390x844 and 768x1024 viewports before and after a filter interaction"
+    }
+  ],
+  "source_files_ported": [
+    "src/components/FilterSidebar.tsx"
+  ],
+  "test_files_updated": [
+    "e2e/specs/filter-dismiss.spec.ts"
+  ],
+  "supersedes_disposition": {
+    "from": "selective-port-with-browser-verification",
+    "to": "reconciled-selective-source-port"
+  },
+  "production_claim": "Editable source behavior only; no claim that a new build matches or has replaced the live compiled frontend.",
+  "result": "PASS"
+}

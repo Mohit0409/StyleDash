@@ -181,3 +181,163 @@ describe('Razorpay Checkout modal', () => {
     }));
   });
 });
+
+describe('checkout retry on non-JSON replies', () => {
+  const htmlResponse = (status: number) =>
+    new Response('<!DOCTYPE html><title>502 Bad gateway</title>', {
+      status,
+      headers: { 'Content-Type': 'text/html' },
+    });
+
+  const settle = async <T>(promise: Promise<T>) => {
+    const outcome = promise.then((value) => ({ value }), (error: unknown) => ({ error }));
+    await vi.runAllTimersAsync();
+    return outcome;
+  };
+
+  it('retries create-order once with the same idempotency key after an HTML error page', async () => {
+    vi.useFakeTimers();
+    try {
+      const fetcher = vi.fn<typeof fetch>()
+        .mockResolvedValueOnce(htmlResponse(502))
+        .mockResolvedValueOnce(jsonResponse(createdOrder, 201));
+
+      const outcome = await settle(createPaymentOrder(intent, 'checkout-retry-001', fetcher));
+
+      expect(outcome).toEqual({ value: createdOrder });
+      expect(fetcher).toHaveBeenCalledTimes(2);
+      const keys = fetcher.mock.calls.map(([, request]) => new Headers(request?.headers).get('Idempotency-Key'));
+      expect(keys).toEqual(['checkout-retry-001', 'checkout-retry-001']);
+      const bodies = fetcher.mock.calls.map(([, request]) => String(request?.body));
+      expect(bodies[0]).toBe(bodies[1]);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('retries verify-payment once after a dropped connection', async () => {
+    vi.useFakeTimers();
+    try {
+      const fetcher = vi.fn<typeof fetch>()
+        .mockRejectedValueOnce(new TypeError('Failed to fetch'))
+        .mockResolvedValueOnce(jsonResponse({ success: true, idempotent: true, order: {} }));
+
+      const outcome = await settle(verifyPayment({
+        razorpay_order_id: 'order_test_001',
+        razorpay_payment_id: 'pay_test_001',
+        razorpay_signature: 'signature-test',
+      }, 'SD-TEST-001', fetcher));
+
+      expect(outcome).toEqual({ value: { success: true, idempotent: true, order: {} } });
+      expect(fetcher).toHaveBeenCalledTimes(2);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('stops after one retry and names the HTTP status without claiming a charge', async () => {
+    vi.useFakeTimers();
+    try {
+      const fetcher = vi.fn<typeof fetch>(async () => htmlResponse(502));
+
+      const outcome = await settle(createPaymentOrder(intent, 'checkout-retry-002', fetcher));
+
+      expect(fetcher).toHaveBeenCalledTimes(2);
+      expect(outcome).toMatchObject({ error: { name: 'PaymentApiError', code: 'invalid_response', status: 502 } });
+      const { message } = (outcome as { error: Error }).error;
+      expect(message).toContain('HTTP 502');
+      expect(message).toContain('Payment was not taken');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('tells the customer not to pay again when verification cannot be confirmed', async () => {
+    vi.useFakeTimers();
+    try {
+      const fetcher = vi.fn<typeof fetch>(async () => htmlResponse(524));
+
+      const outcome = await settle(verifyPayment({
+        razorpay_order_id: 'order_test_001',
+        razorpay_payment_id: 'pay_test_001',
+        razorpay_signature: 'signature-test',
+      }, 'SD-TEST-001', fetcher));
+
+      expect(fetcher).toHaveBeenCalledTimes(2);
+      expect((outcome as { error: Error }).error.message).toContain('Do not pay again');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('waits 700 ms before the single retry', async () => {
+    vi.useFakeTimers();
+    try {
+      const fetcher = vi.fn<typeof fetch>()
+        .mockResolvedValueOnce(htmlResponse(502))
+        .mockResolvedValueOnce(jsonResponse(createdOrder, 201));
+
+      const pending = createPaymentOrder(intent, 'checkout-retry-delay', fetcher);
+      await vi.advanceTimersByTimeAsync(699);
+      expect(fetcher).toHaveBeenCalledTimes(1);
+      await vi.advanceTimersByTimeAsync(1);
+      expect(fetcher).toHaveBeenCalledTimes(2);
+      await expect(pending).resolves.toEqual(createdOrder);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('retries COD once with the same idempotency key and body after an HTML error page', async () => {
+    vi.useFakeTimers();
+    try {
+      const order = { id: 'SD-COD-RETRY', paymentMethod: 'cod', paymentStatus: 'pending' };
+      const fetcher = vi.fn<typeof fetch>()
+        .mockResolvedValueOnce(htmlResponse(502))
+        .mockResolvedValueOnce(jsonResponse({ success: true, idempotent: true, order }, 200));
+
+      const outcome = await settle(placeCodOrder({ ...intent, paymentMethod: 'cod' }, 'checkout-cod-retry', fetcher));
+
+      expect(outcome).toEqual({ value: { success: true, idempotent: true, order } });
+      expect(fetcher).toHaveBeenCalledTimes(2);
+      expect(fetcher.mock.calls.map(([endpoint]) => endpoint)).toEqual(['/api/place-cod-order', '/api/place-cod-order']);
+      const keys = fetcher.mock.calls.map(([, request]) => new Headers(request?.headers).get('Idempotency-Key'));
+      expect(keys).toEqual(['checkout-cod-retry', 'checkout-cod-retry']);
+      const bodies = fetcher.mock.calls.map(([, request]) => String(request?.body));
+      expect(bodies[0]).toBe(bodies[1]);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('tells a COD customer to check Your Orders when the order cannot be confirmed', async () => {
+    vi.useFakeTimers();
+    try {
+      const fetcher = vi.fn<typeof fetch>(async () => htmlResponse(502));
+
+      const outcome = await settle(placeCodOrder({ ...intent, paymentMethod: 'cod' }, 'checkout-cod-retry-2', fetcher));
+
+      expect(fetcher).toHaveBeenCalledTimes(2);
+      expect(outcome).toMatchObject({ error: { code: 'invalid_response', status: 502 } });
+      expect((outcome as { error: Error }).error.message).toBe(
+        'We could not confirm your order (HTTP 502). Check Your Orders before trying again.',
+      );
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('does not retry a JSON rejection from the server', async () => {
+    const fetcher = vi.fn<typeof fetch>(async () => jsonResponse({
+      success: false,
+      code: 'unsupported_pincode',
+      error: 'Delivery is not available for this pincode.',
+    }, 422));
+
+    await expect(createPaymentOrder(intent, 'checkout-retry-003', fetcher)).rejects.toMatchObject({
+      code: 'unsupported_pincode',
+      message: 'Delivery is not available for this pincode.',
+    });
+    expect(fetcher).toHaveBeenCalledOnce();
+  });
+});

@@ -98,6 +98,7 @@ class ReviewWorkflow:
             db.commit()
             self._migrate_store_review_moderation(db)
             self._migrate_store_review_rollback_compatibility(db)
+            self._migrate_open_reviews(db)
 
     @staticmethod
     def _migrate_store_review_moderation(db: sqlite3.Connection) -> None:
@@ -277,7 +278,10 @@ class ReviewWorkflow:
             "comment": row["comment"],
             "createdAt": row["created_at"],
             "updatedAt": row["updated_at"],
-            "verifiedPurchase": True,
+            "verifiedPurchase": bool(row["order_id"]),
+            "status": self._store_review_api_status(row["status"]),
+            "hasPhoto": bool(row["photo_webp"]),
+            "photoUrl": f"/api/review-photo/{row['id']}" if row["status"] == "published" and row["photo_webp"] else None,
         }
 
     def _owned_row(self, review_id: str, user_id: str) -> sqlite3.Row:
@@ -398,10 +402,10 @@ class ReviewWorkflow:
                 (user_id, product_id),
             ).fetchone()
         return {
-            "eligible": order is not None,
+            "eligible": True,
             "orderId": order.get("id") if order else None,
             "existingReview": self._public_row(existing) if existing is not None else None,
-            "reason": None if order else "delivered_purchase_required",
+            "reason": None,
         }
 
     def create(self, payment_store: Any, user_id: str, payload: dict[str, Any]) -> dict[str, Any]:
@@ -409,22 +413,17 @@ class ReviewWorkflow:
         rating = self._rating(payload.get("rating"))
         title = self._title(payload.get("title"))
         comment = self._comment(payload.get("comment"))
+        photo = self._photo_blob(payload.get("photoDataUrl"))
         order = self._qualifying_order(payment_store, user_id, product_id)
-        if order is None:
-            raise SecurityError(
-                403,
-                "Only customers with a delivered purchase can review this product.",
-                "delivered_purchase_required",
-            )
         review_id = f"rev_{secrets.token_hex(12)}"
         now = _now()
         try:
             with self.connect() as db:
                 db.execute(
                     """INSERT INTO product_reviews(
-                       id,product_id,user_id,order_id,rating,title,comment,status,created_at,updated_at
-                       ) VALUES(?,?,?,?,?,?,?,'published',?,?)""",
-                    (review_id, product_id, user_id, order["id"], rating, title, comment, now, now),
+                       id,product_id,user_id,order_id,rating,title,comment,status,created_at,updated_at,photo_webp
+                       ) VALUES(?,?,?,?,?,?,?,'pending',?,?,?)""",
+                    (review_id, product_id, user_id, order["id"] if order else "", rating, title, comment, now, now, photo),
                 )
                 db.commit()
         except sqlite3.IntegrityError as exc:
@@ -437,16 +436,17 @@ class ReviewWorkflow:
         return self._public_row(self._owned_row(review_id, user_id))
 
     def edit(self, user_id: str, review_id: str, payload: dict[str, Any]) -> dict[str, Any]:
-        self._owned_row(review_id, user_id)
+        existing = self._owned_row(review_id, user_id)
+        photo = self._updated_photo(existing, payload)
         rating = self._rating(payload.get("rating"))
         title = self._title(payload.get("title"))
         comment = self._comment(payload.get("comment"))
         with self.connect() as db:
             db.execute(
                 """UPDATE product_reviews
-                   SET rating=?,title=?,comment=?,updated_at=?
+                   SET rating=?,title=?,comment=?,photo_webp=?,status='pending',updated_at=?
                    WHERE id=? AND user_id=?""",
-                (rating, title, comment, _now(), review_id, user_id),
+                (rating, title, comment, photo, _now(), review_id, user_id),
             )
             db.commit()
         return self.get_owned(review_id, user_id)
@@ -480,11 +480,13 @@ class ReviewWorkflow:
             # Store reviews must never expose a customer identity. Product
             # reviews predate this endpoint; do not extend that disclosure to
             # a new public store-level index.
-            "userName": "Verified local customer", "rating": row["rating"],
+            "userName": "Verified local customer" if row["order_id"] else "Vibe4You customer", "rating": row["rating"],
             "title": row["title"], "comment": row["comment"],
             "status": self._store_review_api_status(row["status"]),
             "createdAt": row["created_at"], "updatedAt": row["updated_at"],
-            "verifiedPurchase": True,
+            "verifiedPurchase": bool(row["order_id"]),
+            "hasPhoto": bool(row["photo_webp"]),
+            "photoUrl": f"/api/review-photo/{row['id']}" if row["status"] == "published" and row["photo_webp"] else None,
         }
 
     @staticmethod
@@ -502,7 +504,7 @@ class ReviewWorkflow:
         return row["submitted_by_user_id"]
 
     def _store_review_draft(self, payload: Any, *, include_store: bool) -> tuple[str | None, int, str | None, str]:
-        allowed = {"rating", "title", "comment"} | ({"storeId"} if include_store else set())
+        allowed = {"rating", "title", "comment", "photoDataUrl", "removePhoto"} | ({"storeId"} if include_store else set())
         if not isinstance(payload, dict) or set(payload) - allowed:
             raise SecurityError(400, "Invalid local store review fields.", "invalid_store_review")
         return (
@@ -558,27 +560,26 @@ class ReviewWorkflow:
             ).fetchone()
         owner = owner_id == user_id
         return {
-            "eligible": order is not None and not owner,
+            "eligible": not owner,
             "orderId": order.get("id") if order else None,
             "existingReview": self._public_store_row(existing) if existing is not None else None,
-            "reason": "own_store_review_forbidden" if owner else (None if order else "delivered_purchase_required"),
+            "reason": "own_store_review_forbidden" if owner else None,
         }
 
     def create_store(self, payment_store: Any, user_id: str, payload: dict[str, Any]) -> dict[str, Any]:
         store_id, rating, title, comment = self._store_review_draft(payload, include_store=True)
         assert store_id is not None
         order = self._qualifying_store_order(payment_store, user_id, store_id)
-        if order is None:
-            raise SecurityError(403, "Only customers with a delivered purchase can review this local store.", "delivered_purchase_required")
+        photo = self._photo_blob(payload.get("photoDataUrl"))
         review_id, now = f"store_rev_{secrets.token_hex(12)}", _now()
         try:
             with self.connect() as db:
                 if self._store_owner_id(db, store_id) == user_id:
                     raise SecurityError(403, "Store owners cannot review their own local store.", "own_store_review_forbidden")
                 db.execute(
-                    """INSERT INTO store_reviews(id,store_id,user_id,order_id,rating,title,comment,status,created_at,updated_at)
-                       VALUES(?,?,?,?,?,?,?,'pending',?,?)""",
-                    (review_id, store_id, user_id, order["id"], rating, title, comment, now, now),
+                    """INSERT INTO store_reviews(id,store_id,user_id,order_id,rating,title,comment,status,created_at,updated_at,photo_webp)
+                       VALUES(?,?,?,?,?,?,?,'pending',?,?,?)""",
+                    (review_id, store_id, user_id, order["id"] if order else "", rating, title, comment, now, now, photo),
                 )
                 db.commit()
         except sqlite3.IntegrityError as exc:
@@ -591,14 +592,15 @@ class ReviewWorkflow:
         return self._public_store_row(self._store_owned_row(review_id, user_id))
 
     def edit_store(self, user_id: str, review_id: str, payload: dict[str, Any]) -> dict[str, Any]:
-        self._store_owned_row(review_id, user_id)
+        existing = self._store_owned_row(review_id, user_id)
+        photo = self._updated_photo(existing, payload)
         _unused, rating, title, comment = self._store_review_draft(payload, include_store=False)
         with self.connect() as db:
             db.execute(
                 """UPDATE store_reviews
-                   SET rating=?,title=?,comment=?,status='pending',updated_at=?
+                   SET rating=?,title=?,comment=?,photo_webp=?,status='pending',updated_at=?
                    WHERE id=? AND user_id=?""",
-                (rating, title, comment, _now(), review_id, user_id),
+                (rating, title, comment, photo, _now(), review_id, user_id),
             )
             db.commit()
         return self.get_owned_store(review_id, user_id)
@@ -640,3 +642,135 @@ class ReviewWorkflow:
             db.execute("UPDATE store_reviews SET status=?,updated_at=? WHERE id=?", (storage_status, _now(), review_id))
             db.commit()
         return {"id": review_id, "storeId": row["store_id"], "status": target}
+
+    @staticmethod
+    def _migrate_open_reviews(db: sqlite3.Connection) -> None:
+        if db.execute("SELECT 1 FROM review_schema_migrations WHERE version=5").fetchone():
+            return
+        db.execute("BEGIN IMMEDIATE")
+        try:
+            db.execute("""CREATE TABLE product_reviews_open_v5(
+                id TEXT PRIMARY KEY, product_id TEXT NOT NULL,
+                user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                order_id TEXT NOT NULL, rating INTEGER NOT NULL CHECK(rating BETWEEN 1 AND 5),
+                title TEXT, comment TEXT NOT NULL,
+                status TEXT NOT NULL DEFAULT 'pending'
+                  CHECK(status IN ('pending','published','rejected','hidden')),
+                created_at TEXT NOT NULL, updated_at TEXT NOT NULL,
+                UNIQUE(user_id,product_id)
+            )""")
+            db.execute("""INSERT INTO product_reviews_open_v5
+                (id,product_id,user_id,order_id,rating,title,comment,status,created_at,updated_at)
+                SELECT id,product_id,user_id,order_id,rating,title,comment,status,created_at,updated_at
+                FROM product_reviews""")
+            db.execute("DROP TABLE product_reviews")
+            db.execute("ALTER TABLE product_reviews_open_v5 RENAME TO product_reviews")
+            db.execute("CREATE INDEX product_reviews_product_idx ON product_reviews(product_id,status,created_at DESC)")
+            db.execute("CREATE INDEX product_reviews_user_idx ON product_reviews(user_id,created_at DESC)")
+            db.execute("ALTER TABLE product_reviews ADD COLUMN photo_webp BLOB")
+            db.execute("ALTER TABLE store_reviews ADD COLUMN photo_webp BLOB")
+            db.execute("INSERT INTO review_schema_migrations(version,applied_at) VALUES(5,?)", (_now(),))
+            db.commit()
+        except Exception:
+            db.rollback()
+            raise
+
+    @staticmethod
+    def _photo_blob(data: Any) -> bytes | None:
+        """Validate WebP chunks and strip incidental browser ICC color metadata."""
+        import base64
+        import struct
+        if data in (None, ""):
+            return None
+        if not isinstance(data, str) or not data.startswith("data:image/webp;base64,") or len(data) > 250000:
+            raise SecurityError(400, "Choose one photo under 180 KB.", "invalid_review_photo")
+        try:
+            photo = base64.b64decode(data.split(",", 1)[1], validate=True)
+        except (ValueError, __import__("binascii").Error):
+            raise SecurityError(400, "Invalid review photo.", "invalid_review_photo") from None
+        if (len(photo) < 30 or len(photo) > 180000 or photo[:4] != b"RIFF"
+                or photo[8:12] != b"WEBP" or struct.unpack_from("<I", photo, 4)[0] + 8 != len(photo)):
+            raise SecurityError(400, "Invalid WebP review photo.", "invalid_review_photo")
+        position, chunks = 12, []
+        while position < len(photo):
+            if position + 8 > len(photo):
+                raise SecurityError(400, "Malformed WebP photo.", "invalid_review_photo")
+            name = photo[position:position+4]
+            size = struct.unpack_from("<I", photo, position+4)[0]
+            end = position + 8 + size + (size % 2)
+            if end > len(photo):
+                raise SecurityError(400, "Malformed WebP photo.", "invalid_review_photo")
+            chunks.append((name, photo[position+8:position+8+size]))
+            if len(chunks) > 3:
+                raise SecurityError(400, "Unsupported WebP photo.", "invalid_review_photo")
+            position = end
+        names = [name for name, _value in chunks]
+        if names not in ([b"VP8 "], [b"VP8X", b"VP8 "], [b"VP8X", b"ICCP", b"VP8 "]):
+            raise SecurityError(400, "Unsupported WebP photo.", "invalid_review_photo")
+        if names[0] == b"VP8X":
+            flags = chunks[0][1][0] if len(chunks[0][1]) == 10 else 255
+            if flags not in (0, 0x20) or (b"ICCP" in names) != bool(flags & 0x20):
+                raise SecurityError(400, "Unsupported WebP photo metadata.", "invalid_review_photo")
+            if b"ICCP" in names and len(chunks[1][1]) > 16384:
+                raise SecurityError(400, "Unsupported color profile.", "invalid_review_photo")
+        frame = chunks[-1][1]
+        if len(frame) < 10 or frame[3:6] != b"\x9d\x01\x2a":
+            raise SecurityError(400, "Invalid WebP frame.", "invalid_review_photo")
+        width = struct.unpack_from("<H", frame, 6)[0] & 0x3fff
+        height = struct.unpack_from("<H", frame, 8)[0] & 0x3fff
+        if not (1 <= width <= 1600 and 1 <= height <= 1600):
+            raise SecurityError(400, "Review photo dimensions are unsupported.", "invalid_review_photo")
+        # Store a simple WebP with only the VP8 image frame. No customer metadata.
+        padding = b"\0" if len(frame) & 1 else b""
+        chunk = b"VP8 " + struct.pack("<I", len(frame)) + frame + padding
+        return b"RIFF" + struct.pack("<I", len(chunk) + 4) + b"WEBP" + chunk
+
+
+    @classmethod
+    def _updated_photo(cls, existing: sqlite3.Row, payload: dict[str, Any]) -> bytes | None:
+        if payload.get("removePhoto") is True:
+            return None
+        if "photoDataUrl" in payload:
+            return cls._photo_blob(payload["photoDataUrl"])
+        return existing["photo_webp"]
+
+    @staticmethod
+    def _admin_guard(db: sqlite3.Connection, admin_id: str) -> None:
+        if db.execute("SELECT 1 FROM admin_users WHERE id=?", (admin_id,)).fetchone() is None:
+            raise SecurityError(403, "Administrator access is required.", "admin_required")
+
+    def admin_list_product_reviews(self, admin_id: str) -> list[dict[str, Any]]:
+        with self.connect() as db:
+            self._admin_guard(db, admin_id)
+            rows = db.execute("""SELECT r.*,u.name AS user_name,u.email AS user_email
+                FROM product_reviews r JOIN users u ON u.id=r.user_id
+                ORDER BY CASE r.status WHEN 'pending' THEN 0 ELSE 1 END, r.updated_at DESC LIMIT 500""").fetchall()
+        return [{**self._public_row(row),
+            "customerName": self._display_name(row["user_name"]),
+            "customerEmail": row["user_email"]} for row in rows]
+
+    def moderate_product_review(self, admin_id: str, review_id: str, status: Any) -> dict[str, Any]:
+        target = str(status or "").strip().lower()
+        if target not in {"approved","rejected","hidden"}:
+            raise SecurityError(400, "Invalid product review status.", "invalid_review_status")
+        with self.connect() as db:
+            self._admin_guard(db, admin_id)
+            row = db.execute("SELECT id,product_id FROM product_reviews WHERE id=?", (review_id,)).fetchone()
+            if row is None:
+                raise SecurityError(404, "Review not found.", "review_not_found")
+            db.execute("UPDATE product_reviews SET status=?,updated_at=? WHERE id=?",
+                       ("published" if target == "approved" else target, _now(), review_id))
+            db.commit()
+        return {"id": review_id,"productId":row["product_id"],"status":target}
+
+    def review_photo(self, review_id: str, admin_id: str | None = None) -> bytes:
+        if not isinstance(review_id, str) or len(review_id) > 64 or not review_id:
+            raise SecurityError(404, "Photo not found.", "photo_not_found")
+        table = "store_reviews" if review_id.startswith("store_rev_") else "product_reviews"
+        with self.connect() as db:
+            if admin_id is not None:
+                self._admin_guard(db, admin_id)
+            row = db.execute(f"SELECT status,photo_webp FROM {table} WHERE id=?", (review_id,)).fetchone()
+        if row is None or not row["photo_webp"] or (admin_id is None and row["status"] != "published"):
+            raise SecurityError(404, "Photo not found.", "photo_not_found")
+        return row["photo_webp"]

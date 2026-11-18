@@ -37,6 +37,14 @@ test('product images fill fixed cards and the detail viewer is accessible', asyn
   await expect(galleryButton).toBeVisible();
   await expect(galleryButton.locator('img')).toHaveCSS('object-fit', 'contain');
 
+  await page.setViewportSize({ width: 390, height: 844 });
+  await expect(page.getByTestId('desktop-gallery-thumbnails')).toBeHidden();
+  const mobileGalleryBox = await galleryButton.boundingBox();
+  expect(Math.abs((mobileGalleryBox?.width || 0) - (mobileGalleryBox?.height || 0))).toBeLessThanOrEqual(2);
+
+  await page.setViewportSize({ width: 1366, height: 768 });
+  await expect(page.getByTestId('desktop-gallery-thumbnails')).toBeVisible();
+
   await galleryButton.click();
   const viewer = page.getByRole('dialog', { name: /image viewer/i });
   await expect(viewer).toBeVisible();

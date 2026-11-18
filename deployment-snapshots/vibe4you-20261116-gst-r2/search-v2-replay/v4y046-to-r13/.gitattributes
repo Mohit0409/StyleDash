@@ -1,0 +1,4 @@
+live-baseline/** -text whitespace=-blank-at-eol,-blank-at-eof,-space-before-tab,cr-at-eol
+tools/build_v4y056_storefront_hardening.py -text whitespace=-blank-at-eol,-blank-at-eof,-space-before-tab,cr-at-eol
+patched-backend/serve.py -text whitespace=-blank-at-eol,-blank-at-eof,-space-before-tab,cr-at-eol
+replay-manifest.json -text whitespace=-blank-at-eol,-blank-at-eof,-space-before-tab,cr-at-eol

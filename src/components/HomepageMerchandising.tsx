@@ -1,6 +1,9 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowRight, ChevronLeft, ChevronRight, Gem, MapPin, Sparkles, Store, TrendingUp, UserRound, UsersRound, WalletCards, Zap } from 'lucide-react';
+import {
+  ArrowRight, ChevronLeft, ChevronRight, Footprints, Gift, MapPin, Shirt, Smartphone, Sofa, Sparkles, Store,
+  TrendingUp, UserRound, UsersRound, WalletCards, Watch, Zap, type LucideIcon,
+} from 'lucide-react';
 import { StoreImage } from './StoreImage';
 import { HomepageProductSection, HOME_PRODUCT_CARD_WRAP_CLASS } from './HomepageProductSection';
 import { vendorRepository } from '../repositories/vendorRepository';
@@ -13,14 +16,28 @@ interface HomepageMerchandisingProps {
   loading: boolean;
 }
 
+// Every section must name its own icon. A Record keyed by every section id
+// makes TypeScript reject a new section that forgets one, instead of quietly
+// falling back to a generic icon.
+const HOME_SECTION_ICONS: Record<HomeMerchSectionId, LucideIcon> = {
+  express: Zap,
+  new: Sparkles,
+  trending: TrendingUp,
+  under499: WalletCards,
+  women: UsersRound,
+  men: UserRound,
+  clothing: Shirt,
+  footwear: Footprints,
+  accessories: Watch,
+  beauty: Sparkles,
+  electronics: Smartphone,
+  gifts: Gift,
+  home: Sofa,
+};
+
 const iconFor = (id: HomeMerchSectionId) => {
-  if (id === 'express') return <Zap className="h-5 w-5" />;
-  if (id === 'new' || id === 'beauty') return <Sparkles className="h-5 w-5" />;
-  if (id === 'trending') return <TrendingUp className="h-5 w-5" />;
-  if (id === 'under499') return <WalletCards className="h-5 w-5" />;
-  if (id === 'women') return <UsersRound className="h-5 w-5" />;
-  if (id === 'men') return <UserRound className="h-5 w-5" />;
-  return <Gem className="h-5 w-5" />;
+  const Icon = HOME_SECTION_ICONS[id];
+  return <Icon className="h-5 w-5" aria-hidden="true" />;
 };
 const loadingRailClass = 'flex snap-x snap-mandatory gap-3 overflow-x-hidden pb-2 pr-2 sm:gap-4';
 const storeRailClass = 'flex w-full snap-x snap-mandatory gap-4 overflow-x-auto overscroll-x-contain pb-3 pr-4 scroll-smooth sm:gap-5';

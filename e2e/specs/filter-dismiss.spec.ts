@@ -16,8 +16,15 @@ test('mobile filter drawer closes on outside click without closing for filter in
     await expect(page.getByTestId('mobile-filter-backdrop')).toBeVisible();
     expect(await page.evaluate(() => document.body.style.overflow)).toBe('hidden');
 
+    const apply = dialog.getByRole('button', { name: 'Apply Filters', exact: true });
+    await expect(apply).toBeVisible();
+    const applyBox = await apply.boundingBox();
+    expect(applyBox).not.toBeNull();
+    expect(applyBox!.y + applyBox!.height).toBeLessThanOrEqual(viewport.height);
+
     await dialog.getByRole('button', { name: 'men', exact: true }).click();
     await expect(dialog).toBeVisible();
+    await expect(apply).toBeVisible();
 
     await page.mouse.click(viewport.width - 8, Math.min(300, viewport.height - 8));
     await expect(dialog).toHaveCount(0);

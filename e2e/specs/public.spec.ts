@@ -297,6 +297,25 @@ test('global search returns matching local stores', async ({ page }) => {
   await expect(page.getByRole('heading', { name: 'Unapproved Royals', exact: true })).toHaveCount(0);
 });
 
+test('global store search treats NMH as the Neemuch alias', async ({ page }) => {
+  await page.route('**/api/stores/active', route => route.fulfill({
+    status: 200,
+    contentType: 'application/json',
+    body: JSON.stringify({ success: true, stores: [{
+      id: 'store-royals-alias', slug: 'royals-alias', storeName: 'Royals Alias Store',
+      category: 'Clothing & Fashion', address: 'Neemuch', pincode: '458441', city: 'Neemuch',
+      deliveryMinutes: 60, description: 'Local fashion store', active: true, approved: true,
+      createdAt: '2026-01-01T00:00:00Z',
+    }] }),
+  }));
+
+  await page.goto('/products?search=royals%20in%20NMH');
+
+  await expect(page.getByRole('heading', { name: 'Matching Local Stores' })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Visit Royals Alias Store storefront' }))
+    .toHaveAttribute('href', '/store/royals-alias');
+});
+
 test('catalogue browsing does not fetch active stores without search', async ({ page }) => {
   let activeStoreRequests = 0;
   page.on('request', request => {
@@ -338,6 +357,10 @@ test('product detail exposes product social metadata and structured data', async
   expect(jsonLd.name).toBe('Pure Cotton Oversized Graphic Tee');
   expect(jsonLd.offers.priceCurrency).toBe('INR');
   expect(jsonLd.aggregateRating).toBeUndefined();
+  expect(jsonLd.offers.shippingDetails).toBeUndefined();
+  const merchant = JSON.parse(await page.locator('#styledash-merchant-policy-jsonld').textContent() || '{}');
+  expect(merchant['@type']).toBe('Organization');
+  expect(merchant.hasMerchantReturnPolicy.merchantReturnLink).toBe('https://vibe4you.in/returns');
 });
 
 test('robots and sitemap expose only intended public discovery metadata', async ({ request }) => {

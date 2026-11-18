@@ -1,0 +1,13 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "in.vibe4you.app",
+      "sha256_cert_fingerprints": [
+        "14:82:B3:3E:88:8F:F8:0E:AE:06:45:64:E6:17:AE:84:F3:10:0A:74:79:F1:15:22:BA:DE:E0:E8:25:0A:BA:34",
+        "AE:A1:62:7A:CB:7E:6A:1C:CD:E9:2D:CE:37:40:F5:2C:AE:6E:DF:32:63:36:AC:31:1D:DF:53:8A:00:EB:40:C5"
+      ]
+    }
+  }
+]

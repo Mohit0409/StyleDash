@@ -12,6 +12,7 @@ import { productRepository } from '../repositories/productRepository';
 import { vendorRepository } from '../repositories/vendorRepository';
 import { expressCatalogueState } from '../utils/delivery';
 import { availableBrandOptions, availableCategoryOptions, availableSizeOptions, matchesCatalogueProduct } from '../utils/catalogFilters';
+import { scoreProductSearch, scoreStoreSearch } from '../utils/searchEngine';
 
 export const Products: React.FC = () => {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -147,7 +148,8 @@ export const Products: React.FC = () => {
     if (loading) return;
     const nextParams = new URLSearchParams(searchParams);
     let changed = false;
-    if (brand !== 'all' && !brandOptions.includes(brand)) {
+    if (brand !== 'all' && !brandOptions.some(value =>
+      value.localeCompare(brand, undefined, { sensitivity: 'base' }) === 0)) {
       nextParams.delete('brand');
       changed = true;
     }
@@ -161,25 +163,31 @@ export const Products: React.FC = () => {
     }
   }, [brand, brandOptions, loading, searchParams, setSearchParams, size, sizeOptions]);
 
-  const filteredProducts = products.filter(product => matchesCatalogueProduct(product, catalogueFilters));
+  const filteredProducts = useMemo(
+    () => products.filter(product => matchesCatalogueProduct(product, catalogueFilters)),
+    [products, catalogueFilters],
+  );
 
   const matchingStores = searchQuery
-    ? stores.filter(store => {
-        const q = searchQuery.toLowerCase();
-        return [store.storeName, store.category, store.description, store.address, store.city]
-          .some(value => value?.toLowerCase().includes(q));
-      })
+    ? stores.filter(store => scoreStoreSearch(store, searchQuery) !== null)
     : [];
 
-  // Sorting logic
-  const sortedProducts = [...filteredProducts].sort((a, b) => {
-    if (sortBy === 'price-asc') return a.price - b.price;
-    if (sortBy === 'price-desc') return b.price - a.price;
-    if (sortBy === 'rating') return b.rating - a.rating;
-    if (sortBy === 'newest') return (b.newArrival ? 1 : 0) - (a.newArrival ? 1 : 0);
-    if (sortBy === 'discount') return b.discount - a.discount;
-    return 0; // recommended
-  });
+  // Keep all existing sorts and pagination, but rank the recommended search
+  // result list by relevance rather than accidental catalogue insertion order.
+  const sortedProducts = useMemo(() => {
+    const scores = searchQuery.trim()
+      ? new Map(filteredProducts.map(product => [product, scoreProductSearch(product, searchQuery) || 0]))
+      : null;
+    return [...filteredProducts].sort((a, b) => {
+      if (sortBy === 'price-asc') return a.price - b.price;
+      if (sortBy === 'price-desc') return b.price - a.price;
+      if (sortBy === 'rating') return b.rating - a.rating;
+      if (sortBy === 'newest') return (b.newArrival ? 1 : 0) - (a.newArrival ? 1 : 0);
+      if (sortBy === 'discount') return b.discount - a.discount;
+      if (scores) return (scores.get(b) || 0) - (scores.get(a) || 0);
+      return 0;
+    });
+  }, [filteredProducts, searchQuery, sortBy]);
 
   const pagination = useProductPagination(sortedProducts, 24, 'page', !loading, 'catalogue-products');
 
@@ -267,7 +275,8 @@ export const Products: React.FC = () => {
           category={category}
           setCategory={updateCategory}
           categories={categoryOptions}
-          brand={brand}
+          brand={brandOptions.find(value =>
+            value.localeCompare(brand, undefined, { sensitivity: 'base' }) === 0) || brand}
           setBrand={(b) => updateParam('brand', b)}
           brands={brandOptions}
           size={size}

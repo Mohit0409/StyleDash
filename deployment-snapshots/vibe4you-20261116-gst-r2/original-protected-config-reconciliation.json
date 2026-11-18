@@ -1,0 +1,56 @@
+{
+  "schema_version": 1,
+  "reconciled_at": "2026-11-17",
+  "source_audit": "deployment-snapshots/vibe4you-20261116-gst-r2/original-tracked-audit.json",
+  "source_bundle": "protected-policy-and-config",
+  "original_checkout_head": "2c3e6e7bc400502516467869c370264e27d069aa",
+  "inspection_policy": "Compare key names, presence, and equality only. Do not copy or record protected values.",
+  "audited_paths": [
+    ".env.e2e",
+    ".env.example",
+    "AGENTS.md",
+    "server/payment-data/settings.json"
+  ],
+  "file_decisions": [
+    {
+      "path": ".env.e2e",
+      "observed_changed_keys": ["VITE_GA_MEASUREMENT_ID"],
+      "decision": "already-satisfied-do-not-copy-value",
+      "evidence": "The key is present and non-empty in both checkouts and its value compares equal. The value is intentionally omitted from this report."
+    },
+    {
+      "path": ".env.example",
+      "observed_changed_keys": ["VITE_GA_MEASUREMENT_ID", "VITE_META_PIXEL_ID"],
+      "decision": "already-satisfied-by-current-example",
+      "evidence": "The isolated branch already documents both consent-gated public analytics keys. Its current GA example reflects the synchronized public identifier and must not be overwritten by the older placeholder."
+    },
+    {
+      "path": "AGENTS.md",
+      "observed_change": "deleted-in-original-working-tree",
+      "decision": "reject-policy-file-deletion",
+      "evidence": "Repository operating instructions are policy, not application source. Removing them from the synchronization branch would discard active safety and workflow constraints."
+    },
+    {
+      "path": "server/payment-data/settings.json",
+      "observed_changed_paths": ["gst.principalPlace"],
+      "decision": "reject-runtime-setting-value",
+      "evidence": "The dirty value differs from the isolated branch. A GST principal-place value is deployment/runtime configuration and cannot be selected from an unverified dirty checkout. Neither value is recorded in this report."
+    }
+  ],
+  "already_satisfied_without_port": [
+    ".env.e2e",
+    ".env.example"
+  ],
+  "source_files_ported": [],
+  "source_files_rejected": [
+    "AGENTS.md",
+    "server/payment-data/settings.json"
+  ],
+  "protected_values_recorded": false,
+  "supersedes_disposition": {
+    "from": "manual-review-do-not-copy-values",
+    "to": "reconciled-no-protected-value-port"
+  },
+  "production_claim": "No environment, GST, payment, database, service, or production setting was changed or inferred.",
+  "result": "PASS"
+}

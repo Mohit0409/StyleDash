@@ -72,16 +72,20 @@ class ReviewWorkflowTests(unittest.TestCase):
             callback()
         self.assertEqual(caught.exception.code, code)
 
-    def test_review_requires_delivered_purchase(self) -> None:
+    def test_signed_in_unverified_product_review_is_private_until_approved(self) -> None:
         self.add_order(status='placed')
         eligibility = self.reviews.eligibility(self.payment_store, self.user['id'], 'sd-prod-001')
-        self.assertFalse(eligibility['eligible'])
-        self.assert_security_code(
-            'delivered_purchase_required',
-            lambda: self.reviews.create(self.payment_store, self.user['id'], {
-                'productId': 'sd-prod-001', 'rating': 5, 'comment': 'Great product',
-            }),
-        )
+        self.assertTrue(eligibility['eligible'])
+        self.assertIsNone(eligibility['orderId'])
+        review = self.reviews.create(self.payment_store, self.user['id'], {
+            'productId': 'sd-prod-001', 'rating': 5, 'comment': 'Great product',
+        })
+        self.assertFalse(review['verifiedPurchase'])
+        self.assertEqual(review['status'], 'pending')
+        self.assertEqual(self.reviews.list_product('sd-prod-001')['reviewCount'], 0)
+        self.assertEqual(self.reviews.admin_list_product_reviews(self.admin['id'])[0]['id'], review['id'])
+        self.reviews.moderate_product_review(self.admin['id'], review['id'], 'approved')
+        self.assertEqual(self.reviews.list_product('sd-prod-001')['reviewCount'], 1)
 
     def test_verified_review_create_summary_edit_delete(self) -> None:
         self.add_order()
@@ -93,6 +97,9 @@ class ReviewWorkflowTests(unittest.TestCase):
         })
         self.assertTrue(created['verifiedPurchase'])
         self.assertEqual(created['userName'], 'Review C.')
+        self.assertEqual(created['status'], 'pending')
+        self.assertEqual(self.reviews.list_product('sd-prod-001')['reviewCount'], 0)
+        self.reviews.moderate_product_review(self.admin['id'], created['id'], 'approved')
 
         summary = self.reviews.list_product('sd-prod-001')
         self.assertEqual(summary['rating'], 5.0)
@@ -106,6 +113,9 @@ class ReviewWorkflowTests(unittest.TestCase):
         })
         self.assertEqual(updated['rating'], 4)
         self.assertIsNone(updated['title'])
+        self.assertEqual(updated['status'], 'pending')
+        self.assertEqual(self.reviews.summaries(['sd-prod-001'])['sd-prod-001']['reviewCount'], 0)
+        self.reviews.moderate_product_review(self.admin['id'], created['id'], 'approved')
         self.assertEqual(self.reviews.summaries(['sd-prod-001'])['sd-prod-001']['rating'], 4.0)
 
         self.reviews.delete(self.user['id'], created['id'])
@@ -136,12 +146,18 @@ class ReviewWorkflowTests(unittest.TestCase):
             lambda: self.reviews.delete(self.other['id'], created['id']),
         )
 
-    def test_payment_test_order_does_not_grant_review_eligibility(self) -> None:
+    def test_payment_test_order_never_grants_verified_purchase_status(self) -> None:
         self.add_order()
         self.payment_store.state['orders']['order-1']['isPaymentTestOrder'] = True
-        self.assertFalse(
-            self.reviews.eligibility(self.payment_store, self.user['id'], 'sd-prod-001')['eligible']
-        )
+        eligibility = self.reviews.eligibility(self.payment_store, self.user['id'], 'sd-prod-001')
+        self.assertTrue(eligibility['eligible'])
+        self.assertIsNone(eligibility['orderId'])
+        created = self.reviews.create(self.payment_store, self.user['id'], {
+            'productId': 'sd-prod-001', 'rating': 4, 'comment': 'A review without verified purchase',
+        })
+        self.assertFalse(created['verifiedPurchase'])
+        self.assertEqual(created['status'], 'pending')
+        self.assertEqual(self.reviews.list_product('sd-prod-001')['reviewCount'], 0)
 
     def test_verified_store_review_create_summary_edit_delete(self) -> None:
         self.add_order(store_id=self.store['id'])
@@ -207,7 +223,9 @@ class ReviewWorkflowTests(unittest.TestCase):
                    FROM store_reviews_current"""
             )
             db.execute('DROP TABLE store_reviews_current')
-            db.execute('DELETE FROM review_schema_migrations WHERE version IN (3, 4)')
+            # Simulate an original v2 database before both moderation and
+            # v5 photo/open-review migrations, not an already-v5 database.
+            db.execute('DELETE FROM review_schema_migrations WHERE version IN (3, 4, 5)')
             db.commit()
         upgraded = ReviewWorkflow(self.security.path)
         summary = upgraded.list_store(self.store['id'])
@@ -239,7 +257,8 @@ class ReviewWorkflowTests(unittest.TestCase):
                    FROM store_reviews_current"""
             )
             db.execute('DROP TABLE store_reviews_current')
-            db.execute('DELETE FROM review_schema_migrations WHERE version=4')
+            # Simulate a v3 database; v5 photo schema is not installed yet.
+            db.execute('DELETE FROM review_schema_migrations WHERE version IN (4, 5)')
             db.commit()
         upgraded = ReviewWorkflow(self.security.path)
         with upgraded.connect() as db:
@@ -278,14 +297,25 @@ class ReviewWorkflowTests(unittest.TestCase):
         self.assertEqual(summary['reviewCount'], 2)
         self.assertEqual({item['status'] for item in summary['reviews']}, {'approved'})
 
-    def test_store_review_requires_delivered_order_and_blocks_idor_and_owner(self) -> None:
+    def test_unverified_store_review_is_private_and_blocks_idor_and_owner(self) -> None:
         payload = {'storeId': self.store['id'], 'rating': 5, 'comment': 'Review without delivery'}
-        self.assert_security_code('delivered_purchase_required', lambda: self.reviews.create_store(self.payment_store, self.user['id'], payload))
-        self.add_order(store_id=self.store['id'])
         created = self.reviews.create_store(self.payment_store, self.user['id'], payload)
-        self.assert_security_code('store_review_not_found', lambda: self.reviews.edit_store(self.other['id'], created['id'], {'rating': 1, 'comment': 'Cross-account edit'}))
+        self.assertFalse(created['verifiedPurchase'])
+        self.assertEqual(created['status'], 'pending')
+        self.assertEqual(self.reviews.list_store(self.store['id'])['reviewCount'], 0)
+        self.assert_security_code(
+            'store_review_not_found',
+            lambda: self.reviews.edit_store(self.other['id'], created['id'], {
+                'rating': 1, 'comment': 'Cross-account edit',
+            }),
+        )
         self.add_order(user_id=self.owner['id'], store_id=self.store['id'], order_id='owner-order')
-        self.assert_security_code('own_store_review_forbidden', lambda: self.reviews.create_store(self.payment_store, self.owner['id'], {'storeId': self.store['id'], 'rating': 5, 'comment': 'Owner review attempt'}))
+        self.assert_security_code(
+            'own_store_review_forbidden',
+            lambda: self.reviews.create_store(self.payment_store, self.owner['id'], {
+                'storeId': self.store['id'], 'rating': 5, 'comment': 'Owner review attempt',
+            }),
+        )
 
     def test_store_review_rejects_unsupported_fields(self) -> None:
         self.add_order(store_id=self.store['id'])
@@ -293,6 +323,72 @@ class ReviewWorkflowTests(unittest.TestCase):
             self.payment_store, self.user['id'],
             {'storeId': self.store['id'], 'rating': 5, 'comment': 'A valid comment', 'userId': self.other['id']},
         ))
+
+
+    def test_v5_migration_adds_private_photo_columns(self) -> None:
+        with self.reviews.connect() as db:
+            versions = {row['version'] for row in db.execute(
+                'SELECT version FROM review_schema_migrations'
+            )}
+            product_cols = {row['name'] for row in db.execute(
+                'PRAGMA table_info(product_reviews)'
+            )}
+            store_cols = {row['name'] for row in db.execute(
+                'PRAGMA table_info(store_reviews)'
+            )}
+        self.assertTrue({3, 4, 5}.issubset(versions))
+        self.assertIn('photo_webp', product_cols)
+        self.assertIn('photo_webp', store_cols)
+
+    def test_synthetic_webp_photo_private_until_moderated_and_after_edit(self) -> None:
+        import base64
+        # Original 2x2 test-only WebP image; no real user photo.
+        image_data_url = 'data:image/webp;base64,UklGRiQAAABXRUJQVlA4IBgAAAAwAQCdASoCAAIAAkA4JaQAA3AA/vucwAA='
+        expected_photo = base64.b64decode(image_data_url.split(',', 1)[1])
+        self.add_order()
+        created = self.reviews.create(self.payment_store, self.user['id'], {
+            'productId': 'sd-prod-001', 'rating': 5,
+            'comment': 'Small synthetic photo privacy test.',
+            'photoDataUrl': image_data_url,
+        })
+        self.assertEqual(created['status'], 'pending')
+        self.assertTrue(created['hasPhoto'])
+        self.assertIsNone(created['photoUrl'])
+        self.assertEqual(self.reviews.list_product('sd-prod-001')['reviewCount'], 0)
+        self.assert_security_code('photo_not_found', lambda:
+            self.reviews.review_photo(created['id']))
+        self.assertEqual(
+            self.reviews.review_photo(created['id'], admin_id=self.admin['id']),
+            expected_photo,
+        )
+        self.reviews.moderate_product_review(self.admin['id'], created['id'], 'approved')
+        public = self.reviews.list_product('sd-prod-001')
+        self.assertEqual(public['reviewCount'], 1)
+        self.assertEqual(public['reviews'][0]['photoUrl'], '/api/review-photo/' + created['id'])
+        self.assertEqual(self.reviews.review_photo(created['id']), expected_photo)
+        modified = self.reviews.edit(self.user['id'], created['id'], {
+            'rating': 4, 'title': 'Updated privately',
+            'comment': 'Editing hides the review and its photo again.',
+        })
+        self.assertEqual(modified['status'], 'pending')
+        self.assertIsNone(modified['photoUrl'])
+        self.assertEqual(self.reviews.list_product('sd-prod-001')['reviewCount'], 0)
+        self.assert_security_code('photo_not_found', lambda:
+            self.reviews.review_photo(created['id']))
+
+    def test_invalid_review_photo_is_rejected_before_database_write(self) -> None:
+        self.add_order()
+        for value in ('data:image/jpeg;base64,AA==',
+                      'data:image/webp;base64,***',
+                      'data:image/webp;base64,AA=='):
+            with self.subTest(value=value[:25]):
+                self.assert_security_code('invalid_review_photo', lambda:
+                    self.reviews.create(self.payment_store, self.user['id'], {
+                        'productId': 'sd-prod-001', 'rating': 5,
+                        'comment': 'Reject malformed image upload.',
+                        'photoDataUrl': value,
+                    }))
+        self.assertEqual(self.reviews.list_product('sd-prod-001')['reviewCount'], 0)
 
 
 if __name__ == '__main__':

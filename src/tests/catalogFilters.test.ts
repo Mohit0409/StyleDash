@@ -113,6 +113,14 @@ describe('catalogue dynamic facets', () => {
     ]);
   });
 
+  it('treats NMH and Neemuch as equivalent local-search aliases', () => {
+    expect(products.filter(product => matchesCatalogueProduct(product, baseFilters({ searchQuery: 'footwear in nmh' }))).map(product => product.id))
+      .toEqual(['goutam-men', 'campus-men']);
+    expect(products.filter(product => matchesCatalogueProduct(product, baseFilters({ searchQuery: 'neemuch perfume' }))).map(product => product.id))
+      .toEqual(['beauty-perfume']);
+    expect(products.filter(product => matchesCatalogueProduct(product, baseFilters({ searchQuery: 'nmh' })))).toHaveLength(4);
+  });
+
   it('matches category metadata case-insensitively and supports canonical tag aliases', () => {
     const tagged = makeProduct({
       id: 'tagged-slider',

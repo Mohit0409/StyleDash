@@ -1,4 +1,5 @@
 import type { Product } from '../types';
+import { parseSearchQuery, scoreProductSearch } from './searchEngine';
 
 export interface CatalogueFilterState {
   department: string;
@@ -20,15 +21,8 @@ interface MatchOptions {
 
 const matchesSearch = (product: Product, searchQuery: string): boolean => {
   if (!searchQuery.trim()) return true;
-  const query = searchQuery.trim().toLocaleLowerCase();
-  return (
-    product.name.toLocaleLowerCase().includes(query)
-    || product.brand.toLocaleLowerCase().includes(query)
-    || product.category.toLocaleLowerCase().includes(query)
-    || (product.subcategory?.toLocaleLowerCase().includes(query) ?? false)
-    || product.tags.some(tag => tag.toLocaleLowerCase().includes(query))
-    || (product.storeName?.toLocaleLowerCase().includes(query) ?? false)
-  );
+  const query = parseSearchQuery(searchQuery);
+  return query.tokens.length === 0 || scoreProductSearch(product, query) !== null;
 };
 
 const equalCatalogueValue = (left: string | undefined, right: string): boolean =>
@@ -77,10 +71,31 @@ export const availableCategoryOptions = (
     .map(product => product.category),
 );
 
+/** Canonicalize display labels only; never alter persisted product brand values. */
+export const canonicalBrandOptions = (brands: string[]): string[] => {
+  const groups = new Map<string, Map<string, number>>();
+  for (const brand of brands) {
+    const label = (brand || '').trim();
+    if (!label) continue;
+    const key = label.normalize('NFKC').toLocaleLowerCase('en-IN');
+    const variants = groups.get(key) || new Map<string, number>();
+    variants.set(label, (variants.get(label) || 0) + 1);
+    groups.set(key, variants);
+  }
+  const stylePreference = (label: string): number =>
+    label !== label.toUpperCase() && label[0] === label[0].toUpperCase() ? 1 : 0;
+  return [...groups.values()]
+    .map(variants => [...variants]
+      .sort(([a, countA], [b, countB]) =>
+        countB - countA || stylePreference(b) - stylePreference(a)
+        || a.localeCompare(b, undefined, { sensitivity: 'variant' }))[0][0])
+    .sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base', numeric: true }));
+};
+
 export const availableBrandOptions = (
   products: Product[],
   filters: CatalogueFilterState,
-): string[] => uniqueSorted(
+): string[] => canonicalBrandOptions(
   products
     .filter(product => matchesCatalogueProduct(product, filters, { ignoreBrand: true }))
     .map(product => product.brand),
