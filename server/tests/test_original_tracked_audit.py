@@ -70,6 +70,12 @@ CATALOG_SELLER_RECONCILIATION = (
     / "vibe4you-20261116-gst-r2"
     / "original-catalog-seller-reconciliation.json"
 )
+PRODUCT_PRESENTATION_RECONCILIATION = (
+    ROOT
+    / "deployment-snapshots"
+    / "vibe4you-20261116-gst-r2"
+    / "original-product-presentation-reconciliation.json"
+)
 
 
 class OriginalTrackedAuditTests(unittest.TestCase):
@@ -103,6 +109,9 @@ class OriginalTrackedAuditTests(unittest.TestCase):
         )
         cls.catalog_seller_reconciliation = json.loads(
             CATALOG_SELLER_RECONCILIATION.read_text(encoding="utf-8")
+        )
+        cls.product_presentation_reconciliation = json.loads(
+            PRODUCT_PRESENTATION_RECONCILIATION.read_text(encoding="utf-8")
         )
 
     def test_inventory_is_complete_and_non_overlapping(self) -> None:
@@ -478,6 +487,40 @@ class OriginalTrackedAuditTests(unittest.TestCase):
         self.assertIn("administrator review", invariants)
         self.assertEqual(
             "reconciled-selective-seller-label-port",
+            reconciliation["supersedes_disposition"]["to"],
+        )
+        self.assertEqual("PASS", reconciliation["result"])
+
+    def test_product_presentation_reconciliation_covers_the_whole_audit_bundle(self) -> None:
+        bundle = next(
+            item
+            for item in self.audit["bundles"]
+            if item["id"] == "product-presentation-and-store-detail"
+        )
+        reconciliation = self.product_presentation_reconciliation
+        self.assertEqual(set(bundle["paths"]), set(reconciliation["audited_paths"]))
+        self.assertEqual(5, len(reconciliation["file_decisions"]))
+
+    def test_product_presentation_reconciliation_limits_untracked_admission(self) -> None:
+        reconciliation = self.product_presentation_reconciliation
+        self.assertEqual(
+            {"src/components/VariantSelector.tsx", "src/pages/ProductDetail.tsx"},
+            set(reconciliation["source_files_ported"]),
+        )
+        self.assertEqual(
+            {"src/utils/productPresentation.ts", "src/tests/productPresentation.test.ts"},
+            set(reconciliation["reviewed_untracked_dependencies_admitted"]),
+        )
+        self.assertEqual(
+            {"src/components/ProductAssurances.tsx", "src/services/ecommerceAnalytics.ts"},
+            set(reconciliation["untracked_dependencies_not_admitted"]),
+        )
+        invariants = " ".join(reconciliation["presentation_invariants"])
+        self.assertIn("single generic variant", invariants)
+        self.assertIn("keyboard, swipe, focus-return, and scroll-lock", invariants)
+        self.assertIn("without verification", invariants)
+        self.assertEqual(
+            "reconciled-selective-product-presentation-port",
             reconciliation["supersedes_disposition"]["to"],
         )
         self.assertEqual("PASS", reconciliation["result"])
